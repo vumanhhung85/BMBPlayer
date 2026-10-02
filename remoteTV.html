@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Điều khiển nhạc</title>
+<script>
+  /* Trang điều khiển TV = nhac.html ở chế độ ?mode=remote (giữ các tham số khác như ?room=...) */
+  location.replace('./nhac.html?mode=remote' + (location.search ? '&' + location.search.slice(1) : ''));
+</script>
+</head>
+<body style="background:#0a0a0f;color:#f2f2f7;font-family:sans-serif;padding:24px">
+  <a href="./nhac.html?mode=remote" style="color:#c084fc">Mở trang điều khiển</a>
+</body>
+</html>

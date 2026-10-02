@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>BMB Remote — Tìm bài YouTube</title>
+<style>
+  :root{ --bg:#0a0a0f; --panel:#15151f; --line:#2a2a3a; --ink:#f2f2f7; --quiet:#9a9ab0; --accent:#8b5cf6; --accent2:#c084fc; --good:#34d399; --warn:#fbbf24; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg); color:var(--ink); font-family:-apple-system,"Segoe UI",Roboto,Arial,sans-serif; min-height:100vh; display:flex; flex-direction:column}
+  header{padding:12px 16px; background:linear-gradient(135deg,#1a1530,#0a0a0f); border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; position:sticky; top:0; z-index:10}
+  .logo{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,var(--accent),var(--accent2)); display:flex;align-items:center;justify-content:center;font-weight:800}
+  header .room{margin-left:auto; background:var(--accent); font-size:12px; font-weight:700; padding:3px 10px; border-radius:999px}
+  #gear{background:none; border:1px solid var(--line); color:var(--ink); border-radius:10px; padding:6px 10px; font-size:14px}
+
+  #now{padding:10px 16px; background:#120f1f; border-bottom:1px solid var(--line); font-size:14px}
+  #now .lbl{color:var(--quiet); font-size:12px} #now .t{font-weight:700; margin-top:2px}
+
+  #settings{display:none; padding:12px 16px; background:var(--panel); border-bottom:1px solid var(--line); font-size:13px; line-height:1.6}
+  #settings input{width:100%; background:#0e0e16; border:1px solid var(--line); color:var(--ink); border-radius:10px; padding:10px; font-size:14px; margin:6px 0}
+  #settings button{background:var(--accent); border:none; color:#fff; font-weight:700; border-radius:10px; padding:8px 14px; margin-top:4px}
+  #settings .hint{color:var(--quiet)}
+
+  .tabs{display:flex; border-bottom:1px solid var(--line)}
+  .tabs button{flex:1; background:none; border:none; color:var(--quiet); padding:12px; font-size:15px; font-weight:600; border-bottom:2px solid transparent}
+  .tabs button.on{color:var(--ink); border-bottom-color:var(--accent)}
+
+  #searchBox{display:flex; gap:8px; padding:12px 16px}
+  #searchBox input{flex:1; background:var(--panel); border:1px solid var(--line); color:var(--ink); border-radius:12px; padding:12px 14px; font-size:16px}
+  #searchBox button{background:var(--accent); border:none; color:#fff; font-weight:700; border-radius:12px; padding:0 18px; font-size:15px}
+  #detect{display:none; gap:8px; padding:0 16px 8px; flex-wrap:wrap}
+  #detect button, .secAct button{background:var(--accent); border:none; color:#fff; font-weight:700; border-radius:10px; padding:8px 12px; font-size:13px}
+  .secAct button.ghost{background:#20202e; border:1px solid var(--line)}
+  .opt{padding:0 16px 6px; color:var(--quiet); font-size:13px; display:flex; align-items:center; gap:8px; line-height:1.4}
+
+  .list{flex:1; overflow:auto; padding:0 16px 190px}
+  .secHead{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:14px 0 6px; font-size:14px}
+  .secAct{display:flex; gap:6px; flex:0 0 auto}
+  .hint{color:var(--quiet); font-size:12px; padding:0 0 6px; line-height:1.5}
+  .row{display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--line)}
+  .row img{width:96px; height:54px; object-fit:cover; border-radius:8px; background:#20202e; flex:0 0 auto}
+  .row .meta{flex:1; min-width:0}
+  .row .name{font-weight:600; font-size:14px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden}
+  .row .sub{color:var(--quiet); font-size:12px; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .row button{background:var(--accent); border:none; color:#fff; font-weight:700; border-radius:10px; padding:9px 12px; font-size:13px; flex:0 0 auto}
+  .row button.ghost{background:#20202e; border:1px solid var(--line)}
+  .row.cur{background:#1b1530}
+  .msg{color:var(--quiet); text-align:center; padding:26px 0; line-height:1.6}
+  .err{color:#fecdd3}
+
+  #dock{position:fixed; left:0; right:0; bottom:0; background:var(--panel); border-top:1px solid var(--line); padding:10px 12px calc(10px + env(safe-area-inset-bottom)); display:flex; flex-direction:column; gap:8px}
+  .ctrlRow{display:flex; gap:8px; align-items:center}
+  .ctrlRow button{flex:1; background:#20202e; border:1px solid var(--line); color:var(--ink); border-radius:12px; padding:12px 6px; font-size:14px; font-weight:600}
+  .ctrlRow button.primary{background:linear-gradient(135deg,var(--accent),var(--accent2)); border:none}
+  .vol{display:flex; align-items:center; gap:10px; background:#0e0e16; border:1px solid var(--line); border-radius:12px; padding:8px 12px}
+  .vol label{color:var(--quiet); font-size:12px} .vol input{flex:1}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">B</div><b>BMB Remote</b> <span style="color:var(--quiet);font-size:12px">YouTube nhúng</span>
+  <div class="room" id="roomTag">PHÒNG</div>
+  <button id="gear" aria-label="Cài đặt">⚙</button>
+</header>
+
+<div id="settings">
+  <b>Kết nối tới Worker</b> (khoá YouTube nằm trong Worker, không cần dán vào đây)
+  <input type="url" id="apiInput" placeholder="https://nhac-playlist.ten-cua-ban.workers.dev" autocomplete="off">
+  <input type="password" id="passInput" placeholder="Mật khẩu truy cập (APP_PASS)" autocomplete="off">
+  <button id="saveKey">Lưu</button> <button id="clearKey" style="background:#20202e;border:1px solid var(--line)">Xoá</button>
+  <div class="hint" style="margin-top:8px">
+    Hai thông tin này chỉ lưu trong trình duyệt của thiết bị này. Đổi khoá YouTube sau này chỉ cần đổi secret <code>YT_KEY</code> trong Worker, không phải sửa ở đây.<br>
+    Hạn mức mặc định mỗi dự án: <b>100 lượt tìm YouTube mỗi ngày</b> (tính riêng) và <b>10.000 đơn vị/ngày</b> cho các lệnh khác, dùng chung với mọi trang cùng Worker.
+    Thêm bài bằng link, nạp playlist và làm mới danh mục chỉ tốn khoảng 1 đơn vị mỗi lần.
+    Hạn mức reset lúc nửa đêm giờ Thái Bình Dương (khoảng 14h–15h giờ Việt Nam).
+  </div>
+</div>
+
+<div id="now"><div class="lbl">Đang hát</div><div class="t" id="nowTitle">—</div></div>
+
+<div class="tabs">
+  <button id="tabSearch" class="on">Tìm bài</button>
+  <button id="tabQueue">Hàng chờ (<span id="qCount">0</span>)</button>
+</div>
+
+<div id="paneSearch">
+  <div id="searchBox">
+    <input id="q" type="search" placeholder="Tên bài, ca sĩ hoặc dán link YouTube…" autocomplete="off" enterkeyhint="go">
+    <button id="goBtn">Tìm</button>
+  </div>
+  <div id="detect"></div>
+  <div class="opt"><input type="checkbox" id="kw" checked><label for="kw">Tự thêm chữ “karaoke” khi tìm trên YouTube</label></div>
+  <div class="opt" id="quotaLine"></div>
+  <div class="opt" id="plBox" style="gap:6px;flex-wrap:wrap">
+    <label for="plSel" style="white-space:nowrap">Playlist đã lưu:</label>
+    <select id="plSel" style="flex:1;min-width:120px;padding:8px;border-radius:8px;background:#14141c;color:inherit;border:1px solid var(--line)"><option value="">(chưa tải)</option></select>
+    <button id="plOpen">Mở</button>
+    <button id="plReload" class="ghost" title="Tải lại danh sách">↻</button>
+  </div>
+  <div class="list">
+    <div id="results"></div>
+    <div id="localSec"></div>
+  </div>
+</div>
+
+<div id="paneQueue" style="display:none"><div class="list" id="queueList"></div></div>
+
+<div id="dock">
+  <div class="ctrlRow">
+    <button class="primary" id="playBtn">▶ Phát/Dừng</button>
+    <button id="replayBtn">↺ Hát lại</button>
+    <button id="nextBtn">⏭ Bài kế</button>
+    <button id="muteBtn">🔊</button>
+  </div>
+  <div class="vol"><label>Âm lượng</label><input type="range" id="vol" min="0" max="100" value="100"></div>
+</div>
+
+<script>
+const params = new URLSearchParams(location.search);
+const ROOM = (params.get('room') || 'P1').toUpperCase();
+const bc = new BroadcastChannel('bmb-yt-' + ROOM);
+const $ = id => document.getElementById(id);
+const API_NAME = 'np_api', PASS_NAME = 'np_pass';          // dùng chung tên với nhac.html: nếu cùng địa chỉ trang thì chỉ cần nhập một lần
+const CAT_KEY = 'bmb_yt_catalog_v1';
+const COUNT_KEY = 'bmb_yt_search_count';
+const DAY = 86400000, MAX_AGE = 30 * DAY, REFRESH_AGE = 20 * DAY, MAX_CAT = 500;
+$('roomTag').textContent = 'PHÒNG ' + ROOM;
+
+const send = (action, extra) => bc.postMessage({ type:'cmd', payload:Object.assign({action}, extra||{}) });
+
+/* ---------- Tiện ích ---------- */
+function el(tag, cls, text){ const e = document.createElement(tag); if(cls) e.className = cls; if(text != null) e.textContent = text; return e; }
+function btn(label, cls, fn){ const b = el('button', cls, label); b.onclick = fn; return b; }
+const nd = s => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').replace(/Đ/g,'D').toLowerCase();
+const decode = s => new DOMParser().parseFromString(s || '', 'text/html').documentElement.textContent;
+const safeThumb = u => /^https:\/\/[\w.-]*ytimg\.com\//.test(u || '') ? u : '';
+const norm = it => ({ id:it.id, title:decode(it.title), channel:decode(it.channel), thumb:safeThumb(it.thumb) });
+const lsGet = k => { try{ return localStorage.getItem(k); }catch(e){ return null; } };
+const lsSet = (k, v) => { try{ localStorage.setItem(k, v); }catch(e){} };
+
+/* ---------- Kết nối Worker ---------- */
+try{ localStorage.removeItem('bmb_yt_api_key'); }catch(e){}   // bản cũ từng lưu khoá YouTube trong trình duyệt: không còn cần nữa
+const DEFAULT_API = 'https://nhac-playlist.vumanhhung85.workers.dev';
+let cfg = { api: lsGet(API_NAME) || DEFAULT_API, pass: lsGet(PASS_NAME) || '' };
+const hasCfg = () => !!(cfg.api && cfg.pass);
+$('gear').onclick = () => { const s = $('settings'); if(s.style.display !== 'block'){ $('apiInput').value = cfg.api; $('passInput').value = cfg.pass; } s.style.display = s.style.display === 'block' ? 'none' : 'block'; };
+$('saveKey').onclick = () => {
+  cfg.api = $('apiInput').value.trim().replace(/\/+$/, ''); cfg.pass = $('passInput').value;
+  lsSet(API_NAME, cfg.api); lsSet(PASS_NAME, cfg.pass);
+  $('settings').style.display = 'none'; msg('Đã lưu kết nối. Nhập tên bài hoặc dán link để bắt đầu.'); autoRefresh(); loadPlaylistNames(true);
+};
+$('clearKey').onclick = () => { try{ localStorage.removeItem(API_NAME); localStorage.removeItem(PASS_NAME); }catch(e){} cfg = { api:DEFAULT_API, pass:'' }; $('apiInput').value = DEFAULT_API; $('passInput').value = ''; msg('Đã xoá thông tin kết nối.'); };
+if(!hasCfg()) $('settings').style.display = 'block';
+function needConfig(){ $('apiInput').value = cfg.api; $('passInput').value = cfg.pass; $('settings').style.display = 'block'; msg('Cần nhập địa chỉ Worker và mật khẩu (nút ⚙).', true); }
+
+async function api(path){
+  if(!hasCfg()){ needConfig(); const e = new Error('Chưa cấu hình kết nối'); e.reason = 'noconfig'; throw e; }
+  const res = await fetch(cfg.api + path, { headers:{ 'x-pass': cfg.pass } });
+  let data = {}; try{ data = await res.json(); }catch(e){}
+  if(!res.ok){ const e = new Error(data.error || ('Lỗi ' + res.status)); e.status = res.status; e.reason = data.reason || ''; throw e; }
+  return data;
+}
+function showApiError(e){
+  if(!e || e.reason === 'noconfig') return;
+  if(e.status === 401){ needConfig(); return msg('Sai mật khẩu hoặc địa chỉ Worker.', true); }
+  if(e.reason === 'origin') return msg('Worker từ chối địa chỉ trang này. Thêm ' + location.origin + ' vào biến ALLOWED_ORIGINS của Worker.', true);
+  if(e.reason === 'quotaExceeded'){ setCount(100); return msg('Hết lượt tìm hôm nay (100 lượt/ngày). Vẫn dùng được danh mục, link và playlist. Hạn mức reset khoảng 14h–15h giờ Việt Nam.', true); }
+  if(e.reason === 'notEmbeddable') return msg('Chủ video không cho phép phát nhúng nên player không phát được video này.', true);
+  if(e instanceof TypeError) return msg('Không kết nối được tới Worker (mạng, địa chỉ sai hoặc bị chặn CORS).', true);
+  msg(e.message || 'Có lỗi xảy ra', true);
+}
+
+/* ---------- Danh mục riêng (lưu trên trình duyệt này) ----------
+   Theo điều khoản YouTube, dữ liệu lấy từ API chỉ được lưu tối đa 30 ngày rồi phải xoá hoặc làm mới.
+   Vì vậy: mục nào quá 30 ngày bị xoá; mục quá 20 ngày được làm mới tự động (1 đơn vị cho mỗi 50 bài). */
+function loadCat(){
+  try{
+    const a = JSON.parse(lsGet(CAT_KEY) || '[]');
+    return (Array.isArray(a) ? a : []).filter(x => x && /^[\w-]{11}$/.test(x.id || '') && Date.now() - (+x.fetchedAt || 0) < MAX_AGE)
+      .map(x => ({ id:x.id, title:String(x.title||'').slice(0,200), channel:String(x.channel||'').slice(0,100), thumb:safeThumb(x.thumb),
+                   fetchedAt:+x.fetchedAt, lastUsed:+x.lastUsed || +x.fetchedAt }));
+  }catch(e){ return []; }
+}
+let catalog = loadCat();
+function saveCat(){ lsSet(CAT_KEY, JSON.stringify(catalog)); }
+function upsert(it, fresh){
+  const now = Date.now(); const i = catalog.findIndex(x => x.id === it.id);
+  if(i >= 0 && !fresh){ catalog[i].lastUsed = now; saveCat(); return; }   // bài lấy từ danh mục: không làm mới "tuổi" dữ liệu
+  const rec = { id:it.id, title:String(it.title||'').slice(0,200), channel:String(it.channel||'').slice(0,100), thumb:safeThumb(it.thumb), fetchedAt:now, lastUsed:now };
+  if(i >= 0) catalog[i] = rec; else catalog.push(rec);
+  if(catalog.length > MAX_CAT){ catalog.sort((a,b) => b.lastUsed - a.lastUsed); catalog = catalog.slice(0, MAX_CAT); }
+  saveCat();
+}
+function removeFromCat(id){ catalog = catalog.filter(x => x.id !== id); saveCat(); renderLocal(); }
+function clearCatalog(){ if(!confirm('Xoá toàn bộ danh mục bài đã lưu trên máy này?')) return; catalog = []; saveCat(); renderLocal(); }
+
+/* ---------- Đếm lượt tìm trong ngày (ước tính trên máy này) ---------- */
+const pacificDay = () => new Intl.DateTimeFormat('en-CA', { timeZone:'America/Los_Angeles' }).format(new Date());
+function getCount(){ try{ const o = JSON.parse(lsGet(COUNT_KEY) || '{}'); return o.d === pacificDay() ? (+o.n || 0) : 0; }catch(e){ return 0; } }
+function setCount(n){ lsSet(COUNT_KEY, JSON.stringify({ d:pacificDay(), n })); showQuota(); }
+function showQuota(){ $('quotaLine').textContent = 'Lượt tìm YouTube hôm nay (ước tính trên máy này): ' + getCount() + '/100 · dán link, nạp playlist, làm mới danh mục gần như không tốn.'; }
+
+/* ---------- Nhận diện link YouTube ---------- */
+function parseYT(input){
+  const out = { vid:null, list:null }; const s = (input || '').trim();
+  if(!s || /\s/.test(s)) return out;
+  try{
+    const u = new URL(/^https?:\/\//i.test(s) ? s : 'https://' + s);
+    const h = u.hostname.replace(/^(www|m|music)\./, '');
+    if(h === 'youtu.be') out.vid = u.pathname.slice(1).split('/')[0];
+    else if(h === 'youtube.com'){
+      if(u.pathname === '/watch') out.vid = u.searchParams.get('v');
+      else if(/^\/(shorts|embed|live)\//.test(u.pathname)) out.vid = u.pathname.split('/')[2];
+      out.list = u.searchParams.get('list');
+    }
+  }catch(e){}
+  if(out.vid && !/^[\w-]{11}$/.test(out.vid)) out.vid = null;
+  if(out.list && !/^[\w-]{10,64}$/.test(out.list)) out.list = null;
+  return out;
+}
+
+/* ---------- Hiển thị ---------- */
+function msg(text, err){ const b = $('results'); b.replaceChildren(); b.append(el('div', 'msg' + (err ? ' err' : ''), text)); }
+function rowEl(it, actions){
+  const row = el('div', 'row');
+  const img = document.createElement('img'); img.alt = ''; img.loading = 'lazy'; if(it.thumb) img.src = it.thumb;
+  const meta = el('div', 'meta'); meta.append(el('div', 'name', it.title), el('div', 'sub', it.channel || ''));
+  row.append(img, meta); actions.forEach(a => row.append(a)); return row;
+}
+function addToQueue(it, fresh){ send('add', { id:it.id, title:it.title }); upsert(it, fresh); if(fresh) renderLocal(); }
+function addBtn(it, fresh){
+  const b = el('button', null, '＋ Chọn');
+  b.onclick = () => { addToQueue(it, fresh); b.textContent = '✓ Đã thêm'; setTimeout(() => b.textContent = '＋ Chọn', 1200); };
+  return b;
+}
+function renderResults(items, title, extra){
+  const box = $('results'); box.replaceChildren();
+  const head = el('div', 'secHead'); head.append(el('b', null, title));
+  const act = el('span', 'secAct'); if(extra) act.append(extra); act.append(btn('Đóng', 'ghost', () => box.replaceChildren())); head.append(act);
+  box.append(head);
+  if(!items.length){ box.append(el('div', 'msg', 'Không có kết quả phù hợp.')); return; }
+  items.forEach(it => box.append(rowEl(it, [addBtn(it, true)])));
+}
+function renderLocal(){
+  const box = $('localSec'); box.replaceChildren();
+  const raw = $('q').value.trim(); const p = parseYT(raw);
+  const q = (p.vid || p.list) ? '' : nd(raw);
+  const list = catalog.filter(x => !q || nd(x.title).includes(q) || nd(x.channel).includes(q)).sort((a,b) => b.lastUsed - a.lastUsed);
+  const head = el('div', 'secHead'); head.append(el('b', null, 'Danh mục của tôi (' + catalog.length + ')'));
+  const act = el('span', 'secAct'); act.append(btn('Làm mới', 'ghost', () => refreshCatalog(true)), btn('Xoá hết', 'ghost', clearCatalog));
+  head.append(act); box.append(head);
+  box.append(el('div', 'hint', 'Lưu trên trình duyệt này. Tự làm mới mỗi 20 ngày và tự xoá mục quá 30 ngày (theo quy định lưu dữ liệu của YouTube).'));
+  if(!catalog.length){ box.append(el('div', 'msg', 'Danh mục trống. Bài nào anh chọn sẽ được lưu ở đây để lần sau không cần tìm lại.')); return; }
+  if(!list.length){ box.append(el('div', 'msg', 'Không có bài nào trong danh mục khớp từ khoá. Bấm Tìm để tìm trên YouTube.')); return; }
+  list.slice(0, 40).forEach(it => box.append(rowEl(it, [addBtn(it, false), btn('✕', 'ghost', () => removeFromCat(it.id))])));
+  if(list.length > 40) box.append(el('div', 'hint', '…còn ' + (list.length - 40) + ' bài nữa, gõ từ khoá để lọc.'));
+}
+function updateDetect(){
+  const d = $('detect'); d.replaceChildren();
+  const p = parseYT($('q').value);
+  $('goBtn').textContent = (p.vid || p.list) ? 'Thêm' : 'Tìm';
+  if(p.vid) d.append(btn('＋ Thêm bài từ link', null, () => addByLink(p.vid)));
+  if(p.list) d.append(btn('≡ Nạp playlist', null, () => loadPlaylist(p.list)));
+  d.style.display = (p.vid || p.list) ? 'flex' : 'none';
+}
+
+/* ---------- Thêm bài bằng link ---------- */
+async function addByLink(vid){
+  if(!hasCfg()) return needConfig();
+  msg('Đang đọc thông tin video…');
+  try{
+    const item = norm((await api('/api/video?id=' + vid)).item);
+    addToQueue(item, true);
+    $('q').value = ''; updateDetect(); renderLocal();
+    msg('Đã thêm vào hàng chờ: ' + item.title);
+  }catch(e){ showApiError(e); }
+}
+
+/* ---------- Nạp playlist ---------- */
+async function loadPlaylist(list){
+  if(!hasCfg()) return needConfig();
+  msg('Đang nạp playlist…');
+  try{
+    const d = await api('/api/import?list=' + list);
+    const items = (d.items || []).map(norm);
+    const addAll = btn('＋ Thêm tất cả', null, () => {
+      if(items.length > 50 && !confirm('Thêm ' + items.length + ' bài vào hàng chờ?')) return;
+      items.forEach(it => { send('add', { id:it.id, title:it.title }); upsert(it, true); });
+      renderLocal(); msg('Đã thêm ' + items.length + ' bài vào hàng chờ.');
+    });
+    renderResults(items, 'Playlist: ' + items.length + ' bài phát nhúng được' + (d.skipped ? ' (bỏ ' + d.skipped + ' bài không phát được)' : ''), addAll);
+  }catch(e){ showApiError(e); }
+}
+
+/* ---------- Playlist đã lưu trên D1 (cùng dữ liệu với nhac.html) ---------- */
+const PL_KEY = 'bmb_yt_last_pl';
+async function loadPlaylistNames(quiet){
+  if(!hasCfg()){ if(!quiet) needConfig(); return; }
+  try{
+    const d = await api('/api/playlists');
+    const sel = $('plSel'), keep = sel.value || lsGet(PL_KEY) || '';
+    sel.replaceChildren();
+    (d.playlists || []).forEach(p => { const o = document.createElement('option'); o.value = p.name; o.textContent = p.name + ' (' + p.count + ')'; sel.append(o); });
+    if(!sel.options.length){ const o = document.createElement('option'); o.value = ''; o.textContent = '(chưa có playlist)'; sel.append(o); }
+    if([...sel.options].some(o => o.value === keep)) sel.value = keep;
+  }catch(e){ if(!quiet) showApiError(e); }
+}
+async function openSavedPlaylist(){
+  const name = $('plSel').value; if(!name) return msg('Chưa có playlist nào để mở.', true);
+  if(!hasCfg()) return needConfig();
+  lsSet(PL_KEY, name); msg('Đang mở playlist “' + name + '”…');
+  try{
+    const d = await api('/api/playlist?name=' + encodeURIComponent(name));
+    const all = (d.items || []), items = all.filter(v => !v.unavailable && v.embeddable !== false).map(norm);
+    const skipped = all.length - items.length;
+    const addAll = btn('＋ Thêm tất cả', null, () => {
+      if(items.length > 50 && !confirm('Thêm ' + items.length + ' bài vào hàng chờ?')) return;
+      items.forEach(it => { send('add', { id:it.id, title:it.title }); upsert(it, true); });
+      renderLocal(); msg('Đã thêm ' + items.length + ' bài từ “' + name + '” vào hàng chờ.');
+    });
+    renderResults(items, 'Playlist “' + name + '”: ' + items.length + ' bài' + (skipped ? ' (bỏ ' + skipped + ' bài không phát được)' : ''), addAll);
+  }catch(e){ showApiError(e); }
+}
+$('plOpen').onclick = openSavedPlaylist; $('plReload').onclick = () => loadPlaylistNames(false);
+$('plSel').addEventListener('change', () => lsSet(PL_KEY, $('plSel').value));
+
+/* ---------- Làm mới danh mục ---------- */
+async function refreshCatalog(manual){
+  if(!catalog.length){ if(manual) msg('Danh mục trống, không có gì để làm mới.'); return; }
+  if(!hasCfg()){ if(manual) needConfig(); return; }
+  try{
+    const ids = catalog.map(x => x.id), m = {};
+    for(let i = 0; i < ids.length; i += 50){
+      const d = await api('/api/videos?ids=' + ids.slice(i, i + 50).join(','));
+      (d.items || []).forEach(v => { m[v.id] = v; });
+    }
+    const now = Date.now(); const before = catalog.length;
+    catalog = catalog.filter(x => m[x.id] && m[x.id].embeddable).map(x => {
+      const v = norm(m[x.id]); return Object.assign(x, { title:v.title, channel:v.channel, thumb:v.thumb, fetchedAt:now }); });
+    saveCat(); renderLocal();
+    if(manual) msg('Đã làm mới danh mục' + (before > catalog.length ? ' (bỏ ' + (before - catalog.length) + ' bài không còn phát được).' : '.'));
+  }catch(e){ if(manual) showApiError(e); }
+}
+function autoRefresh(){ if(hasCfg() && catalog.some(x => Date.now() - x.fetchedAt > REFRESH_AGE)) refreshCatalog(false); }
+
+/* ---------- Tìm trên YouTube (100 lượt/ngày) ---------- */
+const cache = new Map();
+async function search(){
+  const raw = $('q').value.trim(); if(!raw) return;
+  if(!hasCfg()) return needConfig();
+  const term = ($('kw').checked && !/karaoke/i.test(raw)) ? raw + ' karaoke' : raw;
+  if(cache.has(term)){ renderResults(cache.get(term), 'Kết quả YouTube (đã lưu tạm, không tốn lượt tìm)'); return; }
+  msg('Đang tìm…');
+  try{
+    const d = await api('/api/search?q=' + encodeURIComponent(term));
+    setCount(getCount() + 1);
+    const items = (d.items || []).map(norm);
+    cache.set(term, items); renderResults(items, 'Kết quả YouTube');
+  }catch(e){ showApiError(e); }
+}
+
+/* ---------- Ô nhập thông minh: link bài → thêm; link playlist → nạp; còn lại → tìm ---------- */
+function go(){
+  const p = parseYT($('q').value);
+  if(p.vid) return addByLink(p.vid);
+  if(p.list) return loadPlaylist(p.list);
+  return search();
+}
+$('goBtn').onclick = go;
+$('q').addEventListener('keydown', e => { if(e.key === 'Enter') go(); });
+$('q').addEventListener('input', () => { updateDetect(); renderLocal(); });
+
+/* ---------- Tabs ---------- */
+function tab(which){
+  $('paneSearch').style.display = which === 'search' ? '' : 'none';
+  $('paneQueue').style.display = which === 'queue' ? '' : 'none';
+  $('tabSearch').classList.toggle('on', which === 'search'); $('tabQueue').classList.toggle('on', which === 'queue');
+}
+$('tabSearch').onclick = () => tab('search'); $('tabQueue').onclick = () => tab('queue');
+
+/* ---------- Điều khiển ---------- */
+$('playBtn').onclick = () => send('play'); $('nextBtn').onclick = () => send('next');
+$('replayBtn').onclick = () => send('replay'); $('muteBtn').onclick = () => send('mute');
+let volTimer; $('vol').oninput = e => { clearTimeout(volTimer); const v = +e.target.value; volTimer = setTimeout(() => send('vol', { value:v }), 80); };
+
+/* ---------- Nhận trạng thái ---------- */
+bc.onmessage = ev => {
+  const m = ev.data || {}; if(m.type !== 'state') return;
+  const s = m.payload || {};
+  $('nowTitle').textContent = s.nowTitle || '—';
+  $('playBtn').textContent = s.playing ? '⏸ Dừng' : '▶ Phát';
+  $('muteBtn').textContent = s.muted ? '🔇' : '🔊';
+  if(typeof s.volume === 'number') $('vol').value = s.volume;
+  const q = s.queue || []; $('qCount').textContent = q.length;
+  const box = $('queueList'); box.replaceChildren();
+  if(!q.length){ box.append(el('div', 'msg', 'Hàng chờ trống.')); return; }
+  q.forEach((it, i) => {
+    const row = el('div', 'row' + (i === s.cur ? ' cur' : ''));
+    const meta = el('div', 'meta');
+    meta.append(el('div', 'name', (i + 1) + '. ' + it.title), el('div', 'sub', i === s.cur ? 'Đang hát' : (i < s.cur ? 'Đã hát' : 'Chờ')));
+    row.append(meta);
+    if(i > s.cur) row.append(btn('↑ Ưu tiên', 'ghost', () => send('prio', { index:i })));
+    row.append(btn('✕', 'ghost', () => send('remove', { index:i })));
+    box.append(row);
+  });
+};
+
+/* ---------- Khởi động ---------- */
+showQuota(); updateDetect(); renderLocal(); autoRefresh(); loadPlaylistNames(true);
+send('hello');
+</script>
+</body>
+</html>
