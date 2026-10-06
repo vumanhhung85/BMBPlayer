@@ -73,10 +73,10 @@
 
 <div id="settings">
   <b>Kết nối tới Worker</b> (khoá YouTube nằm trong Worker, không cần dán vào đây)
-  <input type="url" id="apiInput" placeholder="https://nhac-playlist.ten-cua-ban.workers.dev" autocomplete="off">
+  <input type="url" id="apiInput" value="https://nhac-playlist.vumanhhung85.workers.dev" placeholder="https://nhac-playlist.vumanhhung85.workers.dev" autocomplete="off">
   <input type="password" id="passInput" placeholder="Mật khẩu truy cập (APP_PASS)" autocomplete="off">
   <b>Kho karaoke</b> (Worker kho-karaoke, dùng chung mật khẩu ở trên)
-  <input type="url" id="khoInput" placeholder="https://kho-karaoke.ten-cua-ban.workers.dev" autocomplete="off">
+  <input type="url" id="khoInput" value="https://kho-karaoke.vumanhhung85.workers.dev" placeholder="https://kho-karaoke.vumanhhung85.workers.dev" autocomplete="off">
   <button id="saveKey">Lưu</button> <button id="clearKey" style="background:#20202e;border:1px solid var(--line)">Xoá</button>
   <div class="hint" style="margin-top:8px">
     Hai thông tin này chỉ lưu trong trình duyệt của thiết bị này. Đổi khoá YouTube sau này chỉ cần đổi secret <code>YT_KEY</code> trong Worker, không phải sửa ở đây.<br>
@@ -163,8 +163,9 @@ $('saveKey').onclick = () => {
   $('settings').style.display = 'none'; msg('Đã lưu kết nối. Nhập tên bài hoặc dán link để bắt đầu.'); autoRefresh(); loadPlaylistNames(true); hotCache = null; quota = null; showQuota(); renderKho();
 };
 $('clearKey').onclick = () => { try{ localStorage.removeItem(API_NAME); localStorage.removeItem(PASS_NAME); localStorage.removeItem(KHO_NAME); }catch(e){} cfg = { api:DEFAULT_API, pass:'', kho:DEFAULT_KHO }; $('apiInput').value = DEFAULT_API; $('passInput').value = ''; $('khoInput').value = DEFAULT_KHO; msg('Đã xoá thông tin kết nối.'); };
+$('apiInput').value = cfg.api; $('khoInput').value = cfg.kho;     // địa chỉ Worker điền sẵn, chỉ cần nhập mật khẩu
 if(!hasCfg()) $('settings').style.display = 'block';
-function needConfig(){ $('apiInput').value = cfg.api; $('passInput').value = cfg.pass; $('settings').style.display = 'block'; msg('Cần nhập địa chỉ Worker và mật khẩu (nút ⚙).', true); }
+function needConfig(){ $('apiInput').value = cfg.api; $('khoInput').value = cfg.kho; $('passInput').value = cfg.pass; $('settings').style.display = 'block'; msg(cfg.api ? 'Nhập mật khẩu truy cập rồi bấm Lưu.' : 'Cần nhập địa chỉ Worker và mật khẩu (nút ⚙).', true); }
 
 async function api(path){
   if(!hasCfg()){ needConfig(); const e = new Error('Chưa cấu hình kết nối'); e.reason = 'noconfig'; throw e; }
