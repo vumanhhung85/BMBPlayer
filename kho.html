@@ -47,6 +47,17 @@
   th, td{text-align:left; padding:6px 4px; border-bottom:1px solid var(--line); vertical-align:top}
   th{color:var(--quiet); font-weight:600; font-size:12px}
   td.n{text-align:right; white-space:nowrap}
+  h3{font-size:14px; margin:16px 0 4px; display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+  h3 .sp{margin-left:auto}
+  textarea.links{min-height:76px}
+  .pill.pl{background:#14304a; color:#7dd3fc} .pill.star{background:#3a2f12; color:var(--warn)}
+  .warn{color:var(--warn)}
+  .card{background:#0e0e16; border:1px solid var(--line); border-radius:12px; padding:10px; margin-top:8px}
+  .card .row{padding:0; border:none}
+  .card .samples{background:#15151f}
+  details{margin-top:12px} summary{cursor:pointer; color:var(--quiet); font-size:13px}
+  button.star{background:#20202e; border:1px solid var(--line); color:var(--quiet)} button.star.on{background:#3a2f12; border-color:#6b5520; color:var(--warn)}
+  .chk{display:inline-flex; align-items:center; gap:5px; font-size:13px; color:var(--ink)}
   @media (max-width:560px){ .row{flex-wrap:wrap} .row .acts{max-width:100%; justify-content:flex-start} .hide-sm{display:none} }
 </style>
 </head>
@@ -79,17 +90,34 @@
   <div class="hint err" id="cronWarn" style="display:none"></div>
   <div class="hint err" id="keyWarn" style="display:none"></div>
   <div class="hint err" id="writeWarn" style="display:none"></div>
+  <div class="hint err" id="lagWarn" style="display:none"></div>
   <pre id="last">—</pre>
 </section>
 
 <section>
-  <h2>Kênh karaoke nguồn</h2>
-  <div class="line"><input id="chInput" placeholder="Dán link kênh: youtube.com/@ten-kenh hoặc youtube.com/channel/UC…"><button id="chAdd">＋ Thêm kênh</button></div>
-  <div class="line"><input id="sgInput" value="karaoke" placeholder="Từ khoá tìm kênh"><button class="ghost" id="sgBtn">Gợi ý kênh (tốn 1 lượt tìm)</button></div>
-  <div id="suggest"></div>
+  <h2>Nguồn karaoke: kênh &amp; playlist <button class="ghost sp" id="reloadCh">↻</button></h2>
+  <textarea id="chInput" class="links" placeholder="Dán link kênh hoặc playlist, mỗi dòng một link&#10;youtube.com/@ten-kenh&#10;youtube.com/playlist?list=PL…"></textarea>
+  <div class="line"><button id="chPreview">🔍 Xem trước</button><button class="ghost" id="chAdd">＋ Thêm ngay</button>
+    <span class="hint">Xem trước ≈ 3 đơn vị/link, không tốn lượt tìm, chưa lưu gì vào kho. Kênh hỗn hợp (ca sĩ, nhiều loại video) thì dán link playlist karaoke của kênh thay vì cả kênh.</span></div>
+  <div id="preview"></div>
+
+  <h3>Gợi ý từ kho <span class="hint">không tốn lượt tìm</span></h3>
+  <div class="hint">Kênh chưa thêm nhưng đã có bản karaoke vào kho (qua tìm YouTube, tìm bài hot, dán link). Xếp theo lượt anh chọn, rồi số bài kho chỉ có từ kênh đó.</div>
+  <div id="discover"><div class="hint">Đang tải…</div></div>
+  <details><summary>Tìm kênh trên YouTube (tốn 1 lượt tìm/lần)</summary>
+    <div class="line"><input id="sgInput" value="karaoke" placeholder="Từ khoá tìm kênh"><button class="ghost" id="sgBtn">Tìm kênh</button></div>
+    <div id="suggest"></div>
+  </details>
+
+  <h3>Nguồn đang dùng <select id="chSort" class="sp">
+    <option value="added">Thứ tự thêm</option><option value="uniq">Bài riêng: ít → nhiều</option>
+    <option value="picks">Lượt chọn: nhiều → ít</option><option value="star">⭐ trước</option></select></h3>
   <div id="channels"><div class="hint">Đang tải…</div></div>
   <div class="hint" style="margin-top:8px">
-    <b>Kiểu tiêu đề</b>: hầu hết kênh đặt “Karaoke <i>Tên bài</i> – Ca sĩ” (Tên bài trước). Nếu kênh đặt “Ca sĩ – <i>Tên bài</i> | Karaoke”, bấm <b>Xem mẫu</b> để kiểm tra rồi đổi sang <b>Ca sĩ trước</b>, kho sẽ gom bài lại cho đúng.
+    <b>Bài riêng</b> = số bài kho CHỈ có từ nguồn đó. Nguồn đã quét hết mà bài riêng gần 0 thì chỉ thêm bản trùng, có thể tắt để đỡ lượt quét.
+    <b>⭐ Tin dùng</b>: khi các bản của cùng một bài hoà lượt chọn, bản của nguồn ⭐ được đưa lên trước (kênh nhỏ ít lượt xem không bị chìm).
+    <b>Nhịp kiểm</b>: nguồn đã quét hết được kiểm bài mới mỗi ngày nếu vừa đăng trong 14 ngày, 3 ngày nếu trong 60 ngày, 7 ngày nếu lâu hơn; playlist 3 ngày.
+    <b>Kiểu tiêu đề</b>: hầu hết kênh đặt “Karaoke <i>Tên bài</i> – Ca sĩ”. Nếu kênh đặt “Ca sĩ – <i>Tên bài</i>”, bấm <b>Xem mẫu</b> rồi đổi sang <b>Ca sĩ trước</b>.
   </div>
 </section>
 
@@ -114,6 +142,7 @@ const lsSet = (k, v) => { try{ localStorage.setItem(k, v); }catch(e){} };
 const DEFAULT_KHO = 'https://kho-karaoke.vumanhhung85.workers.dev';
 let cfg = { kho: lsGet('kho_api') || DEFAULT_KHO, pass: lsGet('np_pass') || '' };
 const fmt = n => (+n || 0).toLocaleString('vi-VN');
+const until = t => { const m = Math.round((t - Date.now()) / 60000); return m <= 0 ? 'đến hạn' : m < 60 ? 'sau ' + m + ' phút' : m < 1440 ? 'sau ' + Math.round(m / 60) + ' giờ' : 'sau ' + Math.round(m / 1440) + ' ngày'; };
 const ago = t => { if(!t) return 'chưa'; const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'vừa xong' : m < 60 ? m + ' phút trước' : m < 1440 ? Math.round(m / 60) + ' giờ trước' : Math.round(m / 1440) + ' ngày trước'; };
 
 $('gear').onclick = () => { const s = $('settings'); $('khoInput').value = cfg.kho; $('passInput').value = cfg.pass; s.style.display = s.style.display === 'none' ? '' : 'none'; };
@@ -139,7 +168,11 @@ function showReport(r){
   if(!r){ $('last').textContent = '—'; return; }
   const parts = [(JOB[r.job] || r.job) + ' · ' + ago(r.at)];
   if(r.idle) parts.push('không có việc cần làm' + (r.reason ? ' (' + r.reason + ')' : ''));
-  if(r.channel) parts.push('kênh “' + r.channel + '” (' + r.mode + '): ' + r.pages + ' trang, ' + r.seen + ' video, thêm ' + r.added + ', bỏ ' + r.rejected + (r.done ? ', đã xong' : ', còn tiếp'));
+  if(r.job === 'scan' && r.list){
+    parts.push('Quét ' + r.sources + ' nguồn: ' + r.pages + ' trang, ' + r.seen + ' video, thêm ' + r.added + ', bỏ ' + r.rejected);
+    r.list.forEach(x => parts.push('  • ' + (x.k === 'playlist' ? '[PL] ' : '') + x.t + ' (' + x.m + '): ' + x.p + ' trang, +' + x.a + (x.d ? '' : ', còn tiếp') + (x.e ? ' — ' + x.e : '')));
+    if(r.sources > r.list.length) parts.push('  … và ' + (r.sources - r.list.length) + ' nguồn khác');
+  } else if(r.channel) parts.push('kênh “' + r.channel + '” (' + r.mode + '): ' + r.pages + ' trang, ' + r.seen + ' video, thêm ' + r.added + ', bỏ ' + r.rejected + (r.done ? ', đã xong' : ', còn tiếp'));
   if(r.refreshed != null) parts.push('làm mới ' + r.refreshed + ', gỡ ' + r.removed + ' bài không còn phát được, xoá ' + r.purged + ' bài quá 30 ngày');
   if(r.trending != null) parts.push(r.trending + ' bài thịnh hành, ghép được ' + r.matched + ', bảng hot ' + r.hotSongs + ' bài');
   if(r.job === 'rehot') parts.push('ghép được ' + r.matched + ' bài, bảng hot ' + r.hotSongs + ' bài');
@@ -160,7 +193,8 @@ async function loadStats(){
   try{
     const s = await api('/api/kho/stats');
     const g = $('stats'); g.replaceChildren();
-    [['Bản karaoke', fmt(s.videos)], ['Bài (đã gom)', fmt(s.songs)], ['Kênh đang bật', s.channelsOn + '/' + s.channels], ['Bài hot', s.hotSongs],
+    [['Bản karaoke', fmt(s.videos)], ['Bài (đã gom)', fmt(s.songs)], ['Nguồn đang bật', s.channelsOn + '/' + s.channels + (s.playlists ? ' (' + s.playlists + ' PL)' : '')],
+     ['Chờ quét toàn bộ', s.pendingFull || 0], ['Đến hạn kiểm', s.dueNow || 0], ['Bài hot', s.hotSongs],
      ['Hot chờ tìm', s.hotPending], ['Lượt chọn 30 ngày', fmt(s.picks30)], ['Đơn vị hôm nay', fmt(s.unitsToday) + '/' + fmt(s.budget)],
      ['Tìm tự động', s.searchesToday + '/' + s.hotSearchPerDay], ['Bài hot cập nhật', ago(s.hotAt)],
      ['Dòng ghi D1 hôm nay', s.writeLimit ? fmt(s.writesToday) + '/' + fmt(s.writeLimit) : '—'], ['Khoá YouTube', keyLabel(s.keys)]]
@@ -189,6 +223,11 @@ async function loadStats(){
         '). Khi chạm trần kho tự dừng ghi tới ngày mới. Nếu không phải đang quét kênh lớn thì có thể Worker đang lỗi ghi lặp — báo em kiểm tra.';
       ww.style.display = '';
     } else ww.style.display = 'none';
+    const lw = $('lagWarn');
+    if(s.late > 0){
+      lw.textContent = '⚠ ' + s.late + ' nguồn trễ hạn kiểm bài mới hơn 3 ngày (trễ nhất ' + ago(s.oldestDue) + '). Thường do quá nhiều nguồn so với số lượt chạy, hoặc hết đơn vị mỗi ngày. Bấm ⚡ Quét nhanh để kiểm bù; nếu lặp lại thì tắt bớt nguồn có “bài riêng” thấp.';
+      lw.style.display = '';
+    } else lw.style.display = 'none';
   }catch(e){ fail('stats', e); }
 }
 async function runJob(job, b){
@@ -202,66 +241,178 @@ $('runAuto').onclick = () => runJob('auto');
 document.querySelectorAll('[data-job]').forEach(b => b.onclick = () => runJob(b.dataset.job));
 $('reloadStats').onclick = loadStats;
 
-/* ---------- Kênh ---------- */
+/* ---------- Nguồn (kênh & playlist) ---------- */
+let chData = [], chSort = lsGet('kho_chsort') || 'added';
+$('chSort').value = chSort;
+$('chSort').onchange = () => { chSort = $('chSort').value; lsSet('kho_chsort', chSort); renderChannels(); };
+const ytLink = c => c.kind === 'playlist' ? 'https://www.youtube.com/playlist?list=' + c.id : 'https://www.youtube.com/channel/' + c.id;
 async function loadChannels(){
   try{
-    const d = await api('/api/kho/channels'), box = $('channels'); box.replaceChildren();
-    if(!d.channels.length){ box.append(el('div', 'hint', 'Chưa có kênh nào. Dán link kênh karaoke ở trên hoặc bấm Gợi ý kênh.')); return; }
-    d.channels.forEach(c => {
+    const d = await api('/api/kho/channels');
+    chData = d.channels; renderChannels(); renderDiscover(d.discover || []);
+  }catch(e){ fail('channels', e); }
+}
+function renderChannels(){
+  const box = $('channels'); box.replaceChildren();
+  if(!chData.length){ box.append(el('div', 'hint', 'Chưa có nguồn nào. Dán link kênh/playlist karaoke ở trên, hoặc thêm từ Gợi ý từ kho.')); return; }
+  const list = chData.slice();
+  if(chSort === 'uniq') list.sort((a, b) => (a.fullDone ? 0 : 1) - (b.fullDone ? 0 : 1) || (a.uniq || 0) - (b.uniq || 0) || (a.picks30 || 0) - (b.picks30 || 0));
+  else if(chSort === 'picks') list.sort((a, b) => (b.picks30 || 0) - (a.picks30 || 0) || (b.uniq || 0) - (a.uniq || 0));
+  else if(chSort === 'star') list.sort((a, b) => (b.star ? 1 : 0) - (a.star ? 1 : 0) || (a.addedAt || 0) - (b.addedAt || 0));
+  list.forEach(c => {
+    const row = el('div', 'row'), meta = el('div', 'meta');
+    const name = el('div', 'name'), a = el('a', null, (c.star ? '⭐ ' : '') + c.title);
+    a.href = ytLink(c); a.target = '_blank'; a.rel = 'noopener'; a.style.color = 'inherit';
+    name.append(a); if(c.handle) name.append(document.createTextNode('  ' + (c.kind === 'playlist' ? '· ' : '') + c.handle));
+    const st = el('div', 'sub');
+    st.append(el('span', 'pill ' + (c.enabled ? 'on' : 'off'), c.enabled ? 'Bật' : 'Tắt'));
+    if(c.kind === 'playlist') st.append(el('span', 'pill pl', 'Playlist'));
+    st.append(el('span', 'pill ' + (c.fullDone ? '' : 'run'), c.fullDone ? 'Đã quét hết' : 'Đang quét toàn bộ'));
+    const l1 = el('div', 'sub');
+    l1.append(document.createTextNode(fmt(c.videos) + ' bản · ' + fmt(c.songs) + ' bài · '), el('b', null, fmt(c.uniq) + ' bài riêng'),
+      document.createTextNode(' · ' + fmt(c.picks30) + ' lượt chọn 30 ngày'));
+    const l2 = el('div', 'sub', fmt(c.ytCount) + ' video trên ' + (c.kind === 'playlist' ? 'playlist' : 'kênh') +
+      ' · bài mới nhất ' + (c.newestAt ? ago(c.newestAt) : '—') + ' · ' + (c.fullDone ? (c.enabled ? 'kiểm bài mới ' + until(c.nextScan) : 'đã tắt') : 'quét lần đầu ' + ago(c.lastScan)));
+    meta.append(name, st, l1, l2);
+    if(c.fullDone && c.videos > 0 && !c.uniq && !c.picks30) meta.append(el('div', 'sub warn', 'Không có bài riêng, chưa được chọn — nguồn này chỉ thêm bản trùng.'));
+    if(c.note) meta.append(el('div', 'sub err', c.note));
+    const acts = el('div', 'acts');
+    const sb = btn(c.star ? '⭐ Tin dùng' : '☆ Tin dùng', 'star' + (c.star ? ' on' : ''), async () => {
+      sb.disabled = true;
+      try{ await api('/api/kho/channel/update', { id:c.id, star:!c.star }); c.star = !c.star; renderChannels(); }catch(e){ alert(e.message); sb.disabled = false; }
+    });
+    const sel = document.createElement('select');
+    [['song', 'Tên bài trước'], ['artist', 'Ca sĩ trước']].forEach(([v, t]) => { const o = document.createElement('option'); o.value = v; o.textContent = t; sel.append(o); });
+    sel.value = c.order;
+    sel.onchange = async () => { try{ await api('/api/kho/channel/update', { id:c.id, order:sel.value }); c.order = sel.value; showSamples(); }catch(e){ alert(e.message); } };
+    const showSamples = async () => {
+      let s = meta.querySelector('.samples'); if(!s){ s = el('div', 'samples'); meta.append(s); }
+      s.replaceChildren(el('div', null, 'Đang tải…'));
+      try{
+        const r = await api('/api/kho/channel/samples?id=' + encodeURIComponent(c.id));
+        s.replaceChildren();
+        if(!r.items.length) s.append(el('div', null, 'Chưa có bài nào trong kho từ nguồn này.'));
+        r.items.forEach(x => { const d2 = el('div'); d2.append(document.createTextNode(x.title + '  →  '), el('b', null, x.song_key)); s.append(d2); });
+      }catch(e){ s.replaceChildren(el('div', 'err', e.message)); }
+    };
+    acts.append(sb, sel,
+      btn('Xem mẫu', 'ghost', showSamples),
+      btn(c.enabled ? 'Tắt' : 'Bật', 'ghost', async () => { try{ await api('/api/kho/channel/update', { id:c.id, enabled:!c.enabled }); loadChannels(); loadStats(); }catch(e){ alert(e.message); } }),
+      btn('Quét lại', 'ghost', async () => { if(!confirm('Quét lại toàn bộ “' + c.title + '”? Chỉ tốn khoảng 1 đơn vị cho mỗi 50 video.')) return; try{ await api('/api/kho/channel/update', { id:c.id, rescan:true }); loadChannels(); }catch(e){ alert(e.message); } }),
+      btn('Xoá', 'danger', async () => {
+        if(!confirm('Xoá “' + c.title + '” khỏi danh sách nguồn?')) return;
+        const purge = confirm('Xoá luôn ' + fmt(c.videos) + ' bản của nguồn này khỏi kho?\nOK = xoá cả bản · Huỷ = giữ bản, chỉ ngừng quét');
+        try{ await api('/api/kho/channel/remove', { id:c.id, purge }); loadChannels(); loadStats(); }catch(e){ alert(e.message); }
+      }));
+    row.append(meta, acts); box.append(row);
+  });
+}
+function renderDiscover(items){
+  const box = $('discover'); box.replaceChildren();
+  if(!items.length){ box.append(el('div', 'hint', 'Chưa có gợi ý. Gợi ý xuất hiện khi kênh chưa thêm có từ 3 bản trong kho, hoặc có bản được chọn hát.')); return; }
+  items.forEach(x => {
+    const row = el('div', 'row'), meta = el('div', 'meta');
+    const a = el('a', null, x.title || x.id); a.href = 'https://www.youtube.com/channel/' + x.id; a.target = '_blank'; a.rel = 'noopener'; a.style.color = 'inherit';
+    const name = el('div', 'name'); name.append(a);
+    const sub = el('div', 'sub');
+    sub.append(document.createTextNode(fmt(x.n) + ' bản đã vào kho · ' + fmt(x.songs) + ' bài · '), el('b', null, fmt(x.uniq) + ' bài riêng'), document.createTextNode(' · ' + fmt(x.picks30) + ' lượt chọn 30 ngày'));
+    if(x.viaPlaylist) sub.append(el('span', 'pill pl', 'đã thêm playlist của kênh'));
+    meta.append(name, sub);
+    const acts = el('div', 'acts'), link = 'https://www.youtube.com/channel/' + x.id;
+    acts.append(
+      btn('Xem trước', null, () => { previewLinks([link]); $('preview').scrollIntoView({ behavior:'smooth', block:'start' }); }),
+      btn('Ẩn', 'ghost', async () => { try{ await api('/api/kho/channel/hide', { id:x.id }); row.remove(); }catch(e){ alert(e.message); } }));
+    row.append(meta, acts); box.append(row);
+  });
+}
+
+/* ----- Dán nhiều link: xem trước rồi thêm ----- */
+const linesOf = t => [...new Set(String(t || '').split(/[\r\n]+/).map(s => s.trim()).filter(Boolean))].slice(0, 30);
+$('chPreview').onclick = () => previewLinks(linesOf($('chInput').value));
+$('chAdd').onclick = async e => {
+  const lines = linesOf($('chInput').value); if(!lines.length) return;
+  const b = e.target; b.disabled = true;
+  const ok = [], bad = [];
+  for(const [i, input] of lines.entries()){
+    b.textContent = 'Đang thêm ' + (i + 1) + '/' + lines.length + '…';
+    try{ const d = await api('/api/kho/channel/add', { input }); ok.push(d.channel.title + (d.existed ? ' (đã có, bật lại)' : '')); }
+    catch(err){ bad.push(input + ' → ' + err.message); }
+  }
+  b.disabled = false; b.textContent = '＋ Thêm ngay';
+  if(!bad.length) $('chInput').value = '';
+  alert((ok.length ? 'Đã thêm ' + ok.length + ' nguồn:\n• ' + ok.join('\n• ') : '') + (bad.length ? '\n\nKhông thêm được:\n• ' + bad.join('\n• ') : '') + (ok.length ? '\n\nKho sẽ quét dần trong các lượt tự chạy, hoặc bấm ⚡ Quét nhanh.' : ''));
+  loadChannels(); loadStats();
+};
+async function previewLinks(lines){
+  const box = $('preview'); box.replaceChildren();
+  if(!lines.length) return;
+  const cards = [];
+  const head = el('div', 'line'), addAll = btn('＋ Thêm tất cả nguồn có bài karaoke', null, async () => {
+    addAll.disabled = true;
+    const todo = cards.filter(c => c.ready && c.karaoke > 0 && !c.added);
+    for(const [i, c] of todo.entries()){ addAll.textContent = 'Đang thêm ' + (i + 1) + '/' + todo.length + '…'; await c.add(); }
+    addAll.textContent = '✓ Đã thêm ' + todo.length + ' nguồn'; loadChannels(); loadStats();
+  });
+  addAll.disabled = true;
+  head.append(addAll, el('span', 'hint', 'Kiểm từng nguồn: tỉ lệ bài karaoke, bài mới nhất, cách tách tên bài.'));
+  box.append(head);
+  for(const input of lines){
+    const card = el('div', 'card'), st = { ready:false, karaoke:0, added:false, add: async () => {} };
+    card.append(el('div', 'hint', 'Đang xem trước: ' + input)); box.append(card); cards.push(st);
+    try{
+      const d = await api('/api/kho/channel/preview?input=' + encodeURIComponent(input));
+      const s = d.source; st.ready = true; st.karaoke = d.karaoke;
+      card.replaceChildren();
       const row = el('div', 'row'), meta = el('div', 'meta');
-      const st = el('div', 'sub');
-      st.append(el('span', 'pill ' + (c.enabled ? 'on' : 'off'), c.enabled ? 'Bật' : 'Tắt'), el('span', 'pill ' + (c.fullDone ? '' : 'run'), c.fullDone ? 'Đã quét hết' : 'Đang quét toàn bộ'));
-      st.append(document.createTextNode(fmt(c.videos) + ' bài trong kho / ' + fmt(c.ytCount) + ' video trên kênh · quét ' + ago(c.lastScan)));
-      meta.append(el('div', 'name', c.title + (c.handle ? '  ' + c.handle : '')), st);
-      if(c.note) meta.append(el('div', 'sub err', c.note));
+      const a = el('a', null, s.title); a.href = ytLink(s); a.target = '_blank'; a.rel = 'noopener'; a.style.color = 'inherit';
+      const name = el('div', 'name'); name.append(a); if(s.handle) name.append(document.createTextNode('  ' + (s.kind === 'playlist' ? '· ' : '') + s.handle));
+      const pills = el('div', 'sub');
+      pills.append(el('span', 'pill' + (s.kind === 'playlist' ? ' pl' : ''), s.kind === 'playlist' ? 'Playlist' : 'Kênh'));
+      if(d.existing) pills.append(el('span', 'pill on', 'Đã có trong nguồn' + (d.existing.enabled ? '' : ' (đang tắt)')));
+      const ratio = d.sampled ? Math.round(d.karaoke * 100 / d.sampled) : 0;
+      const info = el('div', 'sub', fmt(s.ytCount) + ' video · ' + d.karaoke + '/' + d.sampled + ' video ' + (s.kind === 'playlist' ? 'đầu' : 'mới nhất') + ' là karaoke phát được (' + ratio + '%) · bài mới nhất ' + (d.newestAt ? ago(d.newestAt) : '—'));
+      meta.append(name, pills, info);
+      if(!d.karaoke) meta.append(el('div', 'sub err', 'Không thấy bài karaoke phát được trong ' + d.sampled + ' video ' + (s.kind === 'playlist' ? 'đầu' : 'mới nhất') + '. ' + (s.kind === 'channel' ? 'Nếu kênh có playlist karaoke riêng, dán link playlist đó thay vì cả kênh.' : '')));
+      else if(s.kind === 'channel' && ratio < 30) meta.append(el('div', 'sub warn', 'Kênh hỗn hợp, ít bài karaoke: quét cả kênh vẫn được (video không phải karaoke bị bỏ qua), nhưng nếu kênh có playlist karaoke riêng thì thêm playlist sẽ gọn hơn.'));
       const acts = el('div', 'acts');
       const sel = document.createElement('select');
       [['song', 'Tên bài trước'], ['artist', 'Ca sĩ trước']].forEach(([v, t]) => { const o = document.createElement('option'); o.value = v; o.textContent = t; sel.append(o); });
-      sel.value = c.order;
-      sel.onchange = async () => { try{ await api('/api/kho/channel/update', { id:c.id, order:sel.value }); showSamples(); }catch(e){ alert(e.message); } };
-      const showSamples = async () => {
-        let s = meta.querySelector('.samples'); if(!s){ s = el('div', 'samples'); meta.append(s); }
-        s.replaceChildren(el('div', null, 'Đang tải…'));
-        try{
-          const r = await api('/api/kho/channel/samples?id=' + encodeURIComponent(c.id));
-          s.replaceChildren();
-          if(!r.items.length) s.append(el('div', null, 'Chưa có bài nào trong kho từ kênh này.'));
-          r.items.forEach(x => { const d2 = el('div'); d2.append(document.createTextNode(x.title + '  →  '), el('b', null, x.song_key)); s.append(d2); });
-        }catch(e){ s.replaceChildren(el('div', 'err', e.message)); }
+      sel.value = d.existing ? d.existing.order : d.guess;
+      const starL = el('label', 'chk'), starC = document.createElement('input'); starC.type = 'checkbox'; starC.checked = !!(d.existing && d.existing.star);
+      starL.append(starC, document.createTextNode('⭐ Tin dùng'));
+      const addB = btn(d.existing ? 'Cập nhật' : '＋ Thêm', null, () => st.add());
+      st.add = async () => {
+        addB.disabled = true;
+        try{ await api('/api/kho/channel/add', { id:s.id, order:sel.value, star:starC.checked }); st.added = true; addB.textContent = '✓ Đã thêm'; loadChannels(); loadStats(); }
+        catch(e){ addB.disabled = false; alert(e.message); }
       };
-      acts.append(sel,
-        btn('Xem mẫu', 'ghost', showSamples),
-        btn(c.enabled ? 'Tắt' : 'Bật', 'ghost', async () => { try{ await api('/api/kho/channel/update', { id:c.id, enabled:!c.enabled }); loadChannels(); }catch(e){ alert(e.message); } }),
-        btn('Quét lại', 'ghost', async () => { if(!confirm('Quét lại toàn bộ kênh “' + c.title + '”? Chỉ tốn khoảng 1 đơn vị cho mỗi 50 video.')) return; try{ await api('/api/kho/channel/update', { id:c.id, rescan:true }); loadChannels(); }catch(e){ alert(e.message); } }),
-        btn('Xoá', 'danger', async () => {
-          if(!confirm('Xoá kênh “' + c.title + '” khỏi danh sách nguồn?')) return;
-          const purge = confirm('Xoá luôn ' + fmt(c.videos) + ' bài của kênh này khỏi kho?\nOK = xoá cả bài · Huỷ = giữ bài, chỉ ngừng quét');
-          try{ await api('/api/kho/channel/remove', { id:c.id, purge }); loadChannels(); loadStats(); }catch(e){ alert(e.message); }
-        }));
-      row.append(meta, acts); box.append(row);
-    });
-  }catch(e){ fail('channels', e); }
+      acts.append(sel, starL, addB);
+      row.append(meta, acts); card.append(row);
+      const guess = el('div', 'hint', 'Đoán kiểu tiêu đề theo bài đã có trong kho: “Tên bài trước” khớp ' + d.hitsSong + ' bài, “Ca sĩ trước” khớp ' + d.hitsArtist + ' bài → chọn sẵn “' + (d.guess === 'artist' ? 'Ca sĩ trước' : 'Tên bài trước') + '”. Kiểm lại cột đậm bên dưới là tên bài.');
+      const sm = el('div', 'samples');
+      const drawSamples = () => {
+        sm.replaceChildren();
+        if(!d.samples.length) sm.append(el('div', null, 'Không có mẫu.'));
+        d.samples.forEach(x => { const k = sel.value === 'artist' && x.artist ? x.artist : x.song; const r2 = el('div'); r2.append(document.createTextNode(x.title + '  →  '), el('b', null, k)); sm.append(r2); });
+      };
+      sel.onchange = drawSamples; drawSamples();
+      card.append(guess, sm);
+    }catch(e){ card.replaceChildren(el('div', 'hint err', input + ' → ' + e.message)); }
+  }
+  addAll.disabled = !cards.some(c => c.ready && c.karaoke > 0);
 }
-async function addChannel(input, b){
-  if(!input) return;
-  if(b) b.disabled = true;
-  try{ const d = await api('/api/kho/channel/add', { input }); $('chInput').value = ''; alert('Đã thêm kênh “' + d.channel.title + '” (' + fmt(d.channel.ytCount) + ' video). Kho sẽ quét dần trong các lượt chạy tự động.'); loadChannels(); loadStats(); }
-  catch(e){ alert(e.message); }
-  finally{ if(b) b.disabled = false; }
-}
-$('chAdd').onclick = e => addChannel($('chInput').value.trim(), e.target);
-$('chInput').addEventListener('keydown', e => { if(e.key === 'Enter') addChannel($('chInput').value.trim(), $('chAdd')); });
+$('reloadCh').onclick = loadChannels;
 $('sgBtn').onclick = async () => {
   const box = $('suggest'); box.replaceChildren(el('div', 'hint', 'Đang tìm kênh…'));
   try{
     const d = await api('/api/kho/channel/suggest?q=' + encodeURIComponent($('sgInput').value.trim() || 'karaoke'));
-    box.replaceChildren(el('div', 'hint', 'Gợi ý theo số người đăng ký. Nên chọn kênh chuyên karaoke, nhiều video, tiêu đề đặt đều tay.'));
+    box.replaceChildren(el('div', 'hint', 'Xếp theo số người đăng ký. Bấm Xem trước để kiểm trước khi thêm.'));
     d.items.forEach(x => {
       const row = el('div', 'row'), meta = el('div', 'meta');
       meta.append(el('div', 'name', x.title + (x.handle ? '  ' + x.handle : '')), el('div', 'sub', fmt(x.subs) + ' người đăng ký · ' + fmt(x.videos) + ' video'));
       const acts = el('div', 'acts');
       if(x.added) acts.append(el('span', 'pill on', 'Đã thêm'));
-      else acts.append(btn('＋ Thêm', null, ev => { addChannel('https://www.youtube.com/channel/' + x.id, ev.target); ev.target.textContent = '✓'; }));
+      else acts.append(btn('Xem trước', null, () => { previewLinks(['https://www.youtube.com/channel/' + x.id]); $('preview').scrollIntoView({ behavior:'smooth', block:'start' }); }));
       row.append(meta, acts); box.append(row);
     });
     if(!d.items.length) box.append(el('div', 'hint', 'Không có kết quả.'));
@@ -318,12 +469,13 @@ $('fastScan').onclick = async () => {
       const r = d.report || {}; rounds++;
       if(r.job === 'busy'){ await sleep(4000); continue; }
       if(r.job === 'error'){ endMsg = 'Dừng vì lỗi: ' + r.error + (/quota/i.test(r.reason || r.error) ? ' (hết hạn mức YouTube hôm nay)' : ''); break; }
+      if(r.error){ addedTotal += r.added || 0; endMsg = 'Dừng vì lỗi: ' + r.error + (/quota/i.test(r.reason || r.error) ? ' (hết hạn mức YouTube hôm nay)' : ''); break; }
       if(r.job === 'idle' && r.reason){ endMsg = 'Dừng: ' + r.reason; break; }
-      if(r.idle){ endMsg = 'Đã quét hết các kênh.'; break; }
+      if(r.idle){ endMsg = 'Đã quét hết các nguồn, không còn nguồn đến hạn kiểm.'; break; }
       addedTotal += r.added || 0;
       const min = Math.max(1, Math.round((Date.now() - t0) / 60000));
-      $('last').textContent = '⚡ Quét nhanh: lượt ' + rounds + ' · kênh “' + r.channel + '” +' + (r.added || 0) + ' bài' + (r.done ? ' (xong kênh)' : '') +
-        '\nKho hiện có ' + fmt(d.videos) + ' bản · còn ' + d.pending + ' kênh chưa quét hết · đã thêm ' + fmt(addedTotal) + ' bài trong ' + min + ' phút' +
+      $('last').textContent = '⚡ Quét nhanh: lượt ' + rounds + ' · ' + (r.sources > 1 ? r.sources + ' nguồn' : '“' + r.channel + '”') + ' +' + (r.added || 0) + ' bài' + (r.done ? ' (xong)' : '') +
+        '\nKho hiện có ' + fmt(d.videos) + ' bản · còn ' + d.pending + ' nguồn chưa quét hết, ' + (d.due || 0) + ' nguồn đến hạn kiểm · đã thêm ' + fmt(addedTotal) + ' bài trong ' + min + ' phút' +
         '\nĐơn vị hôm nay: ' + fmt(d.units) + '/' + fmt(d.budget) + (d.writeLimit ? ' · dòng ghi D1: ' + fmt(d.writes) + '/' + fmt(d.writeLimit) : '');
       if(r.done || rounds % 10 === 0){ loadStats(); loadChannels(); }
       if(d.units >= d.budget){ endMsg = 'Dừng vì đã chạm trần đơn vị hôm nay.'; break; }
