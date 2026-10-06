@@ -11,6 +11,8 @@
                    → ghép với kho → tính bảng "Bài hot"
      • hotsearch : bài hot chưa có bản karaoke trong kho → tìm "tên bài karaoke"
                    (tối đa HOT_SEARCH_PER_DAY lượt/ngày, phần còn lại để anh tìm tay)
+   Tìm YouTube cho remote.html (/api/kho/ytsearch): đếm lượt chung mọi máy, từ khoá đã tìm
+   trong 7 ngày không tốn lượt, hết lượt/lỗi → tự gợi ý bài gần giống trong kho.
    Cùng một bài có nhiều bản: ưu tiên bản được chọn nhiều nhất (pick_log),
    hoà thì bản nhiều lượt xem YouTube hơn.
 
@@ -22,6 +24,7 @@
      DAILY_UNIT_BUDGET  : (tuỳ chọn) trần đơn vị/ngày kho được dùng, mặc định 5000
      PAGES_PER_TICK     : (tuỳ chọn) số trang 50 bài mỗi lần chạy, mặc định 4
      HOT_SEARCH_PER_DAY : (tuỳ chọn) lượt tìm tự động/ngày cho bài hot, mặc định 20
+     SEARCH_LIMIT       : (tuỳ chọn) hạn mức lượt tìm/ngày của project, mặc định 100
    Cron Trigger: * /10 * * * *   (viết liền: "*\/10 * * * *")
    Chỉ dùng cá nhân/thử nghiệm — không dùng phát cho khách BMB.
    ===================================================================== */
@@ -35,11 +38,18 @@ const YT = 'https://www.googleapis.com/youtube/v3/';
 const ID_RE = /^[\w-]{11}$/;
 
 const num = (v, d) => { const n = parseInt(v, 10); return Number.isFinite(n) && n > 0 ? n : d; };
-const conf = env => ({ pages: Math.min(num(env.PAGES_PER_TICK, 4), 10), budget: num(env.DAILY_UNIT_BUDGET, 5000), hotSearch: num(env.HOT_SEARCH_PER_DAY, 20) });
+const conf = env => ({ pages: Math.min(num(env.PAGES_PER_TICK, 4), 10), budget: num(env.DAILY_UNIT_BUDGET, 5000), hotSearch: num(env.HOT_SEARCH_PER_DAY, 20), searchLimit: num(env.SEARCH_LIMIT, 100) });
+const CACHE_FRESH = 7 * DAY;      // cùng một từ khoá đã tìm trong 7 ngày → trả lại kết quả cũ, không tốn lượt
+let cacheReady = false;
+async function ensureCache(env) {
+  if (cacheReady) return;
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS yt_cache (q TEXT PRIMARY KEY, items TEXT, at INTEGER)`).run();
+  cacheReady = true;
+}
 const pacificDay = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles' }).format(new Date());
 
 /* ---------------- Xử lý tên bài ---------------- */
-const nd = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase();
+const nd = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase();
 const ascii = s => nd(s).replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
 
 // Các cụm "nhiễu" trong tiêu đề karaoke/MV: coi như dấu phân cách, phần còn lại mới là tên bài/ca sĩ.
@@ -120,11 +130,11 @@ async function yt(env, run, path, params, cost) {
   for (const [k, v] of Object.entries(params)) if (v !== '' && v != null) u.searchParams.set(k, String(v));
   u.searchParams.set('key', env.YT_KEY);
   if (path === 'search') run.searches++; else run.units += cost;
-  const res = await fetch(u.toString());
+  const res = await fetch(u.toString(), { signal: AbortSignal.timeout(10000) });
   let d = {}; try { d = await res.json(); } catch (e) {}
   if (!res.ok) {
     const er = d.error || {}, reason = (er.errors && er.errors[0] && er.errors[0].reason) || '';
-    if (/quota|rateLimit/i.test(reason)) run.quotaHit = true;
+    if (/quota|rateLimit/i.test(reason)) { if (path === 'search') run.searchQuotaHit = true; else run.quotaHit = true; }
     throw Object.assign(new Error(er.message || ('YouTube lỗi ' + res.status)), { reason, status: res.status });
   }
   return d;
@@ -177,7 +187,7 @@ async function fetchAndIngest(env, run, ids, now) {
   const bad = ids.filter(i => !okIds.has(i));
   await ingest(env, rows, now);
   await removeIds(env, bad, now);
-  return { added: rows.length, rejected: bad.length, rows };
+  return { added: rows.length, rejected: bad.length, rows, items };
 }
 async function knownIds(env, ids) {
   const J = JSON.stringify(ids);
@@ -228,7 +238,9 @@ async function refreshJob(env, run, c, now) {
   // xoá phần quá hạn 30 ngày (phòng khi làm mới không kịp) và dọn bảng phụ
   const stale = (await env.DB.prepare(`SELECT id FROM videos WHERE fetched_at < ?1 LIMIT 500`).bind(now - MAX_AGE).all()).results || [];
   if (stale.length) await removeIds(env, stale.map(x => x.id), now);
+  await ensureCache(env);
   await env.DB.batch([
+    env.DB.prepare(`DELETE FROM yt_cache WHERE at < ?1`).bind(now - MAX_AGE),
     env.DB.prepare(`DELETE FROM rejected WHERE at < ?1`).bind(now - MAX_AGE),
     env.DB.prepare(`DELETE FROM pick_log WHERE ts < ?1`).bind(now - 365 * DAY),
     env.DB.prepare(`DELETE FROM meta WHERE (k LIKE 'units:%' OR k LIKE 'search:%') AND k NOT IN (?1, ?2)`).bind('units:' + run.day, 'search:' + run.day)
@@ -351,6 +363,7 @@ async function flush(env, run, c) {
   if (run.units) st.push(add('units:' + run.day, run.units));
   if (run.searches) st.push(add('search:' + run.day, run.searches));
   if (run.quotaHit) st.push(env.DB.prepare(`INSERT INTO meta (k, v) VALUES (?1, ?2) ON CONFLICT(k) DO UPDATE SET v = excluded.v`).bind('units:' + run.day, String(c.budget)));
+  if (run.searchQuotaHit) st.push(env.DB.prepare(`INSERT INTO meta (k, v) VALUES (?1, ?2) ON CONFLICT(k) DO UPDATE SET v = excluded.v`).bind('search:' + run.day, String(c.searchLimit)));
   if (st.length) await env.DB.batch(st);
 }
 
@@ -416,24 +429,51 @@ function parseChannelInput(s) {
 const chOut = c => ({ id: c.id, title: c.title, handle: c.handle, enabled: !!c.enabled, order: c.order_mode, fullDone: !!c.full_done,
   lastScan: c.last_scan, videos: c.video_count, ytCount: c.yt_count, note: c.note || '' });
 
-async function groupSearch(env, q, limit) {
-  const words = ascii(q).split(' ').filter(Boolean).slice(0, 8);
+// Tìm trong kho. relaxed = true: chỉ cần khớp MỘT trong các từ (dùng để gợi ý "bài gần giống" khi không tìm được trên YouTube)
+const QUERY_NOISE = new Set(['karaoke', 'beat', 'tone', 'ton', 'nhac', 'song', 'bai', 'hat', 'lyric', 'lyrics', 'hd', 'mv']);
+async function groupSearch(env, q, limit, relaxed) {
+  let words = ascii(q).split(' ').filter(Boolean);
+  const core = words.filter(w => !QUERY_NOISE.has(w));
+  if (core.length) words = core;
+  words = words.slice(0, 8);
+  if (relaxed) words = words.filter(w => w.length > 1 || words.length === 1);
   if (!words.length) return [];
-  const match = words.map(w => '"' + w + '"*').join(' ');
+  const match = words.map(w => '"' + w + '"*').join(relaxed ? ' OR ' : ' ');
   const rows = (await env.DB.prepare(`SELECT v.id, v.title, v.channel, v.song_key, v.tone, v.views, v.duration FROM videos_fts JOIN videos v ON v.rid = videos_fts.rowid
       WHERE videos_fts MATCH ?1 ORDER BY rank LIMIT 300`).bind(match).all()).results || [];
   const pk = await picksById(env, rows.map(r => r.id), 0);
   const qn = words.join(' '), G = {};
-  rows.forEach(r => {
+  rows.forEach((r, i) => {
     const gk = r.song_key + '|' + (r.tone || ''), n = pk[r.id] || 0;
-    const g = G[gk] = G[gk] || { key: r.song_key, tone: r.tone || '', versions: 0, picks: 0, maxViews: 0, best: null, bn: -1 };
+    const g = G[gk] = G[gk] || { key: r.song_key, tone: r.tone || '', versions: 0, picks: 0, maxViews: 0, best: null, bn: -1, pos: i };
     g.versions++; g.picks += n; g.maxViews = Math.max(g.maxViews, r.views || 0);
     if (n > g.bn || (n === g.bn && (r.views || 0) > (g.best.views || 0))) { g.best = r; g.bn = n; }
   });
+  const nRows = rows.length || 1;
   return Object.values(G).map(g => ({
     key: g.key, tone: g.tone, versions: g.versions, picks: g.picks, best: vOut(g.best, g.bn),
-    s: (g.key === qn ? 6 : g.key.startsWith(qn) ? 4 : g.key.includes(qn) ? 2 : 0) + Math.log10(1 + g.maxViews) * 0.6 + Math.log2(1 + g.picks) * 1.5
+    s: (g.key === qn ? 6 : g.key.startsWith(qn) ? 4 : g.key.includes(qn) ? 2 : 0) + (relaxed ? 4 : 1) * (1 - g.pos / nRows)
+      + Math.log10(1 + g.maxViews) * 0.6 + Math.log2(1 + g.picks) * 1.5
   })).sort((a, b) => b.s - a.s).slice(0, limit).map(({ s, ...g }) => g);
+}
+async function searchUsed(env, run) {
+  const r = await env.DB.prepare(`SELECT v FROM meta WHERE k = ?1`).bind('search:' + run.day).first();
+  return +(r && r.v) || 0;
+}
+async function hotList(env, lim) {
+  const rows = (await env.DB.prepare(`SELECT h.song_key, h.score, h.trend_rank, h.delta, h.picks, h.versions, h.label, v.id, v.title, v.channel, v.tone, v.views, v.duration
+      FROM hot_songs h JOIN videos v ON v.id = h.best_id ORDER BY h.score DESC LIMIT ?1`).bind(lim).all()).results || [];
+  return rows.map(r => ({ key: r.song_key, score: r.score, trendRank: r.trend_rank, delta: r.delta, picks: r.picks, versions: r.versions, label: r.label, best: vOut(r, 0) }));
+}
+// Gợi ý từ kho khi chưa có bài hot: bài được chọn nhiều, rồi bài mới, rồi bài nhiều lượt xem
+async function suggestList(env, now, lim) {
+  const picked = (await env.DB.prepare(`SELECT v.id, v.title, v.channel, v.tone, v.views, v.duration, COUNT(*) AS n FROM pick_log p JOIN videos v ON v.id = p.id
+      WHERE p.ts >= ?1 GROUP BY v.id ORDER BY n DESC LIMIT ?2`).bind(now - 90 * DAY, lim).all()).results || [];
+  const fresh = (await env.DB.prepare(`SELECT id, title, channel, tone, views, duration FROM videos WHERE published_at > ?1 ORDER BY views DESC LIMIT ?2`).bind(now - 30 * DAY, lim).all()).results || [];
+  const top = (await env.DB.prepare(`SELECT id, title, channel, tone, views, duration FROM videos ORDER BY views DESC LIMIT ?1`).bind(lim).all()).results || [];
+  const seen = new Set(), out = [];
+  [...picked, ...fresh, ...top].forEach(r => { if (!seen.has(r.id) && out.length < lim) { seen.add(r.id); out.push(vOut(r, r.n || 0)); } });
+  return out;
 }
 const vOut = (r, n) => ({ id: r.id, title: r.title, channel: r.channel, tone: r.tone || '', views: r.views || 0, duration: r.duration || 0, picks: n || 0 });
 
@@ -462,13 +502,72 @@ async function handle(req, env, ctx) {
     }
     if (p === '/api/kho/hot' && req.method === 'GET') {
       const lim = Math.min(num(url.searchParams.get('limit'), 50), 100);
-      const rows = (await env.DB.prepare(`SELECT h.song_key, h.score, h.trend_rank, h.delta, h.picks, h.versions, h.label, v.id, v.title, v.channel, v.tone, v.views, v.duration
-          FROM hot_songs h JOIN videos v ON v.id = h.best_id ORDER BY h.score DESC LIMIT ?1`).bind(lim).all()).results || [];
-      return J({ items: rows.map(r => ({ key: r.song_key, score: r.score, trendRank: r.trend_rank, delta: r.delta, picks: r.picks, versions: r.versions, label: r.label, best: vOut(r, 0) })) }, 200, h);
+      const items = await hotList(env, lim);
+      const suggest = items.length < 10 ? await suggestList(env, now, 30) : [];
+      return J({ items, suggest, quota: { used: await searchUsed(env, run), limit: c.searchLimit } }, 200, h);
     }
     if (p === '/api/kho/new' && req.method === 'GET') {
-      const rows = (await env.DB.prepare(`SELECT id, title, channel, tone, views, duration FROM videos WHERE published_at > ?1 ORDER BY views DESC LIMIT 50`).bind(now - 30 * DAY).all()).results || [];
-      return J({ items: rows.map(r => vOut(r, 0)) }, 200, h);
+      return J({ items: await suggestList(env, now, 50) }, 200, h);
+    }
+    if (p === '/api/kho/quota' && req.method === 'GET') {
+      return J({ used: await searchUsed(env, run), limit: c.searchLimit }, 200, h);
+    }
+    /* Tìm trên YouTube cho remote — luôn trả về thứ gì đó để chọn:
+         cache  : từ khoá này đã tìm trong 7 ngày → trả lại, không tốn lượt
+         youtube: tìm thật (1 lượt) → bài karaoke tìm được tự vào kho
+         fallback: hết lượt / YouTube lỗi / quá chậm → bài gần giống trong kho (+ bài hot nếu không có) */
+    if (p === '/api/kho/ytsearch' && req.method === 'GET') {
+      const q = String(url.searchParams.get('q') || '').trim().slice(0, 120);
+      if (!q) return J({ error: 'Thiếu từ khoá' }, 400, h);
+      await ensureCache(env);
+      const qk = ascii(q);
+      const used = await searchUsed(env, run);
+      const quota = n => ({ used: n, limit: c.searchLimit });
+      const cached = await env.DB.prepare(`SELECT items, at FROM yt_cache WHERE q = ?1`).bind(qk).first();
+      if (cached && now - cached.at < CACHE_FRESH) {
+        let items = []; try { items = JSON.parse(cached.items); } catch (e) {}
+        const pk = await picksById(env, items.map(x => x.id), 0);
+        items.forEach(x => { x.picks = pk[x.id] || 0; });
+        return J({ source: 'cache', items, quota: quota(used) }, 200, h);
+      }
+      const fallback = async reason => {
+        const groups = await groupSearch(env, q, 30, true);
+        const hot = groups.length ? [] : (await hotList(env, 20));
+        const sug = groups.length || hot.length ? [] : await suggestList(env, now, 20);
+        done();
+        return J({ source: 'fallback', reason, groups, hot, suggest: sug, quota: quota(Math.max(used, run.searchQuotaHit ? c.searchLimit : used)) }, 200, h);
+      };
+      if (used >= c.searchLimit) return fallback('limit');
+      if (!env.YT_KEY) return fallback('nokey');
+      try {
+        const d = await yt(env, run, 'search', { part: 'id', type: 'video', videoEmbeddable: 'true', regionCode: 'VN', relevanceLanguage: 'vi', maxResults: 25, q }, 0);
+        const ids = (d.items || []).map(x => x.id && x.id.videoId).filter(i => ID_RE.test(i || ''));
+        let items = [];
+        if (ids.length) {
+          const r = await fetchAndIngest(env, run, ids, now);
+          const byId = {}; (r.items || []).forEach(v => { byId[v.id] = v; });
+          items = ids.map(i => byId[i]).filter(Boolean).filter(v => {
+            const ss = v.status || {}, cd = v.contentDetails || {}, rr = cd.regionRestriction;
+            if (!ss.embeddable || ss.privacyStatus === 'private') return false;
+            if (rr && ((rr.blocked || []).includes('VN') || (rr.allowed && !rr.allowed.includes('VN')))) return false;
+            return durSec(cd.duration) >= 60;
+          }).map(v => ({ id: v.id, title: String(v.snippet.title || '').slice(0, 200), channel: String(v.snippet.channelTitle || '').slice(0, 100),
+            tone: toneOf(nd(v.snippet.title)), views: +(v.statistics || {}).viewCount || 0, duration: durSec(v.contentDetails.duration), picks: 0 }));
+          const isK = x => /\b(?:karaoke|beat)\b/.test(nd(x.title)) ? 0 : 1;      // bản karaoke lên trước, giữ thứ tự YouTube
+          items = items.map((x, i) => [isK(x), i, x]).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map(a => a[2]);
+        }
+        await env.DB.prepare(`INSERT INTO yt_cache (q, items, at) VALUES (?1, ?2, ?3) ON CONFLICT(q) DO UPDATE SET items = excluded.items, at = excluded.at`)
+          .bind(qk, JSON.stringify(items), now).run();
+        if (!items.length) {
+          const groups = await groupSearch(env, q, 30, true);
+          done();
+          return J({ source: 'youtube', items, groups, quota: quota(used + 1) }, 200, h);
+        }
+        done();
+        return J({ source: 'youtube', items, quota: quota(used + 1) }, 200, h);
+      } catch (e) {
+        return fallback(e.reason === 'quotaExceeded' || run.searchQuotaHit ? 'limit' : (e.name === 'TimeoutError' ? 'timeout' : 'error'));
+      }
     }
     if (p === '/api/kho/pick' && req.method === 'POST') {
       const id = String(body.id || '');
