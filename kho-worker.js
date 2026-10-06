@@ -19,12 +19,17 @@
    Bindings / biến cần đặt trong Cloudflare:
      DB                 : D1 database (chạy kho-schema.sql trước)
      YT_KEY  (secret)   : khoá YouTube Data API (cùng project với nhac-playlist cũng được)
+     YT_KEY_2 (secret)  : (tuỳ chọn) khoá DỰ PHÒNG — tạo trong CÙNG project Google với YT_KEY.
+                          Chỉ dùng khi YT_KEY hỏng (bị xoá/hết hạn/bị chặn); KHÔNG đổi key khi hết hạn mức
+                          (hạn mức tính theo project, dùng nhiều project để có thêm hạn mức là vi phạm chính sách YouTube)
      APP_PASS (secret)  : mật khẩu, gửi qua header x-pass (nên đặt giống nhac-playlist)
      ALLOWED_ORIGINS    : ví dụ https://vumanhhung85.github.io,http://localhost:8000
      DAILY_UNIT_BUDGET  : (tuỳ chọn) trần đơn vị/ngày kho được dùng, mặc định 5000
      PAGES_PER_TICK     : (tuỳ chọn) số trang 50 bài mỗi lần chạy, mặc định 4
      HOT_SEARCH_PER_DAY : (tuỳ chọn) lượt tìm tự động/ngày cho bài hot, mặc định 20
      SEARCH_LIMIT       : (tuỳ chọn) hạn mức lượt tìm/ngày của project, mặc định 100
+     DAILY_WRITE_LIMIT  : (tuỳ chọn) trần số dòng D1 được ghi mỗi ngày, mặc định 1000000
+                          (chạm trần → kho tự dừng ghi tới ngày mới; chống lỗi ghi lặp làm phát sinh phí)
    Cron Trigger: * /10 * * * *   (viết liền: "*\/10 * * * *")
    Chỉ dùng cá nhân/thử nghiệm — không dùng phát cho khách BMB.
    ===================================================================== */
@@ -34,11 +39,12 @@ const REFRESH_AGE = 7 * DAY;      // làm mới mỗi 7 ngày (đồng thời l�
 const MAX_AGE = 30 * DAY;         // dữ liệu API YouTube lưu tối đa 30 ngày
 const HOT_EVERY = 6 * 3600000;    // lấy bảng thịnh hành 6 giờ/lần
 const LOCK_MS = 9 * 60000;
+const RUN_WRITE_CAP = 100000;     // một lượt chạy/một yêu cầu ghi quá số dòng này → chặn ngay (chắc chắn là lỗi lặp)
 const YT = 'https://www.googleapis.com/youtube/v3/';
 const ID_RE = /^[\w-]{11}$/;
 
 const num = (v, d) => { const n = parseInt(v, 10); return Number.isFinite(n) && n > 0 ? n : d; };
-const conf = env => ({ pages: Math.min(num(env.PAGES_PER_TICK, 4), 10), budget: num(env.DAILY_UNIT_BUDGET, 5000), hotSearch: num(env.HOT_SEARCH_PER_DAY, 20), searchLimit: num(env.SEARCH_LIMIT, 100) });
+const conf = env => ({ pages: Math.min(num(env.PAGES_PER_TICK, 4), 10), budget: num(env.DAILY_UNIT_BUDGET, 5000), hotSearch: num(env.HOT_SEARCH_PER_DAY, 20), searchLimit: num(env.SEARCH_LIMIT, 100), writeLimit: num(env.DAILY_WRITE_LIMIT, 1000000) });
 const CACHE_FRESH = 7 * DAY;      // cùng một từ khoá đã tìm trong 7 ngày → trả lại kết quả cũ, không tốn lượt
 let cacheReady = false;
 async function ensureCache(env) {
@@ -124,20 +130,78 @@ function toRow(v, mode) {
 }
 
 /* ---------------- YouTube API ---------------- */
+// Lỗi do CHÍNH khoá (bị xoá, hết hạn, bị giới hạn sai...) → thử khoá dự phòng. Lỗi hạn mức KHÔNG đổi khoá.
+const KEY_REASONS = /^(?:keyInvalid|keyExpired|ipRefererBlocked|API_KEY_[A-Z_]+)$/;
+const keyBadUntil = [0, 0];       // nhớ trong isolate: khoá hỏng thì 10 phút sau mới thử lại
+function ytKeys(env) { return [env.YT_KEY, env.YT_KEY_2].map(k => String(k || '').trim()); }
+function isKeyError(res, er) {
+  if (res.status !== 400 && res.status !== 403) return false;
+  const rs = [].concat((er.errors || []).map(x => x.reason), (er.details || []).map(x => x.reason)).filter(Boolean);
+  if (rs.some(r => /quota|rateLimit/i.test(r))) return false;
+  return rs.some(r => KEY_REASONS.test(r)) || /api key/i.test(er.message || '');
+}
 async function yt(env, run, path, params, cost) {
-  if (!env.YT_KEY) throw Object.assign(new Error('Chưa đặt secret YT_KEY cho Worker'), { reason: 'nokey' });
-  const u = new URL(YT + path);
-  for (const [k, v] of Object.entries(params)) if (v !== '' && v != null) u.searchParams.set(k, String(v));
-  u.searchParams.set('key', env.YT_KEY);
+  const keys = ytKeys(env);
+  if (!keys[0] && !keys[1]) throw Object.assign(new Error('Chưa đặt secret YT_KEY cho Worker'), { reason: 'nokey' });
+  const now = Date.now();
+  let order = [0, 1].filter(i => keys[i]);
+  const good = order.filter(i => keyBadUntil[i] < now);
+  order = good.length ? good.concat(order.filter(i => !good.includes(i))) : order;
   if (path === 'search') run.searches++; else run.units += cost;
-  const res = await fetch(u.toString(), { signal: AbortSignal.timeout(10000) });
-  let d = {}; try { d = await res.json(); } catch (e) {}
-  if (!res.ok) {
+  let last;
+  for (const i of order) {
+    const u = new URL(YT + path);
+    for (const [k, v] of Object.entries(params)) if (v !== '' && v != null) u.searchParams.set(k, String(v));
+    u.searchParams.set('key', keys[i]);
+    const res = await fetch(u.toString(), { signal: AbortSignal.timeout(10000) });
+    let d = {}; try { d = await res.json(); } catch (e) {}
+    if (res.ok) { run.keyOk[i] = true; keyBadUntil[i] = 0; return d; }
     const er = d.error || {}, reason = (er.errors && er.errors[0] && er.errors[0].reason) || '';
+    if (isKeyError(res, er)) {
+      keyBadUntil[i] = now + 600000;
+      run.keyBad[i] = { reason: ((er.details || []).map(x => x.reason).find(Boolean)) || reason || ('HTTP ' + res.status), msg: String(er.message || '').slice(0, 160), at: now };
+      last = Object.assign(new Error('Khoá YouTube ' + (i ? 'YT_KEY_2' : 'YT_KEY') + ' không dùng được: ' + (er.message || res.status)), { reason: 'badkey', status: 502 });
+      continue;                   // thử khoá còn lại
+    }
     if (/quota|rateLimit/i.test(reason)) { if (path === 'search') run.searchQuotaHit = true; else run.quotaHit = true; }
     throw Object.assign(new Error(er.message || ('YouTube lỗi ' + res.status)), { reason, status: res.status });
   }
-  return d;
+  if (order.length > 1) last.message = 'Cả YT_KEY và YT_KEY_2 đều không dùng được — ' + last.message.replace(/^Khoá YouTube YT_KEY(?:_2)? không dùng được: /, '');
+  throw last;
+}
+
+/* ---------------- Đồng hồ đếm dòng ghi D1 (chống lỗi ghi lặp) ---------------- */
+function meter(db, run) {
+  if (db._raw) db = db._raw;
+  const acc = r => {
+    const m = (r && r.meta) || {};
+    run.writes += +m.rows_written || 0;
+    if (run.writes > RUN_WRITE_CAP) throw Object.assign(new Error('Một lượt ghi hơn ' + RUN_WRITE_CAP + ' dòng — đã chặn để an toàn'), { reason: 'writecap' });
+    return r;
+  };
+  const wrap = st => ({
+    _st: st,
+    bind: (...a) => wrap(st.bind(...a)),
+    run: async () => acc(await st.run()),
+    all: async () => acc(await st.all()),
+    first: c => st.first(c),
+    raw: o => st.raw(o)
+  });
+  return {
+    _raw: db,
+    prepare: q => wrap(db.prepare(q)),
+    batch: async list => { const rs = await db.batch(list.map(x => x._st || x)); rs.forEach(acc); return rs; },
+    exec: q => db.exec(q)
+  };
+}
+// Hôm nay đã ghi quá trần chưa (đọc 1 lần cho mỗi lượt chạy)
+async function writesBlocked(env, run, c) {
+  if (run.writeStop === undefined) {
+    const r = await env.DB.prepare(`SELECT v FROM meta WHERE k = ?1`).bind('writes:' + run.day).first();
+    run.writesBefore = +(r && r.v) || 0;
+    run.writeStop = run.writesBefore >= c.writeLimit;
+  }
+  return run.writeStop;
 }
 
 /* ---------------- D1: ghi/xoá ---------------- */
@@ -185,8 +249,10 @@ async function fetchAndIngest(env, run, ids, now) {
   for (const v of items) { const r = toRow(v, modes[(v.snippet || {}).channelId]); if (r) rows.push(r); }
   const okIds = new Set(rows.map(r => r.id));
   const bad = ids.filter(i => !okIds.has(i));
-  await ingest(env, rows, now);
-  await removeIds(env, bad, now);
+  if (!(await writesBlocked(env, run, conf(env)))) {   // chạm trần ghi hôm nay → vẫn trả kết quả, chỉ không lưu kho
+    await ingest(env, rows, now);
+    await removeIds(env, bad, now);
+  }
   return { added: rows.length, rejected: bad.length, rows, items };
 }
 async function knownIds(env, ids) {
@@ -243,7 +309,7 @@ async function refreshJob(env, run, c, now) {
     env.DB.prepare(`DELETE FROM yt_cache WHERE at < ?1`).bind(now - MAX_AGE),
     env.DB.prepare(`DELETE FROM rejected WHERE at < ?1`).bind(now - MAX_AGE),
     env.DB.prepare(`DELETE FROM pick_log WHERE ts < ?1`).bind(now - 365 * DAY),
-    env.DB.prepare(`DELETE FROM meta WHERE (k LIKE 'units:%' OR k LIKE 'search:%') AND k NOT IN (?1, ?2)`).bind('units:' + run.day, 'search:' + run.day)
+    env.DB.prepare(`DELETE FROM meta WHERE (k LIKE 'units:%' OR k LIKE 'search:%' OR k LIKE 'writes:%') AND k NOT IN (?1, ?2, ?3)`).bind('units:' + run.day, 'search:' + run.day, 'writes:' + run.day)
   ]);
   const due = (await env.DB.prepare(`SELECT id FROM videos WHERE fetched_at < ?1 ORDER BY fetched_at LIMIT ?2`).bind(now - REFRESH_AGE, c.pages * 50).all()).results || [];
   if (!due.length) return { job: 'refresh', idle: true, purged: stale.length };
@@ -362,27 +428,37 @@ async function metaGet(env, keys) {
   const r = await env.DB.prepare(`SELECT k, v FROM meta WHERE k IN (SELECT value FROM json_each(?1))`).bind(JSON.stringify(keys)).all();
   const m = {}; (r.results || []).forEach(x => { m[x.k] = x.v; }); return m;
 }
-function newRun() { return { units: 0, searches: 0, day: pacificDay(), used: 0, searchUsed: 0, quotaHit: false }; }
+function newRun() { return { units: 0, searches: 0, day: pacificDay(), used: 0, searchUsed: 0, quotaHit: false, writes: 0, keyOk: {}, keyBad: {} }; }
 async function flush(env, run, c) {
+  if (run.flushed) return;          // mỗi lượt chỉ cộng sổ một lần
+  run.flushed = true;
   const st = [];
   const add = (k, n) => env.DB.prepare(`INSERT INTO meta (k, v) VALUES (?1, ?2) ON CONFLICT(k) DO UPDATE SET v = CAST(CAST(meta.v AS INTEGER) + ?2 AS TEXT)`).bind(k, n);
   if (run.units) st.push(add('units:' + run.day, run.units));
   if (run.searches) st.push(add('search:' + run.day, run.searches));
   if (run.quotaHit) st.push(env.DB.prepare(`INSERT INTO meta (k, v) VALUES (?1, ?2) ON CONFLICT(k) DO UPDATE SET v = excluded.v`).bind('units:' + run.day, String(c.budget)));
   if (run.searchQuotaHit) st.push(env.DB.prepare(`INSERT INTO meta (k, v) VALUES (?1, ?2) ON CONFLICT(k) DO UPDATE SET v = excluded.v`).bind('search:' + run.day, String(c.searchLimit)));
+  for (const i of [0, 1]) {
+    if (run.keyBad[i] && !run.keyOk[i]) st.push(env.DB.prepare(`INSERT INTO meta (k, v) VALUES (?1, ?2) ON CONFLICT(k) DO UPDATE SET v = excluded.v`).bind('keybad:' + i, JSON.stringify(run.keyBad[i])));
+    else if (run.keyOk[i]) st.push(env.DB.prepare(`DELETE FROM meta WHERE k = ?1`).bind('keybad:' + i));
+  }
+  if (run.writes) st.push(add('writes:' + run.day, run.writes));
   if (st.length) await env.DB.batch(st);
 }
 
 async function tick(env, force) {
   const now = Date.now(), c = conf(env), run = newRun();
+  env = Object.assign({}, env, { DB: meter(env.DB, run) });
   const lk = await env.DB.prepare(`UPDATE meta SET v = ?1 WHERE k = 'lock' AND CAST(v AS INTEGER) < ?2`).bind(String(now), now - LOCK_MS).run();
   if (!lk.meta || !lk.meta.changes) return { job: 'busy', note: 'Một lượt chạy khác đang làm việc, thử lại sau ít phút' };
   let rep;
   try {
-    const m = await metaGet(env, ['units:' + run.day, 'search:' + run.day, 'hot_at', 'tick']);
+    const m = await metaGet(env, ['units:' + run.day, 'search:' + run.day, 'hot_at', 'tick', 'writes:' + run.day]);
     run.used = +m['units:' + run.day] || 0; run.searchUsed = +m['search:' + run.day] || 0;
+    run.writesBefore = +m['writes:' + run.day] || 0; run.writeStop = run.writesBefore >= c.writeLimit;
     const t = (+m.tick || 0) + 1;
-    if (!force && run.used >= c.budget) rep = { job: 'idle', reason: 'Đã dùng hết trần ' + c.budget + ' đơn vị hôm nay' };
+    if (run.writeStop) rep = { job: 'idle', reason: 'Hôm nay đã ghi ' + run.writesBefore + ' dòng D1, chạm trần ' + c.writeLimit + ' — kho tạm dừng tới ngày mới để tránh phát sinh phí' };
+    else if (!force && run.used >= c.budget) rep = { job: 'idle', reason: 'Đã dùng hết trần ' + c.budget + ' đơn vị hôm nay' };
     else {
       let order;
       if (force && force !== 'auto') order = [force];
@@ -397,7 +473,7 @@ async function tick(env, force) {
   } catch (e) {
     rep = { job: 'error', error: String(e.message || e), reason: e.reason || '' };
   } finally {
-    rep = Object.assign(rep || {}, { at: now, units: run.units, searches: run.searches });
+    rep = Object.assign(rep || {}, { at: now, units: run.units, searches: run.searches, writes: run.writes });
     try { await flush(env, run, c); } catch (e) {}
     try {
       await env.DB.batch([
@@ -484,6 +560,11 @@ async function suggestList(env, now, lim) {
 const vOut = (r, n) => ({ id: r.id, title: r.title, channel: r.channel, tone: r.tone || '', views: r.views || 0, duration: r.duration || 0, picks: n || 0 });
 
 async function handle(req, env, ctx) {
+  const run = newRun();
+  try { return await route(req, env, ctx, run); }
+  finally { if (env.DB && !run.flushed && (run.writes || run.units || run.searches)) ctx.waitUntil(flush({ DB: meter(env.DB, run) }, run, conf(env)).catch(() => {})); }
+}
+async function route(req, env, ctx, run) {
   const { ok, h } = cors(req, env);
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: h });
   if (!ok) return J({ error: 'Origin không được phép', reason: 'origin' }, 403, h);
@@ -491,7 +572,9 @@ async function handle(req, env, ctx) {
   if (p === '' || p === '/') return J({ ok: true, app: 'kho-karaoke' }, 200, h);
   if (!env.APP_PASS || req.headers.get('x-pass') !== env.APP_PASS) return J({ error: 'Sai mật khẩu', reason: 'auth' }, 401, h);
   if (!env.DB) return J({ error: 'Worker chưa gắn D1 với tên DB' }, 500, h);
-  const c = conf(env), run = newRun(), now = Date.now();
+  const c = conf(env), now = Date.now();
+  const rawEnv = env;
+  env = Object.assign({}, env, { DB: meter(env.DB, run) });
   const body = req.method === 'POST' ? await req.json().catch(() => ({})) : {};
   const done = () => ctx.waitUntil(flush(env, run, c).catch(() => {}));
   try {
@@ -544,7 +627,7 @@ async function handle(req, env, ctx) {
         return J({ source: 'fallback', reason, groups, hot, suggest: sug, quota: quota(Math.max(used, run.searchQuotaHit ? c.searchLimit : used)) }, 200, h);
       };
       if (used >= c.searchLimit) return fallback('limit');
-      if (!env.YT_KEY) return fallback('nokey');
+      if (!ytKeys(env).some(Boolean)) return fallback('nokey');
       try {
         const d = await yt(env, run, 'search', { part: 'id', type: 'video', videoEmbeddable: 'true', regionCode: 'VN', relevanceLanguage: 'vi', maxResults: 25, q }, 0);
         const ids = (d.items || []).map(x => x.id && x.id.videoId).filter(i => ID_RE.test(i || ''));
@@ -620,7 +703,7 @@ async function handle(req, env, ctx) {
       await env.DB.prepare(`INSERT INTO pick_log (id, ts) VALUES (?1, ?2)`).bind(id, now).run();
       const has = await env.DB.prepare(`SELECT 1 AS x FROM videos WHERE id = ?1 UNION SELECT 1 FROM rejected WHERE id = ?1`).bind(id).first();
       let added = 0;
-      if (!has && env.YT_KEY) { try { added = (await fetchAndIngest(env, run, [id], now)).added; } catch (e) {} }   // bài mới anh tự tìm → bổ sung vào kho
+      if (!has && ytKeys(env).some(Boolean)) { try { added = (await fetchAndIngest(env, run, [id], now)).added; } catch (e) {} }   // bài mới anh tự tìm → bổ sung vào kho
       done();
       return J({ ok: true, added }, 200, h);
     }
@@ -633,18 +716,21 @@ async function handle(req, env, ctx) {
         one(`SELECT COUNT(*) AS n, SUM(enabled) AS on_ FROM channels`), one(`SELECT COUNT(*) AS n FROM hot_songs`),
         one(`SELECT COUNT(*) AS n FROM hot WHERE song_key IS NULL AND searched = 0`), one(`SELECT COUNT(*) AS n FROM pick_log WHERE ts >= ?1`, now - 30 * DAY)
       ]);
-      const m = await metaGet(env, ['units:' + run.day, 'search:' + run.day, 'last', 'hot_at']);
+      const m = await metaGet(env, ['units:' + run.day, 'search:' + run.day, 'last', 'hot_at', 'writes:' + run.day, 'keybad:0', 'keybad:1']);
       let last = null; try { last = JSON.parse(m.last || 'null'); } catch (e) {}
+      const kb = i => { try { return JSON.parse(m['keybad:' + i] || 'null'); } catch (e) { return null; } };
+      const ks = ytKeys(env), keys = [0, 1].map(i => ({ name: i ? 'YT_KEY_2' : 'YT_KEY', set: !!ks[i], bad: ks[i] ? kb(i) : null }));
       return J({ videos: v.n, songs: s.n, channels: ch.n, channelsOn: ch.on_ || 0, hotSongs: hs.n, hotPending: hq.n, picks30: pk.n,
         unitsToday: +m['units:' + run.day] || 0, searchesToday: +m['search:' + run.day] || 0, budget: c.budget, hotSearchPerDay: c.hotSearch,
-        pagesPerTick: c.pages, hotAt: +m.hot_at || 0, last }, 200, h);
+        pagesPerTick: c.pages, hotAt: +m.hot_at || 0, last, keys,
+        writesToday: +m['writes:' + run.day] || 0, writeLimit: c.writeLimit }, 200, h);
     }
     if (p === '/api/kho/run' && req.method === 'POST') {
       const job = ['auto', 'scan', 'refresh', 'hot', 'hotsearch', 'rehot'].includes(body.job) ? body.job : 'auto';
-      const report = await tick(env, job);
+      const report = await tick(rawEnv, job);
       const st = await env.DB.prepare(`SELECT (SELECT COUNT(*) FROM channels WHERE enabled = 1 AND full_done = 0) AS pending,
-          (SELECT COUNT(*) FROM videos) AS videos, (SELECT v FROM meta WHERE k = ?1) AS units`).bind('units:' + run.day).first();
-      return J({ report, pending: st.pending, videos: st.videos, units: +st.units || 0, budget: c.budget }, 200, h);
+          (SELECT COUNT(*) FROM videos) AS videos, (SELECT v FROM meta WHERE k = ?1) AS units, (SELECT v FROM meta WHERE k = ?2) AS writes`).bind('units:' + run.day, 'writes:' + run.day).first();
+      return J({ report, pending: st.pending, videos: st.videos, units: +st.units || 0, budget: c.budget, writes: +st.writes || 0, writeLimit: c.writeLimit }, 200, h);
     }
     if (p === '/api/kho/channels' && req.method === 'GET') {
       const rows = (await env.DB.prepare(`SELECT * FROM channels ORDER BY added_at`).all()).results || [];
