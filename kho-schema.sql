@@ -1,10 +1,11 @@
-CREATE TABLE IF NOT EXISTS channels (id TEXT PRIMARY KEY, title TEXT, handle TEXT, uploads TEXT, enabled INTEGER DEFAULT 1, order_mode TEXT DEFAULT 'song', full_done INTEGER DEFAULT 0, page_token TEXT, last_scan INTEGER DEFAULT 0, video_count INTEGER DEFAULT 0, yt_count INTEGER DEFAULT 0, note TEXT, added_at INTEGER);
-CREATE TABLE IF NOT EXISTS videos (rid INTEGER PRIMARY KEY, id TEXT NOT NULL UNIQUE, channel_id TEXT, channel TEXT, title TEXT, segs TEXT, song_key TEXT, tone TEXT, duration INTEGER, views INTEGER DEFAULT 0, views_delta REAL DEFAULT 0, published_at INTEGER, fetched_at INTEGER);
+CREATE TABLE IF NOT EXISTS channels (id TEXT PRIMARY KEY, title TEXT, handle TEXT, uploads TEXT, enabled INTEGER DEFAULT 1, order_mode TEXT DEFAULT 'song', full_done INTEGER DEFAULT 0, page_token TEXT, last_scan INTEGER DEFAULT 0, video_count INTEGER DEFAULT 0, yt_count INTEGER DEFAULT 0, note TEXT, added_at INTEGER, kind TEXT DEFAULT 'channel', star INTEGER DEFAULT 0, newest_at INTEGER DEFAULT 0, next_scan INTEGER DEFAULT 0, owner_id TEXT);
+CREATE TABLE IF NOT EXISTS videos (rid INTEGER PRIMARY KEY, id TEXT NOT NULL UNIQUE, channel_id TEXT, channel TEXT, title TEXT, segs TEXT, song_key TEXT, tone TEXT, duration INTEGER, views INTEGER DEFAULT 0, views_delta REAL DEFAULT 0, published_at INTEGER, fetched_at INTEGER, src TEXT);
 CREATE INDEX IF NOT EXISTS idx_videos_key ON videos (song_key);
 CREATE INDEX IF NOT EXISTS idx_videos_fetched ON videos (fetched_at);
 CREATE INDEX IF NOT EXISTS idx_videos_delta ON videos (views_delta);
 CREATE INDEX IF NOT EXISTS idx_videos_channel ON videos (channel_id);
 CREATE INDEX IF NOT EXISTS idx_videos_pub ON videos (published_at);
+CREATE INDEX IF NOT EXISTS idx_videos_src ON videos (src);
 CREATE VIRTUAL TABLE IF NOT EXISTS videos_fts USING fts5 (txt);
 CREATE TABLE IF NOT EXISTS rejected (id TEXT PRIMARY KEY, at INTEGER);
 CREATE INDEX IF NOT EXISTS idx_rejected_at ON rejected (at);
@@ -15,4 +16,5 @@ CREATE TABLE IF NOT EXISTS hot (id TEXT PRIMARY KEY, source TEXT, rank INTEGER, 
 CREATE TABLE IF NOT EXISTS hot_songs (song_key TEXT PRIMARY KEY, score REAL, trend_rank INTEGER, delta REAL, picks INTEGER, best_id TEXT, versions INTEGER, label TEXT);
 CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT);
 CREATE TABLE IF NOT EXISTS yt_cache (q TEXT PRIMARY KEY, items TEXT, at INTEGER);
+CREATE TABLE IF NOT EXISTS channel_hide (id TEXT PRIMARY KEY, at INTEGER);
 INSERT OR IGNORE INTO meta (k, v) VALUES ('lock', '0');
