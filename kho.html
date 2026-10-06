@@ -70,7 +70,7 @@
 <main>
 <section id="settings" style="display:none">
   <h2>Kết nối Worker kho</h2>
-  <div class="line"><input type="url" id="khoInput" placeholder="https://kho-karaoke.ten-cua-ban.workers.dev" autocomplete="off"></div>
+  <div class="line"><input type="url" id="khoInput" value="https://kho-karaoke.vumanhhung85.workers.dev" placeholder="https://kho-karaoke.vumanhhung85.workers.dev" autocomplete="off"></div>
   <div class="line"><input type="password" id="passInput" placeholder="Mật khẩu (APP_PASS của Worker kho)" autocomplete="off"><button id="saveCfg">Lưu</button></div>
   <div class="hint">Lưu trong trình duyệt này, dùng chung với remote.html nếu cùng địa chỉ trang.</div>
 </section>
@@ -149,7 +149,7 @@ $('gear').onclick = () => { const s = $('settings'); $('khoInput').value = cfg.k
 $('saveCfg').onclick = () => { cfg.kho = $('khoInput').value.trim().replace(/\/+$/, ''); cfg.pass = $('passInput').value; lsSet('kho_api', cfg.kho); lsSet('np_pass', cfg.pass); $('settings').style.display = 'none'; loadAll(); };
 
 async function api(path, body){
-  if(!cfg.kho || !cfg.pass){ $('settings').style.display = ''; throw new Error('Chưa nhập địa chỉ Worker kho và mật khẩu'); }
+  if(!cfg.kho || !cfg.pass){ $('khoInput').value = cfg.kho; $('settings').style.display = ''; throw new Error(cfg.kho ? 'Chưa nhập mật khẩu (ô Mật khẩu ở trên)' : 'Chưa nhập địa chỉ Worker kho và mật khẩu'); }
   const opt = body ? { method:'POST', headers:{ 'x-pass':cfg.pass, 'content-type':'application/json' }, body:JSON.stringify(body) } : { headers:{ 'x-pass':cfg.pass } };
   let res;
   try{ res = await fetch(cfg.kho + path, opt); }catch(e){ throw new Error('Không kết nối được tới Worker kho (sai địa chỉ, mạng, hoặc CORS)'); }
@@ -494,6 +494,7 @@ $('fastScan').onclick = async () => {
 window.addEventListener('beforeunload', e => { if(fastRun){ e.preventDefault(); e.returnValue = ''; } });
 
 function loadAll(){ loadStats(); loadChannels(); loadHot(); }
+$('khoInput').value = cfg.kho; $('passInput').value = cfg.pass;     // địa chỉ Worker điền sẵn, chỉ cần nhập mật khẩu
 if(!cfg.pass) $('settings').style.display = '';
 loadAll();
 </script>
