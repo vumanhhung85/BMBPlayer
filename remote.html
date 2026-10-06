@@ -598,7 +598,10 @@ let volTimer; $('vol').oninput = e => { clearTimeout(volTimer); const v = +e.tar
 bc.onmessage = ev => {
   const m = ev.data || {}; if(m.type !== 'state') return;
   const s = m.payload || {};
-  $('nowTitle').textContent = s.nowTitle || '—';
+  $('nowTitle').textContent = s.apiFailed ? '⚠ Màn hình phát không tải được YouTube, xem hướng dẫn trên màn hình phát'
+    : s.needStart ? '⚠ Bấm “▶ Bắt đầu phiên hát” trên màn hình phát một lần để bắt đầu'
+    : s.ready === false && s.cur >= 0 ? '⏳ Màn hình phát đang khởi động YouTube…'
+    : (s.nowTitle || '—');
   $('playBtn').textContent = s.playing ? '⏸ Dừng' : '▶ Phát';
   $('muteBtn').textContent = s.muted ? '🔇' : '🔊';
   if(typeof s.volume === 'number') $('vol').value = s.volume;
