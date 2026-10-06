@@ -30,6 +30,7 @@
   .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:8px}
   .stat{background:#0e0e16; border:1px solid var(--line); border-radius:12px; padding:10px}
   .stat b{display:block; font-size:20px} .stat span{color:var(--quiet); font-size:12px}
+  .stat b.sm{font-size:15px; line-height:1.45; overflow-wrap:anywhere}
   .row{display:flex; gap:10px; align-items:flex-start; padding:10px 0; border-bottom:1px solid var(--line)}
   .row:last-child{border-bottom:none}
   .row .meta{flex:1; min-width:0}
@@ -76,6 +77,8 @@
   </div>
   <div class="hint">Kho tự chạy 10 phút/lần (Cron Trigger), mỗi lượt làm một việc nhỏ. <b>Quét nhanh</b> dùng khi mới thêm kênh: trang này gọi quét liên tục (giữ trang mở) cho tới khi quét hết các kênh, rồi tự ghép lại bài hot.</div>
   <div class="hint err" id="cronWarn" style="display:none"></div>
+  <div class="hint err" id="keyWarn" style="display:none"></div>
+  <div class="hint err" id="writeWarn" style="display:none"></div>
   <pre id="last">—</pre>
 </section>
 
@@ -143,8 +146,15 @@ function showReport(r){
   if(r.searched != null) parts.push('đã tìm ' + r.searched + ' bài, thêm ' + r.added + ' bản karaoke, ghép được ' + r.matched);
   if(r.error) parts.push('Lỗi: ' + r.error);
   if(r.note) parts.push(r.note);
-  parts.push('tốn ' + (r.units || 0) + ' đơn vị, ' + (r.searches || 0) + ' lượt tìm');
+  parts.push('tốn ' + (r.units || 0) + ' đơn vị, ' + (r.searches || 0) + ' lượt tìm' + (r.writes != null ? ', ghi ' + fmt(r.writes) + ' dòng D1' : ''));
   $('last').textContent = parts.join('\n');
+}
+function keyLabel(keys){
+  if(!keys) return '—';
+  const [a, b] = keys, st = k => !k.set ? 'chưa đặt' : (k.bad ? 'hỏng' : 'ổn');
+  if(a.set && !a.bad) return 'YT_KEY ổn' + (b.set ? (b.bad ? ' · dự phòng hỏng' : ' · có dự phòng') : '');
+  if(b.set && !b.bad) return 'Đang dùng YT_KEY_2';
+  return 'YT_KEY ' + st(a) + (b.set ? ' · YT_KEY_2 ' + st(b) : '');
 }
 async function loadStats(){
   try{
@@ -152,14 +162,33 @@ async function loadStats(){
     const g = $('stats'); g.replaceChildren();
     [['Bản karaoke', fmt(s.videos)], ['Bài (đã gom)', fmt(s.songs)], ['Kênh đang bật', s.channelsOn + '/' + s.channels], ['Bài hot', s.hotSongs],
      ['Hot chờ tìm', s.hotPending], ['Lượt chọn 30 ngày', fmt(s.picks30)], ['Đơn vị hôm nay', fmt(s.unitsToday) + '/' + fmt(s.budget)],
-     ['Tìm tự động', s.searchesToday + '/' + s.hotSearchPerDay], ['Bài hot cập nhật', ago(s.hotAt)]]
-      .forEach(([l, v]) => { const d = el('div', 'stat'); d.append(el('b', null, String(v)), el('span', null, l)); g.append(d); });
+     ['Tìm tự động', s.searchesToday + '/' + s.hotSearchPerDay], ['Bài hot cập nhật', ago(s.hotAt)],
+     ['Dòng ghi D1 hôm nay', s.writeLimit ? fmt(s.writesToday) + '/' + fmt(s.writeLimit) : '—'], ['Khoá YouTube', keyLabel(s.keys)]]
+      .forEach(([l, v]) => { const d = el('div', 'stat'); d.append(el('b', String(v).length > 12 ? 'sm' : null, String(v)), el('span', null, l)); g.append(d); });
     showReport(s.last);
     const w = $('cronWarn');
     if(s.last && Date.now() - s.last.at > 30 * 60000){
       w.textContent = '⚠ Lượt chạy gần nhất cách đây ' + ago(s.last.at) + ' nên lịch tự chạy 10 phút/lần (Cron Trigger) đang KHÔNG hoạt động. Vào Cloudflare → Worker kho-karaoke → Settings → Triggers → thêm Cron Trigger */10 * * * * .';
       w.style.display = '';
     } else w.style.display = 'none';
+    const kw = $('keyWarn'), bad = (s.keys || []).filter(k => k.set && k.bad);
+    if(bad.length){
+      const k2 = (s.keys || [])[1] || {};
+      kw.textContent = '⚠ ' + bad.map(k => k.name + ' hỏng (' + (k.bad.reason || '') + ', ' + ago(k.bad.at) + ')').join(' · ') +
+        (bad.length >= (s.keys || []).filter(k => k.set).length ? ' — kho KHÔNG gọi được YouTube. Tạo khoá mới trong cùng project Google rồi cập nhật secret trong Cloudflare.'
+          : (k2.set && !k2.bad ? ' — kho đang tự chạy bằng YT_KEY_2. Anh thay YT_KEY mới (cùng project) khi tiện.' : ''));
+      kw.style.display = '';
+    } else if(s.keys && !s.keys[1].set){
+      kw.className = 'hint'; kw.textContent = 'Gợi ý: thêm secret YT_KEY_2 (khoá thứ hai tạo trong CÙNG project Google) để kho tự chuyển sang khi YT_KEY bị hỏng.';
+      kw.style.display = '';
+    } else kw.style.display = 'none';
+    if(bad.length) kw.className = 'hint err';
+    const ww = $('writeWarn');
+    if(s.writeLimit && s.writesToday >= s.writeLimit * 0.8){
+      ww.textContent = (s.writesToday >= s.writeLimit ? '⛔ Kho đã chạm trần ' : '⚠ Kho sắp chạm trần ') + fmt(s.writeLimit) + ' dòng ghi D1 hôm nay (' + fmt(s.writesToday) +
+        '). Khi chạm trần kho tự dừng ghi tới ngày mới. Nếu không phải đang quét kênh lớn thì có thể Worker đang lỗi ghi lặp — báo em kiểm tra.';
+      ww.style.display = '';
+    } else ww.style.display = 'none';
   }catch(e){ fail('stats', e); }
 }
 async function runJob(job, b){
@@ -295,9 +324,10 @@ $('fastScan').onclick = async () => {
       const min = Math.max(1, Math.round((Date.now() - t0) / 60000));
       $('last').textContent = '⚡ Quét nhanh: lượt ' + rounds + ' · kênh “' + r.channel + '” +' + (r.added || 0) + ' bài' + (r.done ? ' (xong kênh)' : '') +
         '\nKho hiện có ' + fmt(d.videos) + ' bản · còn ' + d.pending + ' kênh chưa quét hết · đã thêm ' + fmt(addedTotal) + ' bài trong ' + min + ' phút' +
-        '\nĐơn vị hôm nay: ' + fmt(d.units) + '/' + fmt(d.budget);
+        '\nĐơn vị hôm nay: ' + fmt(d.units) + '/' + fmt(d.budget) + (d.writeLimit ? ' · dòng ghi D1: ' + fmt(d.writes) + '/' + fmt(d.writeLimit) : '');
       if(r.done || rounds % 10 === 0){ loadStats(); loadChannels(); }
       if(d.units >= d.budget){ endMsg = 'Dừng vì đã chạm trần đơn vị hôm nay.'; break; }
+      if(d.writeLimit && d.writes >= d.writeLimit){ endMsg = 'Dừng vì đã chạm trần dòng ghi D1 hôm nay.'; break; }
       await sleep(300);
     }
     if(addedTotal){ try{ await api('/api/kho/run', { job:'rehot' }); }catch(e){} }
