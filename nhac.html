@@ -315,8 +315,18 @@ function makePlayer(){
 }
 function onReady(){ ready = true; player.setVolume(+$('vol').value); if(pendingStart){ pendingStart = false; start(); } }
 const ERR = { 2:'mã video không hợp lệ', 5:'lỗi trình phát HTML5', 100:'video đã bị xoá hoặc riêng tư', 101:'chủ video không cho phép phát nhúng', 150:'chủ video không cho phép phát nhúng', 153:'thiếu thông tin nguồn (hãy mở trang qua https hoặc localhost)' };
+// Bài bị gỡ / cấm nhúng → báo kho karaoke kiểm lại và xoá ngay (dùng chung địa chỉ + mật khẩu đã lưu ở remote/kho trên cùng trang)
+const KHO_DEFAULT = 'https://kho-karaoke.vumanhhung85.workers.dev';
+function reportDead(id, done){
+  let kho = '', pass = '';
+  try{ kho = localStorage.getItem('kho_api') || KHO_DEFAULT; pass = localStorage.getItem('np_pass') || ''; }catch(e){}
+  if(!kho || !pass || !/^[\w-]{11}$/.test(id || '')) return;
+  fetch(kho + '/api/kho/check', { method:'POST', headers:{ 'x-pass':pass, 'content-type':'application/json' }, body:JSON.stringify({ ids:[id], reason:'player' }) })
+    .then(r => r.ok ? r.json() : null).then(d => { if(d && (d.removed || []).includes(id) && done) done(); }).catch(() => {});
+}
 function onError(e){
   const it = items[order[pos]];
+  if(it && [100, 101, 150].includes(e.data)) reportDead(it.id);    // bài này có thể cũng nằm trong kho karaoke
   toast('Không phát được “' + (it ? it.title : '') + '”: ' + (ERR[e.data] || ('mã lỗi ' + e.data)) + (e.data === 153 ? '' : ' — tự chuyển bài sau 3 giây.'), 'err', 5000);
   if(e.data !== 153) setTimeout(() => next(true), 3000);
 }

@@ -861,6 +861,24 @@ async function route(req, env, ctx, run) {
       done();
       return J({ items: out, skipped: ids.length - out.length }, 200, h);
     }
+    /* Kiểm lại bài nghi đã bị gỡ (trình phát báo lỗi 100/101/150, hoặc remote thấy ảnh bìa xám): 1 đơn vị cho ≤50 bài,
+       bài thật sự không còn phát được thì xoá khỏi kho ngay, không đợi lượt làm mới 7 ngày */
+    if (p === '/api/kho/check' && req.method === 'POST') {
+      const ids = [...new Set((Array.isArray(body.ids) ? body.ids : [body.id]).map(String).filter(i => ID_RE.test(i)))].slice(0, 50);
+      if (!ids.length) return J({ error: 'Thiếu id' }, 400, h);
+      // chỉ kiểm bài đang có trong kho; báo từ ảnh bìa thì bỏ qua bài vừa kiểm trong 3 giờ (đỡ tốn lượt khi nhiều máy cùng báo)
+      const minAge = body.reason === 'player' ? 0 : 3 * 3600000;
+      const rows = (await env.DB.prepare(`SELECT id FROM videos WHERE id IN (SELECT value FROM json_each(?1)) AND fetched_at <= ?2`).bind(JSON.stringify(ids), now - minAge).all()).results || [];
+      const todo = rows.map(r => r.id);
+      if (!todo.length) return J({ checked: 0, removed: [], ok: [] }, 200, h);
+      const r = await fetchAndIngest(env, run, todo, now);
+      const okIds = new Set(r.rows.map(x => x.id)), removed = todo.filter(i => !okIds.has(i));
+      if (removed.length && await env.DB.prepare(`SELECT 1 AS x FROM hot_songs WHERE best_id IN (SELECT value FROM json_each(?1)) LIMIT 1`).bind(JSON.stringify(removed)).first())
+        await rebuildHot(env, now);       // bản ưu tiên của một bài hot vừa bị gỡ → chọn bản khác
+      if (removed.length) await env.DB.prepare(`INSERT INTO meta (k, v) VALUES ('gone', ?1) ON CONFLICT(k) DO UPDATE SET v = CAST(CAST(meta.v AS INTEGER) + ?1 AS TEXT)`).bind(removed.length).run();
+      done();
+      return J({ checked: todo.length, removed, ok: todo.filter(i => okIds.has(i)) }, 200, h);
+    }
     if (p === '/api/kho/pick' && req.method === 'POST') {
       const id = String(body.id || '');
       if (!ID_RE.test(id)) return J({ error: 'id không hợp lệ' }, 400, h);
