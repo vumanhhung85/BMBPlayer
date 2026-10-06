@@ -286,28 +286,42 @@ function updateDetect(){
   const p = parseYT($('q').value);
   $('goBtn').textContent = (p.vid || p.list) ? 'Thêm' : 'Tìm';
   if(p.vid) d.append(btn('＋ Thêm bài từ link', null, () => addByLink(p.vid)));
-  if(p.list) d.append(btn('≡ Nạp playlist', null, () => loadPlaylist(p.list)));
+  if(p.list && !/^RD/.test(p.list)) d.append(btn('≡ Nạp playlist', null, () => loadPlaylist(p.list)));
   d.style.display = (p.vid || p.list) ? 'flex' : 'none';
 }
 
 /* ---------- Thêm bài bằng link ---------- */
+/* Đọc thông tin qua Worker nhac-playlist; không được thì qua Worker kho; vẫn không được thì phát theo ID (bài vẫn hát được) */
+async function viaEither(pathMain, pathKho){
+  let err = null;
+  if(hasCfg()){ try{ return await api(pathMain); }catch(e){ if(e.reason === 'notEmbeddable' || e.status === 400 || e.status === 404) throw e; err = e; } }
+  if(hasKho()){ try{ return await kapi(pathKho); }catch(e){ if(e.reason === 'notEmbeddable' || e.status === 400 || e.status === 404) throw e; err = e; } }
+  throw err || Object.assign(new Error('Chưa cấu hình kết nối'), { reason:'noconfig' });
+}
 async function addByLink(vid){
-  if(!hasCfg()) return needConfig();
+  if(!hasCfg() && !hasKho()) return needConfig();
   msg('Đang đọc thông tin video…');
-  try{
-    const item = norm((await api('/api/video?id=' + vid)).item);
-    addToQueue(item, true);
-    $('q').value = ''; updateDetect(); renderLocal();
-    msg('Đã thêm vào hàng chờ: ' + item.title);
-  }catch(e){ showApiError(e); }
+  let item;
+  try{ item = norm((await viaEither('/api/video?id=' + vid, '/api/kho/video?id=' + vid)).item); }
+  catch(e){
+    if(e.reason === 'notEmbeddable') return msg('Chủ video không cho phép phát nhúng nên player không phát được video này.', true);
+    // Không đọc được tên bài: vẫn thêm vào hàng chờ theo ID để không bị gián đoạn
+    send('add', { id:vid, title:'Bài từ link YouTube' }); reportPick(vid);
+    $('q').value = ''; updateDetect(); renderLocal(); renderKho();
+    return msg('Đã thêm vào hàng chờ. Tạm chưa đọc được tên bài (mạng chập chờn) nhưng bài vẫn phát bình thường.');
+  }
+  addToQueue(item, true); reportPick(item.id);
+  $('q').value = ''; updateDetect(); renderLocal(); renderKho();
+  msg('Đã thêm vào hàng chờ: ' + item.title);
 }
 
 /* ---------- Nạp playlist ---------- */
 async function loadPlaylist(list){
-  if(!hasCfg()) return needConfig();
+  if(!hasCfg() && !hasKho()) return needConfig();
+  if(/^RD/.test(list)) return msg('Đây là danh sách “Mix” YouTube tự tạo, không đọc được qua API. Anh bấm “＋ Thêm bài từ link” để thêm riêng bài đang mở, hoặc dán link một playlist thật (list=PL…).', true);
   msg('Đang nạp playlist…');
   try{
-    const d = await api('/api/import?list=' + list);
+    const d = await viaEither('/api/import?list=' + list, '/api/kho/import?list=' + list);
     const items = (d.items || []).map(norm);
     const addAll = btn('＋ Thêm tất cả', null, () => {
       if(items.length > 50 && !confirm('Thêm ' + items.length + ' bài vào hàng chờ?')) return;
@@ -315,7 +329,10 @@ async function loadPlaylist(list){
       renderLocal(); msg('Đã thêm ' + items.length + ' bài vào hàng chờ.');
     });
     renderResults(items, 'Playlist: ' + items.length + ' bài phát nhúng được' + (d.skipped ? ' (bỏ ' + d.skipped + ' bài không phát được)' : ''), addAll);
-  }catch(e){ showApiError(e); }
+  }catch(e){
+    if(e.status === 404) return msg('Không đọc được playlist này (riêng tư hoặc đã bị xoá).', true);
+    showApiError(e);
+  }
 }
 
 /* ---------- Playlist đã lưu trên D1 (cùng dữ liệu với nhac.html) ---------- */

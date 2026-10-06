@@ -569,6 +569,45 @@ async function handle(req, env, ctx) {
         return fallback(e.reason === 'quotaExceeded' || run.searchQuotaHit ? 'limit' : (e.name === 'TimeoutError' ? 'timeout' : 'error'));
       }
     }
+    /* Dự phòng cho remote khi Worker nhac-playlist không kết nối được: đọc 1 video / nạp playlist (bài karaoke tự vào kho) */
+    const pubItem = v => ({ id: v.id, title: String(v.snippet.title || '').slice(0, 200), channel: String(v.snippet.channelTitle || '').slice(0, 100),
+      thumb: 'https://i.ytimg.com/vi/' + v.id + '/mqdefault.jpg' });
+    const playable = v => { const ss = v.status || {}, rr = (v.contentDetails || {}).regionRestriction;
+      return ss.embeddable && ss.privacyStatus !== 'private' && !(rr && ((rr.blocked || []).includes('VN') || (rr.allowed && !rr.allowed.includes('VN')))); };
+    if (p === '/api/kho/video' && req.method === 'GET') {
+      const id = url.searchParams.get('id') || '';
+      if (!ID_RE.test(id)) return J({ error: 'id không hợp lệ' }, 400, h);
+      const r = await fetchAndIngest(env, run, [id], now);
+      done();
+      const v = (r.items || [])[0];
+      if (!v) return J({ error: 'Không tìm thấy video' }, 404, h);
+      if (!playable(v)) return J({ error: 'Video không cho phát nhúng', reason: 'notEmbeddable' }, 400, h);
+      return J({ item: pubItem(v) }, 200, h);
+    }
+    if (p === '/api/kho/import' && req.method === 'GET') {
+      const list = url.searchParams.get('list') || '';
+      if (!/^[\w-]{10,64}$/.test(list)) return J({ error: 'Mã playlist không hợp lệ' }, 400, h);
+      const ids = []; let token = '';
+      try {
+        for (let i = 0; i < 4; i++) {
+          const d = await yt(env, run, 'playlistItems', { part: 'contentDetails', playlistId: list, maxResults: 50, pageToken: token }, 1);
+          (d.items || []).forEach(x => { const vid = x.contentDetails && x.contentDetails.videoId; if (ID_RE.test(vid || '') && !ids.includes(vid)) ids.push(vid); });
+          token = d.nextPageToken || ''; if (!token) break;
+        }
+      } catch (e) {
+        done();
+        if (e.status === 404 || e.reason === 'playlistNotFound') return J({ error: 'Không đọc được playlist', reason: 'playlistNotFound' }, 404, h);
+        throw e;
+      }
+      const out = [];
+      for (let i = 0; i < ids.length; i += 50) {
+        const r = await fetchAndIngest(env, run, ids.slice(i, i + 50), now);
+        const by = {}; (r.items || []).forEach(v => { by[v.id] = v; });
+        ids.slice(i, i + 50).forEach(x => { if (by[x] && playable(by[x])) out.push(pubItem(by[x])); });
+      }
+      done();
+      return J({ items: out, skipped: ids.length - out.length }, 200, h);
+    }
     if (p === '/api/kho/pick' && req.method === 'POST') {
       const id = String(body.id || '');
       if (!ID_RE.test(id)) return J({ error: 'id không hợp lệ' }, 400, h);
