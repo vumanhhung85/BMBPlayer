@@ -8,8 +8,15 @@
                    nguồn đã quét đủ chỉ kiểm bổ sung theo nhịp đăng bài (đăng trong 14 ngày → mỗi ngày,
                    trong 60 ngày → 3 ngày, lâu hơn → 7 ngày; playlist → 3 ngày), thường chỉ tốn 1 trang.
                    Nguồn gắn ⭐ (tin dùng): bản của nguồn đó được ưu tiên khi các bản hoà lượt chọn.
-   Cột/bảng mới (kind, star, newest_at, next_scan, owner_id, videos.src, channel_hide) Worker tự thêm khi chạy,
-   không cần chạy lại schema.
+     • discover  : kênh chưa thêm nhưng đã có bản karaoke trong kho → đọc playlist của kênh + 50 video mới nhất
+                   (≈3 đơn vị/kênh) → tự thêm kênh (nếu chuyên karaoke) hoặc chỉ các playlist karaoke của kênh đó
+     • gap       : lấp "bài tìm hụt" (anh bấm Tìm mà kho không có) — tìm YouTube 50 kết quả/lượt, tối đa GAP_SEARCH_PER_DAY
+     • plsearch  : tìm PLAYLIST karaoke theo tên ca sĩ/nhạc sĩ (lấy từ tiêu đề trong kho + danh sách anh nhập),
+                   tối đa PL_SEARCH_PER_DAY lượt; mỗi lượt có thể thêm tới 10 playlist làm nguồn
+     Nguồn tự thêm (auto) quét toàn bộ 1 lần; mang về dưới 5 bản mới thì tự tắt. Kiểu tiêu đề tự đoán sau lần quét đầu.
+     Lượt tìm tự động luôn chừa SEARCH_RESERVE lượt (mặc định 25) cho anh tìm tay trên remote.
+   Cột/bảng mới (kind, star, newest_at, next_scan, owner_id, auto, added_total, videos.src, videos.added_at,
+   channel_hide, misses, qstat, cand, artists, near_miss) Worker tự thêm khi chạy, không cần chạy lại schema.
      • refresh   : làm mới bài đã quá 7 ngày (videos.list ≈ 1 đơn vị/50 bài),
                    đo lượt xem tăng/ngày để biết bài nào đang được hát nhiều;
                    bài quá 30 ngày chưa làm mới thì xoá (quy định dữ liệu YouTube)
@@ -34,6 +41,10 @@
      PAGES_PER_TICK     : (tuỳ chọn) số trang 50 bài mỗi lần chạy, mặc định 4
      HOT_SEARCH_PER_DAY : (tuỳ chọn) lượt tìm tự động/ngày cho bài hot, mặc định 20
      SEARCH_LIMIT       : (tuỳ chọn) hạn mức lượt tìm/ngày của project, mặc định 100
+     GAP_SEARCH_PER_DAY : (tuỳ chọn) lượt tìm/ngày để lấp bài tìm hụt, mặc định 30
+     PL_SEARCH_PER_DAY  : (tuỳ chọn) lượt tìm playlist theo ca sĩ/ngày, mặc định 25
+     SEARCH_RESERVE     : (tuỳ chọn) số lượt tìm luôn chừa cho anh tìm tay, mặc định 25
+     DISCOVER_PER_DAY   : (tuỳ chọn) số kênh được tự khám phá mỗi ngày (≈3 đơn vị/kênh), mặc định 80
      DAILY_WRITE_LIMIT  : (tuỳ chọn) trần số dòng D1 được ghi mỗi ngày, mặc định 1000000
                           (chạm trần → kho tự dừng ghi tới ngày mới; chống lỗi ghi lặp làm phát sinh phí)
    Cron Trigger: * /10 * * * *   (viết liền: "*\/10 * * * *")
@@ -53,7 +64,9 @@ const YT = 'https://www.googleapis.com/youtube/v3/';
 const ID_RE = /^[\w-]{11}$/;
 
 const num = (v, d) => { const n = parseInt(v, 10); return Number.isFinite(n) && n > 0 ? n : d; };
-const conf = env => ({ pages: Math.min(num(env.PAGES_PER_TICK, 4), 10), budget: num(env.DAILY_UNIT_BUDGET, 5000), hotSearch: num(env.HOT_SEARCH_PER_DAY, 20), searchLimit: num(env.SEARCH_LIMIT, 100), writeLimit: num(env.DAILY_WRITE_LIMIT, 1000000) });
+const conf = env => ({ pages: Math.min(num(env.PAGES_PER_TICK, 4), 10), budget: num(env.DAILY_UNIT_BUDGET, 5000), hotSearch: num(env.HOT_SEARCH_PER_DAY, 20), searchLimit: num(env.SEARCH_LIMIT, 100), writeLimit: num(env.DAILY_WRITE_LIMIT, 1000000),
+  gapSearch: num(env.GAP_SEARCH_PER_DAY, 30), plSearch: num(env.PL_SEARCH_PER_DAY, 25), reserve: num(env.SEARCH_RESERVE, 25), discoverPerDay: num(env.DISCOVER_PER_DAY, 80) });
+const AUTO_MIN_NEW = 5;           // nguồn tự thêm mang về ít hơn số bản mới này sau lần quét đầu → tự tắt
 const CACHE_FRESH = 7 * DAY;      // cùng một từ khoá đã tìm trong 7 ngày → trả lại kết quả cũ, không tốn lượt
 let cacheReady = false;
 async function ensureCache(env) {
@@ -75,7 +88,10 @@ async function ensureSchema(env) {
   add('channels', ch, 'newest_at', 'INTEGER DEFAULT 0');
   add('channels', ch, 'next_scan', 'INTEGER DEFAULT 0');
   add('channels', ch, 'owner_id', 'TEXT');
+  add('channels', ch, 'auto', 'INTEGER DEFAULT 0');
+  add('channels', ch, 'added_total', 'INTEGER DEFAULT 0');
   add('videos', vd, 'src', 'TEXT');
+  add('videos', vd, 'added_at', 'INTEGER');
   for (const q of alters) {
     try { await env.DB.prepare(q).run(); }
     catch (e) { if (!/duplicate column/i.test(String(e.message || e))) throw e; }   // isolate khác vừa thêm trước
@@ -83,11 +99,26 @@ async function ensureSchema(env) {
   await env.DB.batch([
     env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_videos_src ON videos (src)`),
     env.DB.prepare(`CREATE TABLE IF NOT EXISTS channel_hide (id TEXT PRIMARY KEY, at INTEGER)`),
-    env.DB.prepare(`CREATE TABLE IF NOT EXISTS yt_cache (q TEXT PRIMARY KEY, items TEXT, at INTEGER)`)
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS yt_cache (q TEXT PRIMARY KEY, items TEXT, at INTEGER)`),
+    env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_videos_added ON videos (added_at)`),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS misses (q TEXT PRIMARY KEY, label TEXT, n INTEGER DEFAULT 0, at INTEGER, searched INTEGER DEFAULT 0, added INTEGER DEFAULT 0, found INTEGER DEFAULT 0)`),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS qstat (day TEXT PRIMARY KEY, q INTEGER DEFAULT 0, miss INTEGER DEFAULT 0)`),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS cand (id TEXT PRIMARY KEY, title TEXT, n INTEGER, karaoke INTEGER, sampled INTEGER, action TEXT, at INTEGER)`),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS artists (name TEXT PRIMARY KEY, n INTEGER DEFAULT 0, prio INTEGER DEFAULT 0, searched_at INTEGER DEFAULT 0, added INTEGER DEFAULT 0)`),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS near_miss (id TEXT PRIMARY KEY, title TEXT, channel TEXT, channel_id TEXT, kw TEXT, at INTEGER)`)
   ]);
   schemaReady = true; cacheReady = true;
 }
-const pacificDay = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles' }).format(new Date());
+// Từ khoá mở rộng (ngoài "karaoke"/"beat") anh đã duyệt cho phép nhận bài — đọc lại 5 phút/lần
+let kwOn = new Set(), kwAt = 0;
+async function loadKw(env) {
+  if (Date.now() - kwAt < 300000) return;
+  const r = await env.DB.prepare(`SELECT v FROM meta WHERE k = 'kw_extra'`).first();
+  try { kwOn = new Set(JSON.parse((r && r.v) || '[]')); } catch (e) { kwOn = new Set(); }
+  kwAt = Date.now();
+}
+const pacificDayOf = t => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles' }).format(new Date(t));
+const pacificDay = () => pacificDayOf(Date.now());
 
 /* ---------------- Xử lý tên bài ---------------- */
 const nd = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase();
@@ -143,7 +174,11 @@ function cleanQuery(title) {
 }
 
 // Video YouTube (videos.list đủ part) → dòng lưu kho, hoặc null nếu không phải bài karaoke phát nhúng được
-function toRow(v, mode) {
+// Dấu hiệu karaoke ngoài chữ "karaoke"/"beat": chỉ nhận khi anh đã duyệt (kho.html → Mở rộng kho → Tiêu đề bị loại)
+const EXTRA_KW = { tone: /\b(?:tone|ton) (?:nam|nu)\b/, 'thieu-giong': /\bthieu (?:giong )?(?:nam|nu)\b/, 'song-ca': /\bsong ca\b/,
+  mr: /\bmr\b/, 'minus-one': /\bminus ?one\b/, instrumental: /\binstrumental\b/, 'nhac-nen': /\bnhac nen\b/ };
+const EXTRA_LABEL = { tone: 'Tone nam/nữ', 'thieu-giong': 'Thiếu giọng nam/nữ', 'song-ca': 'Song ca', mr: 'MR', 'minus-one': 'Minus One', instrumental: 'Instrumental', 'nhac-nen': 'Nhạc nền' };
+function toRow(v, mode, near) {
   const sn = v.snippet || {}, cd = v.contentDetails || {}, st = v.statistics || {}, ss = v.status || {};
   if (!ID_RE.test(v.id || '') || !ss.embeddable || ss.privacyStatus === 'private') return null;
   if (sn.liveBroadcastContent && sn.liveBroadcastContent !== 'none') return null;
@@ -152,7 +187,12 @@ function toRow(v, mode) {
   const d = durSec(cd.duration);
   if (d < 60 || d > 1800) return null;
   const t = nd(sn.title);
-  if (!/\b(?:karaoke|beat)\b/.test(t) || /\b(?:cover|reaction|huong dan|tutorial|shorts|day hat|tap hat|review)\b/.test(t)) return null;
+  if (/\b(?:cover|reaction|huong dan|tutorial|shorts|day hat|tap hat|review)\b/.test(t)) return null;
+  if (!/\b(?:karaoke|beat)\b/.test(t)) {
+    const kw = Object.keys(EXTRA_KW).find(k => EXTRA_KW[k].test(t));
+    if (!kw) return null;
+    if (!kwOn.has(kw)) { if (near) near.push({ id: v.id, title: String(sn.title || '').slice(0, 200), cht: String(sn.channelTitle || '').slice(0, 100), ch: String(sn.channelId || ''), kw }); return null; }
+  }
   const segs = segments(sn.title);
   if (!segs.length) return null;
   const key = (mode === 'artist' && segs.length > 1) ? segs[1] : segs[0];
@@ -255,10 +295,10 @@ async function ingest(env, rows, now) {
   if (!rows.length) return;
   const J = JSON.stringify(rows);
   await env.DB.batch([
-    env.DB.prepare(`INSERT INTO videos (id, channel_id, channel, title, segs, song_key, tone, duration, views, views_delta, published_at, fetched_at, src)
+    env.DB.prepare(`INSERT INTO videos (id, channel_id, channel, title, segs, song_key, tone, duration, views, views_delta, published_at, fetched_at, src, added_at)
       SELECT json_extract(value,'$.id'), json_extract(value,'$.ch'), json_extract(value,'$.cht'), json_extract(value,'$.title'),
              json_extract(value,'$.segs'), json_extract(value,'$.key'), json_extract(value,'$.tone'), json_extract(value,'$.dur'),
-             json_extract(value,'$.views'), 0, json_extract(value,'$.pub'), ?2, json_extract(value,'$.src')
+             json_extract(value,'$.views'), 0, json_extract(value,'$.pub'), ?2, json_extract(value,'$.src'), ?2
       FROM json_each(?1) WHERE true
       ON CONFLICT(id) DO UPDATE SET channel = excluded.channel, title = excluded.title, segs = excluded.segs, src = COALESCE(videos.src, excluded.src),
         song_key = excluded.song_key, tone = excluded.tone, duration = excluded.duration,
@@ -286,9 +326,9 @@ async function fetchAndIngest(env, run, ids, now, opt) {
   const d = await yt(env, run, 'videos', { part: 'snippet,contentDetails,statistics,status', id: ids.join(',') }, 1);
   const items = d.items || [];
   const modes = opt.mode ? {} : await orderModes(env, items);
-  const rows = [];
+  const rows = [], near = [];
   for (const v of items) {
-    const r = toRow(v, opt.mode || modes[v.id]);
+    const r = toRow(v, opt.mode || modes[v.id], near);
     if (r) { r.src = opt.src || null; rows.push(r); }
   }
   const okIds = new Set(rows.map(r => r.id));
@@ -296,6 +336,9 @@ async function fetchAndIngest(env, run, ids, now, opt) {
   if (!(await writesBlocked(env, run, conf(env)))) {   // chạm trần ghi hôm nay → vẫn trả kết quả, chỉ không lưu kho
     await ingest(env, rows, now);
     await removeIds(env, bad, now);
+    if (near.length) await env.DB.prepare(`INSERT INTO near_miss (id, title, channel, channel_id, kw, at)
+        SELECT json_extract(value,'$.id'), json_extract(value,'$.title'), json_extract(value,'$.cht'), json_extract(value,'$.ch'), json_extract(value,'$.kw'), ?2
+        FROM json_each(?1) WHERE true ON CONFLICT(id) DO UPDATE SET at = excluded.at`).bind(JSON.stringify(near), now).run();
   }
   return { added: rows.length, rejected: bad.length, rows, items };
 }
@@ -354,6 +397,34 @@ async function scanOne(env, run, c, ch, now, pageLimit) {
   return r;
 }
 
+// Đoán kiểu tiêu đề của một nguồn từ chính các bản của nó: đoạn nào trùng tên bài của NGUỒN KHÁC nhiều hơn thì đó là tên bài
+async function guessOrder(env, segsList, exceptSrc) {
+  const A = segsList.map(x => x[0]).filter(Boolean), B = segsList.filter(x => x.length > 1).map(x => x[1]);
+  if (!A.length) return { mode: 'song', hitsSong: 0, hitsArtist: 0 };
+  const hit = new Set(((await env.DB.prepare(`SELECT DISTINCT song_key FROM videos WHERE song_key IN (SELECT value FROM json_each(?1))
+      AND (?2 IS NULL OR COALESCE(src, channel_id) <> ?2)`).bind(JSON.stringify([...new Set(A.concat(B))]), exceptSrc || null).all()).results || []).map(x => x.song_key));
+  const hitsSong = A.filter(k => hit.has(k)).length, hitsArtist = B.filter(k => hit.has(k)).length;
+  return { mode: hitsArtist >= 2 && hitsArtist > hitsSong * 1.5 ? 'artist' : 'song', hitsSong, hitsArtist };
+}
+async function autoOrder(env, ch) {
+  const where = ch.kind === 'playlist' ? `src = ?1` : `channel_id = ?1 AND (src IS NULL OR src = ?1)`;
+  const rows = (await env.DB.prepare(`SELECT segs FROM videos WHERE ${where} LIMIT 80`).bind(ch.id).all()).results || [];
+  const g = await guessOrder(env, rows.map(r => { try { return JSON.parse(r.segs); } catch (e) { return []; } }), ch.id);
+  if (g.mode !== (ch.order_mode || 'song')) await env.DB.batch([env.DB.prepare(`UPDATE channels SET order_mode = ?2 WHERE id = ?1`).bind(ch.id, g.mode), rekeyStmt(env, ch, g.mode)]);
+  return g.mode;
+}
+// Thêm một nguồn (kênh/playlist). auto = do kho tự tìm: không đè nguồn đã có, không thêm lại nguồn anh đã xoá/ẩn
+async function addSource(env, s, now, opt) {
+  opt = opt || {};
+  if (opt.auto) {
+    const r = await env.DB.prepare(`INSERT INTO channels (id, title, handle, uploads, enabled, order_mode, full_done, last_scan, video_count, yt_count, added_at, kind, star, owner_id, next_scan, newest_at, auto, added_total)
+        SELECT ?1, ?2, ?3, ?4, 1, ?7, 0, 0, 0, ?5, ?6, ?8, 0, ?9, 0, 0, 1, ?10 WHERE NOT EXISTS (SELECT 1 FROM channel_hide WHERE id = ?1)
+        ON CONFLICT(id) DO NOTHING`).bind(s.id, s.title, s.handle, s.uploads, s.ytCount, now, opt.order || 'song', s.kind, s.owner || null, opt.addedTotal || 0).run();
+    return !!(r.meta && r.meta.changes);
+  }
+  return false;
+}
+
 async function scanJob(env, run, c, now) {
   const t0 = Date.now(), list = [], tried = [], maxPages = c.pages * 2;
   let pages = 0, seen = 0, added = 0, rejected = 0, stop = null;
@@ -379,11 +450,17 @@ async function scanJob(env, run, c, now) {
     const finished = !r.err && (r.done || (ch.full_done && ch.kind !== 'playlist'));
     const token = ch.full_done && ch.kind !== 'playlist' ? null : (r.done ? null : (r.token || null));
     const recount = r.added > 0 || (r.done && !ch.full_done) ? 1 : 0;
+    const total = (+ch.added_total || 0) + r.added;
+    // nguồn tự thêm vừa quét xong lần đầu: ít bản mới → tắt; đủ → tự đoán kiểu tiêu đề (Tên bài trước / Ca sĩ trước)
+    const autoOff = ch.auto && !ch.full_done && r.done && total < AUTO_MIN_NEW;
     if (r.pages || r.err) await env.DB.prepare(`UPDATE channels SET page_token = ?2, full_done = ?3,
         last_scan = CASE WHEN ?4 = 1 THEN ?5 ELSE last_scan END, next_scan = CASE WHEN ?4 = 1 THEN ?6 ELSE next_scan END,
-        newest_at = MAX(IFNULL(newest_at, 0), ?7), note = NULL,
+        newest_at = MAX(IFNULL(newest_at, 0), ?7), note = ?10, added_total = ?9, enabled = CASE WHEN ?10 IS NULL THEN enabled ELSE 0 END,
         video_count = CASE WHEN ?8 = 1 THEN ${VCOUNT} ELSE video_count END WHERE id = ?1`)
-      .bind(ch.id, r.err && !r.pages ? ch.page_token : token, full, finished ? 1 : 0, now, now + nextGap(ch, r.newest, now), r.newest, recount).run();
+      .bind(ch.id, r.err && !r.pages ? ch.page_token : token, full, finished ? 1 : 0, now, now + nextGap(ch, r.newest, now), r.newest, recount,
+        total, autoOff ? 'Tự thêm: chỉ mang về ' + total + ' bản mới — đã tắt sau lần quét đầu' : null).run();
+    if (autoOff) item.e = 'ít bài mới, đã tắt';
+    else if (ch.auto && !ch.full_done && r.done) { const m = await autoOrder(env, ch); if (m === 'artist') item.e = 'tự đổi sang Ca sĩ trước'; }
     if (r.err) { stop = r.err; item.e = String(r.err.message || r.err).slice(0, 160); break; }   // hết hạn mức/lỗi mạng → dừng lượt này
   }
   if (!list.length) {
@@ -406,7 +483,12 @@ async function refreshJob(env, run, c, now) {
     env.DB.prepare(`DELETE FROM yt_cache WHERE at < ?1`).bind(now - MAX_AGE),
     env.DB.prepare(`DELETE FROM rejected WHERE at < ?1`).bind(now - MAX_AGE),
     env.DB.prepare(`DELETE FROM pick_log WHERE ts < ?1`).bind(now - 365 * DAY),
-    env.DB.prepare(`DELETE FROM meta WHERE (k LIKE 'units:%' OR k LIKE 'search:%' OR k LIKE 'writes:%') AND k NOT IN (?1, ?2, ?3)`).bind('units:' + run.day, 'search:' + run.day, 'writes:' + run.day)
+    env.DB.prepare(`DELETE FROM meta WHERE (k LIKE 'units:%' OR k LIKE 'search:%' OR k LIKE 'writes:%') AND k NOT IN (?1, ?2, ?3)`).bind('units:' + run.day, 'search:' + run.day, 'writes:' + run.day),
+    env.DB.prepare(`DELETE FROM meta WHERE k LIKE 'sc:%' AND k NOT LIKE ?1`).bind('%:' + run.day),
+    env.DB.prepare(`DELETE FROM misses WHERE at < ?1`).bind(now - 120 * DAY),
+    env.DB.prepare(`DELETE FROM qstat WHERE day < ?1`).bind(pacificDayOf(now - 60 * DAY)),
+    env.DB.prepare(`DELETE FROM cand WHERE at < ?1`).bind(now - 180 * DAY),
+    env.DB.prepare(`DELETE FROM near_miss WHERE id NOT IN (SELECT id FROM near_miss ORDER BY at DESC LIMIT 600)`)
   ]);
   const due = (await env.DB.prepare(`SELECT id FROM videos WHERE fetched_at < ?1 ORDER BY fetched_at LIMIT ?2`).bind(now - REFRESH_AGE, c.pages * 50).all()).results || [];
   if (!due.length) return { job: 'refresh', idle: true, purged: stale.length };
@@ -497,13 +579,14 @@ async function hotJob(env, run, c, now) {
 }
 
 async function hotSearchJob(env, run, c, now) {
-  const left = c.hotSearch - (run.searchUsed + run.searches);
-  if (left <= 0) return { job: 'hotsearch', idle: true, reason: 'hết lượt tìm tự động hôm nay' };
+  const left = await searchLeft(env, run, c, 'hot', c.hotSearch);
+  if (left <= 0) return { job: 'hotsearch', idle: true, reason: 'hết lượt tìm bài hot hôm nay' };
   const rows = (await env.DB.prepare(`SELECT id, q, label FROM hot WHERE song_key IS NULL AND searched = 0 ORDER BY CASE source WHEN 'manual' THEN 0 ELSE 1 END, rank LIMIT ?1`).bind(Math.min(2, left)).all()).results || [];
   if (!rows.length) return { job: 'hotsearch', idle: true };
   let added = 0;
   for (const r of rows) {
     const d = await yt(env, run, 'search', { part: 'id', type: 'video', videoEmbeddable: 'true', regionCode: 'VN', relevanceLanguage: 'vi', maxResults: 15, q: (r.q || r.label) + ' karaoke' }, 0);
+    run.cat.hot = (run.cat.hot || 0) + 1;
     const ids = (d.items || []).map(x => x.id && x.id.videoId).filter(i => ID_RE.test(i || ''));
     if (ids.length) added += (await fetchAndIngest(env, run, ids, now)).added;
     await env.DB.prepare(`UPDATE hot SET searched = 1 WHERE id = ?1`).bind(r.id).run();
@@ -519,14 +602,155 @@ async function rehotJob(env, run, c, now) {
   const hotSongs = await rebuildHot(env, now);
   return { job: 'rehot', matched, hotSongs };
 }
-const JOBS = { scan: scanJob, refresh: refreshJob, hot: hotJob, hotsearch: hotSearchJob, rehot: rehotJob };
+
+/* ---------------- Mở rộng kho: lấp bài tìm hụt, khám phá kênh/playlist, tìm playlist theo ca sĩ ---------------- */
+// Chuẩn hoá từ khoá tìm: bỏ dấu, bỏ chữ nhiễu (karaoke, beat, tone...) → khoá của "bài tìm hụt"
+function missKey(q) {
+  const w = ascii(q).split(' ').filter(x => x && !QUERY_NOISE.has(x));
+  return w.join(' ').slice(0, 80);
+}
+const DISC_KW = /\b(?:karaoke|beat|instrumental|minus ?one|mr|nhac nen|backing track|(?:tone|ton) (?:nam|nu)|thieu (?:giong )?(?:nam|nu))\b/;
+
+async function gapJob(env, run, c, now) {
+  const left = await searchLeft(env, run, c, 'gap', c.gapSearch);
+  if (left <= 0) return { job: 'gap', idle: true, reason: 'hết lượt tìm lấp bài hụt hôm nay' };
+  const rows = (await env.DB.prepare(`SELECT q, label FROM misses WHERE searched = 0 AND found = 0 ORDER BY n DESC, at DESC LIMIT ?1`).bind(Math.min(2, left)).all()).results || [];
+  if (!rows.length) return { job: 'gap', idle: true };
+  let added = 0; const list = [];
+  for (const r of rows) {
+    const d = await yt(env, run, 'search', { part: 'id', type: 'video', videoEmbeddable: 'true', regionCode: 'VN', relevanceLanguage: 'vi', maxResults: 50, q: (r.label || r.q) + ' karaoke' }, 0);
+    run.cat.gap = (run.cat.gap || 0) + 1;
+    const ids = (d.items || []).map(x => x.id && x.id.videoId).filter(i => ID_RE.test(i || ''));
+    const known = ids.length ? await knownIds(env, ids) : new Set();
+    const fresh = ids.filter(i => !known.has(i));
+    const a = fresh.length ? (await fetchAndIngest(env, run, fresh, now)).added : 0;
+    added += a; list.push({ t: r.label || r.q, a });
+    await env.DB.prepare(`UPDATE misses SET searched = 1, added = ?2 WHERE q = ?1`).bind(r.q, a).run();
+  }
+  return { job: 'gap', searched: rows.length, added, list };
+}
+
+// Khám phá kênh chưa thêm nhưng đã có bản karaoke trong kho (do tìm YouTube / bài hot / lấp bài hụt mang về)
+async function discoverJob(env, run, c, now) {
+  const left = c.discoverPerDay - await catUsed(env, run, 'disc');
+  if (left <= 0) return { job: 'discover', idle: true, reason: 'đã khám phá đủ ' + c.discoverPerDay + ' kênh hôm nay' };
+  if (run.used + run.units > c.budget * 0.85) return { job: 'discover', idle: true, reason: 'giữ đơn vị cho việc quét chính' };
+  const cands = (await env.DB.prepare(`SELECT v.channel_id AS id, MAX(v.channel) AS title, COUNT(*) AS n FROM videos v
+      WHERE v.channel_id LIKE 'UC%' AND v.channel_id NOT IN (SELECT id FROM channels)
+        AND v.channel_id NOT IN (SELECT owner_id FROM channels WHERE owner_id IS NOT NULL)
+        AND v.channel_id NOT IN (SELECT id FROM channel_hide) AND v.channel_id NOT IN (SELECT id FROM cand WHERE at > ?1)
+      GROUP BY v.channel_id ORDER BY n DESC LIMIT ?2`).bind(now - 60 * DAY, Math.min(4, left)).all()).results || [];
+  if (!cands.length) return { job: 'discover', idle: true };
+  const cd = await yt(env, run, 'channels', { part: 'snippet,contentDetails,statistics', id: cands.map(x => x.id).join(',') }, 1);
+  const info = {}; (cd.items || []).forEach(x => { info[x.id] = x; });
+  const list = []; let addCh = 0, addPl = 0;
+  for (const cnd of cands) {
+    run.cat.disc = (run.cat.disc || 0) + 1;
+    const it = info[cnd.id];
+    const rec = { t: cnd.title || cnd.id, n: cnd.n, k: 0, s: 0, act: 'bỏ qua' };
+    const uploads = it && it.contentDetails && it.contentDetails.relatedPlaylists && it.contentDetails.relatedPlaylists.uploads;
+    if (!it || !uploads) { rec.act = 'không đọc được kênh'; list.push(rec); await saveCand(env, cnd, rec, now); continue; }
+    const ytCount = +(it.statistics || {}).videoCount || 0, chTitle = String(it.snippet.title || cnd.title || '').slice(0, 100);
+    // 1) 50 video mới nhất: tỉ lệ karaoke (bản karaoke tìm được cũng vào kho luôn)
+    const pi = await yt(env, run, 'playlistItems', { part: 'contentDetails', playlistId: uploads, maxResults: 50 }, 1);
+    const ids = (pi.items || []).map(x => x.contentDetails && x.contentDetails.videoId).filter(i => ID_RE.test(i || ''));
+    const known = ids.length ? await knownIds(env, ids) : new Set();
+    const fresh = ids.filter(i => !known.has(i));
+    const got = fresh.length ? (await fetchAndIngest(env, run, fresh, now)).added : 0;   // bản mới kênh này vừa mang về (tính vào đóng góp)
+    const inKho = ids.length ? +((await env.DB.prepare(`SELECT COUNT(*) AS n FROM videos WHERE id IN (SELECT value FROM json_each(?1))`).bind(JSON.stringify(ids)).first()).n) : 0;
+    rec.k = inKho; rec.s = ids.length;
+    const ratio = ids.length ? inKho / ids.length : 0;
+    const src = { kind: 'channel', id: cnd.id, title: chTitle, handle: String(it.snippet.customUrl || '').slice(0, 100), uploads, ytCount, owner: cnd.id };
+    if (ratio >= 0.5 && inKho >= 10) {
+      if (await addSource(env, src, now, { auto: true, addedTotal: got })) { addCh++; rec.act = 'thêm cả kênh'; }
+    } else {
+      // 2) kênh không chuyên: tìm playlist karaoke của kênh
+      const pls = await yt(env, run, 'playlists', { part: 'snippet,contentDetails', channelId: cnd.id, maxResults: 50 }, 1);
+      const good = (pls.items || []).filter(p => DISC_KW.test(ascii((p.snippet || {}).title)) && +(p.contentDetails || {}).itemCount >= 3)
+        .sort((a, b) => b.contentDetails.itemCount - a.contentDetails.itemCount).slice(0, 5);
+      let n = 0;
+      for (const p of good) {
+        if (await addSource(env, { kind: 'playlist', id: p.id, title: String(p.snippet.title || '').slice(0, 100), handle: chTitle, uploads: p.id,
+          ytCount: +p.contentDetails.itemCount || 0, owner: cnd.id }, now, { auto: true })) n++;
+      }
+      if (n) { addPl += n; rec.act = 'thêm ' + n + ' playlist karaoke'; }
+      else if (ratio >= 0.2 && ytCount <= 300) { if (await addSource(env, src, now, { auto: true, addedTotal: got })) { addCh++; rec.act = 'thêm kênh nhỏ'; } }
+    }
+    list.push(rec); await saveCand(env, cnd, rec, now);
+  }
+  return { job: 'discover', checked: cands.length, addCh, addPl, list };
+}
+async function saveCand(env, cnd, rec, now) {
+  await env.DB.prepare(`INSERT INTO cand (id, title, n, karaoke, sampled, action, at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+      ON CONFLICT(id) DO UPDATE SET title = excluded.title, n = excluded.n, karaoke = excluded.karaoke, sampled = excluded.sampled, action = excluded.action, at = excluded.at`)
+    .bind(cnd.id, rec.t, cnd.n, rec.k, rec.s, rec.act, now).run();
+}
+
+// Danh sách ca sĩ/nhạc sĩ lấy từ chính tiêu đề trong kho (đoạn ca sĩ), làm mới mỗi ngày; bài anh hay chọn được ưu tiên
+async function refreshArtists(env, now) {
+  const m = await env.DB.prepare(`SELECT v FROM meta WHERE k = 'artists_at'`).first();
+  if (m && now - (+m.v || 0) < DAY) return;
+  const A = `CASE WHEN c.order_mode = 'artist' THEN json_extract(v.segs,'$[0]') ELSE json_extract(v.segs,'$[1]') END`;
+  await env.DB.batch([
+    env.DB.prepare(`INSERT INTO artists (name, n) SELECT a, cnt FROM (SELECT ${A} AS a, COUNT(*) AS cnt FROM videos v
+        LEFT JOIN channels c ON c.id = COALESCE(v.src, v.channel_id) GROUP BY a)
+      WHERE a IS NOT NULL AND length(a) BETWEEN 4 AND 40 AND cnt >= 3
+      ON CONFLICT(name) DO UPDATE SET n = excluded.n WHERE artists.n <> excluded.n`),
+    env.DB.prepare(`UPDATE artists SET prio = 10 WHERE prio < 10 AND name IN (SELECT ${A} FROM pick_log p JOIN videos v ON v.id = p.id
+        LEFT JOIN channels c ON c.id = COALESCE(v.src, v.channel_id) WHERE p.ts >= ?1)`).bind(now - 90 * DAY),
+    env.DB.prepare(`INSERT INTO meta (k, v) VALUES ('artists_at', ?1) ON CONFLICT(k) DO UPDATE SET v = excluded.v`).bind(String(now))
+  ]);
+}
+async function plsearchJob(env, run, c, now) {
+  const left = await searchLeft(env, run, c, 'pl', c.plSearch);
+  if (left <= 0) return { job: 'plsearch', idle: true, reason: 'hết lượt tìm playlist hôm nay' };
+  await refreshArtists(env, now);
+  const a = await env.DB.prepare(`SELECT name FROM artists WHERE searched_at < ?1
+      ORDER BY prio DESC, CASE WHEN n BETWEEN 3 AND 60 THEN 0 ELSE 1 END, n DESC LIMIT 1`).bind(now - 90 * DAY).first();
+  if (!a) return { job: 'plsearch', idle: true };
+  const d = await yt(env, run, 'search', { part: 'snippet', type: 'playlist', regionCode: 'VN', relevanceLanguage: 'vi', maxResults: 50, q: 'karaoke ' + a.name }, 0);
+  run.cat.pl = (run.cat.pl || 0) + 1;
+  const ids = [...new Set((d.items || []).filter(x => DISC_KW.test(ascii((x.snippet || {}).title))).map(x => x.id && x.id.playlistId).filter(i => /^[\w-]{10,64}$/.test(i || '') && !/^(?:RD|LL|WL)/.test(i)))];
+  let added = 0;
+  if (ids.length) {
+    const have = new Set(((await env.DB.prepare(`SELECT id FROM channels WHERE id IN (SELECT value FROM json_each(?1)) UNION SELECT id FROM channel_hide WHERE id IN (SELECT value FROM json_each(?1))`)
+      .bind(JSON.stringify(ids)).all()).results || []).map(x => x.id));
+    const todo = ids.filter(i => !have.has(i)).slice(0, 50);
+    if (todo.length) {
+      const pl = await yt(env, run, 'playlists', { part: 'snippet,contentDetails', id: todo.join(','), maxResults: 50 }, 1);
+      const good = (pl.items || []).filter(p => +(p.contentDetails || {}).itemCount >= 5).sort((x, y) => y.contentDetails.itemCount - x.contentDetails.itemCount).slice(0, 10);
+      for (const p of good) {
+        if (await addSource(env, { kind: 'playlist', id: p.id, title: String(p.snippet.title || '').slice(0, 100), handle: String(p.snippet.channelTitle || '').slice(0, 100),
+          uploads: p.id, ytCount: +p.contentDetails.itemCount || 0, owner: p.snippet.channelId || '' }, now, { auto: true })) added++;
+      }
+    }
+  }
+  await env.DB.prepare(`UPDATE artists SET searched_at = ?2, added = ?3 WHERE name = ?1`).bind(a.name, now, added).run();
+  return { job: 'plsearch', artist: a.name, found: ids.length, added };
+}
+const JOBS = { scan: scanJob, refresh: refreshJob, hot: hotJob, hotsearch: hotSearchJob, rehot: rehotJob, gap: gapJob, discover: discoverJob, plsearch: plsearchJob };
 
 /* ---------------- Bộ điều phối ---------------- */
 async function metaGet(env, keys) {
   const r = await env.DB.prepare(`SELECT k, v FROM meta WHERE k IN (SELECT value FROM json_each(?1))`).bind(JSON.stringify(keys)).all();
   const m = {}; (r.results || []).forEach(x => { m[x.k] = x.v; }); return m;
 }
-function newRun() { return { units: 0, searches: 0, day: pacificDay(), used: 0, searchUsed: 0, quotaHit: false, writes: 0, keyOk: {}, keyBad: {} }; }
+function newRun() { return { units: 0, searches: 0, day: pacificDay(), used: 0, searchUsed: 0, quotaHit: false, writes: 0, keyOk: {}, keyBad: {}, cat: {}, catUsed: null }; }
+// Lượt tìm/đơn vị theo từng loại việc tự động trong ngày (hot, gap, pl = lượt tìm; disc = số kênh khám phá)
+const CATS = ['hot', 'gap', 'pl', 'disc'];
+async function catUsed(env, run, cat) {
+  if (!run.catUsed) {
+    const m = await metaGet(env, CATS.map(k => 'sc:' + k + ':' + run.day));
+    run.catUsed = {}; CATS.forEach(k => { run.catUsed[k] = +m['sc:' + k + ':' + run.day] || 0; });
+  }
+  return run.catUsed[cat] + (run.cat[cat] || 0);
+}
+// Còn được bao nhiêu lượt tìm cho loại việc này: theo trần riêng của loại, và luôn chừa SEARCH_RESERVE lượt cho anh tìm tay
+async function searchLeft(env, run, c, cat, limit) {
+  const own = limit - await catUsed(env, run, cat);
+  const all = c.searchLimit - c.reserve - (run.searchUsed + run.searches);
+  return Math.min(own, all);
+}
 async function flush(env, run, c) {
   if (run.flushed) return;          // mỗi lượt chỉ cộng sổ một lần
   run.flushed = true;
@@ -534,6 +758,7 @@ async function flush(env, run, c) {
   const add = (k, n) => env.DB.prepare(`INSERT INTO meta (k, v) VALUES (?1, ?2) ON CONFLICT(k) DO UPDATE SET v = CAST(CAST(meta.v AS INTEGER) + ?2 AS TEXT)`).bind(k, n);
   if (run.units) st.push(add('units:' + run.day, run.units));
   if (run.searches) st.push(add('search:' + run.day, run.searches));
+  CATS.forEach(k => { if (run.cat[k]) st.push(add('sc:' + k + ':' + run.day, run.cat[k])); });
   if (run.quotaHit) st.push(env.DB.prepare(`INSERT INTO meta (k, v) VALUES (?1, ?2) ON CONFLICT(k) DO UPDATE SET v = excluded.v`).bind('units:' + run.day, String(c.budget)));
   if (run.searchQuotaHit) st.push(env.DB.prepare(`INSERT INTO meta (k, v) VALUES (?1, ?2) ON CONFLICT(k) DO UPDATE SET v = excluded.v`).bind('search:' + run.day, String(c.searchLimit)));
   for (const i of [0, 1]) {
@@ -551,7 +776,7 @@ async function tick(env, force) {
   if (!lk.meta || !lk.meta.changes) return { job: 'busy', note: 'Một lượt chạy khác đang làm việc, thử lại sau ít phút' };
   let rep;
   try {
-    await ensureSchema(env);
+    await ensureSchema(env); await loadKw(env);
     const m = await metaGet(env, ['units:' + run.day, 'search:' + run.day, 'hot_at', 'tick', 'writes:' + run.day]);
     run.used = +m['units:' + run.day] || 0; run.searchUsed = +m['search:' + run.day] || 0;
     run.writesBefore = +m['writes:' + run.day] || 0; run.writeStop = run.writesBefore >= c.writeLimit;
@@ -562,9 +787,8 @@ async function tick(env, force) {
       let order;
       if (force && force !== 'auto') order = [force];
       else if (now - (+m.hot_at || 0) > HOT_EVERY) order = ['hot', 'scan', 'refresh'];
-      else if (t % 3 === 0) order = ['refresh', 'scan', 'hotsearch'];
-      else if (t % 3 === 1) order = ['hotsearch', 'scan', 'refresh'];
-      else order = ['scan', 'refresh', 'hotsearch'];
+      else order = [['refresh', 'scan', 'hotsearch', 'discover'], ['hotsearch', 'scan', 'gap', 'refresh'], ['scan', 'discover', 'refresh', 'gap'],
+                    ['gap', 'scan', 'plsearch', 'refresh'], ['discover', 'scan', 'refresh', 'plsearch'], ['plsearch', 'scan', 'refresh', 'hotsearch']][t % 6];
       for (const j of order) { rep = await JOBS[j](env, run, c, now); if (!rep.idle) break; }
       if (rep.idle && order.length > 1) rep = { job: 'idle', idle: true, reason: 'kho đã cập nhật đủ, chưa có việc mới' };
     }
@@ -663,7 +887,7 @@ async function sourceStats(env, now) {
 }
 const chOut = (c, st) => ({ id: c.id, kind: c.kind || 'channel', title: c.title, handle: c.handle, enabled: !!c.enabled, order: c.order_mode,
   fullDone: !!c.full_done, star: !!c.star, lastScan: c.last_scan, nextScan: c.next_scan || 0, newestAt: c.newest_at || 0, owner: c.owner_id || '',
-  videos: c.video_count, ytCount: c.yt_count, note: c.note || '', addedAt: c.added_at || 0,
+  videos: c.video_count, ytCount: c.yt_count, note: c.note || '', addedAt: c.added_at || 0, auto: !!c.auto, addedTotal: c.added_total || 0,
   songs: st ? st.songs : null, uniq: st ? st.uniq : null, picks30: st ? st.picks : null });
 
 // Tìm trong kho. relaxed = true: chỉ cần khớp MỘT trong các từ (dùng để gợi ý "bài gần giống" khi không tìm được trên YouTube)
@@ -740,7 +964,7 @@ async function route(req, env, ctx, run) {
   const body = req.method === 'POST' ? await req.json().catch(() => ({})) : {};
   const done = () => ctx.waitUntil(flush(env, run, c).catch(() => {}));
   try {
-    await ensureSchema(env);
+    await ensureSchema(env); await loadKw(env);
     /* ----- dùng cho remote.html ----- */
     if (p === '/api/kho/search' && req.method === 'GET') {
       return J({ groups: await groupSearch(env, url.searchParams.get('q') || '', Math.min(num(url.searchParams.get('limit'), 40), 80)) }, 200, h);
@@ -758,6 +982,16 @@ async function route(req, env, ctx, run) {
       const items = await hotList(env, lim);
       const suggest = items.length < 10 ? await suggestList(env, now, 30) : [];
       return J({ items, suggest, quota: { used: await searchUsed(env, run), limit: c.searchLimit } }, 200, h);
+    }
+    // remote báo mỗi lần anh BẤM TÌM (không phải từng phím gõ): đo tỉ lệ tìm hụt, ghi bài kho chưa có để tự lấp
+    if (p === '/api/kho/qlog' && req.method === 'POST') {
+      const label = String(body.q || '').trim().slice(0, 120), key = missKey(label), n = +body.n || 0;
+      if (key.length < 3 || /^https?:|youtu/.test(label)) return J({ ok: true }, 200, h);
+      const st = [env.DB.prepare(`INSERT INTO qstat (day, q, miss) VALUES (?1, 1, ?2) ON CONFLICT(day) DO UPDATE SET q = q + 1, miss = miss + ?2`).bind(run.day, n ? 0 : 1)];
+      if (n) st.push(env.DB.prepare(`UPDATE misses SET found = 1 WHERE q = ?1 AND found = 0`).bind(key));
+      else st.push(env.DB.prepare(`INSERT INTO misses (q, label, n, at) VALUES (?1, ?2, 1, ?3) ON CONFLICT(q) DO UPDATE SET n = n + 1, at = excluded.at, label = excluded.label, found = 0`).bind(key, label, now));
+      await env.DB.batch(st);
+      return J({ ok: true }, 200, h);
     }
     if (p === '/api/kho/new' && req.method === 'GET') {
       return J({ items: await suggestList(env, now, 50) }, 200, h);
@@ -811,6 +1045,7 @@ async function route(req, env, ctx, run) {
         }
         await env.DB.prepare(`INSERT INTO yt_cache (q, items, at) VALUES (?1, ?2, ?3) ON CONFLICT(q) DO UPDATE SET items = excluded.items, at = excluded.at`)
           .bind(qk, JSON.stringify(items), now).run();
+        await env.DB.prepare(`UPDATE misses SET searched = 1 WHERE q = ?1`).bind(missKey(q)).run();   // anh đã tự tìm YouTube → khỏi tìm lại tự động
         if (!items.length) {
           const groups = await groupSearch(env, q, 30, true);
           done();
@@ -891,6 +1126,50 @@ async function route(req, env, ctx, run) {
     }
 
     /* ----- quản trị (kho.html) ----- */
+    /* ----- Mở rộng kho (kho.html) ----- */
+    if (p === '/api/kho/grow' && req.method === 'GET') {
+      const all = (sql, ...b) => env.DB.prepare(sql).bind(...b).all().then(r => r.results || []);
+      const [mis, misN, art, artN, near, nearN, cand, candN] = await Promise.all([
+        all(`SELECT q, label, n, at, searched, added, found FROM misses WHERE found = 0 ORDER BY searched ASC, n DESC, at DESC LIMIT 40`),
+        all(`SELECT SUM(CASE WHEN searched = 0 AND found = 0 THEN 1 ELSE 0 END) AS wait, COUNT(*) AS total FROM misses`),
+        all(`SELECT name, n, prio, searched_at, added FROM artists ORDER BY CASE WHEN searched_at < ?1 THEN 0 ELSE 1 END, prio DESC,
+            CASE WHEN n BETWEEN 3 AND 60 THEN 0 ELSE 1 END, n DESC LIMIT 25`, now - 90 * DAY),
+        all(`SELECT COUNT(*) AS total, SUM(CASE WHEN searched_at > 0 THEN 1 ELSE 0 END) AS done, SUM(added) AS added FROM artists`),
+        all(`SELECT id, title, channel, kw, at FROM near_miss ORDER BY at DESC LIMIT 40`),
+        all(`SELECT kw, COUNT(*) AS n FROM near_miss GROUP BY kw`),
+        all(`SELECT title, n, karaoke, sampled, action, at FROM cand ORDER BY at DESC LIMIT 25`),
+        all(`SELECT COUNT(*) AS n, SUM(CASE WHEN action LIKE 'thêm%' THEN 1 ELSE 0 END) AS added FROM cand`)
+      ]);
+      const au = await env.DB.prepare(`SELECT COUNT(*) AS n, SUM(enabled) AS on_, SUM(added_total) AS vids FROM channels WHERE auto = 1`).first();
+      return J({ misses: mis, missWait: misN[0].wait || 0, missTotal: misN[0].total || 0, artists: art, artistTotal: artN[0].total || 0, artistDone: artN[0].done || 0,
+        artistAdded: artN[0].added || 0, near, nearByKw: nearN, kwOn: [...kwOn], kwOptions: EXTRA_LABEL, cand, candChecked: candN[0].n || 0, candAdded: candN[0].added || 0,
+        autoSources: au.n || 0, autoOn: au.on_ || 0, autoVideos: au.vids || 0 }, 200, h);
+    }
+    // Duyệt từ khoá mở rộng → lưu, rồi nhận lại ngay các bài đã bị loại vì từ khoá đó (≤600 bài, ≈1 đơn vị/50)
+    if (p === '/api/kho/grow/kw' && req.method === 'POST') {
+      const words = (Array.isArray(body.words) ? body.words : []).filter(w => EXTRA_KW[w]);
+      await env.DB.prepare(`INSERT INTO meta (k, v) VALUES ('kw_extra', ?1) ON CONFLICT(k) DO UPDATE SET v = excluded.v`).bind(JSON.stringify(words)).run();
+      kwOn = new Set(words); kwAt = Date.now();
+      const ids = ((await env.DB.prepare(`SELECT id FROM near_miss WHERE kw IN (SELECT value FROM json_each(?1))`).bind(JSON.stringify(words)).all()).results || []).map(x => x.id);
+      let accepted = 0;
+      if (ids.length) {
+        await env.DB.prepare(`DELETE FROM rejected WHERE id IN (SELECT value FROM json_each(?1))`).bind(JSON.stringify(ids)).run();
+        for (let i = 0; i < ids.length; i += 50) accepted += (await fetchAndIngest(env, run, ids.slice(i, i + 50), now)).added;
+        await env.DB.prepare(`DELETE FROM near_miss WHERE id IN (SELECT value FROM json_each(?1))`).bind(JSON.stringify(ids)).run();
+      }
+      done();
+      return J({ ok: true, kwOn: words, rechecked: ids.length, accepted }, 200, h);
+    }
+    if (p === '/api/kho/grow/artists' && req.method === 'POST') {
+      const names = [...new Set(String(body.text || '').split(/[\r\n,;]+/).map(x => ascii(x.replace(/^\s*\d+[.)]\s*/, ''))).filter(x => x.length >= 2 && x.length <= 40))].slice(0, 300);
+      if (names.length) await env.DB.prepare(`INSERT INTO artists (name, n, prio, searched_at) SELECT value, 0, 100, 0 FROM json_each(?1) WHERE true
+          ON CONFLICT(name) DO UPDATE SET prio = 100, searched_at = 0`).bind(JSON.stringify(names)).run();
+      return J({ ok: true, added: names.length }, 200, h);
+    }
+    if (p === '/api/kho/grow/miss/drop' && req.method === 'POST') {
+      await env.DB.prepare(`DELETE FROM misses WHERE q = ?1`).bind(String(body.q || '')).run();
+      return J({ ok: true }, 200, h);
+    }
     if (p === '/api/kho/stats' && req.method === 'GET') {
       const one = (sql, ...b) => env.DB.prepare(sql).bind(...b).first();
       const [v, s, ch, hs, hq, pk] = await Promise.all([
@@ -903,7 +1182,14 @@ async function route(req, env, ctx, run) {
         one(`SELECT COUNT(*) AS n FROM hot_songs`),
         one(`SELECT COUNT(*) AS n FROM hot WHERE song_key IS NULL AND searched = 0`), one(`SELECT COUNT(*) AS n FROM pick_log WHERE ts >= ?1`, now - 30 * DAY)
       ]);
-      const m = await metaGet(env, ['units:' + run.day, 'search:' + run.day, 'last', 'hot_at', 'writes:' + run.day, 'keybad:0', 'keybad:1']);
+      const m = await metaGet(env, ['units:' + run.day, 'search:' + run.day, 'last', 'hot_at', 'writes:' + run.day, 'keybad:0', 'keybad:1'].concat(CATS.map(k => 'sc:' + k + ':' + run.day)));
+      const wk = now - 7 * DAY;
+      const [ns, nv, qs] = await Promise.all([
+        one(`SELECT COUNT(*) AS n FROM (SELECT song_key FROM videos GROUP BY song_key HAVING MIN(IFNULL(added_at, 0)) >= ?1)`, wk),
+        one(`SELECT COUNT(*) AS n FROM videos WHERE added_at >= ?1`, wk),
+        one(`SELECT SUM(q) AS q, SUM(miss) AS miss FROM qstat WHERE day >= ?1`, pacificDayOf(wk))
+      ]);
+      const cat = {}; CATS.forEach(k => { cat[k] = +m['sc:' + k + ':' + run.day] || 0; });
       let last = null; try { last = JSON.parse(m.last || 'null'); } catch (e) {}
       const kb = i => { try { return JSON.parse(m['keybad:' + i] || 'null'); } catch (e) { return null; } };
       const ks = ytKeys(env), keys = [0, 1].map(i => ({ name: i ? 'YT_KEY_2' : 'YT_KEY', set: !!ks[i], bad: ks[i] ? kb(i) : null }));
@@ -911,10 +1197,12 @@ async function route(req, env, ctx, run) {
         dueNow: ch.due || 0, late: ch.late || 0, oldestDue: ch.oldest || 0, hotSongs: hs.n, hotPending: hq.n, picks30: pk.n,
         unitsToday: +m['units:' + run.day] || 0, searchesToday: +m['search:' + run.day] || 0, budget: c.budget, hotSearchPerDay: c.hotSearch,
         pagesPerTick: c.pages, hotAt: +m.hot_at || 0, last, keys,
-        writesToday: +m['writes:' + run.day] || 0, writeLimit: c.writeLimit }, 200, h);
+        writesToday: +m['writes:' + run.day] || 0, writeLimit: c.writeLimit,
+        searchLimit: c.searchLimit, reserve: c.reserve, cat, catLimit: { hot: c.hotSearch, gap: c.gapSearch, pl: c.plSearch, disc: c.discoverPerDay },
+        newSongs7: ns.n || 0, newVersions7: nv.n || 0, q7: qs.q || 0, miss7: qs.miss || 0 }, 200, h);
     }
     if (p === '/api/kho/run' && req.method === 'POST') {
-      const job = ['auto', 'scan', 'refresh', 'hot', 'hotsearch', 'rehot'].includes(body.job) ? body.job : 'auto';
+      const job = ['auto', 'scan', 'refresh', 'hot', 'hotsearch', 'rehot', 'gap', 'discover', 'plsearch'].includes(body.job) ? body.job : 'auto';
       const report = await tick(rawEnv, job);
       const st = await env.DB.prepare(`SELECT (SELECT COUNT(*) FROM channels WHERE enabled = 1 AND full_done = 0) AS pending,
           (SELECT COUNT(*) FROM channels WHERE enabled = 1 AND full_done = 1 AND next_scan <= ?3) AS due,
@@ -964,7 +1252,7 @@ async function route(req, env, ctx, run) {
       const st = [env.DB.prepare(`INSERT INTO channels (id, title, handle, uploads, enabled, order_mode, full_done, last_scan, video_count, yt_count, added_at, kind, star, owner_id, next_scan, newest_at)
           VALUES (?1, ?2, ?3, ?4, 1, COALESCE(?7, 'song'), 0, 0, 0, ?5, ?6, ?8, COALESCE(?9, 0), ?10, 0, 0)
           ON CONFLICT(id) DO UPDATE SET title = excluded.title, handle = excluded.handle, uploads = excluded.uploads, yt_count = excluded.yt_count,
-            enabled = 1, note = NULL, order_mode = COALESCE(?7, order_mode), star = COALESCE(?9, star), kind = excluded.kind, owner_id = excluded.owner_id`)
+            enabled = 1, note = NULL, order_mode = COALESCE(?7, order_mode), star = COALESCE(?9, star), kind = excluded.kind, owner_id = excluded.owner_id, auto = 0`)
         .bind(s.id, s.title, s.handle, s.uploads, s.ytCount, now, order, s.kind, star, s.owner),
         env.DB.prepare(`DELETE FROM channel_hide WHERE id = ?1`).bind(s.id)];
       if (ex && order && ex.order_mode !== order) st.push(rekeyStmt(env, { id: s.id, kind: s.kind }, order));
@@ -1022,8 +1310,8 @@ async function route(req, env, ctx, run) {
         env.DB.prepare(`DELETE FROM videos_fts WHERE rowid IN (SELECT rid FROM videos WHERE ${where})`).bind(id),
         env.DB.prepare(`DELETE FROM videos WHERE ${where}`).bind(id));
       else if (ch.kind === 'playlist') st.push(env.DB.prepare(`UPDATE videos SET src = NULL WHERE src = ?1`).bind(id));   // giữ bài, trả về tính theo kênh đăng
-      if (ch.kind !== 'playlist')     // kênh đã xoá thì không hiện lại trong "Gợi ý từ kho"
-        st.push(env.DB.prepare(`INSERT INTO channel_hide (id, at) VALUES (?1, ?2) ON CONFLICT(id) DO UPDATE SET at = excluded.at`).bind(id, now));
+      // nguồn đã xoá thì không hiện lại trong "Gợi ý từ kho" và kho không tự thêm lại
+      st.push(env.DB.prepare(`INSERT INTO channel_hide (id, at) VALUES (?1, ?2) ON CONFLICT(id) DO UPDATE SET at = excluded.at`).bind(id, now));
       await env.DB.batch(st);
       return J({ ok: true }, 200, h);
     }

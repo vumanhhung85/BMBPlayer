@@ -414,6 +414,7 @@ async function searchViaKho(raw, term, force){
   if(cache.has(term)) return renderYT(cache.get(term), term, true);
   if(!force){
     const n = lastKho.q === raw ? lastKho.n : await renderKho();
+    logQuery(raw, n);
     if(n > 0) return showGate(raw, n);
   }
   gateFor = '';
@@ -498,6 +499,8 @@ async function kapi(path, body){
   return data;
 }
 function reportPick(id){ if(hasKho()) kapi('/api/kho/pick', { id }).catch(() => {}); }
+// Mỗi lần bấm Tìm (không phải từng phím gõ): kho ghi lại để đo tỉ lệ tìm hụt và tự đi tìm bài còn thiếu
+function logQuery(q, n){ if(hasKho() && q.length >= 3 && !parseYT(q).vid && !parseYT(q).list) kapi('/api/kho/qlog', { q, n }).catch(() => {}); }
 const TONE = { nam:'Tone Nam', nu:'Tone Nữ', 'song-ca':'Song ca', 'thieu-nam':'Thiếu giọng nam', 'thieu-nu':'Thiếu giọng nữ' };
 const fmtViews = n => n >= 1e6 ? (n / 1e6).toFixed(n >= 1e7 ? 0 : 1).replace('.', ',') + ' Tr' : n >= 1e3 ? Math.round(n / 1e3) + ' N' : String(n || 0);
 const kItem = v => ({ id:v.id, title:String(v.title || ''), channel:String(v.channel || ''), thumb:'https://i.ytimg.com/vi/' + v.id + '/mqdefault.jpg' });
