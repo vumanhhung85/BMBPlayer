@@ -47,6 +47,8 @@
   .row.cur{background:#1b1530}
   .row .tag{display:inline-block; font-size:11px; font-weight:700; padding:1px 7px; border-radius:999px; background:#2a2140; color:var(--accent2); margin-right:4px}
   .row .tag.hot{background:#3a1f12; color:#fdba74}
+  .row.dead{opacity:.45} .row.dead .name{text-decoration:line-through}
+  .row .gone{color:#fca5a5; font-size:12px; font-weight:700; flex:0 0 auto; max-width:90px; text-align:right}
   .row .more{background:none; border:none; color:var(--accent2); font-size:12px; font-weight:700; padding:4px 0 0; display:block}
   .notice{background:#16142a; border:1px solid #2f2850; border-radius:12px; padding:10px 12px; margin:10px 0 4px; font-size:14px; line-height:1.5}
   .notice .secAct{margin-top:8px}
@@ -499,9 +501,37 @@ function reportPick(id){ if(hasKho()) kapi('/api/kho/pick', { id }).catch(() => 
 const TONE = { nam:'Tone Nam', nu:'Tone Nữ', 'song-ca':'Song ca', 'thieu-nam':'Thiếu giọng nam', 'thieu-nu':'Thiếu giọng nữ' };
 const fmtViews = n => n >= 1e6 ? (n / 1e6).toFixed(n >= 1e7 ? 0 : 1).replace('.', ',') + ' Tr' : n >= 1e3 ? Math.round(n / 1e3) + ' N' : String(n || 0);
 const kItem = v => ({ id:v.id, title:String(v.title || ''), channel:String(v.channel || ''), thumb:'https://i.ytimg.com/vi/' + v.id + '/mqdefault.jpg' });
+/* Bài đã bị gỡ khỏi YouTube: ảnh bìa trả về ảnh xám 120×90 (hoặc lỗi tải) → gom lại, nhờ kho kiểm (1 đơn vị/≤50 bài) và xoá ngay */
+const deadIds = new Set(), suspect = new Set();
+let checkTimer = null;
+const CHK = 'kho_chk';                       // bài đã kiểm là còn sống: nhớ 7 ngày để khỏi kiểm lại
+function chkMap(){ try{ const m = JSON.parse(lsGet(CHK) || '{}'), t = Date.now(); for(const k in m) if(t - m[k] > 7 * 864e5) delete m[k]; return m; }catch(e){ return {}; } }
+function markDead(id){
+  deadIds.add(id); hotCache = null;
+  document.querySelectorAll('[data-vid="' + id + '"]').forEach(r => {
+    if(r.classList.contains('dead')) return;
+    r.classList.add('dead');
+    const b = r.querySelector(':scope > button'); if(b) b.replaceWith(el('span', 'gone', 'Đã bị gỡ khỏi YouTube'));
+  });
+}
+function suspectDead(id){
+  if(deadIds.has(id) || suspect.has(id) || !hasKho() || chkMap()[id]) return;
+  suspect.add(id); clearTimeout(checkTimer);
+  checkTimer = setTimeout(async () => {
+    const ids = [...suspect].slice(0, 50); ids.forEach(i => suspect.delete(i));
+    try{
+      const d = await kapi('/api/kho/check', { ids, reason:'thumb' });
+      (d.removed || []).forEach(markDead);
+      const m = chkMap(), t = Date.now(); (d.ok || []).forEach(i => { m[i] = t; }); try{ localStorage.setItem(CHK, JSON.stringify(m)); }catch(e){}
+    }catch(e){}
+  }, 1500);
+}
 function khoRow(v, opts){
   const it = kItem(v), row = el('div', 'row');
+  row.dataset.vid = it.id;
   const img = document.createElement('img'); img.alt = ''; img.loading = 'lazy'; img.src = it.thumb;
+  img.onload = () => { if(img.naturalWidth === 120 && img.naturalHeight === 90) suspectDead(it.id); };   // mqdefault thật là 320×180
+  img.onerror = () => suspectDead(it.id);
   const meta = el('div', 'meta'), sub = el('div', 'sub');
   if(opts.rank) sub.append(el('span', 'tag hot', '🔥 ' + opts.rank));
   if(v.tone && TONE[v.tone]) sub.append(el('span', 'tag', TONE[v.tone]));
@@ -523,6 +553,7 @@ function khoRow(v, opts){
     meta.append(vb);
   }
   row.append(addBtn(it, true));
+  if(deadIds.has(it.id)) setTimeout(() => markDead(it.id), 0);
   return wrap;
 }
 let hotCache = null, sugCache = [], hotAll = false, khoTimer = null, khoSeq = 0, lastKho = { q:null, n:0 };
@@ -597,7 +628,9 @@ let volTimer; $('vol').oninput = e => { clearTimeout(volTimer); const v = +e.tar
 
 /* ---------- Nhận trạng thái ---------- */
 bc.onmessage = ev => {
-  const m = ev.data || {}; if(m.type !== 'state') return;
+  const m = ev.data || {};
+  if(m.type === 'dead' && /^[\w-]{11}$/.test(m.id || '')){ markDead(m.id); return; }
+  if(m.type !== 'state') return;
   const s = m.payload || {};
   $('nowTitle').textContent = s.apiFailed ? '⚠ Màn hình phát không tải được YouTube, xem hướng dẫn trên màn hình phát'
     : s.needStart ? '⚠ Bấm “▶ Bắt đầu phiên hát” trên màn hình phát một lần để bắt đầu'

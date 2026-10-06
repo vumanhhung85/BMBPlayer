@@ -172,8 +172,18 @@ const ERRMSG = {
   150:'Chủ video không cho phép phát nhúng',
   153:'Thiếu thông tin nguồn (Referer). Hãy mở trang qua http://localhost hoặc GitHub Pages, không mở bằng file://'
 };
+// Bài bị gỡ / cấm nhúng → báo kho karaoke kiểm lại và xoá ngay (dùng chung địa chỉ + mật khẩu đã lưu ở remote/kho trên cùng trang)
+const KHO_DEFAULT = 'https://kho-karaoke.vumanhhung85.workers.dev';
+function reportDead(id, done){
+  let kho = '', pass = '';
+  try{ kho = localStorage.getItem('kho_api') || KHO_DEFAULT; pass = localStorage.getItem('np_pass') || ''; }catch(e){}
+  if(!kho || !pass || !/^[\w-]{11}$/.test(id || '')) return;
+  fetch(kho + '/api/kho/check', { method:'POST', headers:{ 'x-pass':pass, 'content-type':'application/json' }, body:JSON.stringify({ ids:[id], reason:'player' }) })
+    .then(r => r.ok ? r.json() : null).then(d => { if(d && (d.removed || []).includes(id) && done) done(); }).catch(() => {});
+}
 function onError(e){
   const it = queue[cur];
+  if(it && [100, 101, 150].includes(e.data)) reportDead(it.id, () => { bc.postMessage({ type:'dead', id:it.id }); toast('Đã gỡ "' + it.title + '" khỏi kho karaoke (không còn phát được trên YouTube).'); });
   toast('Không phát được "' + (it ? it.title : '') + '"\n' + (ERRMSG[e.data] || ('Mã lỗi ' + e.data)) +
         (e.data === 153 ? '' : '\nTự chuyển bài kế sau 4 giây.'));
   if(e.data !== 153) setTimeout(next, 4000);
