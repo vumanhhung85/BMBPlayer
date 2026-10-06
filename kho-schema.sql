@@ -14,4 +14,5 @@ CREATE INDEX IF NOT EXISTS idx_pick_ts ON pick_log (ts);
 CREATE TABLE IF NOT EXISTS hot (id TEXT PRIMARY KEY, source TEXT, rank INTEGER, label TEXT, q TEXT, cands TEXT, song_key TEXT, searched INTEGER DEFAULT 0, seen_at INTEGER);
 CREATE TABLE IF NOT EXISTS hot_songs (song_key TEXT PRIMARY KEY, score REAL, trend_rank INTEGER, delta REAL, picks INTEGER, best_id TEXT, versions INTEGER, label TEXT);
 CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT);
+CREATE TABLE IF NOT EXISTS yt_cache (q TEXT PRIMARY KEY, items TEXT, at INTEGER);
 INSERT OR IGNORE INTO meta (k, v) VALUES ('lock', '0');
