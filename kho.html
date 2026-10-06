@@ -67,13 +67,15 @@
   <h2>Tình trạng kho <button class="ghost sp" id="reloadStats">↻</button></h2>
   <div class="grid" id="stats"></div>
   <div class="line" style="margin-top:10px">
-    <button id="runAuto">▶ Chạy 1 lượt</button>
+    <button id="fastScan">⚡ Quét nhanh đến khi xong</button>
+    <button class="ghost" id="runAuto">▶ Chạy 1 lượt</button>
     <button class="ghost" data-job="scan">Quét kênh</button>
     <button class="ghost" data-job="refresh">Làm mới</button>
     <button class="ghost" data-job="hot">Cập nhật bài hot</button>
     <button class="ghost" data-job="hotsearch">Tìm bài hot còn thiếu</button>
   </div>
-  <div class="hint">Kho tự chạy 10 phút/lần (Cron Trigger), mỗi lượt làm một việc nhỏ. Các nút này để chạy ngay khi cần, không bắt buộc.</div>
+  <div class="hint">Kho tự chạy 10 phút/lần (Cron Trigger), mỗi lượt làm một việc nhỏ. <b>Quét nhanh</b> dùng khi mới thêm kênh: trang này gọi quét liên tục (giữ trang mở) cho tới khi quét hết các kênh, rồi tự ghép lại bài hot.</div>
+  <div class="hint err" id="cronWarn" style="display:none"></div>
   <pre id="last">—</pre>
 </section>
 
@@ -129,7 +131,7 @@ async function api(path, body){
 function fail(boxId, e){ const b = $(boxId); b.replaceChildren(el('div', 'hint err', e.message || String(e))); }
 
 /* ---------- Tình trạng ---------- */
-const JOB = { scan:'Quét kênh', refresh:'Làm mới', hot:'Cập nhật bài hot', hotsearch:'Tìm bài hot còn thiếu', idle:'Nghỉ', busy:'Đang bận', error:'Lỗi' };
+const JOB = { scan:'Quét kênh', refresh:'Làm mới', hot:'Cập nhật bài hot', hotsearch:'Tìm bài hot còn thiếu', rehot:'Ghép lại bài hot', idle:'Nghỉ', busy:'Đang bận', error:'Lỗi' };
 function showReport(r){
   if(!r){ $('last').textContent = '—'; return; }
   const parts = [(JOB[r.job] || r.job) + ' · ' + ago(r.at)];
@@ -137,6 +139,7 @@ function showReport(r){
   if(r.channel) parts.push('kênh “' + r.channel + '” (' + r.mode + '): ' + r.pages + ' trang, ' + r.seen + ' video, thêm ' + r.added + ', bỏ ' + r.rejected + (r.done ? ', đã xong' : ', còn tiếp'));
   if(r.refreshed != null) parts.push('làm mới ' + r.refreshed + ', gỡ ' + r.removed + ' bài không còn phát được, xoá ' + r.purged + ' bài quá 30 ngày');
   if(r.trending != null) parts.push(r.trending + ' bài thịnh hành, ghép được ' + r.matched + ', bảng hot ' + r.hotSongs + ' bài');
+  if(r.job === 'rehot') parts.push('ghép được ' + r.matched + ' bài, bảng hot ' + r.hotSongs + ' bài');
   if(r.searched != null) parts.push('đã tìm ' + r.searched + ' bài, thêm ' + r.added + ' bản karaoke, ghép được ' + r.matched);
   if(r.error) parts.push('Lỗi: ' + r.error);
   if(r.note) parts.push(r.note);
@@ -152,6 +155,11 @@ async function loadStats(){
      ['Tìm tự động', s.searchesToday + '/' + s.hotSearchPerDay], ['Bài hot cập nhật', ago(s.hotAt)]]
       .forEach(([l, v]) => { const d = el('div', 'stat'); d.append(el('b', null, String(v)), el('span', null, l)); g.append(d); });
     showReport(s.last);
+    const w = $('cronWarn');
+    if(s.last && Date.now() - s.last.at > 30 * 60000){
+      w.textContent = '⚠ Lượt chạy gần nhất cách đây ' + ago(s.last.at) + ' nên lịch tự chạy 10 phút/lần (Cron Trigger) đang KHÔNG hoạt động. Vào Cloudflare → Worker kho-karaoke → Settings → Triggers → thêm Cron Trigger */10 * * * * .';
+      w.style.display = '';
+    } else w.style.display = 'none';
   }catch(e){ fail('stats', e); }
 }
 async function runJob(job, b){
@@ -263,6 +271,45 @@ $('manualSave').onclick = async () => {
   try{ const d = await api('/api/kho/hot/manual', { text, replace:$('manualReplace').checked }); alert('Đã lưu ' + d.added + ' bài, ghép ngay được ' + d.matched + ' bài. Bài còn thiếu sẽ được tự tìm bản karaoke dần.'); $('manual').value = ''; loadHot(); loadStats(); }
   catch(e){ alert(e.message); }
 };
+
+/* ---------- Quét nhanh: gọi quét liên tục từ trình duyệt (mỗi lần là một lượt chạy riêng của Worker) ---------- */
+let fastRun = false;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+$('fastScan').onclick = async () => {
+  if(fastRun){ fastRun = false; $('fastScan').textContent = '⏹ Đang dừng…'; return; }
+  fastRun = true; $('fastScan').textContent = '⏹ Dừng quét nhanh';
+  document.querySelectorAll('[data-job], #runAuto').forEach(x => x.disabled = true);
+  let addedTotal = 0, rounds = 0, fails = 0, endMsg = '';
+  const t0 = Date.now();
+  try{
+    while(fastRun){
+      let d;
+      try{ d = await api('/api/kho/run', { job:'scan' }); fails = 0; }
+      catch(e){ if(++fails >= 3){ endMsg = 'Dừng vì lỗi: ' + e.message; break; } await sleep(3000); continue; }
+      const r = d.report || {}; rounds++;
+      if(r.job === 'busy'){ await sleep(4000); continue; }
+      if(r.job === 'error'){ endMsg = 'Dừng vì lỗi: ' + r.error + (/quota/i.test(r.reason || r.error) ? ' (hết hạn mức YouTube hôm nay)' : ''); break; }
+      if(r.job === 'idle' && r.reason){ endMsg = 'Dừng: ' + r.reason; break; }
+      if(r.idle){ endMsg = 'Đã quét hết các kênh.'; break; }
+      addedTotal += r.added || 0;
+      const min = Math.max(1, Math.round((Date.now() - t0) / 60000));
+      $('last').textContent = '⚡ Quét nhanh: lượt ' + rounds + ' · kênh “' + r.channel + '” +' + (r.added || 0) + ' bài' + (r.done ? ' (xong kênh)' : '') +
+        '\nKho hiện có ' + fmt(d.videos) + ' bản · còn ' + d.pending + ' kênh chưa quét hết · đã thêm ' + fmt(addedTotal) + ' bài trong ' + min + ' phút' +
+        '\nĐơn vị hôm nay: ' + fmt(d.units) + '/' + fmt(d.budget);
+      if(r.done || rounds % 10 === 0){ loadStats(); loadChannels(); }
+      if(d.units >= d.budget){ endMsg = 'Dừng vì đã chạm trần đơn vị hôm nay.'; break; }
+      await sleep(300);
+    }
+    if(addedTotal){ try{ await api('/api/kho/run', { job:'rehot' }); }catch(e){} }
+  }finally{
+    fastRun = false; $('fastScan').textContent = '⚡ Quét nhanh đến khi xong';
+    document.querySelectorAll('[data-job], #runAuto').forEach(x => x.disabled = false);
+    const sum = '⚡ Quét nhanh xong ' + rounds + ' lượt. ' + (endMsg || 'Đã dừng.') + '\nTổng thêm ' + fmt(addedTotal) + ' bài vào kho' + (addedTotal ? ', đã ghép lại bài hot.' : '.');
+    await loadStats(); loadChannels(); loadHot();
+    $('last').textContent = sum;
+  }
+};
+window.addEventListener('beforeunload', e => { if(fastRun){ e.preventDefault(); e.returnValue = ''; } });
 
 function loadAll(){ loadStats(); loadChannels(); loadHot(); }
 if(!cfg.pass) $('settings').style.display = '';
