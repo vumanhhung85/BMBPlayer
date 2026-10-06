@@ -204,7 +204,7 @@ async function picksById(env, ids, since) {
 
 /* ---------------- Các việc định kỳ ---------------- */
 async function scanJob(env, run, c, now) {
-  const ch = await env.DB.prepare(`SELECT * FROM channels WHERE enabled = 1 AND (full_done = 0 OR last_scan < ?1) ORDER BY full_done DESC, last_scan ASC LIMIT 1`).bind(now - DAY).first();
+  const ch = await env.DB.prepare(`SELECT * FROM channels WHERE enabled = 1 AND (full_done = 0 OR last_scan < ?1) ORDER BY full_done ASC, (page_token IS NULL) ASC, last_scan ASC LIMIT 1`).bind(now - DAY).first();
   if (!ch) return { job: 'scan', idle: true };
   let token = ch.full_done ? '' : (ch.page_token || ''), pages = 0, seen = 0, added = 0, rejected = 0, done = false;
   try {
@@ -349,7 +349,13 @@ async function hotSearchJob(env, run, c, now) {
   return { job: 'hotsearch', searched: rows.length, added, matched };
 }
 
-const JOBS = { scan: scanJob, refresh: refreshJob, hot: hotJob, hotsearch: hotSearchJob };
+// Ghép lại bài hot với kho (không gọi YouTube) — chạy sau khi quét nhanh xong
+async function rehotJob(env, run, c, now) {
+  const matched = await rematch(env);
+  const hotSongs = await rebuildHot(env, now);
+  return { job: 'rehot', matched, hotSongs };
+}
+const JOBS = { scan: scanJob, refresh: refreshJob, hot: hotJob, hotsearch: hotSearchJob, rehot: rehotJob };
 
 /* ---------------- Bộ điều phối ---------------- */
 async function metaGet(env, keys) {
@@ -634,8 +640,11 @@ async function handle(req, env, ctx) {
         pagesPerTick: c.pages, hotAt: +m.hot_at || 0, last }, 200, h);
     }
     if (p === '/api/kho/run' && req.method === 'POST') {
-      const job = ['auto', 'scan', 'refresh', 'hot', 'hotsearch'].includes(body.job) ? body.job : 'auto';
-      return J({ report: await tick(env, job) }, 200, h);
+      const job = ['auto', 'scan', 'refresh', 'hot', 'hotsearch', 'rehot'].includes(body.job) ? body.job : 'auto';
+      const report = await tick(env, job);
+      const st = await env.DB.prepare(`SELECT (SELECT COUNT(*) FROM channels WHERE enabled = 1 AND full_done = 0) AS pending,
+          (SELECT COUNT(*) FROM videos) AS videos, (SELECT v FROM meta WHERE k = ?1) AS units`).bind('units:' + run.day).first();
+      return J({ report, pending: st.pending, videos: st.videos, units: +st.units || 0, budget: c.budget }, 200, h);
     }
     if (p === '/api/kho/channels' && req.method === 'GET') {
       const rows = (await env.DB.prepare(`SELECT * FROM channels ORDER BY added_at`).all()).results || [];
