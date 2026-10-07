@@ -62,6 +62,7 @@
 </style>
 </head>
 <body>
+<script src="./phong-channel.js"></script>
 <div id="stage">
   <div id="topbar">
     <span id="roomTag">PHÒNG</span>
@@ -81,6 +82,7 @@
       <div id="fileWarn">Trang đang mở bằng <b>file://</b>. YouTube yêu cầu trang nhúng có địa chỉ http(s) nên video sẽ báo lỗi 153.
         Hãy chạy <b>python -m http.server 8000</b> trong thư mục chứa file rồi mở <b>http://localhost:8000/</b>, hoặc đưa lên GitHub Pages.</div>
       <div id="diag"></div>
+      <div id="roomNote" style="display:none;margin:14px 0;font-size:18px;color:#fbbf24;font-weight:700"></div>
       <button id="startBtn">▶ Bắt đầu phiên hát</button>
     </div>
 
@@ -112,10 +114,12 @@
    không đổi tone, không tách giọng, không quyết định được quảng cáo.
    ============================================================ */
 const params = new URLSearchParams(location.search);
-const ROOM = (params.get('room') || 'P1').toUpperCase();
-const bc = new BroadcastChannel('bmb-yt-' + ROOM);
+const ROOM0 = (params.get('room') || 'P1').toUpperCase();
+const bc = openRoomChannel('tv', ROOM0);          // có ?r=<mã TV> → kênh riêng của phòng qua Worker bmb-phong; không có → BroadcastChannel như cũ
+const ROOM = bc.ws ? bc.roomId : ROOM0;
 const $ = id => document.getElementById(id);
-$('roomTag').textContent = 'PHÒNG ' + ROOM;
+function paintRoomTag(extra){ $('roomTag').textContent = 'PHÒNG ' + ROOM + (extra ? ' · ' + extra : ''); }
+paintRoomTag();
 if(location.protocol === 'file:') $('fileWarn').style.display = 'block';
 
 let queue = [], cur = -1;
@@ -280,6 +284,7 @@ function push(){
 }
 bc.onmessage = ev => {
   const m = ev.data || {}; if(m.type !== 'cmd') return;
+  if(!roomOpen) return;
   const c = m.payload || {};
   switch(c.action){
     case 'add': addSong(c); break;
@@ -293,6 +298,29 @@ bc.onmessage = ev => {
     case 'hello': push(); break;
   }
 };
+/* ---------- Kênh phòng (chỉ khi mở bằng liên kết có ?r=) ---------- */
+let roomOpen = !bc.ws, lastSession = null;
+function roomNote(t){ const n = $('roomNote'); n.textContent = t || ''; n.style.display = t ? 'block' : 'none'; }
+function resetSession(){
+  queue = []; cur = -1;
+  if(ready){ try{ player.stopVideo(); }catch(e){} }
+  $('nowTitle').textContent = '—'; $('idle').style.display = 'flex'; render();
+}
+if(bc.ws){
+  bc.onroom = m => {
+    if(m.replaced){ roomNote('Màn hình khác đã nhận phòng này'); return; }
+    if(lastSession !== null && m.session !== lastSession) resetSession();     // phòng đóng/mở lại = phiên hát mới, xoá hàng chờ cũ
+    lastSession = m.session; roomOpen = !!m.open;
+    if(!m.open){ resetSession(); roomNote('Phòng chưa mở — chờ nhân viên mở phòng'); paintRoomTag(); }
+    else { roomNote(''); paintRoomTag(m.remotes ? m.remotes + ' điện thoại' : 'chưa có điện thoại'); push(); }
+  };
+  bc.onstatus = s => {
+    if(s === 'offline' || s === 'connecting') paintRoomTag('đang nối…');
+    if(s === 'replaced') roomNote('Màn hình khác đã nhận phòng này');
+    if(s === 'rotated') roomNote('Mã TV đã bị đổi — mở lại liên kết TV mới');
+    if(s === 'expired') roomNote('Mã TV không hợp lệ');
+  };
+}
 render(); push();
 </script>
 </body>

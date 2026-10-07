@@ -816,10 +816,25 @@ function cors(req, env) {
   return {
     ok, h: {
       'Access-Control-Allow-Origin': origin && ok ? origin : (allowed[0] || '*'),
-      'Access-Control-Allow-Headers': 'x-pass, content-type', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'x-pass, x-guest, content-type', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Max-Age': '86400', 'Vary': 'Origin', 'Content-Type': 'application/json; charset=utf-8'
     }
   };
+}
+/* Vé khách: điện thoại quét QR phòng được Worker bmb-phong cấp 1 vé ký bằng GUEST_SECRET (cùng giá trị ở cả hai Worker).
+   Vé chỉ mở các lệnh tìm/chọn bài bên dưới, hết hạn sau vài giờ; mọi lệnh quản trị (kênh, quét, mở rộng kho…) vẫn cần x-pass. */
+const GUEST_OK = new Set(['GET /api/kho/search', 'GET /api/kho/versions', 'GET /api/kho/hot', 'GET /api/kho/new', 'GET /api/kho/quota', 'GET /api/kho/ytsearch', 'POST /api/kho/pick', 'POST /api/kho/qlog', 'POST /api/kho/check']);
+async function guestAllowed(req, env, p) {
+  const t = req.headers.get('x-guest') || '';
+  if (!env.GUEST_SECRET || !t || !GUEST_OK.has(req.method + ' ' + p)) return false;
+  const i = t.lastIndexOf('.'); if (i < 3) return false;
+  const payload = t.slice(0, i), sig = t.slice(i + 1), exp = +payload.slice(payload.lastIndexOf('.') + 1);
+  if (!(exp > Date.now())) return false;
+  const k = await crypto.subtle.importKey('raw', new TextEncoder().encode(env.GUEST_SECRET), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const raw = new Uint8Array(await crypto.subtle.sign('HMAC', k, new TextEncoder().encode('guest|' + payload)));
+  const want = btoa(String.fromCharCode(...raw)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '').slice(0, 22);
+  let d = want.length ^ sig.length; for (let j = 0; j < want.length; j++) d |= want.charCodeAt(j) ^ (sig.charCodeAt(j) || 0);
+  return d === 0;
 }
 const J = (data, status, h) => new Response(JSON.stringify(data), { status: status || 200, headers: h });
 
@@ -956,7 +971,7 @@ async function route(req, env, ctx, run) {
   if (!ok) return J({ error: 'Origin không được phép', reason: 'origin' }, 403, h);
   const url = new URL(req.url), p = url.pathname.replace(/\/+$/, '');
   if (p === '' || p === '/') return J({ ok: true, app: 'kho-karaoke' }, 200, h);
-  if (!env.APP_PASS || req.headers.get('x-pass') !== env.APP_PASS) return J({ error: 'Sai mật khẩu', reason: 'auth' }, 401, h);
+  if (!(await guestAllowed(req, env, p)) && (!env.APP_PASS || req.headers.get('x-pass') !== env.APP_PASS)) return J({ error: 'Sai mật khẩu', reason: 'auth' }, 401, h);
   if (!env.DB) return J({ error: 'Worker chưa gắn D1 với tên DB' }, 500, h);
   const c = conf(env), now = Date.now();
   const rawEnv = env;
