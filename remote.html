@@ -108,6 +108,7 @@
   <div class="opt"><span>Gõ là tìm ngay trong Kho karaoke (không tốn lượt). Bấm <b>Tìm</b>: kho có bài thì chọn luôn, chưa có mới tìm trên YouTube.</span></div>
   <div class="opt"><input type="checkbox" id="kw" checked><label for="kw">Tự thêm chữ “karaoke” vào đầu khi tìm trên YouTube</label></div>
   <div class="opt" id="quotaLine"></div>
+  <div class="opt" id="idxLine" style="display:none"></div>
   <div class="opt" id="plBox" style="gap:6px;flex-wrap:wrap">
     <label for="plSel" style="white-space:nowrap">Playlist đã lưu:</label>
     <select id="plSel" style="flex:1;min-width:120px;padding:8px;border-radius:8px;background:#14141c;color:inherit;border:1px solid var(--line)"><option value="">(chưa tải)</option></select>
@@ -170,7 +171,7 @@ $('gear').onclick = () => { const s = $('settings'); if(s.style.display !== 'blo
 $('saveKey').onclick = () => {
   cfg.api = $('apiInput').value.trim().replace(/\/+$/, ''); cfg.pass = $('passInput').value; cfg.kho = $('khoInput').value.trim().replace(/\/+$/, '');
   lsSet(API_NAME, cfg.api); lsSet(PASS_NAME, cfg.pass); lsSet(KHO_NAME, cfg.kho);
-  $('settings').style.display = 'none'; msg('Đã lưu kết nối. Nhập tên bài hoặc dán link để bắt đầu.'); autoRefresh(); loadPlaylistNames(true); hotCache = null; quota = null; showQuota(); renderKho();
+  $('settings').style.display = 'none'; msg('Đã lưu kết nối. Nhập tên bài hoặc dán link để bắt đầu.'); autoRefresh(); loadPlaylistNames(true); hotCache = null; quota = null; showQuota(); renderKho(); loadIndex();
 };
 $('clearKey').onclick = () => { try{ localStorage.removeItem(API_NAME); localStorage.removeItem(PASS_NAME); localStorage.removeItem(KHO_NAME); }catch(e){} cfg = { api:DEFAULT_API, pass:'', kho:DEFAULT_KHO }; $('apiInput').value = DEFAULT_API; $('passInput').value = ''; $('khoInput').value = DEFAULT_KHO; msg('Đã xoá thông tin kết nối.'); };
 $('apiInput').value = cfg.api; $('khoInput').value = cfg.kho;     // địa chỉ Worker điền sẵn, chỉ cần nhập mật khẩu
@@ -596,6 +597,13 @@ async function renderKho(){
       return 0;
     }
     if(raw.length < 2){ box.replaceChildren(); lastKho = { q:raw, n:0 }; return 0; }
+    const loc = localKho(raw, 30);
+    if(loc && loc.length){
+      lastKho = { q:raw, n:loc.length };
+      box.replaceChildren(khoHead('Kho karaoke (' + loc.length + (loc.length >= 30 ? '+' : '') + ' bài · trên máy)'));
+      loc.forEach(g => box.append(khoRow({ id:g.id, title:g.title, channel:g.channel, tone:g.tone, views:g.views, picks:g.picks }, { versions:g.versions, key:g.key, tone:g.tone })));
+      return loc.length;
+    }
     const d = await kapi('/api/kho/search?q=' + encodeURIComponent(raw) + '&limit=30');
     if(seq !== khoSeq) return 0;
     const g = d.groups || [];
@@ -612,7 +620,78 @@ async function renderKho(){
     return 0;
   }
 }
-function khoSoon(){ clearTimeout(khoTimer); khoTimer = setTimeout(renderKho, 300); }
+function khoSoon(){ clearTimeout(khoTimer); if(IDX) renderKho(); else khoTimer = setTimeout(renderKho, 300); }   // có danh mục trên máy: tìm ngay, không chờ
+
+/* ---------- Danh mục kho trên máy (giống songs.dat của SmartK) ----------
+   Tải /api/kho/index tối đa 1 lần/ngày, lưu IndexedDB, quá 7 ngày thì xoá (dữ liệu YouTube không giữ quá 30 ngày).
+   Gõ là tìm ngay trên máy, kể cả gõ tắt chữ cái đầu: "slca" → Sai lầm của anh, "tnp" → Tình nhạt phai.
+   Trên máy không có thì mới hỏi Worker (FTS), rồi YouTube như trước. */
+const IDX_MAX_AGE = 7 * DAY;
+let IDX = null;
+const vnDay = t => new Date(t + 7 * 3600000).toISOString().slice(0, 10);
+const asc = s => nd(s).replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+function idbOpen(){
+  return new Promise((res, rej) => {
+    if(!window.indexedDB) return rej(new Error('no idb'));
+    const r = indexedDB.open('bmb_kho', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('kv');
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  });
+}
+async function idb(mode, fn){
+  const db = await idbOpen();
+  return new Promise(res => { const tx = db.transaction('kv', mode); const q = fn(tx.objectStore('kv')); tx.oncomplete = () => res(q && q.result); tx.onerror = tx.onabort = () => res(null); });
+}
+function prepIndex(d){
+  const list = (d.rows || []).map(r => {
+    const key = String(r[0] || ''), tw = asc(r[3]);
+    return { key, tone: r[1] || '', id: r[2], title: r[3], channel: (d.chans || [])[r[4]] || '', versions: r[5] || 1, hot: r[6] || 0, views: r[7] || 0, picks: r[8] || 0,
+             ab: key.split(' ').filter(Boolean).map(w => w[0]).join(''), hay: ' ' + key + ' ' + tw + ' ' };
+  });
+  return { v: d.v, at: d.at, list };
+}
+function paintIdx(got){
+  const l = $('idxLine'); if(!IDX){ l.style.display = 'none'; return; }
+  l.style.display = ''; l.textContent = 'Danh mục trên máy: ' + IDX.list.length.toLocaleString('vi-VN') + ' bài · tải ' + new Date(got || IDX.at).toLocaleDateString('vi-VN') + ' · gõ tắt được, vd. “slca”.';
+}
+let idxLoading = false;
+async function loadIndex(){
+  if(!hasKho() || idxLoading) return;
+  idxLoading = true;
+  try{
+    let saved = null; try{ saved = await idb('readonly', st => st.get('index')); }catch(e){}
+    if(saved && (!saved.got || Date.now() - saved.got > IDX_MAX_AGE)){ try{ await idb('readwrite', st => st.delete('index')); }catch(e){} saved = null; }
+    if(saved && !IDX){ IDX = prepIndex(saved.d); paintIdx(saved.got); if($('q').value.trim()) renderKho(); }
+    if(saved && saved.d.v === vnDay(Date.now())) return;                       // hôm nay đã tải
+    const res = await fetch(cfg.kho + '/api/kho/index', { headers: Object.assign({}, khoAuth(), saved && saved.etag ? { 'If-None-Match': saved.etag } : {}) });
+    if(res.status === 304 && saved){ saved.got = Date.now(); try{ await idb('readwrite', st => st.put(saved, 'index')); }catch(e){} paintIdx(saved.got); return; }
+    if(!res.ok) return;
+    const d = await res.json(), rec = { d, etag: res.headers.get('ETag') || '', got: Date.now() };
+    try{ await idb('readwrite', st => st.put(rec, 'index')); }catch(e){}
+    IDX = prepIndex(d); paintIdx(rec.got);
+    if($('q').value.trim()) renderKho();
+  }catch(e){}
+  finally{ idxLoading = false; }
+}
+// Xếp hạng: khớp đủ chữ cái đầu > tên bài bắt đầu bằng chữ gõ > khớp đầu chuỗi viết tắt > khớp từng từ; bằng nhau thì bài hot, được chọn nhiều, nhiều lượt xem
+function localKho(raw, lim){
+  if(!IDX) return null;
+  const q = asc(raw); if(q.length < 2) return [];
+  let toks = q.split(' ').filter(w => !QN.has(w)); if(!toks.length) toks = q.split(' ');
+  const qs = toks.join(' '), one = toks.length === 1 ? toks[0] : null, abOk = one && /^[a-z]{2,10}$/.test(one);
+  const hits = [];
+  for(const g of IDX.list){
+    let tier = 0;
+    if(abOk && g.ab === one) tier = 4;
+    else if(g.key.startsWith(qs)) tier = 3;
+    else if(abOk && one.length >= 3 && g.ab.startsWith(one)) tier = 2;
+    else if(toks.every(t => g.hay.includes(' ' + t))) tier = 1;
+    if(tier) hits.push([tier, g]);
+  }
+  hits.sort((a, b) => b[0] - a[0] || b[1].hot - a[1].hot || b[1].picks - a[1].picks || b[1].views - a[1].views);
+  return hits.slice(0, lim).map(x => x[1]);
+}
+const QN = new Set(['karaoke', 'beat', 'tone', 'ton', 'nhac', 'song', 'bai', 'hat', 'lyric', 'lyrics', 'hd', 'mv']);
 
 /* ---------- Ô nhập thông minh: link bài → thêm; link playlist → nạp; còn lại → tìm ---------- */
 function go(){
@@ -679,14 +758,14 @@ const BANNER = {
 function banner(t){ const b = $('roomBanner'); b.textContent = t || ''; b.style.display = t ? 'block' : 'none'; document.body.classList.toggle('roomOff', !!t); }
 if(GUEST){
   bc.onroom = m => {
-    if(m.gt){ const first = !guestTok; guestTok = m.gt; if(first){ showQuota(); renderKho(); } }
+    if(m.gt){ const first = !guestTok; guestTok = m.gt; if(first){ showQuota(); renderKho(); loadIndex(); } }
     if(m.open){ banner(''); send('hello'); } else banner(BANNER[m.reason === 'notopen' ? 'waiting' : 'closed']);
   };
   bc.onstatus = s => { if(s !== 'open' && s !== 'closed' && s !== 'waiting') banner(BANNER[s] || ''); else if(s === 'waiting') banner(BANNER.waiting); };
 }
 
 /* ---------- Khởi động ---------- */
-showQuota(); updateDetect(); renderLocal(); autoRefresh(); loadPlaylistNames(true); renderKho();
+showQuota(); updateDetect(); renderLocal(); autoRefresh(); loadPlaylistNames(true); renderKho(); loadIndex();
 send('hello');
 </script>
 </body>

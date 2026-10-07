@@ -816,14 +816,14 @@ function cors(req, env) {
   return {
     ok, h: {
       'Access-Control-Allow-Origin': origin && ok ? origin : (allowed[0] || '*'),
-      'Access-Control-Allow-Headers': 'x-pass, x-guest, content-type', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'x-pass, x-guest, content-type, if-none-match', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Max-Age': '86400', 'Vary': 'Origin', 'Content-Type': 'application/json; charset=utf-8'
     }
   };
 }
 /* Vé khách: điện thoại quét QR phòng được Worker bmb-phong cấp 1 vé ký bằng GUEST_SECRET (cùng giá trị ở cả hai Worker).
    Vé chỉ mở các lệnh tìm/chọn bài bên dưới, hết hạn sau vài giờ; mọi lệnh quản trị (kênh, quét, mở rộng kho…) vẫn cần x-pass. */
-const GUEST_OK = new Set(['GET /api/kho/search', 'GET /api/kho/versions', 'GET /api/kho/hot', 'GET /api/kho/new', 'GET /api/kho/quota', 'GET /api/kho/ytsearch', 'POST /api/kho/pick', 'POST /api/kho/qlog', 'POST /api/kho/check']);
+const GUEST_OK = new Set(['GET /api/kho/index', 'GET /api/kho/search', 'GET /api/kho/versions', 'GET /api/kho/hot', 'GET /api/kho/new', 'GET /api/kho/quota', 'GET /api/kho/ytsearch', 'POST /api/kho/pick', 'POST /api/kho/qlog', 'POST /api/kho/check']);
 async function guestAllowed(req, env, p) {
   const t = req.headers.get('x-guest') || '';
   if (!env.GUEST_SECRET || !t || !GUEST_OK.has(req.method + ' ' + p)) return false;
@@ -933,6 +933,33 @@ async function groupSearch(env, q, limit, relaxed) {
       + Math.log10(1 + g.maxViews) * 0.6 + Math.log2(1 + g.picks) * 1.5 + (g.star ? 1 : 0)
   })).sort((a, b) => b.s - a.s).slice(0, limit).map(({ s, ...g }) => g);
 }
+/* Danh mục gọn cho remote tải về máy (giống songs.dat của SmartK): mỗi bài + giọng một dòng, kèm bản tốt nhất.
+   Phiên bản = ngày giờ Việt Nam ⇒ mỗi máy tải tối đa 1 lần/ngày; remote xoá bản lưu sau 7 ngày (quy định YouTube ≤ 30 ngày).
+   Giữ bản dựng trong bộ nhớ isolate 1 giờ để nhiều máy tải cùng ngày không phải đọc lại cả bảng. */
+const vnDay = t => new Date(t + 7 * 3600000).toISOString().slice(0, 10);
+let IDX_CACHE = null;
+async function buildIndex(env, now) {
+  const v = vnDay(now);
+  if (IDX_CACHE && IDX_CACHE.v === v && now - IDX_CACHE.at < 3600000) return IDX_CACHE;
+  const rows = (await env.DB.prepare(`SELECT g.song_key, g.tone, g.id, g.title, g.channel, g.views, g.cnt, g.picks, IFNULL(h.score, 0) AS hot FROM (
+      SELECT v.song_key, IFNULL(v.tone, '') AS tone, v.id, v.title, v.channel, v.views,
+        COUNT(*) OVER w AS cnt, SUM(IFNULL(p.n, 0)) OVER w AS picks,
+        ROW_NUMBER() OVER (PARTITION BY v.song_key, IFNULL(v.tone, '') ORDER BY IFNULL(p.n, 0) DESC, MAX(IFNULL(c1.star, 0), IFNULL(c2.star, 0)) DESC, v.views DESC) AS rn
+      FROM videos v LEFT JOIN (SELECT id, COUNT(*) AS n FROM pick_log WHERE ts >= ?1 GROUP BY id) p ON p.id = v.id
+        LEFT JOIN channels c1 ON c1.id = v.channel_id LEFT JOIN channels c2 ON c2.id = v.src
+      WHERE v.song_key IS NOT NULL AND v.song_key <> ''
+      WINDOW w AS (PARTITION BY v.song_key, IFNULL(v.tone, ''))) g
+    LEFT JOIN hot_songs h ON h.song_key = g.song_key WHERE g.rn = 1`).bind(now - 30 * DAY).all()).results || [];
+  const chans = [], ci = new Map();
+  const out = rows.map(r => {
+    const c = r.channel || '';
+    if (!ci.has(c)) { ci.set(c, chans.length); chans.push(c); }
+    return [r.song_key, r.tone || '', r.id, r.title, ci.get(c), r.cnt || 1, Math.round(r.hot || 0), r.views || 0, r.picks || 0];
+  });
+  const body = JSON.stringify({ v, at: now, n: out.length, cols: ['key', 'tone', 'id', 'title', 'ch', 'versions', 'hot', 'views', 'picks'], chans, rows: out });
+  IDX_CACHE = { v, at: now, etag: '"' + v + '-' + out.length + '"', body };
+  return IDX_CACHE;
+}
 async function searchUsed(env, run) {
   const r = await env.DB.prepare(`SELECT v FROM meta WHERE k = ?1`).bind('search:' + run.day).first();
   return +(r && r.v) || 0;
@@ -981,6 +1008,12 @@ async function route(req, env, ctx, run) {
   try {
     await ensureSchema(env); await loadKw(env);
     /* ----- dùng cho remote.html ----- */
+    if (p === '/api/kho/index' && req.method === 'GET') {
+      const ix = await buildIndex(env, now);
+      const hh = Object.assign({}, h, { 'ETag': ix.etag, 'Cache-Control': 'private, max-age=3600', 'Access-Control-Expose-Headers': 'ETag' });
+      if (req.headers.get('If-None-Match') === ix.etag) return new Response(null, { status: 304, headers: hh });
+      return new Response(ix.body, { status: 200, headers: hh });
+    }
     if (p === '/api/kho/search' && req.method === 'GET') {
       return J({ groups: await groupSearch(env, url.searchParams.get('q') || '', Math.min(num(url.searchParams.get('limit'), 40), 80)) }, 200, h);
     }
