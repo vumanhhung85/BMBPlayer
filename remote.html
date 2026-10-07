@@ -64,14 +64,18 @@
   .ctrlRow button.primary{background:linear-gradient(135deg,var(--accent),var(--accent2)); border:none}
   .vol{display:flex; align-items:center; gap:10px; background:#0e0e16; border:1px solid var(--line); border-radius:12px; padding:8px 12px}
   .vol label{color:var(--quiet); font-size:12px} .vol input{flex:1}
+  .roomOff #dock{ opacity:.4; pointer-events:none }
 </style>
 </head>
 <body>
+<script src="./phong-channel.js"></script>
 <header>
   <div class="logo">B</div><b>BMB Remote</b> <span style="color:var(--quiet);font-size:12px">YouTube nhúng</span>
   <div class="room" id="roomTag">PHÒNG</div>
   <button id="gear" aria-label="Cài đặt">⚙</button>
 </header>
+
+<div id="roomBanner" style="display:none;padding:12px 14px;background:#3a2a10;color:#fbbf24;font-weight:700;font-size:15px;text-align:center"></div>
 
 <div id="settings">
   <b>Kết nối tới Worker</b> (khoá YouTube nằm trong Worker, không cần dán vào đây)
@@ -131,8 +135,11 @@
 
 <script>
 const params = new URLSearchParams(location.search);
-const ROOM = (params.get('room') || 'P1').toUpperCase();
-const bc = new BroadcastChannel('bmb-yt-' + ROOM);
+const ROOM0 = (params.get('room') || 'P1').toUpperCase();
+const bc = openRoomChannel('remote', ROOM0);       // có ?r=<mã QR> → kênh riêng của phòng qua Worker bmb-phong (khách, không cần mật khẩu); không có → như cũ
+const GUEST = !!bc.ws;
+const ROOM = GUEST ? bc.roomId : ROOM0;
+let guestTok = '';                                   // vé khách do Worker phòng cấp khi phòng đang mở: chỉ đủ để tìm/chọn bài trong kho
 const $ = id => document.getElementById(id);
 const API_NAME = 'np_api', PASS_NAME = 'np_pass';          // dùng chung tên với nhac.html: nếu cùng địa chỉ trang thì chỉ cần nhập một lần
 const CAT_KEY = 'bmb_yt_catalog_v1';
@@ -158,6 +165,7 @@ const DEFAULT_API = 'https://nhac-playlist.vumanhhung85.workers.dev';
 const KHO_NAME = 'kho_api', DEFAULT_KHO = 'https://kho-karaoke.vumanhhung85.workers.dev';
 let cfg = { api: lsGet(API_NAME) || DEFAULT_API, pass: lsGet(PASS_NAME) || '', kho: lsGet(KHO_NAME) || DEFAULT_KHO };
 const hasCfg = () => !!(cfg.api && cfg.pass);
+if(GUEST){ $('gear').style.display = 'none'; $('plBox').style.display = 'none'; }
 $('gear').onclick = () => { const s = $('settings'); if(s.style.display !== 'block'){ $('apiInput').value = cfg.api; $('passInput').value = cfg.pass; $('khoInput').value = cfg.kho; } s.style.display = s.style.display === 'block' ? 'none' : 'block'; };
 $('saveKey').onclick = () => {
   cfg.api = $('apiInput').value.trim().replace(/\/+$/, ''); cfg.pass = $('passInput').value; cfg.kho = $('khoInput').value.trim().replace(/\/+$/, '');
@@ -166,8 +174,8 @@ $('saveKey').onclick = () => {
 };
 $('clearKey').onclick = () => { try{ localStorage.removeItem(API_NAME); localStorage.removeItem(PASS_NAME); localStorage.removeItem(KHO_NAME); }catch(e){} cfg = { api:DEFAULT_API, pass:'', kho:DEFAULT_KHO }; $('apiInput').value = DEFAULT_API; $('passInput').value = ''; $('khoInput').value = DEFAULT_KHO; msg('Đã xoá thông tin kết nối.'); };
 $('apiInput').value = cfg.api; $('khoInput').value = cfg.kho;     // địa chỉ Worker điền sẵn, chỉ cần nhập mật khẩu
-if(!hasCfg()) $('settings').style.display = 'block';
-function needConfig(){ $('apiInput').value = cfg.api; $('khoInput').value = cfg.kho; $('passInput').value = cfg.pass; $('settings').style.display = 'block'; msg(cfg.api ? 'Nhập mật khẩu truy cập rồi bấm Lưu.' : 'Cần nhập địa chỉ Worker và mật khẩu (nút ⚙).', true); }
+if(!hasCfg() && !GUEST) $('settings').style.display = 'block';
+function needConfig(){ if(GUEST) return msg(guestTok ? 'Tính năng này dành cho nhân viên.' : 'Chưa nối được phòng, vui lòng đợi vài giây.', true); $('apiInput').value = cfg.api; $('khoInput').value = cfg.kho; $('passInput').value = cfg.pass; $('settings').style.display = 'block'; msg(cfg.api ? 'Nhập mật khẩu truy cập rồi bấm Lưu.' : 'Cần nhập địa chỉ Worker và mật khẩu (nút ⚙).', true); }
 
 async function api(path){
   if(!hasCfg()){ needConfig(); const e = new Error('Chưa cấu hình kết nối'); e.reason = 'noconfig'; throw e; }
@@ -490,9 +498,10 @@ function renderFallback(d, raw, term){
 function khoWhy(e){ return e.status === 401 ? 'sai mật khẩu' : e.reason === 'origin' ? 'Worker kho chưa cho phép địa chỉ ' + location.origin : e instanceof TypeError ? 'không kết nối được tới Worker kho' : (e.message || 'lỗi'); }
 
 /* ---------- Kho karaoke (Worker kho-karaoke): tìm không tốn lượt, bài hot, ưu tiên bản được chọn nhiều ---------- */
-const hasKho = () => !!(cfg.kho && cfg.pass);
+const hasKho = () => !!(cfg.kho && (cfg.pass || guestTok));
+const khoAuth = () => cfg.pass ? { 'x-pass':cfg.pass } : { 'x-guest':guestTok };   // nhân viên dùng mật khẩu; khách dùng vé do phòng cấp
 async function kapi(path, body){
-  const opt = body ? { method:'POST', headers:{ 'x-pass':cfg.pass, 'content-type':'application/json' }, body:JSON.stringify(body) } : { headers:{ 'x-pass':cfg.pass } };
+  const opt = body ? { method:'POST', headers:Object.assign({ 'content-type':'application/json' }, khoAuth()), body:JSON.stringify(body) } : { headers:khoAuth() };
   const res = await fetch(cfg.kho + path, opt);
   let data = {}; try{ data = await res.json(); }catch(e){}
   if(!res.ok){ const e = new Error(data.error || ('Lỗi ' + res.status)); e.status = res.status; e.reason = data.reason || ''; throw e; }
@@ -655,6 +664,26 @@ bc.onmessage = ev => {
     box.append(row);
   });
 };
+
+/* ---------- Kênh phòng ---------- */
+const BANNER = {
+  waiting:'Phòng chưa mở. Nhờ nhân viên mở phòng — trang sẽ tự nối lại.',
+  closed:'Phòng chưa mở. Nhờ nhân viên mở phòng.',
+  ended:'Phòng đã đóng. Cảm ơn quý khách! Muốn hát tiếp, hãy nhờ nhân viên mở phòng rồi quét lại mã QR trên bàn.',
+  rotated:'Mã QR này đã hết hiệu lực. Vui lòng quét mã QR mới trên bàn.',
+  network:'Vui lòng kết nối wifi của quán rồi quét lại mã QR.',
+  full:'Phòng đã đủ số điện thoại kết nối. Vui lòng nhờ nhân viên hỗ trợ.',
+  replaced:'Phòng đã chuyển sang thiết bị khác.', expired:'Không nối được phòng. Vui lòng quét lại mã QR trên bàn.',
+  offline:'Mất kết nối, đang nối lại…', connecting:'Đang nối vào phòng…'
+};
+function banner(t){ const b = $('roomBanner'); b.textContent = t || ''; b.style.display = t ? 'block' : 'none'; document.body.classList.toggle('roomOff', !!t); }
+if(GUEST){
+  bc.onroom = m => {
+    if(m.gt){ const first = !guestTok; guestTok = m.gt; if(first){ showQuota(); renderKho(); } }
+    if(m.open){ banner(''); send('hello'); } else banner(BANNER[m.reason === 'notopen' ? 'waiting' : 'closed']);
+  };
+  bc.onstatus = s => { if(s !== 'open' && s !== 'closed' && s !== 'waiting') banner(BANNER[s] || ''); else if(s === 'waiting') banner(BANNER.waiting); };
+}
 
 /* ---------- Khởi động ---------- */
 showQuota(); updateDetect(); renderLocal(); autoRefresh(); loadPlaylistNames(true); renderKho();
