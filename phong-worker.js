@@ -12,7 +12,8 @@
      Secret : SECRET (chuỗi ngẫu nhiên dài, ký mã QR/TV), APP_PASS (mật khẩu nhân viên),
               GUEST_SECRET (chuỗi ngẫu nhiên, đặt GIỐNG HỆT ở Worker kho-karaoke: để điện thoại khách tìm bài không cần mật khẩu)
      Biến   : ALLOWED_ORIGINS (mặc định https://bmbplayer.boommusicbox.vn), NET_CHECK (mặc định off)
-     Binding: Durable Object ROOM → class Room ; REG → class Registry
+     Binding: Durable Object ROOM → class Room ; REG → class Registry ; NHAC → class NhacRoom (nhac.html)
+     Tuỳ chọn: NHAC_PASS (mật khẩu cho nhac.html; không đặt thì dùng APP_PASS — nên đặt giống APP_PASS của nhac-playlist)
    ============================================================ */
 import { DurableObject } from 'cloudflare:workers';
 
@@ -72,6 +73,27 @@ export class Registry extends DurableObject {
       return json({ room });
     }
     if(u.pathname === '/del'){ await this.ctx.storage.delete('r:' + String(body.id || '')); return json({ ok: true }); }
+
+    /* Mã ghép 6 số cho nhac.html: TV xin (có mật khẩu), điện thoại đổi lấy vé của đúng phòng đó */
+    if(u.pathname === '/pair/new'){
+      const now = Date.now(), old = await this.ctx.storage.list({ prefix: 'p:' });
+      for(const [k, v] of old) if(v.exp < now) await this.ctx.storage.delete(k);
+      let code;
+      do{ code = String(crypto.getRandomValues(new Uint32Array(1))[0] % 1000000).padStart(6, '0'); }while(old.has('p:' + code) && old.get('p:' + code).exp >= now);
+      const exp = now + PAIR_MS;
+      await this.ctx.storage.put('p:' + code, { room: String(body.room || ''), exp });
+      return json({ code, exp });
+    }
+    if(u.pathname === '/pair/claim'){
+      const now = Date.now(), rk = 'rl:' + String(body.ip || '?');
+      const rl = (await this.ctx.storage.get(rk)) || { n: 0, t: now };
+      if(now - rl.t > 600000){ rl.n = 0; rl.t = now; }
+      rl.n++; await this.ctx.storage.put(rk, rl);
+      if(rl.n > 20) return json({ error: 'Thử quá nhiều lần, đợi 10 phút rồi quét lại mã trên TV.' }, 429);
+      const v = await this.ctx.storage.get('p:' + String(body.code || ''));
+      if(!v || v.exp < now) return json({ error: 'Mã không đúng hoặc đã hết hạn. Bấm “Ghép điện thoại” trên TV để lấy mã mới.' }, 404);
+      return json({ room: v.room });
+    }
     return json({ error: 'not found' }, 404);
   }
 }
@@ -210,6 +232,102 @@ export class Room extends DurableObject {
 }
 
 /* ============================================================
+   NhacRoom — kênh tức thì cho nhac.html (TV nghe nhạc + điện thoại điều khiển)
+   - Trình duyệt không gắn được header vào WebSocket ⇒ tin nhắn ĐẦU TIÊN phải là
+       {type:'auth', role:'tv'|'remote', pass}  (mật khẩu NHAC_PASS, không đặt thì dùng APP_PASS)
+     hoặc {type:'auth', tok}                    (vé ghép mã, chỉ làm điều khiển, chỉ đúng phòng này)
+     Sai/không gửi trong 15 giây ⇒ đóng kết nối.
+   - Điện thoại {type:'cmd', action, payload} → mọi TV trong phòng.
+   - TV {type:'state', state} và {type:'list', …} → mọi điện thoại; giữ bản mới nhất để gửi ngay cho máy vừa vào.
+   ============================================================ */
+const NHAC_ACTIONS = new Set(['toggle', 'next', 'prev', 'vol', 'shuffle', 'repeat', 'playid', 'reload', 'playlist', 'hello']);
+const NHAC_ROOM_RE = /^[\w-]{1,20}$/;
+const PAIR_MS = 5 * 60 * 1000, PAIR_TOKEN_MS = 24 * 3600 * 1000, MAX_LIST = 400000;
+const nhacPass = env => env.NHAC_PASS || env.APP_PASS;
+async function nhacToken(env, room, exp){ return room + '.' + exp + '.' + await hmac(env.SECRET, 'nhac|' + room + '|' + exp); }
+async function nhacTokenOk(env, room, tok){
+  const m = /^([\w-]{1,20})\.(\d{13})\.([\w-]{22})$/.exec(String(tok || ''));
+  if(!m || m[1] !== room || +m[2] < Date.now()) return false;
+  return same(m[3], await hmac(env.SECRET, 'nhac|' + room + '|' + m[2]));
+}
+
+export class NhacRoom extends DurableObject {
+  constructor(ctx, env){
+    super(ctx, env);
+    this.ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair('ping', 'pong'));
+  }
+  peers(role){ return this.ctx.getWebSockets().filter(w => { const a = w.deserializeAttachment() || {}; return a.auth && (!role || a.role === role); }); }
+  sendAll(list, msg){ for(const w of list){ try{ w.send(msg); }catch(e){} } }
+  peersMsg(){ return JSON.stringify({ type: 'peers', tv: this.peers('tv').length > 0, remotes: this.peers('remote').length }); }
+
+  async fetch(req){
+    const u = new URL(req.url);
+    if(req.headers.get('Upgrade') !== 'websocket') return new Response('expected websocket', { status: 426 });
+    const room = u.searchParams.get('room') || '';
+    const pair = new WebSocketPair(), [client, server] = Object.values(pair);
+    this.ctx.acceptWebSocket(server);
+    server.serializeAttachment({ auth: false, room, at: Date.now(), n: 0, t: 0 });
+    if(!(await this.ctx.storage.getAlarm())) await this.ctx.storage.setAlarm(Date.now() + 15000);
+    return new Response(null, { status: 101, webSocket: client });
+  }
+  async alarm(){                                      // đóng các kết nối không xác thực trong 15 giây
+    const now = Date.now(); let next = 0;
+    for(const w of this.ctx.getWebSockets()){
+      const a = w.deserializeAttachment() || {};
+      if(!a.auth){ if(now - a.at >= 14000){ try{ w.send(JSON.stringify({ type: 'denied', reason: 'timeout' })); w.close(4001, 'auth'); }catch(e){} } else if(!next || a.at < next) next = a.at; }
+    }
+    if(next) await this.ctx.storage.setAlarm(next + 15000);
+  }
+  async webSocketMessage(ws, data){
+    if(typeof data !== 'string' || data.length > MAX_LIST) return;
+    const a = ws.deserializeAttachment() || {}, now = Date.now();
+    if(now - (a.t || 0) < 1000) a.n = (a.n || 0) + 1; else { a.n = 1; a.t = now; }
+    let m; try{ m = JSON.parse(data); }catch(e){ m = null; }
+    if(!a.auth){
+      if(!m || m.type !== 'auth'){ try{ ws.close(4001, 'auth'); }catch(e){} return; }
+      let role = null, full = false;
+      if(m.pass && same(m.pass, nhacPass(this.env))){ role = m.role === 'tv' ? 'tv' : 'remote'; full = true; }
+      else if(m.tok && await nhacTokenOk(this.env, a.room, m.tok)) role = 'remote';
+      if(!role){ try{ ws.send(JSON.stringify({ type: 'denied', reason: m.tok ? 'token' : 'pass' })); ws.close(4001, 'auth'); }catch(e){} return; }
+      a.auth = true; a.role = role; a.full = full; ws.serializeAttachment(a);
+      ws.send(JSON.stringify({ type: 'hello', role, full, room: a.room }));
+      if(role === 'remote'){
+        const [last, list] = await Promise.all([this.ctx.storage.get('last'), this.ctx.storage.get('list')]);
+        if(list) ws.send(list);
+        if(last) ws.send(last);
+      }
+      const pm = this.peersMsg(); this.sendAll(this.peers(), pm);
+      return;
+    }
+    ws.serializeAttachment(a);
+    if(a.n > 20 || !m) return;
+    if(a.role === 'remote'){
+      if(m.type !== 'cmd' || data.length > 4096 || !NHAC_ACTIONS.has(m.action)) return;
+      const p = m.payload && typeof m.payload === 'object' ? m.payload : {};
+      const out = {};
+      if(m.action === 'vol') out.value = Math.max(0, Math.min(100, +p.value || 0));
+      if(m.action === 'playid'){ if(!/^[\w-]{11}$/.test(p.id || '')) return; out.id = p.id; }
+      if(m.action === 'playlist') out.name = String(p.name || '').slice(0, 60);
+      this.sendAll(this.peers('tv'), JSON.stringify({ type: 'cmd', action: m.action, payload: out, at: now }));
+      return;
+    }
+    if(m.type === 'state'){
+      if(data.length > 32768) return;
+      const msg = JSON.stringify({ type: 'state', state: m.state || null, at: now });
+      await this.ctx.storage.put('last', msg);
+      this.sendAll(this.peers('remote'), msg);
+    }else if(m.type === 'list'){
+      const msg = JSON.stringify({ type: 'list', playlists: Array.isArray(m.playlists) ? m.playlists.slice(0, 200) : [], name: m.name || null, items: Array.isArray(m.items) ? m.items.slice(0, 2000) : [] });
+      if(msg.length > MAX_LIST) return;
+      await this.ctx.storage.put('list', msg);
+      this.sendAll(this.peers('remote'), msg);
+    }
+  }
+  async webSocketClose(ws, code, reason){ try{ ws.close(code === 1005 || code === 1006 ? 1000 : code, reason); }catch(e){} this.sendAll(this.peers().filter(w => w !== ws), this.peersMsg()); }
+  async webSocketError(ws){ try{ ws.close(1011, 'error'); }catch(e){} }
+}
+
+/* ============================================================
    Cổng vào
    ============================================================ */
 const roomStub = (env, id) => env.ROOM.get(env.ROOM.idFromName(id));
@@ -229,6 +347,31 @@ export default {
       const t = parseToken(u.searchParams.get('r'));
       if(!t) return new Response('bad token', { status: 403 });
       return roomStub(env, t.id).fetch(req);
+    }
+
+    /* nhac.html: kênh tức thì + ghép mã */
+    if(u.pathname === '/nhac/ws'){
+      const o = req.headers.get('Origin'), room = u.searchParams.get('room') || '';
+      if(!o || !origins(env).includes(o)) return new Response('origin', { status: 403 });
+      if(!NHAC_ROOM_RE.test(room)) return new Response('room', { status: 400 });
+      return env.NHAC.get(env.NHAC.idFromName(room)).fetch(req);
+    }
+    if(u.pathname === '/api/nhac/pair' && req.method === 'POST'){        // TV (có mật khẩu) xin mã 6 số sống 5 phút
+      if(!same(req.headers.get('x-pass') || '', nhacPass(env))) return json({ error: 'Sai mật khẩu' }, 401, ch);
+      const body = await req.json().catch(() => ({})), room = String(body.room || '');
+      if(!NHAC_ROOM_RE.test(room)) return json({ error: 'Tên phòng không hợp lệ' }, 400, ch);
+      return json(await call(regStub(env), '/pair/new', { room }), 200, ch);
+    }
+    if(u.pathname === '/api/nhac/claim' && req.method === 'POST'){       // điện thoại đổi mã lấy vé 24 giờ (không cần mật khẩu)
+      const o = req.headers.get('Origin');
+      if(!o || !origins(env).includes(o)) return json({ error: 'origin' }, 403, ch);
+      const body = await req.json().catch(() => ({})), code = String(body.code || '').replace(/\D/g, '');
+      if(code.length !== 6) return json({ error: 'Mã gồm 6 chữ số' }, 400, ch);
+      const r = await regStub(env).fetch('https://do/pair/claim', { method: 'POST', body: JSON.stringify({ code, ip: req.headers.get('CF-Connecting-IP') || '' }) });
+      const d = await r.json();
+      if(!r.ok) return json(d, r.status, ch);
+      const exp = Date.now() + PAIR_TOKEN_MS;
+      return json({ room: d.room, tok: await nhacToken(env, d.room, exp), exp }, 200, ch);
     }
 
     /* Phần còn lại: chỉ nhân viên (x-pass) */

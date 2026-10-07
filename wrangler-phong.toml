@@ -16,6 +16,14 @@ class_name = "Room"
 name = "REG"
 class_name = "Registry"
 
+[[durable_objects.bindings]]
+name = "NHAC"
+class_name = "NhacRoom"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Room", "Registry"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["NhacRoom"]

@@ -91,6 +91,22 @@
   #modal .btns button.pri{background:var(--accent); border:none; color:#fff}
   #modal .hint{margin-top:12px}
 
+  /* Kênh tức thì + ghép mã */
+  #link{font-size:12px; padding:4px 10px; border-radius:999px; background:#20202e; color:var(--quiet); white-space:nowrap}
+  #link.on{background:#12361f; color:var(--good)}
+  #pairBtn{display:none}
+  body:not(.remote) #pairBtn{display:inline-block}
+  body.paired #plNew, body.paired #plDel, body.paired #tAdd, body.paired .acts{display:none}
+  #pairModal{position:fixed; inset:0; z-index:61; display:none; align-items:center; justify-content:center; background:#000c; padding:16px}
+  #pairModal .card{background:var(--panel); border:1px solid var(--line); border-radius:18px; padding:22px; width:min(440px,100%); text-align:center}
+  #pairCode{font-size:clamp(44px,9vw,72px); font-weight:800; letter-spacing:.12em; color:var(--accent2); margin:6px 0}
+  #pairQr{background:#fff; border-radius:12px; padding:10px; display:inline-block; margin:8px 0}
+  #pairQr img{width:220px; height:220px; image-rendering:pixelated; display:block}
+  #pairIn{width:100%; background:#0e0e16; border:1px solid var(--line); color:var(--ink); border-radius:12px; padding:14px; font-size:28px; text-align:center; letter-spacing:.2em; margin:10px 0}
+  #pairModal .btns{display:flex; gap:8px; margin-top:12px}
+  #pairModal .btns button{flex:1; background:#20202e; border:1px solid var(--line); border-radius:10px; padding:11px; font-weight:600}
+  #pairModal .btns button.pri{background:var(--accent); border:none; color:#fff}
+  @media (max-width:480px){ header{gap:6px; padding:8px 10px} header .ttl{display:none} header select{max-width:150px} #link{font-size:11px; padding:3px 8px} }
   @media (min-width:900px){
     main{display:grid; grid-template-columns:1fr 430px; overflow:hidden}
     #stage{min-height:0; overflow:auto}
@@ -107,6 +123,8 @@
   <button id="plNew" class="ico" title="Tạo playlist mới">＋</button>
   <button id="plDel" class="ico" title="Xoá playlist này">🗑</button>
   <span class="sp"></span>
+  <span id="link" title="Kênh tức thì tới Worker bmb-phong">● Hỏi định kỳ</span>
+  <button id="pairBtn" class="ico" title="Ghép điện thoại bằng mã / QR">📱</button>
   <button id="gear" class="ico" title="Cài đặt kết nối">⚙</button>
 </header>
 
@@ -154,6 +172,22 @@
 
 <div id="toast"></div>
 
+<div id="pairModal"><div class="card">
+  <div id="pairTv">
+    <h3>Ghép điện thoại</h3>
+    <p class="hint">Quét mã QR bằng điện thoại, hoặc mở trang điều khiển rồi nhập mã. Mã dùng được trong 5 phút; điện thoại đã ghép điều khiển được 24 giờ, không cần mật khẩu.</p>
+    <div id="pairCode">––––––</div>
+    <div id="pairQr"></div>
+    <div class="hint" id="pairLeft"></div>
+  </div>
+  <div id="pairRemote">
+    <h3>Ghép với TV</h3>
+    <p class="hint">Trên TV bấm nút 📱 để hiện mã 6 số, rồi nhập vào đây (hoặc quét mã QR trên TV).</p>
+    <input id="pairIn" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="000000">
+  </div>
+  <div class="btns"><button id="pairClose">Đóng</button><button id="pairPass">Dùng mật khẩu</button><button id="pairGo" class="pri">Ghép</button></div>
+</div></div>
+
 <div id="modal">
   <div class="card">
     <h3>Kết nối tới Worker</h3>
@@ -167,6 +201,7 @@
   </div>
 </div>
 
+<script src="./qrcode.js"></script>
 <script>
 /* ============================================================
    Playlist nhạc yêu thích — phát bằng trình phát nhúng chính thức của YouTube.
@@ -237,19 +272,24 @@ $('mClose').onclick = () => { $('modal').style.display = 'none'; };
 $('mSave').onclick = () => {
   cfg.api = $('apiUrl').value.trim(); cfg.pass = $('pass').value;
   lsSet(LS.api, cfg.api); lsSet(LS.pass, cfg.pass);
-  $('modal').style.display = 'none'; loadPlaylists();
+  $('modal').style.display = 'none'; paintLink(); loadPlaylists();
+  wsStop = false; wsTries = 0; try{ if(ws) ws.close(); }catch(e){} wsConnect();          // nối lại kênh tức thì bằng mật khẩu mới
 };
 
 /* ---------- Gửi lệnh tới trang phát (chế độ điều khiển) ---------- */
 async function sendCmd(action, payload){
-  try{ await api('/api/cmd', { room: ROOM, action, payload: payload || null }); }catch(e){ apiFail(e); }
+  if(wsSend({ type:'cmd', action, payload: payload || {} })) return;                 // kênh tức thì: TV nhận dưới 0,5 giây
+  if(!cfg.pass){ toast('Đang nối lại tới TV, thử lại sau vài giây…', 'err'); wsKick(); return; }
+  try{ await api('/api/cmd', { room: ROOM, action, payload: payload || null }); }catch(e){ apiFail(e); }   // dự phòng: qua D1
 }
 function ping(){          // báo cho trang phát biết có người đang điều khiển → trang phát hỏi lệnh nhanh hơn
+  if(wsReady) return;
   if(document.visibilityState === 'visible' && cfg.api && cfg.pass) api('/api/cmd', { room: ROOM, action:'hello' }).catch(() => {});
 }
 
 /* ---------- Playlist ---------- */
 async function loadPlaylists(selectName){
+  if(PAIRED()){ if(selectName) sendCmd('playlist', { name: selectName }); return; }   // điện thoại ghép mã: danh sách do TV gửi qua kênh tức thì
   try{
     const d = await api('/api/playlists');
     playlists = d.playlists || [];
@@ -272,11 +312,12 @@ async function loadPlaylist(name, keep){
     const n = order.length;
     $('startInfo').textContent = n ? ('Playlist “' + name + '” có ' + n + ' bài phát được.') : ('Playlist “' + name + '” đang trống. Vào tab “Thêm bài” để thêm.');
     $('plSel').value = name;
+    publishList();
   }catch(e){ apiFail(e); }
 }
 $('plSel').onchange = e => {
   const n = e.target.value;
-  if(REMOTE){ loadPlaylist(n, false); sendCmd('playlist', { name: n }); return; }
+  if(REMOTE){ if(!PAIRED()) loadPlaylist(n, false); sendCmd('playlist', { name: n }); return; }
   stopPlayback(); loadPlaylist(n, false);
 };
 $('plNew').onclick = async () => {
@@ -394,7 +435,7 @@ document.addEventListener('visibilitychange', () => {
 /* ---------- Trang phát: nhận lệnh và báo trạng thái qua Worker ----------
    Hỏi lệnh mỗi 5 giây khi không có ai điều khiển, mỗi 1,5 giây trong 60 giây sau khi có lệnh
    (để tiết kiệm hạn mức yêu cầu của Cloudflare Workers). */
-let lastCmd = null, fastUntil = 0, lastPub = '', lastPubAt = 0;
+let lastCmd = null, fastUntil = 0, lastPub = '', lastPubAt = 0, pollTimer = null;
 function snapshot(){
   const it = items[order[pos]];
   const st = ready && player.getPlayerState ? player.getPlayerState() : -1;
@@ -403,11 +444,15 @@ function snapshot(){
            shuffle, repeat, playlist: curName, pos: pos + 1, total: order.length };
 }
 async function publishState(force){
-  if(REMOTE || !cfg.api || !cfg.pass) return;
-  const s = JSON.stringify(snapshot());
-  if(!force && s === lastPub && Date.now() - lastPubAt < 30000) return;
-  lastPub = s; lastPubAt = Date.now();
-  try{ await api('/api/state', { room: ROOM, state: JSON.parse(s) }); }catch(e){}
+  if(REMOTE) return;
+  const snap = snapshot(), str = JSON.stringify(snap), changed = str !== lastPub, now = Date.now();
+  if(wsReady && (changed || force)) wsSend({ type:'state', state: snap });             // kênh tức thì: gửi ngay khi đổi
+  lastPub = str;
+  if(!cfg.api || !cfg.pass) return;
+  const gap = wsReady ? 60000 : ((changed || force) ? 0 : 30000);                    // có kênh tức thì: D1 chỉ 1 lần/phút làm dự phòng
+  if(now - lastPubAt < gap) return;
+  lastPubAt = now;
+  try{ await api('/api/state', { room: ROOM, state: snap }); }catch(e){}
 }
 async function runCmd(c){
   const a = c.action, p = c.payload || {};
@@ -421,6 +466,7 @@ async function runCmd(c){
     case 'repeat': cycleRepeat(); break;
     case 'playid': await playId(String(p.id || '')); break;
     case 'reload': if(curName) await loadPlaylist(curName, true); break;
+    case 'hello': publishList(); break;
     case 'playlist': {
       const n = String(p.name || '');
       if(playlists.some(x => x.name === n)){ stopPlayback(); await loadPlaylist(n, false); } else { await loadPlaylists(n); }
@@ -441,7 +487,7 @@ async function pollCmds(){
       }
     }
   }catch(e){}
-  setTimeout(pollCmds, Date.now() < fastUntil ? 1500 : 5000);
+  pollTimer = setTimeout(pollCmds, wsReady ? 30000 : (Date.now() < fastUntil ? 1500 : 5000));   // có kênh tức thì: chỉ hỏi D1 30 giây/lần làm dự phòng
 }
 
 /* ---------- Trang điều khiển: đọc trạng thái của trang phát ---------- */
@@ -464,12 +510,12 @@ function applyRemoteState(d){
   if((st.id || null) !== curId){ curId = st.id || null; renderList(); }
   if(st.playlist && st.playlist !== lastStatePlaylist){            // theo sát playlist đang phát trên TV
     lastStatePlaylist = st.playlist;
-    if(st.playlist !== curName && playlists.some(p => p.name === st.playlist)){ $('plSel').value = st.playlist; loadPlaylist(st.playlist, false); }
+    if(!PAIRED() && st.playlist !== curName && playlists.some(p => p.name === st.playlist)){ $('plSel').value = st.playlist; loadPlaylist(st.playlist, false); }
   }
 }
 async function pollState(){
   if(!REMOTE) return;
-  if(document.visibilityState === 'visible' && cfg.api && cfg.pass){
+  if(!wsReady && document.visibilityState === 'visible' && cfg.api && cfg.pass){
     try{ applyRemoteState(await api('/api/state?room=' + ROOM)); }catch(e){}
   }
   setTimeout(pollState, 2500);
@@ -505,7 +551,7 @@ async function moveItem(id, dir){
   if(j < 0 || j >= items.length || j === i) return;
   const [it] = items.splice(i, 1); items.splice(j, 0, it);
   buildOrder(curId); renderList();
-  try{ await api('/api/playlist/move', { name: curName, id, dir }); if(REMOTE) sendCmd('reload'); }
+  try{ await api('/api/playlist/move', { name: curName, id, dir }); if(REMOTE) sendCmd('reload'); else publishList(); }
   catch(e){ apiFail(e); loadPlaylist(curName, true); }
 }
 async function removeItem(id){
@@ -519,7 +565,7 @@ async function removeItem(id){
   items.splice(i, 1);
   if(wasCur){ buildOrder(); if(order.length && unlocked) playAt(Math.min(Math.max(oldPos, 0), order.length - 1)); else stopPlayback(); }
   else buildOrder(curId);
-  renderList();
+  renderList(); publishList();
   try{ await api('/api/playlist/remove', { name: curName, id }); }catch(e){ apiFail(e); loadPlaylist(curName, true); }
 }
 
@@ -547,7 +593,7 @@ async function addItem(it){
   try{
     await api('/api/playlist/add', { name: curName, id: it.id });
     if(!items.some(x => x.id === it.id)){ items.push(norm(it)); buildOrder(curId); renderList(); }
-    if(REMOTE) sendCmd('reload');
+    if(REMOTE) sendCmd('reload'); else publishList();
     toast('Đã thêm: ' + decode(it.title));
   }catch(e){ apiFail(e); }
 }
@@ -647,10 +693,130 @@ window.addEventListener('keydown', e => {
   else if(k === 'f' && !REMOTE) $('fsBtn').click();
 });
 
+/* ============================================================
+   Kênh tức thì (WebSocket tới Worker bmb-phong, Durable Object NhacRoom)
+   - Có thì lệnh/trạng thái đi thẳng, không qua D1; rớt thì tự quay về hỏi định kỳ /api/cmd, /api/state
+     và thử nối lại sau 1, 2, 4… tối đa 30 giây.
+   - Xác thực bằng tin nhắn đầu: mật khẩu (TV, máy anh) hoặc vé ghép mã 24 giờ (điện thoại khách/nhà).
+   ============================================================ */
+const DEFAULT_PHONG = 'https://bmb-phong.vumanhhung85.workers.dev';
+const PHONG_API = (params.get('phong') || lsGet('phong_api') || DEFAULT_PHONG).replace(/\/+$/, '');
+const TOK_KEY = 'nhac_tok:' + ROOM;
+let pairTok = lsGet(TOK_KEY) || '';
+let ws = null, wsReady = false, wsTries = 0, wsTimer = null, wsPing = null, wsStop = false, tvOnline = false, lastWsState = null;
+const tokValid = () => { const m = /\.(\d{13})\./.exec(pairTok); return !!m && +m[1] > Date.now() + 60000; };
+const PAIRED = () => REMOTE && !cfg.pass && tokValid();
+function paintLink(){
+  const l = $('link');
+  l.textContent = wsReady ? '● Tức thì' : (cfg.pass ? '● Hỏi định kỳ' : '● Chưa nối');
+  l.classList.toggle('on', wsReady);
+  document.body.classList.toggle('paired', PAIRED());
+}
+function wsSend(o){ if(wsReady && ws && ws.readyState === 1){ try{ ws.send(JSON.stringify(o)); return true; }catch(e){} } return false; }
+function wsRetry(){ clearTimeout(wsTimer); wsTries++; wsTimer = setTimeout(wsConnect, Math.min(30000, 1000 * Math.pow(2, wsTries - 1))); }
+function wsKick(){ if(!wsStop && (!ws || ws.readyState > 1)){ clearTimeout(wsTimer); wsTimer = setTimeout(wsConnect, 200); } }
+function wsConnect(){
+  if(wsStop || !('WebSocket' in window)) return;
+  const auth = cfg.pass ? { type:'auth', role: REMOTE ? 'remote' : 'tv', pass: cfg.pass } : (REMOTE && tokValid() ? { type:'auth', tok: pairTok } : null);
+  if(!auth) return;
+  try{ ws = new WebSocket(PHONG_API.replace(/^http/, 'ws') + '/nhac/ws?room=' + encodeURIComponent(ROOM)); }catch(e){ return wsRetry(); }
+  const me = ws;
+  me.onopen = () => { try{ me.send(JSON.stringify(auth)); }catch(e){} };
+  me.onmessage = ev => { if(ev.data === 'pong') return; let m; try{ m = JSON.parse(ev.data); }catch(e){ return; } wsMsg(m); };
+  me.onerror = () => {};
+  me.onclose = ev => {
+    if(me !== ws) return;
+    const was = wsReady; wsReady = false; clearInterval(wsPing); paintLink();
+    if(!REMOTE && was){ clearTimeout(pollTimer); pollTimer = setTimeout(pollCmds, 300); }      // TV: quay về hỏi định kỳ ngay
+    if(ev.code === 4001){                                                                     // sai mật khẩu / vé hết hạn: không thử lại vô ích
+      if(!cfg.pass && pairTok){ pairTok = ''; try{ localStorage.removeItem(TOK_KEY); }catch(e){} paintLink(); if(REMOTE) openPair(); }
+      return;
+    }
+    wsRetry();
+  };
+}
+function wsMsg(m){
+  if(m.type === 'hello'){
+    wsReady = true; wsTries = 0; clearInterval(wsPing);
+    wsPing = setInterval(() => { try{ ws.send('ping'); }catch(e){} }, 25000);
+    paintLink();
+    if(REMOTE) wsSend({ type:'cmd', action:'hello' });
+    else { publishState(true); publishList(); }
+    return;
+  }
+  if(m.type === 'peers'){ tvOnline = !!m.tv; if(REMOTE && lastWsState) applyRemoteState({ state: lastWsState, age: tvOnline ? 0 : 1e9 }); if(REMOTE && !m.tv && !lastWsState) $('rcStatus').textContent = 'TV chưa mở trang phát trong phòng “' + ROOM + '”.'; return; }
+  if(!REMOTE && m.type === 'cmd'){ fastUntil = Date.now() + 60000; runCmd({ action: m.action, payload: m.payload || {} }); return; }
+  if(REMOTE && m.type === 'state' && m.state){ lastWsState = m.state; applyRemoteState({ state: m.state, age: tvOnline ? 0 : 1e9 }); return; }
+  if(REMOTE && m.type === 'list' && PAIRED()) applyList(m);
+}
+// TV gửi danh sách playlist + bài đang mở cho điện thoại ghép mã (điện thoại đó không có mật khẩu để tự đọc D1)
+function publishList(){
+  if(REMOTE || !wsReady) return;
+  wsSend({ type:'list', playlists: playlists.map(p => ({ name: p.name, count: p.count })), name: curName,
+           items: items.map(i => ({ id: i.id, title: i.title, channel: i.channel, thumb: i.thumb, embeddable: i.embeddable, unavailable: i.unavailable })) });
+}
+function applyList(m){
+  playlists = m.playlists || [];
+  const sel = $('plSel'); sel.replaceChildren();
+  playlists.forEach(p => { const o = el('option', null, p.name + ' (' + p.count + ')'); o.value = p.name; sel.append(o); });
+  curName = m.name || null; if(curName) sel.value = curName;
+  items = (m.items || []).map(norm); buildOrder(curId); renderList();
+}
+
+/* ---------- Ghép mã: TV xin mã 6 số + QR; điện thoại đổi mã lấy vé 24 giờ ---------- */
+let pairTimer = null;
+function closePair(){ $('pairModal').style.display = 'none'; clearInterval(pairTimer); }
+async function openPairTv(){
+  if(!cfg.pass){ openSettings(); return; }
+  $('pairTv').style.display = ''; $('pairRemote').style.display = 'none'; $('pairGo').style.display = 'none'; $('pairPass').style.display = 'none';
+  $('pairCode').textContent = '––––––'; $('pairQr').replaceChildren(); $('pairLeft').textContent = 'Đang xin mã…';
+  $('pairModal').style.display = 'flex';
+  try{
+    const res = await fetch(PHONG_API + '/api/nhac/pair', { method:'POST', headers:{ 'x-pass': cfg.pass, 'content-type':'application/json' }, body: JSON.stringify({ room: ROOM }) });
+    const d = await res.json().catch(() => ({}));
+    if(!res.ok) throw new Error(d.error || ('Lỗi ' + res.status));
+    const url = location.origin + location.pathname + '?mode=remote&room=' + encodeURIComponent(ROOM) + '&code=' + d.code;
+    $('pairCode').textContent = d.code;
+    if(window.qrcode){ const q = qrcode(0, 'M'); q.addData(url); q.make(); const img = document.createElement('img'); img.alt = 'QR'; img.src = q.createDataURL(6, 2); $('pairQr').append(img); }
+    clearInterval(pairTimer);
+    const tick = () => { const left = Math.max(0, Math.round((d.exp - Date.now()) / 1000)); $('pairLeft').textContent = left ? 'Mã còn ' + Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0') : 'Mã đã hết hạn — bấm 📱 để lấy mã mới.'; if(!left){ clearInterval(pairTimer); $('pairQr').replaceChildren(); $('pairCode').textContent = '––––––'; } };
+    tick(); pairTimer = setInterval(tick, 1000);
+  }catch(e){ $('pairLeft').textContent = e instanceof TypeError ? 'Không nối được Worker bmb-phong (' + PHONG_API + ').' : e.message; }
+}
+function openPair(){
+  $('pairTv').style.display = 'none'; $('pairRemote').style.display = ''; $('pairGo').style.display = ''; $('pairPass').style.display = '';
+  $('pairIn').value = ''; $('pairModal').style.display = 'flex'; setTimeout(() => $('pairIn').focus(), 50);
+}
+async function claim(code){
+  code = String(code || '').replace(/\D/g, '');
+  if(code.length !== 6) return toast('Mã gồm 6 chữ số.', 'err');
+  try{
+    const res = await fetch(PHONG_API + '/api/nhac/claim', { method:'POST', headers:{ 'content-type':'application/json' }, body: JSON.stringify({ code }) });
+    const d = await res.json().catch(() => ({}));
+    if(!res.ok) throw new Error(d.error || ('Lỗi ' + res.status));
+    lsSet('nhac_tok:' + d.room, d.tok);
+    if(d.room !== ROOM){ location.replace(location.pathname + '?mode=remote&room=' + encodeURIComponent(d.room)); return; }
+    pairTok = d.tok; closePair(); paintLink(); toast('Đã ghép với TV. Điện thoại này điều khiển được trong 24 giờ.');
+    wsStop = false; wsTries = 0; wsConnect();
+  }catch(e){ toast(e instanceof TypeError ? 'Không nối được Worker bmb-phong.' : e.message, 'err', 6000); if(REMOTE && !PAIRED() && !cfg.pass) openPair(); }
+}
+$('pairBtn').onclick = openPairTv;
+$('pairClose').onclick = closePair;
+$('pairPass').onclick = () => { closePair(); openSettings(); };
+$('pairGo').onclick = () => claim($('pairIn').value);
+$('pairIn').addEventListener('keydown', e => { if(e.key === 'Enter') claim($('pairIn').value); });
+document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') wsKick(); });
+
 /* ---------- Khởi động ---------- */
-paintModes(); renderList();
-if(!cfg.api || !cfg.pass){ $('startInfo').textContent = cfg.api ? 'Nhập mật khẩu truy cập ở cửa sổ vừa mở.' : 'Bấm ⚙ để nhập địa chỉ Worker và mật khẩu.'; openSettings(); }
-else loadPlaylists();
+paintModes(); renderList(); paintLink();
+const codeParam = (params.get('code') || '').replace(/\D/g, '');
+if(codeParam){ try{ history.replaceState(null, '', location.pathname + '?mode=remote&room=' + encodeURIComponent(ROOM)); }catch(e){} }
+if(REMOTE && !cfg.pass){
+  if(codeParam) claim(codeParam);
+  else if(tokValid()){ $('rcStatus').textContent = 'Đang nối tới TV…'; wsConnect(); }
+  else openPair();
+}else if(!cfg.api || !cfg.pass){ $('startInfo').textContent = cfg.api ? 'Nhập mật khẩu truy cập ở cửa sổ vừa mở.' : 'Bấm ⚙ để nhập địa chỉ Worker và mật khẩu.'; openSettings(); }
+else{ loadPlaylists(); wsConnect(); }
 if(REMOTE){ pollState(); ping(); setInterval(ping, 20000); }
 else{
   pollCmds(); setInterval(() => publishState(false), 5000);
