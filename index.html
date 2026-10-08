@@ -56,6 +56,10 @@
   #ovNext .lbl{font-size:clamp(11px,1.2vw,16px); color:var(--good); font-weight:700; letter-spacing:1px}
   #ovNext .t{font-size:clamp(15px,2vw,28px); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
   #ovCount{right:2.2vw; top:2.4vh; transform:translateY(-12px); background:rgba(0,0,0,.6); border-radius:999px; padding:6px 16px; font-size:clamp(13px,1.6vw,22px); font-weight:700}
+  #ovAdd{right:2.2vw; top:9vh; transform:translateX(16px); max-width:46vw; background:rgba(5,95,70,.85); border-left:5px solid var(--good); border-radius:12px; padding:9px 18px}
+  #ovAdd.show{transform:none}
+  #ovAdd .lbl{font-size:clamp(11px,1.2vw,16px); color:#a7f3d0; font-weight:700; letter-spacing:1px}
+  #ovAdd .t{font-size:clamp(14px,1.8vw,24px); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
   #lock{left:50%; bottom:11vh; transform:translate(-50%,12px); text-align:center; z-index:12;
     background:rgba(42,33,16,.95); border:2px solid var(--warn); color:#fef3c7; border-radius:16px; padding:14px 26px; font-size:clamp(16px,2.2vw,30px); font-weight:700; max-width:80vw}
   #lock.show{transform:translate(-50%,0)}
@@ -109,6 +113,7 @@
   <div class="ov" id="ovTitle"><div><div class="lbl">ĐANG HÁT</div><div class="t" id="ovTitleT"></div></div></div>
   <div class="ov" id="ovNext"><div class="lbl">TIẾP THEO</div><div class="t" id="ovNextT"></div></div>
   <div class="ov" id="ovCount"></div>
+  <div class="ov" id="ovAdd"><div class="lbl" id="ovAddL">ĐÃ THÊM</div><div class="t" id="ovAddT"></div></div>
   <div class="ov" id="lock"></div>
   <div class="ov" id="toast"></div>
   <div id="progress"><i id="bar"></i></div>
@@ -329,7 +334,12 @@ function guard(id, stage){
 function addSong(it){
   if(!/^[\w-]{11}$/.test(it.id || '')) return;
   queue.push({ id:it.id, title:String(it.title||'Bài không tên').slice(0,200) });
-  if(cur < 0){ cur = 0; load(); } else { render(); push(); paintCount(); }   // không đang hát → phát ngay, không cần bấm gì
+  if(cur < 0){ cur = 0; load(); }                                            // không đang hát → phát ngay, không cần bấm gì
+  else {
+    render(); push(); paintCount();
+    $('ovAddL').textContent = 'ĐÃ THÊM · THỨ ' + (queue.length - 1 - cur) + ' TRONG HÀNG CHỜ';   // báo ngay trên TV như SK Player
+    $('ovAddT').textContent = queue[queue.length - 1].title; flash('ovAdd', 5000);
+  }
 }
 function next(){ if(cur < queue.length-1){ cur++; } else { cur = -1; } load(); }
 function playPause(){

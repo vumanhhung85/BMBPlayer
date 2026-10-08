@@ -44,6 +44,11 @@
   .row .sub{color:var(--quiet); font-size:12px; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
   .row button{background:var(--accent); border:none; color:#fff; font-weight:700; border-radius:10px; padding:9px 12px; font-size:13px; flex:0 0 auto}
   .row button.ghost{background:#20202e; border:1px solid var(--line)}
+  .row button.done{background:#059669}
+  #snack{position:fixed; left:50%; top:12px; transform:translate(-50%,-140%); z-index:50; max-width:calc(100% - 24px); background:#14532d; border:1px solid #22c55e; color:#dcfce7;
+    padding:10px 16px; border-radius:12px; font-size:14px; font-weight:600; box-shadow:0 8px 30px rgba(0,0,0,.5); transition:transform .25s; pointer-events:none; text-align:center}
+  #snack.show{transform:translate(-50%,0)}
+  #snack.warn{background:#3a2a10; border-color:#fbbf24; color:#fef3c7}
   .row.cur{background:#1b1530}
   .row .tag{display:inline-block; font-size:11px; font-weight:700; padding:1px 7px; border-radius:999px; background:#2a2140; color:var(--accent2); margin-right:4px}
   .row .tag.hot{background:#3a1f12; color:#fdba74}
@@ -266,9 +271,42 @@ function rowEl(it, actions){
   row.append(img, meta); actions.forEach(a => row.append(a)); return row;
 }
 function addToQueue(it, fresh){ send('add', { id:it.id, title:it.title }); upsert(it, fresh); if(fresh) renderLocal(); }
+/* Báo nhận rõ ràng: nút đổi màu ngay, rồi chờ TV xác nhận (bài xuất hiện trong hàng chờ của TV) */
+let snackTimer = null;
+function snack(text, warn){
+  let s = $('snack'); if(!s){ s = el('div'); s.id = 'snack'; document.body.append(s); }
+  s.textContent = text; s.classList.toggle('warn', !!warn); s.classList.add('show');
+  clearTimeout(snackTimer); snackTimer = setTimeout(() => s.classList.remove('show'), warn ? 5000 : 2600);
+}
+const pending = [];                                   // bài vừa chọn, chờ TV báo đã nhận: { id, title, at, timer }
+function expectOnTv(it){
+  const p = { title:it.title, at:Date.now() };
+  p.timer = setTimeout(() => { const i = pending.indexOf(p); if(i < 0) return; pending.splice(i, 1);
+    snack('⚠ TV chưa nhận “' + it.title + '”. Kiểm tra TV còn mở trang phát và mạng, rồi chọn lại.', true); }, 6000);
+  pending.push(p);
+}
+function confirmFromTv(s){
+  if(!pending.length) return;
+  const q = s.queue || [];
+  for(let k = pending.length - 1; k >= 0; k--){
+    const p = pending[k];
+    let idx = -1; for(let i = q.length - 1; i >= 0; i--){ if(q[i].title === p.title){ idx = i; break; } }
+    if(idx < 0) continue;
+    clearTimeout(p.timer); pending.splice(k, 1);
+    const ahead = idx - (s.cur >= 0 ? s.cur : 0);
+    snack(idx === s.cur ? '▶ Đang phát “' + p.title + '”' : '✓ Đã vào hàng chờ: “' + p.title + '” · thứ ' + ahead + ' trong hàng chờ');
+  }
+}
 function addBtn(it, fresh){
   const b = el('button', null, '＋ Chọn');
-  b.onclick = () => { addToQueue(it, fresh); reportPick(it.id); b.textContent = '✓ Đã thêm'; setTimeout(() => b.textContent = '＋ Chọn', 1200); };
+  let last = 0;
+  b.onclick = () => {
+    const now = Date.now(); if(now - last < 700) return; last = now;          // chạm đúp vô tình: không thêm hai lần
+    addToQueue(it, fresh); reportPick(it.id); expectOnTv(it);
+    try{ if(navigator.vibrate) navigator.vibrate(20); }catch(e){}
+    b.textContent = '✓ Đã thêm'; b.classList.add('done');
+    setTimeout(() => { b.textContent = '＋ Chọn'; b.classList.remove('done'); }, 2000);
+  };
   return b;
 }
 function renderResults(items, title, extra){
@@ -731,6 +769,7 @@ bc.onmessage = ev => {
   $('muteBtn').textContent = s.muted ? '🔇' : '🔊';
   if(typeof s.volume === 'number') $('vol').value = s.volume;
   const q = s.queue || []; $('qCount').textContent = q.length;
+  confirmFromTv(s);
   const box = $('queueList'); box.replaceChildren();
   if(!q.length){ box.append(el('div', 'msg', 'Hàng chờ trống.')); return; }
   q.forEach((it, i) => {
