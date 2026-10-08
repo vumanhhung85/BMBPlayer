@@ -3,7 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>BMB Remote — Tìm bài YouTube</title>
+<title>BMBPlayer — Chọn bài & gọi phục vụ</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#0a0a0f">
 <style>
   :root{ --bg:#0a0a0f; --panel:#15151f; --line:#2a2a3a; --ink:#f2f2f7; --quiet:#9a9ab0; --accent:#8b5cf6; --accent2:#c084fc; --good:#34d399; --warn:#fbbf24; }
   *{box-sizing:border-box;margin:0;padding:0}
@@ -70,13 +73,47 @@
   .vol{display:flex; align-items:center; gap:10px; background:#0e0e16; border:1px solid var(--line); border-radius:12px; padding:8px 12px}
   .vol label{color:var(--quiet); font-size:12px} .vol input{flex:1}
   .roomOff #dock{ opacity:.4; pointer-events:none }
+
+  /* ===== Gọi phục vụ (nước có số lượng, dịch vụ bật/tắt) ===== */
+  .tabs button.od{ color:#fde68a }
+  .tabs button.od.on{ color:var(--ink); border-bottom-color:#f59e0b }
+  #odPane{ padding:6px 16px 170px }
+  .odH{ font-size:13px; color:var(--quiet); font-weight:700; letter-spacing:.4px; margin:16px 2px 8px }
+  .svgrid{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px }
+  @media(min-width:520px){ .svgrid{ grid-template-columns:repeat(3,1fr) } }
+  .svbtn{ background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:14px 8px; display:flex; flex-direction:column; align-items:center; gap:6px; cursor:pointer; color:var(--ink); font:inherit }
+  .svbtn .ico{ font-size:26px; line-height:1 } .svbtn .tx{ font-size:13.5px; font-weight:600; text-align:center; line-height:1.3 }
+  .svbtn.on{ border-color:#f59e0b; background:#2a2010 } .svbtn.on .tx{ color:#fde68a }
+  .drow{ display:flex; align-items:center; justify-content:space-between; gap:10px; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:9px 10px 9px 14px; margin-bottom:8px }
+  .drow.on{ border-color:#f59e0b }
+  .drow .di{ display:flex; align-items:center; gap:10px; min-width:0 } .drow .dic{ font-size:22px } .drow .dtx{ font-size:15px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+  .qty{ display:flex; align-items:center; gap:4px; flex:0 0 auto }
+  .qty button{ width:36px; height:36px; border-radius:10px; border:1px solid var(--line); background:#20202e; color:var(--ink); font-size:19px; font-weight:800 }
+  .qty button:disabled{ opacity:.3 } .qty .qn{ width:26px; text-align:center; font-weight:800; font-size:17px; color:var(--quiet) } .drow.on .qn{ color:#fde68a }
+  #odNote{ width:100%; margin-top:14px; background:var(--panel); border:1px solid var(--line); color:var(--ink); border-radius:12px; padding:11px 13px; font:inherit; font-size:15px; resize:none; height:68px }
+  .odTiny{ color:var(--quiet); font-size:12px; text-align:center; margin-top:14px; line-height:1.6 }
+  .lsbtn{ display:block; width:100%; margin:10px 0 2px; padding:11px 14px; border-radius:12px; border:1px dashed var(--line); background:#14141c; color:var(--quiet); font:inherit; font-weight:700; font-size:14px }
+  #odBar{ position:fixed; left:0; right:0; bottom:0; z-index:20; background:var(--panel); border-top:1px solid var(--line); padding:10px 12px calc(10px + env(safe-area-inset-bottom)); display:none; gap:8px; align-items:center }
+  #odBar .sum{ flex:1; min-width:0; font-size:13px; color:var(--quiet); line-height:1.35 }
+  #odBar button{ border:none; border-radius:12px; padding:13px 16px; font-weight:800; font-size:15px; color:#fff; background:#20202e }
+  #odBar #odSendBtn{ background:linear-gradient(135deg,#f59e0b,#fbbf24); color:#2b1400 } #odBar button:disabled{ opacity:.5 }
+  .odOv{ position:fixed; inset:0; z-index:60; background:rgba(0,0,0,.72); display:none; align-items:center; justify-content:center; padding:18px }
+  .odCard{ background:var(--panel); border:1px solid var(--line); border-radius:18px; padding:22px 18px; width:min(420px,100%); max-height:calc(100vh - 36px); overflow:auto; text-align:center }
+  .odCard h3{ margin:0 0 6px; font-size:19px } .odCard p{ color:var(--quiet); font-size:14px; margin:0 0 12px; line-height:1.5 }
+  .odCard .row2{ display:flex; gap:8px; margin-top:14px } .odCard .row2 button{ flex:1; border:none; border-radius:12px; padding:12px; font-weight:700; color:#fff; background:#20202e }
+  .odCard .row2 .y{ background:linear-gradient(135deg,#f59e0b,#fbbf24); color:#2b1400 }
+  .odDot{ display:inline-block; width:9px; height:9px; border-radius:5px; background:#fbbf24; margin-right:7px } .odDot.go{ background:var(--good) }
+  .lsit{ border:1px solid var(--line); border-radius:12px; padding:9px 12px; margin-bottom:8px; text-align:left }
+  .lsit .h{ display:flex; justify-content:space-between; font-size:12px; color:var(--quiet) } .lsit .b{ font-size:14.5px; margin-top:4px; line-height:1.5 } .lsit .n{ font-size:12.5px; color:var(--quiet); font-style:italic }
+  .pill{ font-size:11.5px; font-weight:800; padding:2px 9px; border-radius:99px } .pill.moi{ background:#3a2a10; color:#fbbf24 } .pill.nhan{ background:#12361f; color:var(--good) } .pill.xong{ background:#20202e; color:var(--quiet) } .pill.huy{ background:#3a1515; color:#fca5a5 }
 </style>
 </head>
 <body>
 <script src="./phong-channel.js"></script>
+<script src="./quet-qr.js"></script>
 <header>
-  <div class="logo">B</div><b>BMB Remote</b> <span style="color:var(--quiet);font-size:12px">YouTube nhúng</span>
-  <div class="room" id="roomTag">PHÒNG</div>
+  <div class="logo">B</div><b>BMBPlayer</b>
+  <div class="room" id="roomTag" style="cursor:pointer">PHÒNG</div>
   <button id="gear" aria-label="Cài đặt">⚙</button>
 </header>
 
@@ -102,6 +139,7 @@
 <div class="tabs">
   <button id="tabSearch" class="on">Tìm bài</button>
   <button id="tabQueue">Hàng chờ (<span id="qCount">0</span>)</button>
+  <button id="tabOrder" class="od" style="display:none">🛎️ Phục vụ</button>
 </div>
 
 <div id="paneSearch">
@@ -129,6 +167,29 @@
 
 <div id="paneQueue" style="display:none"><div class="list" id="queueList"></div></div>
 
+<div id="paneOrder" style="display:none">
+  <div id="odPane">
+    <button class="lsbtn" id="odLsBtn">📋 Đơn đã gọi</button>
+    <div class="odH">CẦN HỖ TRỢ</div>
+    <div class="svgrid" id="odSv"></div>
+    <div class="odH">GỌI NƯỚC</div>
+    <div id="odDr"></div>
+    <textarea id="odNote" maxlength="200" placeholder="Ghi chú thêm cho nhân viên (không bắt buộc)…"></textarea>
+    <div class="odTiny">Nhân viên sẽ lên phòng trong ít phút.<br>Giá do nhân viên xác nhận trực tiếp.</div>
+  </div>
+</div>
+<div id="odBar"><div class="sum" id="odSum"></div><button id="odClear">Xoá</button><button id="odSendBtn">Gửi yêu cầu</button></div>
+<div class="odOv" id="odSent"><div class="odCard">
+  <div style="font-size:46px">🛎️</div><h3>Đã gửi yêu cầu</h3><p id="odSentList"></p>
+  <div><span class="odDot" id="odDot"></span><span id="odStTx">Đang chờ quầy tiếp nhận…</span></div>
+  <div class="row2"><button id="odSentClose">Đóng</button><button class="y" id="odSentLs">Xem đơn đã gọi</button></div>
+</div></div>
+<div class="odOv" id="odLs"><div class="odCard">
+  <h3>Đơn đã gọi</h3><p>Các yêu cầu phòng bạn đã gửi. Tình trạng tự cập nhật.</p>
+  <div id="odLsBox"></div>
+  <div class="row2"><button id="odLsClose">Đóng</button></div>
+</div></div>
+
 <div id="dock">
   <div class="ctrlRow">
     <button class="primary" id="playBtn">▶ Phát/Dừng</button>
@@ -142,7 +203,7 @@
 <script>
 const params = new URLSearchParams(location.search);
 const ROOM0 = (params.get('room') || 'P1').toUpperCase();
-const bc = openRoomChannel('remote', ROOM0);       // có ?r=<mã QR> → kênh riêng của phòng qua Worker bmb-phong (khách, không cần mật khẩu); không có → như cũ
+const bc = openRoomChannel('remote', ROOM0);       // có ?r=<QR trên TV> → khách; đã gán máy tính bảng → máy tính bảng; không có → như cũ (thử cục bộ)
 const GUEST = !!bc.ws;
 const ROOM = GUEST ? bc.roomId : ROOM0;
 let guestTok = '';                                   // vé khách do Worker phòng cấp khi phòng đang mở: chỉ đủ để tìm/chọn bài trong kho
@@ -151,7 +212,9 @@ const API_NAME = 'np_api', PASS_NAME = 'np_pass';          // dùng chung tên v
 const CAT_KEY = 'bmb_yt_catalog_v1';
 const COUNT_KEY = 'bmb_yt_search_count';
 const DAY = 86400000, MAX_AGE = 30 * DAY, REFRESH_AGE = 20 * DAY, MAX_CAT = 500;
-$('roomTag').textContent = 'PHÒNG ' + ROOM;
+let roomName = '';
+const paintTag = () => { $('roomTag').textContent = 'PHÒNG ' + (roomName || (bc.ws ? '…' : ROOM)) + (bc.tablet ? ' · MÁY TÍNH BẢNG' : ''); };
+paintTag();
 
 const send = (action, extra) => bc.postMessage({ type:'cmd', payload:Object.assign({action}, extra||{}) });
 
@@ -743,12 +806,118 @@ $('q').addEventListener('keydown', e => { if(e.key === 'Enter') go(); });
 $('q').addEventListener('input', () => { updateDetect(); renderLocal(); khoSoon(); });
 
 /* ---------- Tabs ---------- */
+let curTab = 'search';
 function tab(which){
+  curTab = which;
   $('paneSearch').style.display = which === 'search' ? '' : 'none';
   $('paneQueue').style.display = which === 'queue' ? '' : 'none';
-  $('tabSearch').classList.toggle('on', which === 'search'); $('tabQueue').classList.toggle('on', which === 'queue');
+  $('paneOrder').style.display = which === 'order' ? '' : 'none';
+  $('tabSearch').classList.toggle('on', which === 'search'); $('tabQueue').classList.toggle('on', which === 'queue'); $('tabOrder').classList.toggle('on', which === 'order');
+  $('dock').style.display = which === 'order' ? 'none' : '';             // tab gọi phục vụ: thanh gửi yêu cầu thay cho nút điều khiển bài
+  if(which === 'order'){ if(!OD.menu.length || Date.now() - OD.menuAt > 120000) odLoadMenu(); odRender(); }
+  else $('odBar').style.display = 'none';
 }
-$('tabSearch').onclick = () => tab('search'); $('tabQueue').onclick = () => tab('queue');
+$('tabSearch').onclick = () => tab('search'); $('tabQueue').onclick = () => tab('queue'); $('tabOrder').onclick = () => tab('order');
+
+/* ---------- Gọi phục vụ (trước đây là app Order): nước có số lượng, dịch vụ bật/tắt, không tính tiền ----------
+   Xác thực bằng chính mã vào phòng: khách = QR trên TV của lượt đang mở; máy tính bảng = mã máy tính bảng. */
+const OD = { menu:[], cart:{}, branch:'', orderId:'', pollT:null, lsT:null, menuAt:0, sending:false };
+const QTY_MAX = 20;
+function devId(){
+  let d = ''; try{ d = localStorage.getItem('bmb_dev') || ''; }catch(e){}
+  if(!d){ d = 'D' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); try{ localStorage.setItem('bmb_dev', d); }catch(e){} }
+  return d;
+}
+async function odApi(action, data){
+  const r = await fetch(phongApi() + '/api', { method:'POST', headers:{ 'content-type':'application/json' },
+    body: JSON.stringify(Object.assign({ action, dev: devId() }, data || {})) });
+  return r.json();
+}
+const odAuth = () => ({ r: bc.token, role: bc.tablet ? 'tablet' : 'remote' });
+const odItem = c => OD.menu.find(m => m.code === c);
+async function odLoadMenu(){
+  if(!OD.branch) return;
+  OD.menuAt = Date.now();
+  try{ const r = await odApi('menu.get', { branchId: OD.branch }); if(r && r.ok) OD.menu = r.items || []; }catch(e){}
+  Object.keys(OD.cart).forEach(c => { if(!odItem(c)) delete OD.cart[c]; });   // món vừa hết hàng / bị ẩn
+  odDraw(); odRender();
+}
+function odDraw(){
+  const sv = OD.menu.filter(m => m.type === 'SV'), dr = OD.menu.filter(m => m.type === 'DR');
+  const gSv = $('odSv'), gDr = $('odDr'); gSv.replaceChildren(); gDr.replaceChildren();
+  sv.forEach(m => { const b = el('button', 'svbtn'); b.dataset.c = m.code; b.append(el('div', 'ico', m.icon || '🛎️'), el('div', 'tx', m.label));
+    b.onclick = () => { if(OD.cart[m.code]) delete OD.cart[m.code]; else OD.cart[m.code] = 1; odRender(); }; gSv.append(b); });
+  dr.forEach(m => { const r = el('div', 'drow'); r.dataset.c = m.code;
+    const di = el('div', 'di'); di.append(el('span', 'dic', m.icon || '🥤'), el('span', 'dtx', m.label));
+    const q = el('div', 'qty'), mi = el('button', 'qm', '–'), n = el('span', 'qn', '0'), pl = el('button', 'qp', '+');
+    mi.onclick = () => odQty(m.code, -1); pl.onclick = () => odQty(m.code, 1);
+    q.append(mi, n, pl); r.append(di, q); gDr.append(r); });
+  if(!sv.length) gSv.append(el('div', 'odTiny', OD.menu.length ? 'Chưa có dịch vụ nào.' : 'Đang tải menu…'));
+  if(!dr.length) gDr.append(el('div', 'odTiny', OD.menu.length ? 'Chưa có nước nào.' : ''));
+}
+function odQty(c, d){ const n = (OD.cart[c] || 0) + d; if(n <= 0) delete OD.cart[c]; else OD.cart[c] = Math.min(n, QTY_MAX); odRender(); }
+function odRender(){
+  document.querySelectorAll('#odSv .svbtn').forEach(b => b.classList.toggle('on', !!OD.cart[b.dataset.c]));
+  document.querySelectorAll('#odDr .drow').forEach(r => { const n = OD.cart[r.dataset.c] || 0;
+    r.classList.toggle('on', n > 0); r.querySelector('.qn').textContent = n; r.querySelector('.qm').disabled = n <= 0; r.querySelector('.qp').disabled = n >= QTY_MAX; });
+  const ks = Object.keys(OD.cart);
+  $('odSum').textContent = ks.map(c => { const m = odItem(c); return (m ? m.label : c) + (m && m.type === 'DR' ? ' ×' + OD.cart[c] : ''); }).join(' · ');
+  $('odBar').style.display = curTab === 'order' && ks.length ? 'flex' : 'none';
+}
+async function odSend(){
+  const ks = Object.keys(OD.cart); if(!ks.length || OD.sending) return;
+  if(!bc.token){ snack('Máy chưa vào phòng. Quét mã QR trên TV của phòng.', true); return; }
+  OD.sending = true; $('odSendBtn').disabled = true;
+  const items = ks.map(c => ({ code:c, qty: OD.cart[c] }));
+  const listTx = ks.map(c => { const m = odItem(c); return (m ? m.label : c) + (m && m.type === 'DR' ? ' ×' + OD.cart[c] : ''); }).join(', ');
+  try{
+    const r = await odApi('don.tao', Object.assign({ items, note: $('odNote').value.slice(0, 200) }, odAuth()));
+    if(!r || !r.ok){
+      snack((r && r.msg) || 'Không gửi được, vui lòng thử lại hoặc báo nhân viên.', true);
+      if(r && (r.error === 'het_hang' || r.error === 'bad_item')) odLoadMenu();
+    }else{
+      OD.orderId = r.orderId; $('odSentList').textContent = listTx;
+      $('odStTx').textContent = 'Đang chờ quầy tiếp nhận…'; $('odDot').className = 'odDot';
+      $('odSent').style.display = 'flex';
+      OD.cart = {}; $('odNote').value = ''; odRender(); odPoll();
+    }
+  }catch(e){ snack('Mất kết nối mạng. Vui lòng thử lại hoặc báo nhân viên.', true); }
+  OD.sending = false; $('odSendBtn').disabled = false;
+}
+function odPoll(){
+  clearInterval(OD.pollT); let t = 0;
+  OD.pollT = setInterval(async () => {
+    if((t += 5) > 180){ clearInterval(OD.pollT); return; }
+    try{
+      const r = await odApi('don.trangThai', { orderId: OD.orderId }); if(!r || !r.ok) return;
+      if(r.status === 'NHAN'){ $('odStTx').textContent = 'Nhân viên đã tiếp nhận, đang mang lên…'; $('odDot').className = 'odDot go'; }
+      else if(r.status === 'XONG'){ $('odStTx').textContent = 'Đã phục vụ. Chúc quý khách vui vẻ!'; $('odDot').className = 'odDot go'; clearInterval(OD.pollT); setTimeout(odSentClose, 4000); }
+      else if(r.status === 'HUY'){ $('odStTx').textContent = 'Yêu cầu đã được huỷ. Vui lòng liên hệ quầy.'; clearInterval(OD.pollT); }
+    }catch(e){}
+  }, 5000);
+}
+function odSentClose(){ clearInterval(OD.pollT); $('odSent').style.display = 'none'; }
+const LS_TXT = { MOI:['moi','Đã gửi tới nhân viên'], NHAN:['nhan','Đang phục vụ'], XONG:['xong','Đã xong'], HUY:['huy','Đã huỷ'] };
+async function odLsLoad(){
+  try{
+    const r = await odApi('don.cuaPhong', odAuth()); const box = $('odLsBox');
+    if(!r || !r.ok){ box.replaceChildren(el('p', null, (r && r.msg) || 'Chưa xem được.')); return; }
+    box.replaceChildren();
+    if(!(r.orders || []).length){ box.append(el('p', null, 'Chưa có yêu cầu nào.')); return; }
+    r.orders.forEach(o => {
+      const st = LS_TXT[o.status] || ['xong', o.status], it = el('div', 'lsit'), h = el('div', 'h');
+      const d = new Date(o.at); h.append(el('span', null, String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0')), el('span', 'pill ' + st[0], st[1]));
+      const b = el('div', 'b', o.items.map(i => (i.icon ? i.icon + ' ' : '') + i.label + (i.type === 'DR' ? ' ×' + i.qty : '')).join(' · '));
+      it.append(h, b); if(o.note) it.append(el('div', 'n', '“' + o.note + '”')); box.append(it);
+    });
+  }catch(e){}
+}
+function odLsOpen(){ $('odLsBox').replaceChildren(el('p', null, 'Đang tải…')); $('odLs').style.display = 'flex'; odLsLoad(); clearInterval(OD.lsT); OD.lsT = setInterval(odLsLoad, 8000); }
+function odLsClose(){ $('odLs').style.display = 'none'; clearInterval(OD.lsT); }
+$('odSendBtn').onclick = odSend;
+$('odClear').onclick = () => { OD.cart = {}; $('odNote').value = ''; odRender(); };
+$('odLsBtn').onclick = odLsOpen; $('odLsClose').onclick = odLsClose;
+$('odSentClose').onclick = odSentClose; $('odSentLs').onclick = () => { odSentClose(); odLsOpen(); };
 
 /* ---------- Điều khiển ---------- */
 $('playBtn').onclick = () => send('play'); $('nextBtn').onclick = () => send('next');
@@ -787,21 +956,48 @@ bc.onmessage = ev => {
 const BANNER = {
   waiting:'Phòng chưa mở. Nhờ nhân viên mở phòng — trang sẽ tự nối lại.',
   closed:'Phòng chưa mở. Nhờ nhân viên mở phòng.',
-  ended:'Phòng đã đóng. Cảm ơn quý khách! Muốn hát tiếp, hãy nhờ nhân viên mở phòng rồi quét lại mã QR trên bàn.',
-  rotated:'Mã QR này đã hết hiệu lực. Vui lòng quét mã QR mới trên bàn.',
-  network:'Vui lòng kết nối wifi của quán rồi quét lại mã QR.',
+  ended:'Phòng đã đóng. Cảm ơn quý khách! Muốn hát tiếp, hãy nhờ nhân viên mở phòng rồi quét mã QR mới trên TV.',
+  rotated: bc.tablet ? 'Máy tính bảng này đã được gỡ khỏi phòng (phòng đã gán máy khác). Bấm ô PHÒNG ở góc trên để gán lại.' : 'Mã QR này đã hết hiệu lực. Vui lòng quét mã QR mới ở góc trái màn hình TV.',
+  network:'Vui lòng kết nối wifi của quán rồi quét lại mã QR trên TV.',
   full:'Phòng đã đủ số điện thoại kết nối. Vui lòng nhờ nhân viên hỗ trợ.',
-  replaced:'Phòng đã chuyển sang thiết bị khác.', expired:'Không nối được phòng. Vui lòng quét lại mã QR trên bàn.',
+  replaced:'Phòng đã chuyển sang thiết bị khác.', expired:'Không nối được phòng. Vui lòng quét lại mã QR trên TV.',
   offline:'Mất kết nối, đang nối lại…', connecting:'Đang nối vào phòng…'
 };
 function banner(t){ const b = $('roomBanner'); b.textContent = t || ''; b.style.display = t ? 'block' : 'none'; document.body.classList.toggle('roomOff', !!t); }
 if(GUEST){
   bc.onroom = m => {
+    if(m.name && m.name !== roomName){ roomName = m.name; paintTag(); }
+    if(m.branch && m.branch !== OD.branch){ OD.branch = m.branch; $('tabOrder').style.display = ''; if(curTab === 'order') odLoadMenu(); }
     if(m.gt){ const first = !guestTok; guestTok = m.gt; if(first){ showQuota(); renderKho(); loadIndex(); } }
     if(m.open){ banner(''); send('hello'); } else banner(BANNER[m.reason === 'notopen' ? 'waiting' : 'closed']);
   };
   bc.onstatus = s => { if(s !== 'open' && s !== 'closed' && s !== 'waiting') banner(BANNER[s] || ''); else if(s === 'waiting') banner(BANNER.waiting); };
 }
+
+/* ---------- Máy tính bảng của phòng: bấm ô PHÒNG → quét QR khách ở góc trái TV → máy tự theo phòng qua mọi lượt ---------- */
+const tokFromQr = raw => { raw = String(raw || '').trim(); const m = raw.match(/[?&]r=([^&#\s]+)/); let t = m ? m[1] : raw; try{ t = decodeURIComponent(t); }catch(e){} return /^[A-Za-z0-9_-]{1,40}\.\d{1,6}\.[\w-]{22}$/.test(t) ? t : ''; };
+function assignTablet(){
+  openQrScanner({
+    title: 'Gán máy tính bảng vào phòng',
+    hint: 'Mở phòng trước, rồi quét mã QR đang hiện ở góc trái màn hình TV của phòng đặt máy này. Máy phải dùng wifi của quán.',
+    manualPlaceholder: 'hoặc dán liên kết QR của phòng',
+    onResult: async raw => {
+      const r = tokFromQr(raw);
+      if(!r) return 'Đây không phải mã QR phòng. Quét mã ở góc trái TV.';
+      const res = await fetch(phongApi() + '/api/tablet/claim', { method:'POST', headers:{ 'content-type':'application/json' }, body: JSON.stringify({ r }) });
+      let d = {}; try{ d = await res.json(); }catch(e){}
+      if(!res.ok || !d.tok) return d.error || ('Lỗi ' + res.status);
+      try{ localStorage.setItem(TB_KEY, d.tok); localStorage.setItem('bmb_tablet', '1'); }catch(e){ return 'Trình duyệt không cho lưu dữ liệu (chế độ ẩn danh?).'; }
+      snack('✓ Đã gán máy này vào phòng ' + (d.name || d.id));
+      setTimeout(() => location.replace(location.pathname), 800);
+      return true;
+    }
+  });
+}
+$('roomTag').onclick = () => {
+  if(GUEST && !bc.tablet){ snack('Bạn đang ở phòng ' + (roomName || '') + '. Đổi phòng: quét mã QR ở góc trái TV của phòng đó.', true); return; }
+  if(confirm(bc.tablet ? 'Đổi phòng cho máy tính bảng này?' : 'Gán máy này làm máy tính bảng chọn bài của một phòng?')) assignTablet();
+};
 
 /* ---------- Khởi động ---------- */
 showQuota(); updateDetect(); renderLocal(); autoRefresh(); loadPlaylistNames(true); renderKho(); loadIndex();

@@ -40,10 +40,25 @@
   @keyframes pulse{50%{opacity:.35}}
   #hint{color:var(--quiet); font-size:clamp(14px,1.8vw,24px); max-width:60ch; line-height:1.6}
   #roomNote{display:none; font-size:clamp(16px,2vw,26px); color:var(--warn); font-weight:700}
-  #setup{display:none; background:rgba(255,255,255,.06); border:1px solid rgba(251,191,36,.6); border-radius:16px; padding:16px 20px; max-width:min(92vw,760px); text-align:left}
-  #setup b{color:var(--warn); font-size:clamp(16px,2vw,24px)}
-  #setup p{color:var(--quiet); font-size:clamp(13px,1.5vw,18px); line-height:1.6; margin:6px 0 10px}
+  #setup{display:none; background:rgba(255,255,255,.06); border:1px solid rgba(251,191,36,.6); border-radius:16px; padding:18px 22px; max-width:min(94vw,900px); text-align:left}
+  #setup b{color:var(--warn); font-size:clamp(16px,2vw,26px)}
+  #setup p{color:var(--quiet); font-size:clamp(13px,1.5vw,19px); line-height:1.6; margin:6px 0 10px}
+  #setup p b{font-size:inherit; color:var(--ink)}
+  .pairWrap{display:flex; gap:clamp(14px,2.4vw,32px); align-items:center}
+  #pairQr{flex:0 0 auto; width:clamp(150px,24vh,300px); aspect-ratio:1; background:#fff; border-radius:14px; padding:8px; display:flex; align-items:center; justify-content:center; color:#555; font-size:13px}
+  #pairQr img{width:100%; height:100%; image-rendering:pixelated; display:block}
+  #pairCode{font:800 clamp(40px,7vw,92px)/1.05 ui-monospace,Consolas,monospace; letter-spacing:.08em; color:#fff; text-shadow:0 4px 24px rgba(139,92,246,.6)}
+  #pairSub{color:var(--quiet); font-size:clamp(12px,1.3vw,16px); margin-top:4px}
+  #setup details{margin-top:12px; color:var(--quiet); font-size:14px}
+  #setup summary{cursor:pointer; margin-bottom:8px}
   #setup .f{display:flex; gap:10px}
+
+  /* ===== QR khách ở góc trái (chỉ khi phòng đang mở; đổi mỗi lượt mở phòng) ===== */
+  #gqr{position:absolute; left:1.6vw; top:2vh; z-index:11; display:none; background:#fff; border-radius:14px; padding:.9vh .9vh .5vh; text-align:center; box-shadow:0 6px 30px rgba(0,0,0,.55); pointer-events:none}
+  #gqr img{width:clamp(110px,21vh,280px); height:clamp(110px,21vh,280px); display:block; image-rendering:pixelated}
+  #gqr .l{font:700 clamp(11px,1.6vh,20px)/1.25 Arial,sans-serif; color:#5b21b6; margin-top:.3vh}
+  #gqr .r{font:700 clamp(10px,1.3vh,16px)/1.2 Arial,sans-serif; color:#555}
+  body.hasqr #ovTitle{left:calc(1.6vw + clamp(110px,21vh,280px) + 4vh)}
   #setup input{flex:1; min-width:0; background:#0e0e16; color:var(--ink); border:1px solid var(--line); border-radius:12px; padding:12px 14px; font-size:16px}
   #setup button{background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; border:none; border-radius:12px; padding:0 20px; font-size:16px; font-weight:700; cursor:pointer}
   #setup .err{color:#fecdd3; font-size:14px; margin-top:8px; min-height:1em}
@@ -101,6 +116,7 @@
 </head>
 <body>
 <script src="./phong-channel.js"></script>
+<script src="./qrcode.js"></script>
 <div id="stage">
   <div id="yt"></div>
 
@@ -114,17 +130,28 @@
     <div id="roomNote"></div>
     <p id="hint">Chọn bài trên điện thoại hoặc máy tính bảng — bài sẽ tự phát lên màn hình này.</p>
     <div id="setup">
-      <b>Màn hình này chưa gán phòng</b>
-      <p>Vào <b style="font-size:inherit;color:inherit">phong.html</b> → chọn phòng → bấm <b style="font-size:inherit;color:inherit">Chép liên kết TV</b>, rồi dán vào ô dưới (hoặc mở thẳng liên kết đó trên TV). Gán một lần, lần sau mở trang là vào đúng phòng.</p>
-      <div class="f"><input id="setupIn" type="url" placeholder="https://bmbplayer.boommusicbox.vn/index.html?r=…" autocomplete="off"><button id="setupBtn">Gán phòng</button></div>
+      <div class="pairWrap">
+        <div id="pairQr">Đang lấy mã…</div>
+        <div>
+          <b>Màn hình này chưa gán phòng</b>
+          <p>Nhân viên mở trang <b>Quầy</b> → tab <b>TV &amp; phòng</b> → bấm <b>Gán TV</b> ở đúng phòng → quét mã QR này, hoặc nhập mã:</p>
+          <div id="pairCode">··· ···</div>
+          <div id="pairSub"></div>
+        </div>
+      </div>
+      <details>
+        <summary>Cách khác: dán liên kết TV (admin)</summary>
+        <div class="f"><input id="setupIn" type="url" placeholder="https://bmbplayer.boommusicbox.vn/index.html?r=…" autocomplete="off"><button id="setupBtn">Gán phòng</button></div>
+        <a href="?local=1" id="setupLocal">Chỉ thử trên máy này (không gán phòng)</a>
+      </details>
       <div class="err" id="setupErr"></div>
-      <a href="?local=1" id="setupLocal">Chỉ thử trên máy này (không gán phòng)</a>
     </div>
     <div id="fileWarn">Trang đang mở bằng <b>file://</b>. YouTube yêu cầu trang nhúng có địa chỉ http(s) nên video sẽ báo lỗi 153.
       Hãy chạy <b>python -m http.server 8000</b> trong thư mục chứa file rồi mở <b>http://localhost:8000/</b>, hoặc đưa lên GitHub Pages.</div>
     <div id="diag"></div>
   </div>
 
+  <div id="gqr"><img id="gqrImg" alt="QR chọn bài"><div class="l">QUÉT CHỌN BÀI · GỌI MÓN</div><div class="r" id="gqrRoom"></div></div>
   <div class="ov" id="ovTitle"><div><div class="lbl">ĐANG HÁT</div><div class="t" id="ovTitleT"></div></div></div>
   <div class="ov" id="ovNext"><div class="lbl">TIẾP THEO</div><div class="t" id="ovNextT"></div></div>
   <div class="ov" id="ovCount"></div>
@@ -160,11 +187,12 @@
    ============================================================ */
 const params = new URLSearchParams(location.search);
 const ROOM0 = (params.get('room') || 'P1').toUpperCase();
-const bc = openRoomChannel('tv', ROOM0);          // có ?r=<mã TV> → kênh riêng của phòng qua Worker bmb-phong; không có → BroadcastChannel như cũ
+const bc = openRoomChannel('tv', ROOM0);          // có ?r=<mã TV> hoặc đã gán → kênh riêng của phòng qua Worker bmbplayer; ?local=1 → BroadcastChannel (thử 1 máy)
 const ROOM = bc.ws ? bc.roomId : ROOM0;
 const $ = id => document.getElementById(id);
 const sleepless = () => {};
-function paintRoomTag(extra){ $('roomTag').textContent = 'PHÒNG ' + ROOM + (extra ? ' · ' + extra : ''); }
+let roomName = '';
+function paintRoomTag(extra){ $('roomTag').textContent = 'PHÒNG ' + (roomName || ROOM) + (extra ? ' · ' + extra : ''); }
 paintRoomTag();
 if(location.protocol === 'file:') $('fileWarn').style.display = 'block';
 
@@ -177,18 +205,77 @@ let roomOpen = !bc.ws, lastSession = null, connTxt = '';
 /* Chưa có mã phòng (mở trang gốc lần đầu, hoặc trình duyệt chế độ Khách/ẩn danh xoá mất mã đã nhớ) → hỏi gán phòng.
    ?local=1 = chạy thử trong cùng trình duyệt (BroadcastChannel) như trước. */
 const needSetup = !bc.ws && !params.has('local');
-const TV_TOKEN_RE = /^[A-Z0-9]{2,8}-[A-Z0-9]{1,10}\.\d{1,6}\.[\w-]{22}$/;
+const TV_TOKEN_RE = /^[A-Za-z0-9_-]{1,40}\.\d{1,6}\.[\w-]{22}$/;
 if(needSetup){
   $('setup').style.display = 'block'; $('hint').style.display = 'none';
   const apply = () => {
     const raw = $('setupIn').value.trim(); let tok = '', api = '';
     try{ const u = new URL(raw); tok = u.searchParams.get('r') || ''; api = u.searchParams.get('api') || ''; }catch(e){ tok = raw; }
-    if(!TV_TOKEN_RE.test(tok)){ $('setupErr').textContent = 'Không đúng liên kết TV. Liên kết có dạng …/index.html?r=CN03-P01.1.xxxx — lấy bằng nút "Chép liên kết TV" (không phải mã QR của khách).'; return; }
+    if(!TV_TOKEN_RE.test(tok)){ $('setupErr').textContent = 'Không đúng liên kết TV. Liên kết có dạng …/index.html?r=P1A2B….1.xxxx — lấy bằng nút "Chép liên kết TV" (không phải mã QR của khách).'; return; }
     location.replace(location.pathname + '?r=' + encodeURIComponent(tok) + (api ? '&api=' + encodeURIComponent(api) : ''));
   };
   $('setupBtn').onclick = apply;
   $('setupIn').addEventListener('keydown', e => { if(e.key === 'Enter') apply(); });
 }
+
+/* ---------- Gán phòng bằng mã 6 số: TV xin mã, nhân viên quét/nhập ở quay.html (tab TV & phòng), TV tự nhận mã phòng ---------- */
+const BASE = location.origin + location.pathname.replace(/[^/]*$/, '');
+function qrImg(text, cell, level){ const q = qrcode(0, level || 'M'); q.addData(text); q.make(); return q.createDataURL(cell || 8, 2); }
+function startPairing(){
+  let code = '', key = '', exp = 0, pollT = null;
+  const api = phongApi();
+  const err = t => { $('setupErr').textContent = t || ''; };
+  async function post(path, body){
+    const r = await fetch(api + path, { method:'POST', headers:{ 'content-type':'application/json' }, body: JSON.stringify(body || {}) });
+    let d = {}; try{ d = await r.json(); }catch(e){}
+    return { s: r.status, d };
+  }
+  async function fresh(){
+    clearTimeout(pollT);
+    try{
+      const r = await post('/api/tv/pair/new');
+      if(r.s === 429){ err(r.d.error || 'Xin mã quá nhiều lần, đợi một lát.'); pollT = setTimeout(fresh, 60000); return; }
+      if(r.s !== 200) throw new Error(r.d.error || ('Lỗi ' + r.s));
+      code = r.d.code; key = r.d.key; exp = r.d.exp; err('');
+      $('pairCode').textContent = code.slice(0, 3) + ' ' + code.slice(3);
+      const img = document.createElement('img'); img.alt = 'QR gán phòng'; img.src = qrImg(BASE + 'quay.html#gan=' + code, 8);
+      $('pairQr').replaceChildren(img);
+      paintExp(); pollT = setTimeout(poll, 2500);
+    }catch(e){
+      err('Chưa lấy được mã gán phòng (' + (e.message || 'mất mạng') + '). Đang thử lại…');
+      pollT = setTimeout(fresh, 8000);
+    }
+  }
+  function paintExp(){ const m = Math.max(0, Math.round((exp - Date.now()) / 60000)); $('pairSub').textContent = 'Mã đổi sau khoảng ' + m + ' phút · TV sẽ tự vào phòng ngay khi được gán'; }
+  async function poll(){
+    if(Date.now() > exp - 5000) return fresh();
+    try{
+      const r = await post('/api/tv/pair/poll', { code, key });
+      if(r.s === 200 && r.d.tok){
+        $('pairSub').textContent = 'Đã gán vào phòng ' + (r.d.name || r.d.id || '') + ' — đang vào phòng…';
+        location.replace(location.pathname + '?r=' + encodeURIComponent(r.d.tok));
+        return;
+      }
+      if(r.s === 404 || r.s === 403) return fresh();
+    }catch(e){ /* mất mạng: hỏi lại sau */ }
+    paintExp(); pollT = setTimeout(poll, 2500);
+  }
+  fresh();
+}
+
+/* ---------- QR khách ở góc trái màn hình (đổi mỗi lượt mở phòng) ---------- */
+let shownQr = '';
+function paintGuestQr(tok, name){
+  tok = tok || '';
+  if(name) $('gqrRoom').textContent = 'Phòng ' + name;
+  if(tok === shownQr) return;
+  shownQr = tok;
+  if(!tok){ $('gqr').style.display = 'none'; document.body.classList.remove('hasqr'); return; }
+  $('gqrImg').src = qrImg(BASE + 'remote.html?r=' + encodeURIComponent(tok), 6, 'L');   // mức L: ít ô hơn, khách ngồi xa vẫn quét được
+  $('gqr').style.display = 'block'; document.body.classList.add('hasqr');
+}
+const HINT0 = $('hint').textContent;
+if(needSetup) startPairing();
 
 /* ---------- Màn hình chờ: giờ + trạng thái ---------- */
 function paintClock(){
@@ -489,14 +576,21 @@ if(bc.ws){
     if(m.replaced){ roomNote('Màn hình khác đã nhận phòng này'); return; }
     if(lastSession !== null && m.session !== lastSession) resetSession();     // phòng đóng/mở lại = phiên hát mới, xoá hàng chờ cũ
     lastSession = m.session; roomOpen = !!m.open;
-    if(!m.open){ resetSession(); roomNote('Phòng chưa mở — chờ nhân viên mở phòng'); paintRoomTag(); connTxt = ''; }
-    else { roomNote(''); connTxt = m.remotes ? m.remotes + ' điện thoại đang nối' : 'chưa có điện thoại'; paintRoomTag(connTxt); push(); }
+    if(m.name) roomName = m.name;
+    paintGuestQr(m.open ? m.qr : '', m.name);
+    if(!m.open){ resetSession(); roomNote('Phòng chưa mở — chờ nhân viên mở phòng'); paintRoomTag(); connTxt = ''; $('hint').textContent = HINT0; }
+    else {
+      roomNote('');
+      const n = (m.remotes || 0) + (m.tablets || 0);
+      connTxt = n ? n + ' máy đang nối' : 'chưa có máy chọn bài'; paintRoomTag(connTxt); push();
+      $('hint').textContent = 'Quét mã QR ở góc trái màn hình bằng điện thoại để chọn bài và gọi phục vụ.';
+    }
     paintReady();
   };
   bc.onstatus = s => {
     if(s === 'offline' || s === 'connecting'){ paintRoomTag('đang nối…'); connTxt = 'đang nối…'; }
     if(s === 'replaced') roomNote('Màn hình khác đã nhận phòng này');
-    if(s === 'rotated') roomNote('Mã TV đã bị đổi — mở lại liên kết TV mới');
+    if(s === 'rotated'){ roomNote('Phòng này đã gán cho TV khác — chuyển sang màn hình gán phòng…'); paintGuestQr(''); setTimeout(() => location.replace(location.pathname), 2500); }
     if(s === 'expired') roomNote('Mã TV không hợp lệ');
     paintReady();
   };
