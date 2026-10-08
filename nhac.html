@@ -123,7 +123,7 @@
   <button id="plNew" class="ico" title="Tạo playlist mới">＋</button>
   <button id="plDel" class="ico" title="Xoá playlist này">🗑</button>
   <span class="sp"></span>
-  <span id="link" title="Kênh tức thì tới Worker bmb-phong">● Hỏi định kỳ</span>
+  <span id="link" title="Kênh tức thì tới Worker bmbplayer">● Hỏi định kỳ</span>
   <button id="pairBtn" class="ico" title="Ghép điện thoại bằng mã / QR">📱</button>
   <button id="gear" class="ico" title="Cài đặt kết nối">⚙</button>
 </header>
@@ -694,13 +694,13 @@ window.addEventListener('keydown', e => {
 });
 
 /* ============================================================
-   Kênh tức thì (WebSocket tới Worker bmb-phong, Durable Object NhacRoom)
+   Kênh tức thì (WebSocket tới Worker bmbplayer, Durable Object NhacRoom)
    - Có thì lệnh/trạng thái đi thẳng, không qua D1; rớt thì tự quay về hỏi định kỳ /api/cmd, /api/state
      và thử nối lại sau 1, 2, 4… tối đa 30 giây.
    - Xác thực bằng tin nhắn đầu: mật khẩu (TV, máy anh) hoặc vé ghép mã 24 giờ (điện thoại khách/nhà).
    ============================================================ */
-const DEFAULT_PHONG = 'https://bmb-phong.vumanhhung85.workers.dev';
-const PHONG_API = (params.get('phong') || lsGet('phong_api') || DEFAULT_PHONG).replace(/\/+$/, '');
+const DEFAULT_PHONG = 'https://bmbplayer.vumanhhung85.workers.dev';   // Worker gộp bmbplayer (kênh tức thì NhacRoom)
+const PHONG_API = (params.get('phong') || lsGet('bmb_api') || DEFAULT_PHONG).replace(/\/+$/, '');
 const TOK_KEY = 'nhac_tok:' + ROOM;
 let pairTok = lsGet(TOK_KEY) || '';
 let ws = null, wsReady = false, wsTries = 0, wsTimer = null, wsPing = null, wsStop = false, tvOnline = false, lastWsState = null;
@@ -781,7 +781,7 @@ async function openPairTv(){
     clearInterval(pairTimer);
     const tick = () => { const left = Math.max(0, Math.round((d.exp - Date.now()) / 1000)); $('pairLeft').textContent = left ? 'Mã còn ' + Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0') : 'Mã đã hết hạn — bấm 📱 để lấy mã mới.'; if(!left){ clearInterval(pairTimer); $('pairQr').replaceChildren(); $('pairCode').textContent = '––––––'; } };
     tick(); pairTimer = setInterval(tick, 1000);
-  }catch(e){ $('pairLeft').textContent = e instanceof TypeError ? 'Không nối được Worker bmb-phong (' + PHONG_API + ').' : e.message; }
+  }catch(e){ $('pairLeft').textContent = e instanceof TypeError ? 'Không nối được Worker bmbplayer (' + PHONG_API + ').' : e.message; }
 }
 function openPair(){
   $('pairTv').style.display = 'none'; $('pairRemote').style.display = ''; $('pairGo').style.display = ''; $('pairPass').style.display = '';
@@ -798,7 +798,7 @@ async function claim(code){
     if(d.room !== ROOM){ location.replace(location.pathname + '?mode=remote&room=' + encodeURIComponent(d.room)); return; }
     pairTok = d.tok; closePair(); paintLink(); toast('Đã ghép với TV. Điện thoại này điều khiển được trong 24 giờ.');
     wsStop = false; wsTries = 0; wsConnect();
-  }catch(e){ toast(e instanceof TypeError ? 'Không nối được Worker bmb-phong.' : e.message, 'err', 6000); if(REMOTE && !PAIRED() && !cfg.pass) openPair(); }
+  }catch(e){ toast(e instanceof TypeError ? 'Không nối được Worker bmbplayer.' : e.message, 'err', 6000); if(REMOTE && !PAIRED() && !cfg.pass) openPair(); }
 }
 $('pairBtn').onclick = openPairTv;
 $('pairClose').onclick = closePair;

@@ -1,0 +1,33 @@
+# Worker "bmbplayer" — một Worker cho cả BMBPlayer (chọn bài + gọi phục vụ + quầy + TV)
+# Deploy:  npx wrangler deploy        (chạy trong thư mục repo BMBPlayer)
+name = "bmbplayer"
+main = "bmbplayer-worker.js"
+compatibility_date = "2025-01-01"
+
+[vars]
+ALLOWED_ORIGINS = "https://bmbplayer.boommusicbox.vn"
+NET_CHECK = "off"          # off = không kiểm mạng | warn = cho vào nhưng đánh dấu máy ngoài mạng quán | on = chặn điện thoại khách ngoài mạng quán
+TB_NET = "on"              # on = máy tính bảng phải cùng mạng với TV lúc gán | off = bỏ kiểm
+
+# D1 dùng chung với app quản lý BMB (database cũ của Order)
+# database_id: Cloudflare → Storage & Databases → D1 → bmb_data, hoặc lệnh:  npx wrangler d1 list
+[[d1_databases]]
+binding = "DB"
+database_name = "bmb_data"
+database_id = "DIEN-ID-CUA-bmb_data-VAO-DAY"
+
+[[durable_objects.bindings]]
+name = "ROOM"
+class_name = "Room"
+
+[[durable_objects.bindings]]
+name = "REG"
+class_name = "Registry"
+
+[[durable_objects.bindings]]
+name = "NHAC"
+class_name = "NhacRoom"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Room", "Registry", "NhacRoom"]
