@@ -458,6 +458,39 @@ if(bc.ws){
     paintReady();
   };
 }
+/* ---------- Tự cập nhật: TV chạy liên tục vẫn lấy bản mới sau khi đẩy lên GitHub ----------
+   Cứ 20 phút so nội dung index.html + phong-channel.js trên máy chủ với bản đang chạy (bỏ qua bộ nhớ đệm).
+   Có bản mới mà TV đang rảnh (không bài nào đang hát) → tự tải lại. Đang hát thì chờ lượt kiểm tra sau.
+   Ngoài ra mỗi sáng 4–5 giờ, nếu rảnh và đã chạy trên 6 tiếng → tải lại một lần cho sạch bộ nhớ. */
+(function(){
+  const FILES = [location.pathname, new URL('./phong-channel.js', location.href).pathname];
+  const BOOT = Date.now();
+  const hash = s => { let h = 2166136261; for(let i = 0; i < s.length; i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(16) + ':' + s.length; };
+  async function snapshot(){
+    const parts = [];
+    for(const f of FILES){
+      const r = await fetch(f + (f.includes('?') ? '&' : '?') + '_=' + Date.now(), { cache:'no-store' });
+      if(!r.ok) throw new Error('http ' + r.status);
+      parts.push(hash(await r.text()));
+    }
+    return parts.join('|');
+  }
+  const idle = () => cur < 0 && (!ready || !player.getPlayerState || player.getPlayerState() !== 1);
+  let base = null;
+  async function check(){
+    try{
+      const now = await snapshot();
+      if(base === null){ base = now; return; }
+      const changed = now !== base;
+      const h = new Date().getHours();
+      const morning = h >= 4 && h < 5 && Date.now() - BOOT > 6 * 3600 * 1000;
+      if((changed || morning) && idle()){ try{ sessionStorage.setItem('bmb_reload', '0'); }catch(e){} location.reload(); }
+    }catch(e){ /* mất mạng / máy chủ bận: bỏ qua, lần sau kiểm lại */ }
+  }
+  check();
+  setInterval(check, 20 * 60 * 1000);
+})();
+
 paintReady(); render(); push();
 </script>
 </body>
