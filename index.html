@@ -335,6 +335,7 @@ function next(){ if(cur < queue.length-1){ cur++; } else { cur = -1; } load(); }
 function playPause(){
   if(!ready){ toast(apiFailed ? 'Không tải được trình phát YouTube.' : 'Trình phát YouTube đang khởi động, thử lại sau vài giây.'); return; }
   if(cur < 0 && queue.length){ cur = 0; load(); return; }
+  if(Date.now() - unlockAt < 800) return;
   const st = player.getPlayerState();
   if(st === YT.PlayerState.PLAYING) player.pauseVideo(); else player.playVideo();
 }
@@ -360,14 +361,14 @@ function removeAt(i){
 }
 
 /* ---------- Thao tác người dùng (một lần chạm/phím bất kỳ là đủ) ---------- */
-let fsTried = false;
+let fsTried = false, unlockAt = 0;   // unlockAt: lần chạm vừa mở khoá phát → bỏ qua phím/nút Phát đi kèm (khỏi dừng ngay)
 function onGesture(){
   unlocked = true;
   if(!fsTried && !params.has('nofs')){ fsTried = true; try{ const p = document.documentElement.requestFullscreen(); if(p && p.catch) p.catch(sleepless); }catch(e){} }
   keepAwake();
   if(!ready) return;
   if(lock === 'muted'){ if(!userMuted) player.unMute(); setLock(null); }
-  else if(lock === 'tap'){ player.playVideo(); if(!userMuted) player.unMute(); setLock(null); }
+  else if(lock === 'tap'){ player.playVideo(); if(!userMuted) player.unMute(); setLock(null); unlockAt = Date.now(); }
 }
 ['pointerdown','touchstart','keydown'].forEach(ev => window.addEventListener(ev, onGesture, { passive:true }));
 
