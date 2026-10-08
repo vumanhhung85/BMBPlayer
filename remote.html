@@ -724,7 +724,7 @@ bc.onmessage = ev => {
   if(m.type !== 'state') return;
   const s = m.payload || {};
   $('nowTitle').textContent = s.apiFailed ? '⚠ Màn hình phát không tải được YouTube, xem hướng dẫn trên màn hình phát'
-    : s.needStart ? '⚠ Bấm “▶ Bắt đầu phiên hát” trên màn hình phát một lần để bắt đầu'
+    : s.needStart ? '⚠ TV đang chờ một lần bấm OK / chạm màn hình để bật tiếng'
     : s.ready === false && s.cur >= 0 ? '⏳ Màn hình phát đang khởi động YouTube…'
     : (s.nowTitle || '—');
   $('playBtn').textContent = s.playing ? '⏸ Dừng' : '▶ Phát';
