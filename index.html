@@ -40,6 +40,14 @@
   @keyframes pulse{50%{opacity:.35}}
   #hint{color:var(--quiet); font-size:clamp(14px,1.8vw,24px); max-width:60ch; line-height:1.6}
   #roomNote{display:none; font-size:clamp(16px,2vw,26px); color:var(--warn); font-weight:700}
+  #setup{display:none; background:rgba(255,255,255,.06); border:1px solid rgba(251,191,36,.6); border-radius:16px; padding:16px 20px; max-width:min(92vw,760px); text-align:left}
+  #setup b{color:var(--warn); font-size:clamp(16px,2vw,24px)}
+  #setup p{color:var(--quiet); font-size:clamp(13px,1.5vw,18px); line-height:1.6; margin:6px 0 10px}
+  #setup .f{display:flex; gap:10px}
+  #setup input{flex:1; min-width:0; background:#0e0e16; color:var(--ink); border:1px solid var(--line); border-radius:12px; padding:12px 14px; font-size:16px}
+  #setup button{background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; border:none; border-radius:12px; padding:0 20px; font-size:16px; font-weight:700; cursor:pointer}
+  #setup .err{color:#fecdd3; font-size:14px; margin-top:8px; min-height:1em}
+  #setup a{color:var(--quiet); font-size:13px}
   #fileWarn{display:none; background:#2a2110; border:1px solid var(--warn); color:#fef3c7; padding:10px 16px; border-radius:12px; max-width:68ch; font-size:14px; line-height:1.55}
   #diag{display:none; background:#2a1416; border:1px solid #7f1d1d; color:#fecdd3; padding:12px 16px; border-radius:12px; max-width:68ch; font-size:15px; line-height:1.6; text-align:left}
   #diag button{margin-top:8px; background:#7f1d1d; color:#fff; border:none; border-radius:10px; padding:8px 14px; font-weight:700; cursor:pointer}
@@ -105,6 +113,13 @@
     <div id="readyPill"><i></i><span id="readyTxt">Đang khởi động…</span></div>
     <div id="roomNote"></div>
     <p id="hint">Chọn bài trên điện thoại hoặc máy tính bảng — bài sẽ tự phát lên màn hình này.</p>
+    <div id="setup">
+      <b>Màn hình này chưa gán phòng</b>
+      <p>Vào <b style="font-size:inherit;color:inherit">phong.html</b> → chọn phòng → bấm <b style="font-size:inherit;color:inherit">Chép liên kết TV</b>, rồi dán vào ô dưới (hoặc mở thẳng liên kết đó trên TV). Gán một lần, lần sau mở trang là vào đúng phòng.</p>
+      <div class="f"><input id="setupIn" type="url" placeholder="https://bmbplayer.boommusicbox.vn/index.html?r=…" autocomplete="off"><button id="setupBtn">Gán phòng</button></div>
+      <div class="err" id="setupErr"></div>
+      <a href="?local=1" id="setupLocal">Chỉ thử trên máy này (không gán phòng)</a>
+    </div>
     <div id="fileWarn">Trang đang mở bằng <b>file://</b>. YouTube yêu cầu trang nhúng có địa chỉ http(s) nên video sẽ báo lỗi 153.
       Hãy chạy <b>python -m http.server 8000</b> trong thư mục chứa file rồi mở <b>http://localhost:8000/</b>, hoặc đưa lên GitHub Pages.</div>
     <div id="diag"></div>
@@ -159,6 +174,21 @@ let userMuted = false;          // người dùng chủ động tắt tiếng (k
 let lock = null;                // null | 'muted' (đang phát im lặng vì bị chặn) | 'tap' (chưa phát được, cần một lần chạm)
 let unlocked = false;           // đã có thao tác của người dùng trên trang này
 let roomOpen = !bc.ws, lastSession = null, connTxt = '';
+/* Chưa có mã phòng (mở trang gốc lần đầu, hoặc trình duyệt chế độ Khách/ẩn danh xoá mất mã đã nhớ) → hỏi gán phòng.
+   ?local=1 = chạy thử trong cùng trình duyệt (BroadcastChannel) như trước. */
+const needSetup = !bc.ws && !params.has('local');
+const TV_TOKEN_RE = /^[A-Z0-9]{2,8}-[A-Z0-9]{1,10}\.\d{1,6}\.[\w-]{22}$/;
+if(needSetup){
+  $('setup').style.display = 'block'; $('hint').style.display = 'none';
+  const apply = () => {
+    const raw = $('setupIn').value.trim(); let tok = '', api = '';
+    try{ const u = new URL(raw); tok = u.searchParams.get('r') || ''; api = u.searchParams.get('api') || ''; }catch(e){ tok = raw; }
+    if(!TV_TOKEN_RE.test(tok)){ $('setupErr').textContent = 'Không đúng liên kết TV. Liên kết có dạng …/index.html?r=CN03-P01.1.xxxx — lấy bằng nút "Chép liên kết TV" (không phải mã QR của khách).'; return; }
+    location.replace(location.pathname + '?r=' + encodeURIComponent(tok) + (api ? '&api=' + encodeURIComponent(api) : ''));
+  };
+  $('setupBtn').onclick = apply;
+  $('setupIn').addEventListener('keydown', e => { if(e.key === 'Enter') apply(); });
+}
 
 /* ---------- Màn hình chờ: giờ + trạng thái ---------- */
 function paintClock(){
@@ -172,6 +202,7 @@ function paintReady(){
   pill.className = '';
   if(location.protocol === 'file:'){ pill.classList.add('bad'); t.textContent = 'Cần mở bằng http(s)'; return; }
   if(!ready){ t.textContent = apiFailed ? 'Chưa tải được YouTube — đang thử lại…' : 'Đang khởi động YouTube…'; if(apiFailed) pill.classList.add('bad'); return; }
+  if(needSetup){ t.textContent = 'Chưa gán phòng'; return; }
   if(!roomOpen){ t.textContent = 'Phòng chưa mở'; return; }
   pill.classList.add('ok'); t.textContent = 'Sẵn sàng' + (connTxt ? ' · ' + connTxt : '');
 }
@@ -392,6 +423,7 @@ $('vol').oninput = e => setVol(+e.target.value);
 const toggleFs = () => { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); };
 $('fsBtn').onclick = toggleFs;
 window.addEventListener('keydown', e => {
+  if(e.target && e.target.tagName === 'INPUT') return;          // đang gõ vào ô gán phòng: không coi là phím điều khiển
   if(e.code==='Space'){ e.preventDefault(); playPause(); }
   else if(e.code==='ArrowRight') next();
   else if(e.key.toLowerCase()==='m') toggleMute();
