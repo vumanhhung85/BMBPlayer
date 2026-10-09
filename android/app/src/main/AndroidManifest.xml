@@ -47,7 +47,7 @@
             android:exported="true"
             android:launchMode="singleTask"
             android:resizeableActivity="false"
-            android:windowSoftInputMode="adjustResize">
+            android:windowSoftInputMode="adjustPan">
             <!-- Biểu tượng trên điện thoại / máy tính bảng và trên Android TV -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
