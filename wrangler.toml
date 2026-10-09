@@ -15,7 +15,7 @@ TV_NET = "on"              # on = TV chờ gán khác mạng chi nhánh thì h�
 [[d1_databases]]
 binding = "DB"
 database_name = "bmb_data"
-database_id = "DIEN-ID-CUA-bmb_data-VAO-DAY"
+database_id = "fecac75f-35ab-47df-85c4-caca0e3ca409"
 
 [[durable_objects.bindings]]
 name = "ROOM"
