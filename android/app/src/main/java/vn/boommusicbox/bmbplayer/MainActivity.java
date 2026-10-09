@@ -86,7 +86,10 @@ public class MainActivity extends Activity {
     private static final String URL_TABLET = "https://" + HOST + "/remote.html";
     private static final int MIN_WEBVIEW = 86;           // trang dùng tính năng có từ Chrome/WebView 86
     private static final int REQ_CAMERA = 7;
-    private static final String VERSION = "1.0";
+    private String versionName() {
+        try { return getPackageManager().getPackageInfo(getPackageName(), 0).versionName; }
+        catch (Exception e) { return "?"; }
+    }
 
     private final Handler ui = new Handler(Looper.getMainLooper());
     private SharedPreferences prefs;
@@ -316,7 +319,7 @@ public class MainActivity extends Activity {
         String ua = s.getUserAgentString();
         int i = ua.indexOf(" BMBPlayerApp/");
         if (i >= 0) ua = ua.substring(0, i);
-        s.setUserAgentString(ua + " BMBPlayerApp/" + VERSION + " (" + mode + ")");
+        s.setUserAgentString(ua + " BMBPlayerApp/" + versionName() + " (" + mode + ")");
     }
 
     private void destroyWeb() {
@@ -566,7 +569,7 @@ public class MainActivity extends Activity {
         labels.add("✕  Thoát BMBPlayer"); acts.add(() -> { if (Build.VERSION.SDK_INT >= 21) finishAndRemoveTask(); else finish(); });
 
         AlertDialog.Builder b = new AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert);
-        b.setTitle("BMBPlayer " + VERSION + " · " + ("tablet".equals(mode) ? "Máy tính bảng" : "TV") + " · WebView " + webViewMajor());
+        b.setTitle("BMBPlayer " + versionName() + " · " + ("tablet".equals(mode) ? "Máy tính bảng" : "TV") + " · WebView " + webViewMajor());
         b.setItems(labels.toArray(new String[0]), (d, which) -> acts.get(which).run());
         b.setNegativeButton("Đóng", null);
         openDialog = b.create();
