@@ -52,7 +52,7 @@ const enc = new TextEncoder();
 const ID_RE = /^[A-Za-z0-9_-]{1,40}$/;                                  // mã phòng = order_phong.id của Order (vd P1A2B3C4D5E6)
 const TOKEN_RE = /^([A-Za-z0-9_-]{1,40})\.(\d{1,6})\.([\w-]{22})$/;
 const ACTIONS = new Set(['add', 'play', 'next', 'replay', 'mute', 'vol', 'prio', 'remove', 'hello']);
-const MAX_MSG = 4096, MAX_STATE = 32768, MAX_REMOTES = 12, RATE_PER_SEC = 15;
+const MAX_MSG = 4096, MAX_STATE = 32768, MAX_REMOTES = 2, RATE_PER_SEC = 15;
 
 /* ---------- Mã ---------- */
 const b64uB = u8 => btoa(String.fromCharCode(...u8)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
