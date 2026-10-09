@@ -171,7 +171,10 @@ public class MainActivity extends Activity {
     @Override
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
-        if (hasFocus) hideBars();
+        // Bàn phím hiện/ẩn làm cửa sổ mất rồi lấy lại focus: nếu ẩn thanh hệ thống ngay lúc đó thì
+        // kết nối bàn phím với ô nhập bị ngắt (bấm ô tìm lần đầu gõ không ăn). Chờ bàn phím ổn định rồi mới ẩn.
+        ui.removeCallbacks(hideBarsRun);
+        if (hasFocus) ui.postDelayed(hideBarsRun, 500);
     }
 
     @Override
@@ -715,15 +718,18 @@ public class MainActivity extends Activity {
     // ======================================================================
     // Tiện ích giao diện
     // ======================================================================
+    private final Runnable hideBarsRun = this::hideBars;
+
     @SuppressWarnings("deprecation")
     private void hideBars() {
         View d = getWindow().getDecorView();
-        d.setSystemUiVisibility(View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+        int want = View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
                 | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
                 | View.SYSTEM_UI_FLAG_FULLSCREEN
                 | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
                 | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN);
+                | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN;
+        if (d.getSystemUiVisibility() != want) d.setSystemUiVisibility(want);   // không đặt lại khi đã đúng
     }
 
     private int dp(int v) {
