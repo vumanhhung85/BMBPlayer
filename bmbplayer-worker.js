@@ -351,6 +351,7 @@ async function handleApi(request, env) {
         case 'quay.tvCheck':             res = await quayTvCheck(env, body, ip); break;
         case 'quay.doiQr':               res = await quayDoiQr(env, body); break;
         case 'quay.goMtb':               res = await quayGoMtb(env, body); break;
+        case 'quay.goTv':                res = await quayGoTv(env, body); break;
         case 'quay.pos':                 res = await quayPos(env, body); break;
         case 'quay.chan':                res = await quayChan(env, body); break;
         case 'quay.lichSu':              res = await quayLichSu(env, body); break;
@@ -1168,6 +1169,16 @@ async function quayDoiQr(env, body) {
   const [p, loi2] = await phongCuaChiNhanh(env, ss, s(body.roomId, 60));
   if (loi2) return loi2;
   await call(roomStub(env, p.id), '/rotate', { id: p.id, kind: 'qr' });
+  return ok({});
+}
+// ---------- quay.goTv {roomId}: gỡ TV khỏi phòng (đổi TV sang phòng khác). Mã TV cũ hết hiệu lực → TV tự quay về màn hình mã 6 số ----------
+async function quayGoTv(env, body) {
+  const [ss, loi] = await canPhien(env, body);
+  if (loi) return loi;
+  const [p, loi2] = await phongCuaChiNhanh(env, ss, s(body.roomId, 60));
+  if (loi2) return loi2;
+  await call(roomStub(env, p.id), '/rotate', { id: p.id, kind: 'tv' });
+  await env.DB.prepare('INSERT INTO nhat_ky (luc, loai, noi_dung) VALUES (?,?,?)').bind(Date.now(), 'TV_GO', ss.u + ' @' + ss.b + ': ' + p.ten_phong).run();
   return ok({});
 }
 // ---------- quay.goMtb {roomId}: gỡ máy tính bảng của phòng (quản lý / admin) ----------

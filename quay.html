@@ -709,6 +709,7 @@ function drawTv(){
     h += x.open ? b('dong', 'btn-ghost', 'Đóng phòng') : b('mo', canGan ? 'btn-ghost' : 'btn-y', 'Mở phòng');
     if(!GAN) h += b('quet', 'btn-ghost', '📺 Gán TV');
     if(x.open && x.tokQr) h += b('qr', 'btn-ghost', 'QR khách') + b('doiqr', 'btn-ghost', 'Đổi QR khách');
+    if(x.tv) h += b('gotv', 'btn-ghost', 'Gỡ TV');
     if(S.quanLy && x.tablets) h += b('gomtb', 'btn-ghost', 'Gỡ máy tính bảng');
     if(S.vaiTro==='admin' && x.tokTv) h += b('lktv', 'btn-ghost', 'Chép liên kết TV');
     if(S.vaiTro==='admin') h += '<button class="btn btn-bad btn-sm" data-xoa="'+id+'" data-ten="'+esc(x.roomName)+'">Xoá phòng</button>';
@@ -772,6 +773,10 @@ function tvAct(act, id){
   if(act==='doiqr'){
     if(!confirm('Đổi QR khách phòng '+x.roomName+'? Điện thoại đang nối bị ngắt, khách quét lại mã mới trên TV.')) return;
     api('quay.doiQr', {roomId:id}).then(function(r){ if(!r || !r.ok) alert((r&&r.msg)||'Không đổi được.'); sauTv(); }); return;
+  }
+  if(act==='gotv'){
+    if(!confirm('Gỡ TV khỏi phòng '+x.roomName+'? TV sẽ hiện mã 6 số để gán vào phòng khác (hoặc gán lại phòng này).')) return;
+    api('quay.goTv', {roomId:id}).then(function(r){ if(!r || !r.ok) alert((r&&r.msg)||'Không gỡ được.'); sauTv(); }); return;
   }
   if(act==='gomtb'){
     if(!confirm('Gỡ máy tính bảng khỏi phòng '+x.roomName+'? Máy phải quét lại QR trên TV mới dùng được.')) return;
