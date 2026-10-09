@@ -5,6 +5,9 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.UiModeManager;
 import android.content.ActivityNotFoundException;
+import android.content.BroadcastReceiver;
+import android.content.IntentFilter;
+import android.media.AudioManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -34,6 +37,7 @@ import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
 import android.webkit.CookieManager;
+import android.webkit.JavascriptInterface;
 import android.webkit.PermissionRequest;
 import android.webkit.RenderProcessGoneDetail;
 import android.webkit.WebChromeClient;
@@ -94,6 +98,8 @@ public class MainActivity extends Activity {
     private boolean loadFailed = false;
     private PermissionRequest pendingPermission;
     private ConnectivityManager.NetworkCallback netCallback;
+    private BroadcastReceiver volReceiver;
+    private int lastVolPct = -1;
     private int backCount = 0, cornerCount = 0;
     private long lastBack = 0, lastCorner = 0;
     private int chooserLeft = 0;
@@ -129,6 +135,7 @@ public class MainActivity extends Activity {
         setContentView(root);
         hideBars();
         listenNetwork();
+        listenVolume();
 
         mode = prefs.getString(K_MODE, "");
         if (mode.isEmpty()) {   // lần đầu: tự nhận biết TV / máy tính bảng, không hỏi (đổi sau trong menu nhân viên)
@@ -161,6 +168,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onDestroy() {
         ui.removeCallbacksAndMessages(null);
+        if (volReceiver != null) { try { unregisterReceiver(volReceiver); } catch (Exception ignored) {} volReceiver = null; }
         if (netCallback != null) {
             try { ((ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE)).unregisterNetworkCallback(netCallback); } catch (Exception ignored) {}
         }
@@ -296,6 +304,7 @@ public class MainActivity extends Activity {
         cm.setAcceptThirdPartyCookies(web, true);           // khung YouTube cần cookie bên thứ ba
         web.setWebViewClient(new Client());
         web.setWebChromeClient(new Chrome());
+        web.addJavascriptInterface(new NativeBridge(), "BMBNative");   // trang TV đọc/đặt âm lượng hệ thống
         root.addView(web, 0, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         web.requestFocus();
         return true;
@@ -718,6 +727,59 @@ public class MainActivity extends Activity {
     // ======================================================================
     // Tiện ích giao diện
     // ======================================================================
+    // ======================================================================
+    // Âm lượng hệ thống dùng chung: remote / quầy / nút trên điều khiển TV
+    // ======================================================================
+    private int volPct() {
+        AudioManager am = (AudioManager) getSystemService(AUDIO_SERVICE);
+        if (am == null) return -1;
+        int max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
+        if (max <= 0) return -1;
+        return Math.round(am.getStreamVolume(AudioManager.STREAM_MUSIC) * 100f / max);
+    }
+
+    /** Gọi từ trang web (window.BMBNative). Chỉ cho đọc/đặt âm lượng, không gì khác. */
+    private class NativeBridge {
+        @JavascriptInterface
+        public int getVolume() { return volPct(); }
+
+        @JavascriptInterface
+        public void setVolume(int pct) {
+            AudioManager am = (AudioManager) getSystemService(AUDIO_SERVICE);
+            if (am == null) return;
+            int max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
+            if (max <= 0) return;
+            int idx = Math.round(Math.max(0, Math.min(100, pct)) * max / 100f);
+            if (pct > 0 && idx == 0) idx = 1;                       // kéo lên một chút thì phải có tiếng
+            try { am.setStreamVolume(AudioManager.STREAM_MUSIC, idx, 0); } catch (Exception ignored) {}
+        }
+    }
+
+    private final Runnable volPush = () -> {
+        int v = volPct();
+        if (v < 0 || v == lastVolPct || web == null) return;
+        lastVolPct = v;
+        web.evaluateJavascript("window.bmbSysVol&&window.bmbSysVol(" + v + ")", null);
+    };
+
+    private void listenVolume() {
+        lastVolPct = volPct();
+        volReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context c, Intent i) {
+                int type = i.getIntExtra("android.media.EXTRA_VOLUME_STREAM_TYPE", AudioManager.STREAM_MUSIC);
+                if (type != AudioManager.STREAM_MUSIC) return;
+                ui.removeCallbacks(volPush);
+                ui.postDelayed(volPush, 120);                          // gộp các lần đổi liên tiếp khi giữ nút
+            }
+        };
+        IntentFilter f = new IntentFilter("android.media.VOLUME_CHANGED_ACTION");
+        try {
+            if (Build.VERSION.SDK_INT >= 33) registerReceiver(volReceiver, f, 0x2 /* RECEIVER_EXPORTED: phát từ hệ thống */);
+            else registerReceiver(volReceiver, f);
+        } catch (Exception e) { volReceiver = null; }
+    }
+
     private final Runnable hideBarsRun = this::hideBars;
 
     @SuppressWarnings("deprecation")
