@@ -7,8 +7,8 @@ compatibility_date = "2025-01-01"
 [vars]
 ALLOWED_ORIGINS = "https://bmbplayer.boommusicbox.vn"
 NET_CHECK = "off"          # off = không kiểm mạng | warn = cho vào nhưng đánh dấu máy ngoài mạng quán | on = chặn điện thoại khách ngoài mạng quán
-TB_NET = "on"              # on = máy tính bảng phải cùng mạng với TV lúc gán | off = bỏ kiểm
-TV_NET = "on"              # on = TV chờ gán phải cùng mạng với quầy / TV đã nối của chi nhánh (chống gán nhầm TV chi nhánh khác) | off = bỏ kiểm
+TB_NET = "off"             # on = máy tính bảng phải cùng mạng chi nhánh lúc gán (chi nhánh có 2 đường mạng thì nên để off) | off = bỏ kiểm
+TV_NET = "on"              # on = TV chờ gán khác mạng chi nhánh thì hỏi xác nhận (chống gán nhầm TV chi nhánh khác) | off = bỏ kiểm
 
 # D1 dùng chung với app quản lý BMB (database cũ của Order)
 # database_id: Cloudflare → Storage & Databases → D1 → bmb_data, hoặc lệnh:  npx wrangler d1 list
