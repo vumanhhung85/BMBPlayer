@@ -131,7 +131,11 @@ public class MainActivity extends Activity {
         listenNetwork();
 
         mode = prefs.getString(K_MODE, "");
-        if (mode.isEmpty()) showChooser(); else start();
+        if (mode.isEmpty()) {   // lần đầu: tự nhận biết TV / máy tính bảng, không hỏi (đổi sau trong menu nhân viên)
+            mode = looksLikeTv() ? "tv" : "tablet";
+            prefs.edit().putString(K_MODE, mode).apply();
+        }
+        start();
     }
 
     @Override
