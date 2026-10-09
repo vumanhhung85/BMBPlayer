@@ -1,0 +1,38 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'vn.boommusicbox.bmbplayer'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'vn.boommusicbox.bmbplayer'
+        minSdk 21          // Android 5.0 trở lên (cần WebView cập nhật được)
+        targetSdk 34
+        versionCode 1
+        versionName '1.0'
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            // Không ký ở đây: bản phát hành được ký ngoài (v1 + v2), khoá ký không để trong repo công khai
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    lint {
+        abortOnError false
+        checkReleaseBuilds false
+    }
+
+    dependenciesInfo {
+        includeInApk false
+        includeInBundle false
+    }
+}
