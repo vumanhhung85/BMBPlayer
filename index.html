@@ -97,6 +97,16 @@
   #toast{left:50%; bottom:4vh; transform:translate(-50%,10px); z-index:20; background:#2a1220; border:1px solid var(--bad); color:#ffe4e6; padding:12px 18px; border-radius:12px;
     max-width:min(90%,720px); font-size:clamp(13px,1.5vw,20px); line-height:1.55; white-space:pre-line; text-align:center}
   #toast.show{transform:translate(-50%,0)}
+  /* Âm lượng hiện trên TV khi đổi từ remote / quầy / điều khiển TV */
+  #volOsd{right:2.2vw; top:50%; transform:translate(16px,-50%); z-index:15; display:flex; flex-direction:column; align-items:center; gap:1.4vh;
+    background:rgba(10,8,22,.82); border:2px solid rgba(192,132,252,.55); border-radius:22px; padding:2.2vh 1.4vw; min-width:clamp(64px,6vw,110px);
+    box-shadow:0 10px 40px rgba(0,0,0,.6)}
+  #volOsd.show{transform:translate(0,-50%)}
+  #volOsd svg{width:clamp(26px,3vw,48px); height:clamp(26px,3vw,48px); fill:#fff}
+  #volOsd .vb{width:clamp(10px,.9vw,16px); height:26vh; background:rgba(255,255,255,.15); border-radius:99px; overflow:hidden; display:flex; align-items:flex-end}
+  #volOsd .vb i{display:block; width:100%; background:linear-gradient(0deg,#7c3aed,#FFD21A); border-radius:99px; transition:height .15s}
+  #volOsd b{font-size:clamp(20px,2.6vw,42px); font-weight:800; color:#FFD21A; font-variant-numeric:tabular-nums}
+  #volOsd.muted b{color:#f87171} #volOsd.muted .vb i{background:#555}
 
   #progress{position:absolute; left:0; right:0; bottom:0; height:3px; z-index:9; background:rgba(255,255,255,.08); pointer-events:none}
   #progress i{display:block; height:100%; width:0; background:linear-gradient(90deg,var(--accent),var(--accent2))}
@@ -167,6 +177,7 @@
   <div class="ov" id="ovAdd"><div class="lbl" id="ovAddL">ĐÃ THÊM</div><div class="t" id="ovAddT"></div></div>
   <div class="ov" id="lock"></div>
   <div class="ov" id="toast"></div>
+  <div class="ov" id="volOsd"><span id="volIc"></span><div class="vb"><i id="volBar"></i></div><b id="volNum">100</b></div>
   <div id="progress"><i id="bar"></i></div>
 
   <div id="panel">
@@ -207,7 +218,12 @@ if(location.protocol === 'file:') $('fileWarn').style.display = 'block';
 
 let queue = [], cur = -1;
 let player = null, ready = false, apiReady = false;
-let userMuted = false;          // người dùng chủ động tắt tiếng (khác với bị trình duyệt chặn)
+let userMuted = false;
+/* Âm lượng giữ ở trang (không đọc lại từ YouTube vì getVolume()/isMuted() trả giá trị cũ ngay sau khi đặt → remote bị bật về chỗ cũ).
+   Chạy trong app BMBPlayer (Android) thì điều khiển luôn âm lượng hệ thống của TV/box: remote, quầy, nút trên điều khiển TV dùng chung một mức. */
+const NATIVE = (() => { try{ return window.BMBNative && typeof BMBNative.getVolume === 'function' ? BMBNative : null; }catch(e){ return null; } })();
+let vol = (() => { try{ const v = parseInt(localStorage.getItem('bmb_vol'), 10); return v >= 0 && v <= 100 ? v : 100; }catch(e){ return 100; } })();
+if(NATIVE){ try{ const v = NATIVE.getVolume(); if(v >= 0) vol = v; }catch(e){} }          // người dùng chủ động tắt tiếng (khác với bị trình duyệt chặn)
 let lock = null;                // null | 'muted' (đang phát im lặng vì bị chặn) | 'tap' (chưa phát được, cần một lần chạm)
 let unlocked = false;           // đã có thao tác của người dùng trên trang này
 let roomOpen = !bc.ws, lastSession = null, connTxt = '';
@@ -360,7 +376,7 @@ function makePlayer(){
 }
 function onReady(){
   ready = true; $('diag').style.display = 'none';
-  player.setVolume(+$('vol').value);
+  player.setVolume(NATIVE ? 100 : vol); $('vol').value = vol;
   paintReady();
   if(cur >= 0) load();       // remote đã gửi bài trong lúc YouTube đang khởi động → phát luôn
   push();
@@ -490,9 +506,36 @@ function toggleMute(){
   if(!ready) return;
   userMuted = !userMuted;
   if(userMuted) player.mute(); else if(lock !== 'muted') player.unMute();
-  applyMute(); push();
+  applyMute(); volOsd(); push();
 }
-function setVol(v){ if(ready) player.setVolume(v); $('vol').value = v; push(); }
+const VIC = {
+  on:'<svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 4V5L7 9zM16.5 12A4.5 4.5 0 0 0 14 8v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z"/></svg>',
+  off:'<svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 4V5L7 9zM16.6 12l2.4-2.4-1.4-1.4-2.4 2.4-2.4-2.4-1.4 1.4 2.4 2.4-2.4 2.4 1.4 1.4 2.4-2.4 2.4 2.4 1.4-1.4z"/></svg>'
+};
+function volOsd(){
+  const m = userMuted || vol === 0;
+  $('volIc').innerHTML = m ? VIC.off : VIC.on;
+  $('volBar').style.height = vol + '%';
+  $('volNum').textContent = userMuted ? 'TẮT' : vol;
+  $('volOsd').classList.toggle('muted', m);
+  flash('volOsd', 2200);
+}
+function setVol(v){
+  v = Math.max(0, Math.min(100, Math.round(v)));
+  if(v === vol && $('vol').value == v) return;
+  vol = v; $('vol').value = v;
+  if(NATIVE){ try{ NATIVE.setVolume(v); }catch(e){} if(ready) player.setVolume(100); }
+  else if(ready) player.setVolume(v);
+  try{ localStorage.setItem('bmb_vol', String(v)); }catch(e){}
+  if(userMuted && v > 0){ userMuted = false; if(ready && lock !== 'muted') player.unMute(); applyMute(); }   // kéo âm lượng lên = bật tiếng lại
+  volOsd(); push();
+}
+/* App Android báo khi âm lượng hệ thống đổi (nút trên điều khiển TV) */
+window.bmbSysVol = v => {
+  v = Math.max(0, Math.min(100, Math.round(+v || 0)));
+  if(v === vol) return;
+  vol = v; $('vol').value = v; volOsd(); push();
+};
 function prio(i){ // đưa bài i lên ngay sau bài đang hát
   if(i <= cur || i >= queue.length) return;
   const [it] = queue.splice(i,1); queue.splice(cur+1, 0, it); render(); push(); paintCount();
@@ -559,8 +602,8 @@ function push(){
   bc.postMessage({ type:'state', payload:{
     room:ROOM, ready, needStart: lock !== null && queue.length > 0, soundLocked: lock !== null, apiFailed: apiFailed || $('diag').style.display === 'block',
     playing: ready && player.getPlayerState && player.getPlayerState()===1,
-    muted: ready && player.isMuted ? player.isMuted() : false,
-    volume: ready && player.getVolume ? player.getVolume() : 100,
+    muted: userMuted,
+    volume: vol,
     nowTitle: cur>=0 ? queue[cur].title : null,
     cur, queue: queue.map(q=>({title:q.title}))
   }});
@@ -575,7 +618,7 @@ bc.onmessage = ev => {
     case 'next': next(); break;
     case 'replay': replay(); break;
     case 'mute': toggleMute(); break;
-    case 'vol': setVol(Math.max(0, Math.min(100, +c.value || 0))); break;
+    case 'vol': setVol(+c.value || 0); break;
     case 'prio': prio(+c.index); break;
     case 'remove': removeAt(+c.index); break;
     case 'hello': push(); break;

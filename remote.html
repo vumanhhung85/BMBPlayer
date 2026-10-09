@@ -85,6 +85,10 @@
   .ctrlRow button.primary{width:68px; height:68px; background:linear-gradient(135deg,#7c3aed,#c084fc); border:none; box-shadow:0 6px 20px rgba(139,92,246,.6)} .ctrlRow button.primary svg{width:34px; height:34px}
   .ctrlRow button:active{transform:scale(.94)} .ctrlRow button.off{color:#f87171}
   .vol{display:flex; align-items:center; gap:12px; padding:0 4px}
+  .vol .vn{min-width:30px; text-align:right; color:#FFD21A; font-size:15px; font-variant-numeric:tabular-nums}
+  .vol input{-webkit-appearance:none; appearance:none; background:transparent; touch-action:none}
+  .vol input::-webkit-slider-runnable-track{height:8px; border-radius:99px; background:linear-gradient(90deg,#7c3aed,#c084fc var(--p,100%),#2c2c3c var(--p,100%))}
+  .vol input::-webkit-slider-thumb{-webkit-appearance:none; width:26px; height:26px; margin-top:-9px; border-radius:50%; background:#fff; border:3px solid #a855f7; box-shadow:0 2px 8px rgba(0,0,0,.5)}
   .vol .vi{color:var(--quiet); display:flex} .vol .vi svg{width:20px; height:20px; fill:currentColor} .vol input{flex:1; accent-color:#a855f7; height:28px}
   .roomOff #dock{ opacity:.4; pointer-events:none }
 
@@ -211,7 +215,7 @@
     <button id="nextBtn" aria-label="Bài kế"></button>
     <button id="muteBtn" aria-label="Tắt / bật tiếng"></button>
   </div>
-  <div class="vol"><span class="vi" id="volLo"></span><input type="range" id="vol" min="0" max="100" value="100" aria-label="Âm lượng"><span class="vi" id="volHi"></span></div>
+  <div class="vol"><span class="vi" id="volLo"></span><input type="range" id="vol" min="0" max="100" value="100" aria-label="Âm lượng"><span class="vi" id="volHi"></span><b class="vn" id="volN">–</b></div>
 </div>
 
 <script>
@@ -944,8 +948,21 @@ const IC = {
 $('replayBtn').innerHTML = IC.replay; $('playBtn').innerHTML = IC.play; $('nextBtn').innerHTML = IC.next; $('muteBtn').innerHTML = IC.vol;
 $('volLo').innerHTML = IC.low; $('volHi').innerHTML = IC.vol;
 $('playBtn').onclick = () => send('play'); $('nextBtn').onclick = () => send('next');
-$('replayBtn').onclick = () => send('replay'); $('muteBtn').onclick = () => send('mute');
-let volTimer; $('vol').oninput = e => { clearTimeout(volTimer); const v = +e.target.value; volTimer = setTimeout(() => send('vol', { value:v }), 80); };
+$('replayBtn').onclick = () => send('replay');
+$('muteBtn').onclick = () => { lastMuted = !lastMuted; paintMute(lastMuted); muteHold = Date.now(); send('mute'); };   // đổi icon ngay, TV xác nhận sau
+/* Âm lượng: trong lúc kéo và ngay sau khi thả, không để trạng thái cũ từ TV kéo thanh trượt về chỗ cũ */
+let volTimer, volDrag = false, volHold = 0, volSent = -1, muteHold = 0, lastMuted = false;
+const volNum = v => { $('volN').textContent = v; $('vol').style.setProperty('--p', v + '%'); };
+function volSend(v, now){
+  clearTimeout(volTimer);
+  const go = () => { if(v !== volSent){ volSent = v; send('vol', { value:v }); } };
+  if(now) go(); else volTimer = setTimeout(go, 60);
+}
+$('vol').addEventListener('input', e => { volHold = Date.now(); const v = +e.target.value; volNum(v); volSend(v, false); });
+$('vol').addEventListener('change', e => { volHold = Date.now(); volSend(+e.target.value, true); });
+['pointerdown','touchstart'].forEach(ev => $('vol').addEventListener(ev, () => { volDrag = true; volHold = Date.now(); }, { passive:true }));
+['pointerup','pointercancel','touchend','touchcancel'].forEach(ev => window.addEventListener(ev, () => { if(volDrag){ volDrag = false; volHold = Date.now(); } }, { passive:true }));
+function paintMute(m){ $('muteBtn').innerHTML = m ? IC.mute : IC.vol; $('muteBtn').classList.toggle('off', !!m); }
 
 /* ---------- Nhận trạng thái ---------- */
 bc.onmessage = ev => {
@@ -958,9 +975,8 @@ bc.onmessage = ev => {
     : s.ready === false && s.cur >= 0 ? '⏳ Màn hình phát đang khởi động YouTube…'
     : (s.nowTitle || '—');
   $('playBtn').innerHTML = s.playing ? IC.pause : IC.play;
-  $('muteBtn').innerHTML = s.muted ? IC.mute : IC.vol;
-  $('muteBtn').classList.toggle('off', !!s.muted);
-  if(typeof s.volume === 'number') $('vol').value = s.volume;
+  if(Date.now() - muteHold > 1500){ lastMuted = !!s.muted; paintMute(lastMuted); }
+  if(typeof s.volume === 'number' && !volDrag && Date.now() - volHold > 1500){ $('vol').value = s.volume; volNum(s.volume); volSent = s.volume; }
   const q = s.queue || []; $('qCount').textContent = q.length;
   confirmFromTv(s);
   const box = $('queueList'); box.replaceChildren();
