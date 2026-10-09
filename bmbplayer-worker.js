@@ -127,7 +127,7 @@ const SESSION_TTL_SEC = 12 * 3600;
 
 // ---------------- Trả lời ----------------
 function ok(data) { return json({ ok: true, ...data }); }
-function fail(error, status = 400, msg) { return json({ ok: false, error, ...(msg ? { msg } : {}) }, status); }
+function fail(error, status = 400, msg, extra) { return json({ ok: false, error, ...(msg ? { msg } : {}), ...(extra || {}) }, status); }
 function failSession() { return json({ ok: false, error: 'unauthorized', msg: 'HET_PHIEN' }, 401); }
 function json(obj, status = 200) {
   return new Response(JSON.stringify(obj), { status, headers: { 'Content-Type': 'application/json; charset=utf-8' } });
@@ -348,6 +348,7 @@ async function handleApi(request, env) {
         case 'quay.phong':               res = await quayPhong(env, body); break;
         case 'quay.tv':                  res = await quayTv(env, body); break;
         case 'quay.ganTv':               res = await quayGanTv(env, body, ip); break;
+        case 'quay.tvCheck':             res = await quayTvCheck(env, body, ip); break;
         case 'quay.doiQr':               res = await quayDoiQr(env, body); break;
         case 'quay.goMtb':               res = await quayGoMtb(env, body); break;
         case 'quay.pos':                 res = await quayPos(env, body); break;
@@ -1112,6 +1113,31 @@ async function quayTv(env, body) {
   const lm = String((cn && cn.link_maps) || '').trim();
   return ok({ rooms, reviewUrl: /^https?:\/\//i.test(lm) ? lm : '', net: env.NET_CHECK || 'off' });
 }
+// ---------- Mạng của chi nhánh: TV chờ gán phải cùng mạng với quầy (đang dùng wifi quán) hoặc với TV đã nối của chi nhánh ----------
+async function tvCungMang(env, ss, code, ip) {
+  const pk = await callR(regStub(env), '/tvpair/peek', { code, ip });
+  if (pk.status !== 200) return { err: fail('bad_code', pk.status, pk.data.error) };
+  if ((env.TV_NET || 'on') === 'off') return { same: true, known: false };
+  const tvIp = String(pk.data.ip || '');
+  if (!tvIp) return { same: true, known: false };                       // mã cũ chưa ghi IP: không chặn
+  const { results } = await env.DB.prepare('SELECT id FROM order_phong WHERE chi_nhanh_id = ?').bind(ss.b).all();
+  const mang = new Set([netKey(ip)]);
+  for (const r of results) {
+    const st = await call(roomStub(env, r.id), '/status', { id: r.id });
+    if (st.tvIp) mang.add(st.tvIp);
+  }
+  return { same: mang.has(tvIp), known: true };
+}
+const MSG_KHAC_MANG = 'TV này đang ở mạng khác với chi nhánh — có thể là TV của chi nhánh khác. Kiểm tra lại mã trên TV; nhân viên cần dùng wifi của quán.';
+async function quayTvCheck(env, body, ip) {
+  const [ss, loi] = await canPhien(env, body);
+  if (loi) return loi;
+  const code = String(body.code || '').replace(/\D/g, '');
+  if (code.length !== 6) return fail('bad_code', 400, 'Mã trên TV gồm 6 chữ số.');
+  const r = await tvCungMang(env, ss, code, ip);
+  if (r.err) return r.err;
+  return ok({ same: r.same, canForce: ss.r === 'admin' });
+}
 // ---------- quay.ganTv {roomId, code}: gán TV đang hiện mã 6 số vào phòng (TV cũ của phòng bị đẩy về màn gán) ----------
 async function quayGanTv(env, body, ip) {
   const [ss, loi] = await canPhien(env, body);
@@ -1120,8 +1146,9 @@ async function quayGanTv(env, body, ip) {
   if (loi2) return loi2;
   const code = String(body.code || '').replace(/\D/g, '');
   if (code.length !== 6) return fail('bad_code', 400, 'Mã trên TV gồm 6 chữ số.');
-  const pk = await callR(regStub(env), '/tvpair/peek', { code, ip });
-  if (pk.status !== 200) return fail('bad_code', pk.status, pk.data.error);
+  const net = await tvCungMang(env, ss, code, ip);
+  if (net.err) return net.err;
+  if (!net.same && !(ss.r === 'admin' && body.force === true)) return fail('khac_mang', 403, MSG_KHAC_MANG, { canForce: ss.r === 'admin' });
   const { gen } = await call(roomStub(env, p.id), '/rotate', { id: p.id, kind: 'tv' });
   const tok = await mkToken(env, p.id, 'tv', gen);
   const st = await callR(regStub(env), '/tvpair/set', { code, tok, id: p.id, name: p.ten_phong });
@@ -1179,7 +1206,7 @@ export class Registry extends DurableObject {
       let code;
       do{ code = rndCode(); }while(old.has('t:' + code) && old.get('t:' + code).exp >= now);
       const key = rndKey(), exp = now + TVPAIR_MS;
-      await this.ctx.storage.put('t:' + code, { key, exp, tok: '' });
+      await this.ctx.storage.put('t:' + code, { key, exp, tok: '', ip: netKey(body.ip) });
       return jres({ code, key, exp });
     }
     if(u.pathname === '/tvpair/poll'){
@@ -1195,7 +1222,7 @@ export class Registry extends DurableObject {
       const v = await this.ctx.storage.get('t:' + String(body.code || ''));
       if(!v || v.exp < Date.now()) return jres({ error: 'Mã trên TV không đúng hoặc đã hết hạn. Xem lại mã đang hiện trên TV.' }, 404);
       if(v.tok) return jres({ error: 'Mã này vừa được dùng. Đợi TV hiện mã mới.' }, 409);
-      return jres({ ok: true });
+      return jres({ ok: true, ip: v.ip || '' });
     }
     if(u.pathname === '/tvpair/set'){
       const k = 't:' + String(body.code || ''), v = await this.ctx.storage.get(k);
@@ -1320,7 +1347,7 @@ export class Room extends DurableObject {
     let off = 0;
     for(const ws of this.sockets('remote')){ const a = ws.deserializeAttachment() || {}; if(a.off) off++; }
     return { remotes: this.sockets('remote').length, tablets: this.sockets('tablet').length, tv: this.sockets('tv').length > 0, net, offNet: off,
-      open: c.open, since: c.since, genQ: c.genQ, genT: c.genT };
+      open: c.open, since: c.since, genQ: c.genQ, genT: c.genT, tvIp: (await this.ctx.storage.get('tvIp')) || '' };
   }
 
   async fetch(req){

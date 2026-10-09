@@ -648,13 +648,30 @@ var BASE = location.origin + location.pathname.replace(/[^/]*$/, '');
 function maGan(raw){ raw = String(raw||''); var m = raw.match(/[#&?]gan=(\d{6})/) || raw.replace(/\s/g,'').match(/^(\d{6})$/); return m ? m[1] : ''; }
 var GAN = maGan(location.hash);
 var TV = { rooms:[], tm:null };
+var GANNET = { code:'', same:null, canForce:false };   // TV chờ gán có cùng mạng chi nhánh không (null: đang kiểm)
+function kiemMang(){
+  if(!GAN){ GANNET = { code:'', same:null, canForce:false }; return; }
+  if(GANNET.code === GAN) return;
+  GANNET = { code:GAN, same:null, canForce:false };
+  var c = GAN;
+  api('quay.tvCheck', {code:c}).then(function(r){
+    if(GAN !== c) return;
+    if(r && r.ok) GANNET = { code:c, same:!!r.same, canForce:!!r.canForce };
+    else GANNET = { code:c, same:null, canForce:false, err:(r && r.msg) || 'Mã không đúng hoặc đã hết hạn.' };
+    drawTv();
+  }).catch(function(){});
+}
 function tabTvDangMo(){ return $('p3').className.indexOf('on') >= 0; }
 function moTabTv(){ var t = $('tabTv'); if(t) t.click(); }
 function boGan(){ GAN = ''; history.replaceState(null, '', location.pathname + location.search); drawTv(); }
 function veGanBar(){
   var g = $('ganBar');
   if(!GAN){ g.style.display = 'none'; return; }
-  g.innerHTML = '<span>📺 TV mã <b>'+GAN.slice(0,3)+' '+GAN.slice(3)+'</b> đang chờ gán — bấm <u>Gán TV này vào đây</u> ở đúng phòng.</span> <button class="btn btn-ghost btn-sm" id="btnBoGan">Bỏ</button>';
+  var m = '<b>'+GAN.slice(0,3)+' '+GAN.slice(3)+'</b>', kq = GANNET.same;
+  g.innerHTML = kq === false
+    ? '<span style="color:#ff8f8f">⛔ TV mã '+m+' đang ở <b>mạng khác</b> với chi nhánh này (có thể là TV của chi nhánh khác). Không gán. Nhân viên cần dùng wifi của quán, hoặc kiểm tra lại đúng TV.</span> <button class="btn btn-ghost btn-sm" id="btnBoGan">Bỏ</button>'
+    : GANNET.err ? '<span style="color:#ff8f8f">⚠️ '+esc(GANNET.err)+'</span> <button class="btn btn-ghost btn-sm" id="btnBoGan">Bỏ</button>'
+    : '<span>📺 TV mã '+m+(kq === true ? ' (cùng mạng chi nhánh)' : ' — đang kiểm tra mạng…')+' đang chờ gán — bấm <u>Gán TV này vào đây</u> ở đúng phòng.</span> <button class="btn btn-ghost btn-sm" id="btnBoGan">Bỏ</button>';
   g.style.display = 'flex';
   $('btnBoGan').addEventListener('click', boGan);
 }
@@ -668,20 +685,22 @@ function loadTv(){
   }).catch(function(){});
 }
 function drawTv(){
+  kiemMang();
   veGanBar();
+  var canGan = !!GAN && GANNET.same !== false && !GANNET.err || (!!GAN && GANNET.same === false && GANNET.canForce);
   var box = $('tvList');
   if(!TV.rooms.length){ box.innerHTML = '<div class="mut">Chưa có phòng nào.'+(S.vaiTro==='admin'?' Thêm phòng ở ô phía trên.':' Liên hệ admin để khai báo phòng.')+'</div>'; return; }
   box.innerHTML = TV.rooms.map(function(x){
     var id = esc(x.roomId), b = function(act, cls, tx){ return '<button class="btn '+cls+' btn-sm" data-act="'+act+'" data-id="'+id+'">'+tx+'</button>'; };
-    var h = '<div class="tvc'+(GAN?' gan':'')+'"><div class="hd"><span class="rn">'+esc(x.roomName)+'</span>'
+    var h = '<div class="tvc'+(canGan?' gan':'')+'"><div class="hd"><span class="rn">'+esc(x.roomName)+'</span>'
       + '<span class="chip '+(x.open?'on':'off')+'">'+(x.open ? 'Đang mở'+(x.since?' từ '+hhmm(x.since):'') : 'Đóng')+'</span>'
       + '<span class="chip '+(x.tv?'on':'warn')+'">'+(x.tv?'TV đã nối':'TV chưa nối')+'</span>'
       + '<span class="chip'+(x.tablets?' on':'')+'">'+(x.tablets?'Có máy tính bảng':'Chưa có máy tính bảng')+'</span>'
       + '<span class="chip">'+x.remotes+' điện thoại</span>'
       + (x.offNet ? '<span class="chip warn">'+x.offNet+' máy ngoài mạng quán</span>' : '')
       + '</div><div class="ac">';
-    if(GAN) h += b('gan', 'btn-y', 'Gán TV này vào đây');
-    h += x.open ? b('dong', 'btn-ghost', 'Đóng phòng') : b('mo', GAN ? 'btn-ghost' : 'btn-y', 'Mở phòng');
+    if(canGan) h += b('gan', GANNET.same === false ? 'btn-bad' : 'btn-y', GANNET.same === false ? 'Vẫn gán (admin)' : 'Gán TV này vào đây');
+    h += x.open ? b('dong', 'btn-ghost', 'Đóng phòng') : b('mo', canGan ? 'btn-ghost' : 'btn-y', 'Mở phòng');
     if(!GAN) h += b('quet', 'btn-ghost', '📺 Gán TV');
     if(x.open && x.tokQr) h += b('qr', 'btn-ghost', 'QR khách') + b('doiqr', 'btn-ghost', 'Đổi QR khách');
     if(S.quanLy && x.tablets) h += b('gomtb', 'btn-ghost', 'Gỡ máy tính bảng');
@@ -698,8 +717,12 @@ function drawTv(){
 }
 function tvRoom(id){ return TV.rooms.filter(function(x){ return x.roomId===id; })[0]; }
 function sauTv(){ loadTv(); tick(); }
-function ganTv(id, code){
-  return api('quay.ganTv', {roomId:id, code:code}).then(function(r){
+function ganTv(id, code, force){
+  return api('quay.ganTv', {roomId:id, code:code, force:!!force}).then(function(r){
+    if(r && !r.ok && r.error === 'khac_mang'){
+      if(r.canForce && !force && confirm(r.msg + '\n\nAdmin: vẫn gán TV này vào phòng?')) return ganTv(id, code, true);
+      return r.msg;
+    }
     if(!r || !r.ok) return (r && r.msg) || 'Không gán được, thử lại.';
     GAN = ''; history.replaceState(null, '', location.pathname + location.search);
     toast('Đã gán TV vào phòng ' + r.roomName + ' — TV tự vào phòng sau vài giây.');
@@ -709,7 +732,7 @@ function ganTv(id, code){
 }
 function tvAct(act, id){
   var x = tvRoom(id); if(!x) return;
-  if(act==='gan'){ ganTv(id, GAN).then(function(r){ if(r!==true) alert(r); }); return; }
+  if(act==='gan'){ ganTv(id, GAN, GANNET.same === false).then(function(r){ if(r!==true) alert(r); }); return; }
   if(act==='mo' || act==='dong'){
     if(act==='dong' && !confirm('Đóng phòng '+x.roomName+'? Điện thoại khách bị ngắt, hàng chờ bài trên TV bị xoá.')) return;
     api('quay.phong', {roomId:id, open: act==='mo'}).then(sauTv); return;
