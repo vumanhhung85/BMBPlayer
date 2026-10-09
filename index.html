@@ -55,11 +55,18 @@
   #setup .f{display:flex; gap:10px}
 
   /* ===== QR khách ở góc trái (chỉ khi phòng đang mở; đổi mỗi lượt mở phòng) ===== */
+  :root{--gqrS:clamp(96px,18.5vh,244px)}
   #gqr{position:absolute; left:1.6vw; top:2vh; z-index:11; display:none; background:#fff; border-radius:14px; padding:.9vh .9vh .5vh; text-align:center; box-shadow:0 6px 30px rgba(0,0,0,.55); pointer-events:none}
-  #gqr img{width:clamp(88px,16.8vh,224px); height:clamp(88px,16.8vh,224px); display:block; image-rendering:pixelated}
+  #gqr .qw{position:relative; width:var(--gqrS); height:var(--gqrS)}
+  #gqr .qtag{position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); white-space:nowrap; line-height:1; text-align:center;
+    font-family:"Arial Black",Impact,"Segoe UI",Arial,sans-serif; font-weight:900; color:#FFD21A;
+    background:linear-gradient(180deg,#8f2fd8,#5b1fa8); border:solid #fff; border-radius:.3em; padding:.16em .3em .2em;
+    text-shadow:.045em 0 0 #3b0a73,-.045em 0 0 #3b0a73,0 .045em 0 #3b0a73,0 -.045em 0 #3b0a73,.035em .035em 0 #3b0a73,-.035em .035em 0 #3b0a73,.035em -.035em 0 #3b0a73,-.035em -.035em 0 #3b0a73;
+    box-shadow:0 0 0 .05em rgba(255,255,255,.9)}
+  #gqr img{width:var(--gqrS); height:var(--gqrS); display:block; image-rendering:pixelated}
   #gqr .l{font:700 clamp(9px,1.35vh,17px)/1.25 Arial,sans-serif; color:#5b21b6; margin-top:.3vh}
   #gqr .r{font:700 clamp(8px,1.1vh,14px)/1.2 Arial,sans-serif; color:#555}
-  body.hasqr #ovTitle{left:calc(1.6vw + clamp(88px,16.8vh,224px) + 4vh)}
+  body.hasqr #ovTitle{left:calc(1.6vw + var(--gqrS) + 4vh)}
   #setup input{flex:1; min-width:0; background:#0e0e16; color:var(--ink); border:1px solid var(--line); border-radius:12px; padding:12px 14px; font-size:16px}
   #setup button{background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; border:none; border-radius:12px; padding:0 20px; font-size:16px; font-weight:700; cursor:pointer}
   #setup .err{color:#fecdd3; font-size:14px; margin-top:8px; min-height:1em}
@@ -153,7 +160,7 @@
     <div id="diag"></div>
   </div>
 
-  <div id="gqr"><img id="gqrImg" alt="QR chọn bài"><div class="l">QUÉT CHỌN BÀI · GỌI MÓN</div><div class="r" id="gqrRoom"></div></div>
+  <div id="gqr"><div class="qw"><img id="gqrImg" alt="QR chọn bài"><div class="qtag" id="gqrTag"></div></div><div class="l">QUÉT CHỌN BÀI · GỌI MÓN</div><div class="r" id="gqrRoom"></div></div>
   <div class="ov" id="ovTitle"><div><div class="lbl">ĐANG HÁT</div><div class="t" id="ovTitleT"></div></div></div>
   <div class="ov" id="ovNext"><div class="lbl">TIẾP THEO</div><div class="t" id="ovNextT"></div></div>
   <div class="ov" id="ovCount"></div>
@@ -266,14 +273,22 @@ function startPairing(){
 }
 
 /* ---------- QR khách ở góc trái màn hình (đổi mỗi lượt mở phòng) ---------- */
+/* Tên phòng ở giữa QR (vàng viền tím như logo): chữ vừa đủ lớn để thấy từ xa nhưng che ít ô QR (QR dùng mức sửa lỗi Q) */
+function tagPhong(el, side, name){
+  name = String(name || '').replace(/^\s*ph[oò]ng\s+/i, '').trim().toUpperCase();
+  if(!name){ el.style.display = 'none'; return; }
+  const n = name.length, k = n <= 2 ? .2 : n === 3 ? .17 : n === 4 ? .14 : n === 5 ? .115 : .095;
+  el.textContent = name.slice(0, 8); el.style.display = 'block';
+  el.style.fontSize = 'calc(' + side + ' * ' + k + ')'; el.style.borderWidth = '.07em';
+}
 let shownQr = '';
 function paintGuestQr(tok, name){
   tok = tok || '';
-  if(name) $('gqrRoom').textContent = 'Phòng ' + name;
+  if(name){ $('gqrRoom').textContent = 'Phòng ' + name; tagPhong($('gqrTag'), 'var(--gqrS)', name); }
   if(tok === shownQr) return;
   shownQr = tok;
   if(!tok){ $('gqr').style.display = 'none'; document.body.classList.remove('hasqr'); return; }
-  $('gqrImg').src = qrImg(BASE + 'remote.html?r=' + encodeURIComponent(tok), 6, 'L');   // mức L: ít ô hơn, khách ngồi xa vẫn quét được
+  $('gqrImg').src = qrImg(BASE + 'remote.html?r=' + encodeURIComponent(tok), 6, 'Q');   // mức Q: chừa chỗ cho tên phòng ở giữa
   $('gqr').style.display = 'block'; document.body.classList.add('hasqr');
 }
 const HINT0 = $('hint').textContent;

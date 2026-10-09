@@ -244,6 +244,12 @@ td b{color:var(--txt)}
 .ganbar{display:none;background:rgba(255,210,26,.12);border:1px solid var(--yellow);color:var(--yellow);border-radius:14px;padding:12px 14px;margin:8px 0 12px;font-weight:600;align-items:center;gap:10px;flex-wrap:wrap}
 .ganbar b{font-family:'Baloo 2';font-size:22px;letter-spacing:2px}
 #qrKhach .qbox{background:#fff;border-radius:14px;padding:10px;display:inline-block;margin:6px 0}
+#qrKhach .qw{position:relative;width:240px;height:240px}
+#qrKhach .qtag{position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); white-space:nowrap; line-height:1; text-align:center;
+    font-family:"Arial Black",Impact,"Segoe UI",Arial,sans-serif; font-weight:900; color:#FFD21A;
+    background:linear-gradient(180deg,#8f2fd8,#5b1fa8); border:solid #fff; border-radius:.3em; padding:.16em .3em .2em;
+    text-shadow:.045em 0 0 #3b0a73,-.045em 0 0 #3b0a73,0 .045em 0 #3b0a73,0 -.045em 0 #3b0a73,.035em .035em 0 #3b0a73,-.035em .035em 0 #3b0a73,.035em -.035em 0 #3b0a73,-.035em -.035em 0 #3b0a73;
+    box-shadow:0 0 0 .05em rgba(255,255,255,.9)}
 #qrKhach .qbox img{width:240px;height:240px;image-rendering:pixelated;display:block}
 
 @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
@@ -717,6 +723,14 @@ function drawTv(){
 }
 function tvRoom(id){ return TV.rooms.filter(function(x){ return x.roomId===id; })[0]; }
 function sauTv(){ loadTv(); tick(); }
+/* Tên phòng ở giữa QR (vàng viền tím như logo): chữ vừa đủ lớn để thấy từ xa nhưng che ít ô QR (QR dùng mức sửa lỗi Q) */
+function tagPhong(el, side, name){
+  name = String(name || '').replace(/^\s*ph[oò]ng\s+/i, '').trim().toUpperCase();
+  if(!name){ el.style.display = 'none'; return; }
+  const n = name.length, k = n <= 2 ? .2 : n === 3 ? .17 : n === 4 ? .14 : n === 5 ? .115 : .095;
+  el.textContent = name.slice(0, 8); el.style.display = 'block';
+  el.style.fontSize = 'calc(' + side + ' * ' + k + ')'; el.style.borderWidth = '.07em';
+}
 function ganTv(id, code, force){
   return api('quay.ganTv', {roomId:id, code:code, force:!!force}).then(function(r){
     if(r && !r.ok && r.error === 'khac_mang'){
@@ -749,8 +763,9 @@ function tvAct(act, id){
   }
   if(act==='qr'){
     S.qrUrl = BASE + 'remote.html?r=' + encodeURIComponent(x.tokQr);
-    var q = qrcode(0, 'M'); q.addData(S.qrUrl); q.make();
-    $('qrKhachImg').innerHTML = '<img alt="QR khách" src="'+q.createDataURL(8, 2)+'">';
+    var q = qrcode(0, 'Q'); q.addData(S.qrUrl); q.make();
+    $('qrKhachImg').innerHTML = '<div class="qw"><img alt="QR khách" src="'+q.createDataURL(8, 2)+'"><div class="qtag" id="qrKhachTag"></div></div>';
+    tagPhong($('qrKhachTag'), '240px', x.roomName);
     $('qrKhachTen').textContent = 'QR khách — ' + x.roomName;
     $('qrKhach').classList.add('show'); return;
   }
