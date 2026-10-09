@@ -11,7 +11,9 @@ public class BootReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
         if (intent == null || intent.getAction() == null) return;
-        if (!context.getSharedPreferences(MainActivity.PREFS, Context.MODE_PRIVATE).getBoolean(MainActivity.K_AUTOSTART, true)) return;
+        android.content.SharedPreferences sp = context.getSharedPreferences(MainActivity.PREFS, Context.MODE_PRIVATE);
+        if (!sp.getBoolean(MainActivity.K_AUTOSTART, true)) return;
+        if ("tablet".equals(sp.getString(MainActivity.K_MODE, ""))) return;   // máy tính bảng: không tự mở, nhân viên mở khi cần
         Intent open = new Intent(context, MainActivity.class);
         open.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         open.putExtra("boot", true);

@@ -636,6 +636,7 @@ public class MainActivity extends Activity {
 
     private void maybeAskAutostart() {
         if (Build.VERSION.SDK_INT < 29 || isFinishing()) return;
+        if ("tablet".equals(mode)) return;   // máy tính bảng không cần tự mở
         if (!prefs.getBoolean(K_AUTOSTART, true) || Settings.canDrawOverlays(this) || isDefaultHome()) return;
         int asked = prefs.getInt(K_ASK_OVERLAY, 0);
         if (asked >= 3 || (openDialog != null && openDialog.isShowing())) return;
