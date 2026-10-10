@@ -132,7 +132,8 @@
   body.wide .card > .row img, body.wide .row.card img{width:100%; height:auto; aspect-ratio:16/9; border-radius:0}
   body.wide .card .meta{padding:0 10px}
   body.wide .card .name{font-size:13.5px}
-  body.wide #paneSearch .card button.pick{display:none}
+  /* Không còn nút "Chọn": chạm vào cả dòng/thẻ bài để chọn (rowTap bấm nút ẩn này) */
+  button.pick{display:none !important}
   body.wide #side{display:flex; flex-direction:column; grid-column:2; grid-row:1 / span 2; min-height:0; background:#100e1c; border-left:1px solid var(--line)}
   .sNow{position:relative; flex:0 0 auto}
   .sNow .th{aspect-ratio:16/9; max-height:30vh; background:linear-gradient(135deg,#2a1856,#0e0b1c); display:flex; align-items:center; justify-content:center; overflow:hidden}
