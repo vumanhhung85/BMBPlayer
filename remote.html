@@ -96,6 +96,11 @@
   .row img.qth{width:80px; height:45px}
 
   /* ===== Hộp hỏi khi chọn bài / bấm bài trong hàng chờ (như SK Player) ===== */
+  .odCard.vmCard{padding:0; width:min(480px,100%); height:min(560px,calc(100vh - 36px)); max-height:none; display:flex; flex-direction:column; overflow:hidden; text-align:left}
+  .vmH{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 14px; border-bottom:1px solid var(--line)}
+  .vmH b{display:block; font-size:16px} .vmH small{color:var(--quiet); font-size:12px}
+  .vmH button{border:none; background:#20202e; color:#fff; border-radius:50%; width:34px; height:34px; font-size:16px}
+  .vmList{flex:1; overflow:auto; padding:6px 8px 10px} .vmList .card{margin:0}
   .odCard.pkCard{padding:0 0 16px; overflow:hidden; width:min(440px,100%)}
   .pkCard img{display:block; width:100%; aspect-ratio:16/9; object-fit:cover; background:#20202e}
   .pkT{padding:12px 16px 4px; font-weight:700; font-size:15px; line-height:1.4; text-align:left}
@@ -276,6 +281,7 @@
   <div class="sHead">BÀI KẾ TIẾP (<span id="sCount">0</span>)</div>
   <div class="sList" id="sList"></div>
 </aside>
+<div class="odOv" id="vm"><div class="odCard vmCard"><div class="vmH"><div><b id="vmT"></b><small id="vmN"></small></div><button id="vmX" aria-label="Đóng">✕</button></div><div class="vmList" id="vmList"></div></div></div>
 <div class="odOv" id="pk"><div class="odCard pkCard"><img id="pkImg" alt=""><div class="pkT" id="pkT"></div><div class="pkBtns" id="pkBtns"></div></div></div>
 
 <div id="dock">
@@ -458,6 +464,7 @@ function pickBox(title, thumb, buttons, horiz){
   $('pk').style.display = 'flex';
 }
 function closePick(){ $('pk').style.display = 'none'; }
+$('vmX').onclick = closeVers; $('vm').addEventListener('click', e => { if(e.target === $('vm')) closeVers(); });
 $('pk').addEventListener('click', e => { if(e.target === $('pk')) closePick(); });
 function addBtn(it, fresh){
   const b = el('button', 'pick', '＋ Chọn');
@@ -473,11 +480,12 @@ function addBtn(it, fresh){
   return b;
 }
 /* Chạm vào cả dòng / thẻ bài cũng mở hộp chọn */
-$('paneSearch').addEventListener('click', e => {
+const rowTap = e => {
   if(e.target.closest('button, a, input, select')) return;
   const row = e.target.closest('.row'); if(!row) return;
   const b = row.querySelector('button.pick'); if(b) b.click();
-});
+};
+$('paneSearch').addEventListener('click', rowTap); $('vmList').addEventListener('click', rowTap);
 function renderResults(items, title, extra){
   const box = $('results'); box.replaceChildren();
   const head = el('div', 'secHead'); head.append(el('b', null, title));
@@ -744,6 +752,20 @@ function suspectDead(id){
     }catch(e){}
   }, 1500);
 }
+function closeVers(){ $('vm').style.display = 'none'; }
+async function openVers(it, opts){
+  $('vmT').textContent = it.title.replace(/\s*[\[(].*$/,'').trim() || it.title;
+  const box = $('vmList'); box.replaceChildren(el('div', 'hint', 'Đang tải các bản khác…'));
+  $('vm').style.display = 'flex';
+  try{
+    const d = await kapi('/api/kho/versions?key=' + encodeURIComponent(opts.key) + (opts.tone != null ? '&tone=' + encodeURIComponent(opts.tone) : ''));
+    box.replaceChildren();
+    const items = d.items || [];
+    $('vmN').textContent = items.length + ' bản';
+    items.forEach(x => box.append(khoRow(x, {})));
+    if(!items.length) box.append(el('div', 'hint', 'Không có bản nào.'));
+  }catch(e){ box.replaceChildren(el('div', 'hint err', 'Không tải được: ' + (e.message || ''))); }
+}
 function khoRow(v, opts){
   const it = kItem(v), row = el('div', 'row tap');
   row.dataset.vid = it.id;
@@ -758,16 +780,7 @@ function khoRow(v, opts){
   row.append(img, meta);
   const wrap = el('div', 'card'); wrap.append(row);
   if(opts.versions > 1){
-    const vb = btn('▾ ' + (opts.versions - 1) + ' bản khác', 'more', async () => {
-      const open = wrap.querySelector('.vers'); if(open){ open.remove(); vb.textContent = '▾ ' + (opts.versions - 1) + ' bản khác'; return; }
-      vb.textContent = '▴ Thu gọn';
-      const box = el('div', 'vers'); box.append(el('div', 'hint', 'Đang tải các bản khác…')); wrap.append(box);
-      try{
-        const d = await kapi('/api/kho/versions?key=' + encodeURIComponent(opts.key) + (opts.tone != null ? '&tone=' + encodeURIComponent(opts.tone) : ''));
-        box.replaceChildren();
-        (d.items || []).forEach(x => box.append(khoRow(x, {})));
-      }catch(e){ box.replaceChildren(el('div', 'hint err', 'Không tải được: ' + (e.message || ''))); }
-    });
+    const vb = btn('▾ ' + (opts.versions - 1) + ' bản khác', 'more', () => openVers(it, opts));
     meta.append(vb);
   }
   row.append(addBtn(it, true));
