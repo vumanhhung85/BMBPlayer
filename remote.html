@@ -761,9 +761,10 @@ async function openVers(it, opts){
   try{
     const d = await kapi('/api/kho/versions?key=' + encodeURIComponent(opts.key) + (opts.tone != null ? '&tone=' + encodeURIComponent(opts.tone) : ''));
     box.replaceChildren();
-    const items = d.items || [];
-    $('vmN').textContent = items.length + ' bản';
+    const all = d.items || [], qs = qualitySplit(all), items = qs.good;
+    $('vmN').textContent = all.length + ' bản' + (qs.low.length ? ' · đang ẩn ' + qs.low.length + ' bản ít lượt xem' : '');
     items.forEach(x => box.append(khoRow(x, {})));
+    lowBtn(box, qs.low, v => khoRow(v, {}));
     if(!items.length) box.append(el('div', 'hint', 'Không có bản nào.'));
   }catch(e){ box.replaceChildren(el('div', 'hint err', 'Không tải được: ' + (e.message || ''))); }
 }
@@ -831,6 +832,19 @@ async function feedMore(first){
 }
 /* Kết quả tìm: ít bài (≤ 6 nhóm) → trải phẳng MỌI bản phối, xếp theo lượt xem YouTube giảm dần (đan xen các nhóm) để khách thấy hết;
    nhiều bài → gom nhóm như cũ, bấm "… bản khác" mở hộp chọn bản. Cuộn xuống tới đáy thì nạp tiếp. */
+/* Lọc chất lượng (tầng 1, luật đơn giản): kênh ⭐ luôn giữ; còn lại phải có chữ karaoke/beat/... trong tên hoặc kênh VÀ ≥ 100 lượt xem.
+   Chỉ lọc khi còn ≥ 2 bản tốt (bài mới ra ít lượt xem vẫn hiện); bản bị ẩn có nút "Hiện thêm". */
+const KARA_RE = /karaoke|kara\b|beat|instrumental|nhac nen|nhạc nền|lyric|tone (nam|nu|nữ)|playback/i, MIN_VIEWS = 100;
+function qualitySplit(list){
+  const good = [], low = [];
+  list.forEach(v => (v.star || (KARA_RE.test((v.title || '') + ' ' + (v.channel || '')) && (v.views || 0) >= MIN_VIEWS) ? good : low).push(v));
+  return good.length >= 2 ? { good, low } : { good:list, low:[] };
+}
+function lowBtn(box, low, mk, before){
+  if(!low.length) return;
+  const b = btn('Hiện thêm ' + low.length + ' bản ít lượt xem / không rõ là karaoke', 'ghost', () => { low.forEach(v => box.insertBefore(mk(v), b)); b.remove(); });
+  if(before) box.insertBefore(b, before); else box.append(b);
+}
 const FLAT_MAX_GROUPS = 6, FLAT_CAP = 150, versCache = new Map();
 async function versionsOf(key, tone){
   const k = key + '|' + tone; if(versCache.has(k)) return versCache.get(k);
@@ -853,15 +867,15 @@ async function showGroups(box, groups, seq, suffix){
   }catch(e){ if(seq === khoSeq) grouped(); return; }
   if(seq !== khoSeq) return;
   rows.sort((a, b) => (b.views || 0) - (a.views || 0));
-  rows = rows.slice(0, FLAT_CAP);
+  const qs = qualitySplit(rows); rows = qs.good.slice(0, FLAT_CAP);
   feedReset();
   box.replaceChildren(head(rows.length + ' bản phối · nhiều lượt xem xếp trước'));
   const sent = el('div', 'feedEnd', ''); box.append(sent);
-  let i = 0;
+  let i = 0, lowShown = false;
   const more = () => {
     if(seq !== khoSeq) return;
     rows.slice(i, i + 30).forEach(v => box.insertBefore(khoRow(v, {}), sent)); i += 30;
-    if(i >= rows.length){ if(feedIO){ feedIO.disconnect(); feedIO = null; } sent.textContent = ''; }
+    if(i >= rows.length){ if(feedIO){ feedIO.disconnect(); feedIO = null; } sent.textContent = ''; if(!lowShown){ lowShown = true; lowBtn(box, qs.low.slice(0, 60), v => khoRow(v, {}), sent); } }
     else if(sent.getBoundingClientRect().top < innerHeight + 500) setTimeout(more, 50);
   };
   more();
