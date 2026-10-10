@@ -210,6 +210,7 @@ function showReport(r){
   if(r.job === 'gap' && r.list) parts.push('lấp ' + r.searched + ' bài tìm hụt, thêm ' + r.added + ' bản: ' + r.list.map(x => '“' + x.t + '” +' + x.a).join(', '));
   if(r.job === 'discover' && r.list){ parts.push('khám phá ' + r.checked + ' kênh: thêm ' + r.addCh + ' kênh, ' + r.addPl + ' playlist'); r.list.forEach(x => parts.push('  • ' + x.t + ': ' + x.k + '/' + x.s + ' video mới nhất là karaoke → ' + x.act)); }
   if(r.job === 'plsearch' && r.artist) parts.push('tìm playlist “karaoke ' + r.artist + '”: ' + r.found + ' playlist karaoke, thêm ' + r.added + ' nguồn mới');
+  if(r.scan) parts.push('kèm quét kênh: ' + (r.scan.sources != null ? r.scan.sources + ' nguồn, ' + r.scan.pages + ' trang, thêm ' + r.scan.added + ', bỏ ' + r.scan.rejected : '') + (r.scan.error ? ' — lỗi: ' + r.scan.error : ''));
   if(r.error) parts.push('Lỗi: ' + r.error);
   if(r.note) parts.push(r.note);
   parts.push('tốn ' + (r.units || 0) + ' đơn vị, ' + (r.searches || 0) + ' lượt tìm' + (r.writes != null ? ', ghi ' + fmt(r.writes) + ' dòng D1' : ''));
