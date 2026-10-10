@@ -758,12 +758,15 @@ async function idb(mode, fn){
   const db = await idbOpen();
   return new Promise(res => { const tx = db.transaction('kv', mode); const q = fn(tx.objectStore('kv')); tx.oncomplete = () => res(q && q.result); tx.onerror = tx.onabort = () => res(null); });
 }
-function prepIndex(d){
-  const list = (d.rows || []).map(r => {
-    const key = String(r[0] || ''), tw = asc(r[3]);
-    return { key, tone: r[1] || '', id: r[2], title: r[3], channel: (d.chans || [])[r[4]] || '', versions: r[5] || 1, hot: r[6] || 0, views: r[7] || 0, picks: r[8] || 0,
+/* Dựng danh mục theo từng đợt nhỏ, nhường máy giữa các đợt: máy tính bảng yếu không bị đứng vài giây (lúc đó chạm ô tìm gõ không ăn) */
+async function prepIndex(d){
+  const rows = d.rows || [], chans = d.chans || [], list = new Array(rows.length);
+  for(let i = 0; i < rows.length; i++){
+    const r = rows[i], key = String(r[0] || ''), tw = asc(r[3]);
+    list[i] = { key, tone: r[1] || '', id: r[2], title: r[3], channel: chans[r[4]] || '', versions: r[5] || 1, hot: r[6] || 0, views: r[7] || 0, picks: r[8] || 0,
              ab: key.split(' ').filter(Boolean).map(w => w[0]).join(''), hay: ' ' + key + ' ' + tw + ' ' };
-  });
+    if(i % 1500 === 1499) await new Promise(res => setTimeout(res, 16));
+  }
   return { v: d.v, at: d.at, list };
 }
 function paintIdx(got){
@@ -778,14 +781,14 @@ async function loadIndex(){
   try{
     let saved = null; try{ saved = await idb('readonly', st => st.get('index')); }catch(e){}
     if(saved && (!saved.got || Date.now() - saved.got > IDX_MAX_AGE)){ try{ await idb('readwrite', st => st.delete('index')); }catch(e){} saved = null; }
-    if(saved && !IDX){ IDX = prepIndex(saved.d); paintIdx(saved.got); if($('q').value.trim()) renderKho(); }
+    if(saved && !IDX){ IDX = await prepIndex(saved.d); paintIdx(saved.got); if($('q').value.trim()) renderKho(); }
     if(saved && saved.d.v === vnDay(Date.now())) return;                       // hôm nay đã tải
     const res = await fetch(cfg.kho + '/api/kho/index', { headers: Object.assign({}, khoAuth(), saved && saved.etag ? { 'If-None-Match': saved.etag } : {}) });
     if(res.status === 304 && saved){ saved.got = Date.now(); try{ await idb('readwrite', st => st.put(saved, 'index')); }catch(e){} paintIdx(saved.got); return; }
     if(!res.ok) return;
     const d = await res.json(), rec = { d, etag: res.headers.get('ETag') || '', got: Date.now() };
     try{ await idb('readwrite', st => st.put(rec, 'index')); }catch(e){}
-    IDX = prepIndex(d); paintIdx(rec.got);
+    IDX = await prepIndex(d); paintIdx(rec.got);
     if($('q').value.trim()) renderKho();
   }catch(e){}
   finally{ idxLoading = false; }
