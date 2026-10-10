@@ -293,6 +293,10 @@ async function orderModes(env, items) {
 }
 async function ingest(env, rows, now) {
   if (!rows.length) return;
+  // Một video có thể xuất hiện 2 lần trong cùng lô (playlist chứa trùng bài) → videos_fts bị chèn trùng rowid → SQLITE_CONSTRAINT
+  // làm hỏng cả lô và kẹt nguồn mãi ở cùng một trang. Gộp trùng theo id trước khi ghi.
+  const seen = new Set();
+  rows = rows.filter(r => r && r.id && !seen.has(r.id) && seen.add(r.id));
   const J = JSON.stringify(rows);
   await env.DB.batch([
     env.DB.prepare(`INSERT INTO videos (id, channel_id, channel, title, segs, song_key, tone, duration, views, views_delta, published_at, fetched_at, src, added_at)
@@ -306,7 +310,7 @@ async function ingest(env, rows, now) {
         views = excluded.views, fetched_at = excluded.fetched_at
       WHERE excluded.fetched_at - videos.fetched_at > 43200000`).bind(J, now),
     env.DB.prepare(`DELETE FROM videos_fts WHERE rowid IN (SELECT rid FROM videos WHERE id IN (SELECT json_extract(value,'$.id') FROM json_each(?1)))`).bind(J),
-    env.DB.prepare(`INSERT INTO videos_fts (rowid, txt) SELECT v.rid, json_extract(j.value,'$.txt') FROM json_each(?1) j JOIN videos v ON v.id = json_extract(j.value,'$.id')`).bind(J)
+    env.DB.prepare(`INSERT INTO videos_fts (rowid, txt) SELECT v.rid, MAX(json_extract(j.value,'$.txt')) FROM json_each(?1) j JOIN videos v ON v.id = json_extract(j.value,'$.id') GROUP BY v.rid`).bind(J)
   ]);
 }
 async function removeIds(env, ids, now) {
@@ -321,6 +325,7 @@ async function removeIds(env, ids, now) {
 // Lấy chi tiết ≤50 id, lưu bài đạt, loại (và nhớ) bài không đạt.
 // opt.src = nguồn (kênh/playlist) đang quét, opt.mode = kiểu tiêu đề của nguồn đó
 async function fetchAndIngest(env, run, ids, now, opt) {
+  ids = [...new Set(ids)];
   if (!ids.length) return { added: 0, rejected: 0, rows: [] };
   opt = opt || {};
   const d = await yt(env, run, 'videos', { part: 'snippet,contentDetails,statistics,status', id: ids.join(',') }, 1);
@@ -378,7 +383,7 @@ async function scanOne(env, run, c, ch, now, pageLimit) {
       const d = await yt(env, run, 'playlistItems', { part: 'contentDetails', playlistId: ch.uploads, maxResults: 50, pageToken: token }, 1);
       r.pages++;
       const cds = (d.items || []).map(x => x.contentDetails || {});
-      const ids = cds.map(x => x.videoId).filter(i => ID_RE.test(i || ''));
+      const ids = [...new Set(cds.map(x => x.videoId).filter(i => ID_RE.test(i || '')))];
       const pubs = cds.map(x => Date.parse(x.videoPublishedAt) || 0).filter(Boolean);
       if (pubs.length) r.newest = Math.max(r.newest, ...pubs);
       r.seen += ids.length;
@@ -461,6 +466,12 @@ async function scanJob(env, run, c, now) {
         total, autoOff ? 'Tự thêm: chỉ mang về ' + total + ' bản mới — đã tắt sau lần quét đầu' : null).run();
     if (autoOff) item.e = 'ít bài mới, đã tắt';
     else if (ch.auto && !ch.full_done && r.done) { const m = await autoOrder(env, ch); if (m === 'artist') item.e = 'tự đổi sang Ca sĩ trước'; }
+    if (r.err && /D1_|SQLITE/i.test(String(r.err.message || r.err)) && !run.quotaHit && !run.writeStop) {
+      // lỗi ghi dữ liệu của riêng nguồn này → ghi chú lại, bỏ qua nguồn, quét tiếp nguồn khác (đừng để 1 nguồn chặn cả kho)
+      item.e = 'lỗi ghi, bỏ qua: ' + String(r.err.message || r.err).slice(0, 120);
+      await env.DB.prepare(`UPDATE channels SET note = ?2 WHERE id = ?1`).bind(ch.id, 'Lỗi ghi lúc quét: ' + String(r.err.message || r.err).slice(0, 200)).run();
+      continue;
+    }
     if (r.err) { stop = r.err; item.e = String(r.err.message || r.err).slice(0, 160); break; }   // hết hạn mức/lỗi mạng → dừng lượt này
   }
   if (!list.length) {
@@ -791,6 +802,14 @@ async function tick(env, force) {
                     ['gap', 'scan', 'plsearch', 'refresh'], ['discover', 'scan', 'refresh', 'plsearch'], ['plsearch', 'scan', 'refresh', 'hotsearch']][t % 6];
       for (const j of order) { rep = await JOBS[j](env, run, c, now); if (!rep.idle) break; }
       if (rep.idle && order.length > 1) rep = { job: 'idle', idle: true, reason: 'kho đã cập nhật đủ, chưa có việc mới' };
+      // Quét kênh là việc làm kho lớn lên, nhưng trước đây chỉ chạy khi việc đứng trước nó rảnh (làm mới gần như luôn có việc)
+      // → lượt tự chạy (không phải bấm tay một việc) luôn quét kèm, nếu việc chính chưa phải quét và còn đơn vị/còn trần ghi
+      if ((!force || force === 'auto') && rep.job !== 'scan' && rep.job !== 'error' && !run.quotaHit && !run.writeStop && run.used + run.units < c.budget) {
+        try {
+          const s = await scanJob(env, run, c, Date.now());
+          if (!s.idle) rep.scan = { sources: s.sources, pages: s.pages, added: s.added, rejected: s.rejected, error: s.error || null };
+        } catch (e) { rep.scan = { error: String(e.message || e) }; }
+      }
     }
     await env.DB.prepare(`INSERT INTO meta (k, v) VALUES ('tick', ?1) ON CONFLICT(k) DO UPDATE SET v = excluded.v`).bind(String(t)).run();
   } catch (e) {
@@ -1273,7 +1292,7 @@ async function route(req, env, ctx, run) {
       const s = await resolveSource(env, run, url.searchParams.get('input') || '');
       const d = await yt(env, run, 'playlistItems', { part: 'contentDetails', playlistId: s.uploads, maxResults: 50 }, 1);
       const cds = (d.items || []).map(x => x.contentDetails || {});
-      const ids = cds.map(x => x.videoId).filter(i => ID_RE.test(i || ''));
+      const ids = [...new Set(cds.map(x => x.videoId).filter(i => ID_RE.test(i || '')))];
       const newest = Math.max(0, ...cds.map(x => Date.parse(x.videoPublishedAt) || 0));
       const vd = ids.length ? await yt(env, run, 'videos', { part: 'snippet,contentDetails,statistics,status', id: ids.join(',') }, 1) : { items: [] };
       done();
