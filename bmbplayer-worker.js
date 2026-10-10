@@ -51,7 +51,7 @@ import { DurableObject } from 'cloudflare:workers';
 const enc = new TextEncoder();
 const ID_RE = /^[A-Za-z0-9_-]{1,40}$/;                                  // mã phòng = order_phong.id của Order (vd P1A2B3C4D5E6)
 const TOKEN_RE = /^([A-Za-z0-9_-]{1,40})\.(\d{1,6})\.([\w-]{22})$/;
-const ACTIONS = new Set(['add', 'play', 'next', 'replay', 'mute', 'vol', 'prio', 'remove', 'hello']);
+const ACTIONS = new Set(['add', 'play', 'next', 'replay', 'mute', 'vol', 'prio', 'up', 'remove', 'hello']);
 const MAX_MSG = 4096, MAX_STATE = 32768, MAX_REMOTES = 2, RATE_PER_SEC = 15;
 
 /* ---------- Mã ---------- */
@@ -1483,8 +1483,9 @@ export class Room extends DurableObject {
       if(p.action === 'add'){
         if(!/^[\w-]{11}$/.test(p.id || '')) return;
         out.id = p.id; out.title = String(p.title || 'Bài không tên').slice(0, 200);
+        if(p.prio === true) out.prio = true;
       }else if(p.action === 'vol'){ out.value = Math.max(0, Math.min(100, +p.value || 0));
-      }else if(p.action === 'prio' || p.action === 'remove'){ out.index = Math.max(0, Math.min(500, +p.index | 0)); }
+      }else if(p.action === 'prio' || p.action === 'up' || p.action === 'remove'){ out.index = Math.max(0, Math.min(500, +p.index | 0)); }
       const msg = JSON.stringify({ type: 'cmd', payload: out });
       for(const tv of this.sockets('tv')){ try{ tv.send(msg); }catch(e){} }
       return;

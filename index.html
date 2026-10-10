@@ -500,17 +500,22 @@ function guard(id, stage){
     setLock('tap');
   }
 }
-function addSong(it){
+/* Hàng chờ chỉ gồm bài đang hát + bài sắp hát (như SK Player): hát xong / qua bài là bỏ khỏi danh sách, không giữ lịch sử */
+function addSong(it, prio){
   if(!/^[\w-]{11}$/.test(it.id || '')) return;
-  queue.push({ id:it.id, title:String(it.title||'Bài không tên').slice(0,200) });
-  if(cur < 0){ cur = 0; load(); }                                            // không đang hát → phát ngay, không cần bấm gì
-  else {
-    render(); push(); paintCount();
-    $('ovAddL').textContent = 'ĐÃ THÊM · THỨ ' + (queue.length - 1 - cur) + ' TRONG HÀNG CHỜ';   // báo ngay trên TV như SK Player
-    $('ovAddT').textContent = queue[queue.length - 1].title; flash('ovAdd', 5000);
-  }
+  const item = { id:it.id, title:String(it.title||'Bài không tên').slice(0,200) };
+  if(cur < 0){ queue.push(item); cur = queue.length - 1; load(); return; }    // không đang hát → phát ngay, không cần bấm gì
+  const at = prio ? cur + 1 : queue.length;
+  queue.splice(at, 0, item);
+  render(); push(); paintCount();
+  $('ovAddL').textContent = prio ? 'ƯU TIÊN · HÁT NGAY SAU BÀI NÀY' : 'ĐÃ THÊM · THỨ ' + (at - cur) + ' TRONG HÀNG CHỜ';   // báo ngay trên TV như SK Player
+  $('ovAddT').textContent = item.title; flash('ovAdd', 5000);
 }
-function next(){ if(cur < queue.length-1){ cur++; } else { cur = -1; } load(); }
+function next(){
+  if(cur >= 0 && cur < queue.length) queue.splice(cur, 1);                  // bỏ bài vừa hát
+  cur = queue.length ? Math.min(Math.max(cur, 0), queue.length - 1) : -1;
+  load(); paintCount();
+}
 function playPause(){
   if(!ready){ toast(apiFailed ? 'Không tải được trình phát YouTube.' : 'Trình phát YouTube đang khởi động, thử lại sau vài giây.'); return; }
   if(cur < 0 && queue.length){ cur = 0; load(); return; }
@@ -557,6 +562,10 @@ window.bmbSysVol = v => {
 function prio(i){ // đưa bài i lên ngay sau bài đang hát
   if(i <= cur || i >= queue.length) return;
   const [it] = queue.splice(i,1); queue.splice(cur+1, 0, it); render(); push(); paintCount();
+}
+function up(i){ // đẩy bài i lên trước một bậc (không vượt qua bài đang hát)
+  if(i <= cur + 1 || i >= queue.length) return;
+  const t = queue[i]; queue[i] = queue[i-1]; queue[i-1] = t; render(); push();
 }
 function removeAt(i){
   if(i<0 || i>=queue.length) return;
@@ -623,7 +632,7 @@ function push(){
     muted: userMuted,
     volume: vol,
     nowTitle: cur>=0 ? queue[cur].title : null,
-    cur, queue: queue.map(q=>({title:q.title}))
+    cur, queue: queue.map(q=>({ id:q.id, title:q.title }))
   }});
 }
 bc.onmessage = ev => {
@@ -631,7 +640,8 @@ bc.onmessage = ev => {
   if(!roomOpen) return;
   const c = m.payload || {};
   switch(c.action){
-    case 'add': addSong(c); break;
+    case 'add': addSong(c, c.prio === true); break;
+    case 'up': up(+c.index); break;
     case 'play': playPause(); break;
     case 'next': next(); break;
     case 'replay': replay(); break;

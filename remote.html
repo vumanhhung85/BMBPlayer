@@ -91,6 +91,60 @@
   .vol input::-webkit-slider-thumb{-webkit-appearance:none; width:26px; height:26px; margin-top:-9px; border-radius:50%; background:#fff; border:3px solid #a855f7; box-shadow:0 2px 8px rgba(0,0,0,.5)}
   .vol .vi{color:var(--quiet); display:flex} .vol .vi svg{width:20px; height:20px; fill:currentColor} .vol input{flex:1; accent-color:#a855f7; height:28px}
   .roomOff #dock{ opacity:.4; pointer-events:none }
+  .row.tap{cursor:pointer} .row.tap:active{background:#1c1830}
+  .row .num{flex:0 0 auto; width:26px; text-align:center; color:var(--quiet); font-weight:800; font-size:14px}
+  .row img.qth{width:80px; height:45px}
+
+  /* ===== Hộp hỏi khi chọn bài / bấm bài trong hàng chờ (như SK Player) ===== */
+  .odCard.pkCard{padding:0 0 16px; overflow:hidden; width:min(440px,100%)}
+  .pkCard img{display:block; width:100%; aspect-ratio:16/9; object-fit:cover; background:#20202e}
+  .pkT{padding:12px 16px 4px; font-weight:700; font-size:15px; line-height:1.4; text-align:left}
+  .pkBtns{display:flex; flex-direction:column; gap:10px; padding:10px 16px 0}
+  .pkBtns.h{flex-direction:row} .pkBtns.h button{flex:1}
+  .pkBtns button{border:none; border-radius:12px; padding:14px 10px; font:inherit; font-weight:800; font-size:16px; color:#fff; background:linear-gradient(135deg,#7c3aed,#a855f7); letter-spacing:.3px}
+  .pkBtns button.y{background:linear-gradient(135deg,#f59e0b,#fbbf24); color:#2b1400}
+  .pkBtns button.r{background:#3a1520; color:#fecdd3; border:1px solid #7f1d1d}
+  .pkBtns button.g{background:#20202e; color:var(--ink); border:1px solid var(--line)}
+
+  /* ===== Máy tính bảng xoay ngang: trái tìm bài, phải bài đang hát + nút + bài kế tiếp (như SK Player) ===== */
+  #side{display:none}
+  body.wide{height:100vh; overflow:hidden; display:grid; grid-template-columns:minmax(0,1fr) clamp(300px,35vw,460px); grid-template-rows:auto minmax(0,1fr)}
+  body.wide #top{grid-column:1; grid-row:1; box-shadow:none}
+  body.wide #now, body.wide #tabQueue, body.wide #paneQueue, body.wide #dock{display:none !important}
+  body.wide .tabs{padding:6px 12px 8px} body.wide .tabs button{flex-direction:row; justify-content:center; gap:8px; padding:9px 8px}
+  body.wide .tabs .ti{font-size:19px} body.wide .tabs button.on .ti{font-size:20px}
+  body.wide #paneSearch, body.wide #paneOrder, body.wide #settings{grid-column:1; grid-row:2; overflow:auto; min-height:0}
+  body.wide .list{overflow:visible; padding-bottom:30px}
+  body.wide #odPane{padding-bottom:120px}
+  body.wide #odBar{right:clamp(300px,35vw,460px)}
+  body.wide #results, body.wide #khoSec{display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:12px; align-items:start}
+  body.wide #results > *, body.wide #khoSec > *{grid-column:1 / -1}
+  body.wide #results > .card, body.wide #khoSec > .card{grid-column:auto}
+  body.wide .card > .row, body.wide .row.card{flex-direction:column; align-items:stretch; gap:6px; border:none; background:#16161f; border-radius:12px; padding:0 0 10px; overflow:hidden}
+  body.wide .card > .row img, body.wide .row.card img{width:100%; height:auto; aspect-ratio:16/9; border-radius:0}
+  body.wide .card .meta{padding:0 10px}
+  body.wide .card .name{font-size:13.5px}
+  body.wide #paneSearch .card button.pick{display:none}
+  body.wide #side{display:flex; flex-direction:column; grid-column:2; grid-row:1 / span 2; min-height:0; background:#100e1c; border-left:1px solid var(--line)}
+  .sNow{position:relative; flex:0 0 auto}
+  .sNow .th{aspect-ratio:16/9; max-height:30vh; background:linear-gradient(135deg,#2a1856,#0e0b1c); display:flex; align-items:center; justify-content:center; overflow:hidden}
+  .sNow .th img{width:100%; height:100%; object-fit:cover; display:block}
+  .sNow .idle{color:#c4b5fd; font-weight:800; letter-spacing:.5px; font-size:15px}
+  .sNow .tt{padding:8px 12px; font-weight:800; font-size:14px; line-height:1.35; background:#1a1430; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden}
+  .sNow .tt .eq{margin-right:8px}
+  .sCtl{display:grid; grid-template-columns:repeat(6,1fr); gap:4px; padding:10px 8px 6px; border-bottom:1px solid var(--line)}
+  .sCtl button{background:none; border:none; color:var(--ink); display:flex; flex-direction:column; align-items:center; gap:4px; padding:4px 0; font:inherit}
+  .sCtl .i{width:46px; height:46px; border-radius:50%; background:#241d3d; border:1px solid #3b2f63; display:flex; align-items:center; justify-content:center}
+  .sCtl .i svg{width:24px; height:24px; fill:currentColor}
+  .sCtl button.primary .i{background:linear-gradient(135deg,#7c3aed,#c084fc); border:none; box-shadow:0 4px 14px rgba(139,92,246,.55)}
+  .sCtl button.off .i{color:#f87171}
+  .sCtl .l{font-size:11px; font-weight:700; color:#c9c9dc; white-space:nowrap}
+  .sCtl button:active .i{transform:scale(.92)}
+  .sVol{display:flex; justify-content:center; gap:6px; font-size:12px; color:var(--quiet); padding:4px 0 8px; border-bottom:1px solid var(--line)} .sVol b{color:#FFD21A}
+  .sHead{padding:10px 12px 6px; font-size:12.5px; font-weight:800; color:#FFD21A; letter-spacing:.6px}
+  .sList{flex:1; overflow:auto; padding:0 10px 16px; min-height:0}
+  .sList .row{padding:8px 4px} .sList .row img{width:96px; height:54px}
+  .roomOff #side .sCtl{opacity:.4; pointer-events:none}
 
   /* ===== Gọi phục vụ (nước có số lượng, dịch vụ bật/tắt) ===== */
   .tabs button.od{ color:#fde68a }
@@ -207,6 +261,22 @@
   <div id="odLsBox"></div>
   <div class="row2"><button id="odLsClose">Đóng</button></div>
 </div></div>
+
+<aside id="side">
+  <div class="sNow"><div class="th" id="sTh"><span class="idle">VUI LÒNG CHỌN BÀI HÁT</span></div><div class="tt" id="sTitle">—</div></div>
+  <div class="sCtl">
+    <button class="primary" id="sPlay"><span class="i"></span><span class="l">Phát</span></button>
+    <button id="sNext"><span class="i"></span><span class="l">Qua bài</span></button>
+    <button id="sReplay"><span class="i"></span><span class="l">Hát lại</span></button>
+    <button id="sMute"><span class="i"></span><span class="l">Tắt tiếng</span></button>
+    <button id="sDown"><span class="i"></span><span class="l">Giảm âm</span></button>
+    <button id="sUp"><span class="i"></span><span class="l">Tăng âm</span></button>
+  </div>
+  <div class="sVol">Âm lượng <b id="sVolN">–</b></div>
+  <div class="sHead">BÀI KẾ TIẾP (<span id="sCount">0</span>)</div>
+  <div class="sList" id="sList"></div>
+</aside>
+<div class="odOv" id="pk"><div class="odCard pkCard"><img id="pkImg" alt=""><div class="pkT" id="pkT"></div><div class="pkBtns" id="pkBtns"></div></div></div>
 
 <div id="dock">
   <div class="ctrlRow">
@@ -346,12 +416,12 @@ function parseYT(input){
 /* ---------- Hiển thị ---------- */
 function msg(text, err){ const b = $('results'); b.replaceChildren(); b.append(el('div', 'msg' + (err ? ' err' : ''), text)); }
 function rowEl(it, actions){
-  const row = el('div', 'row');
+  const row = el('div', 'row card tap');
   const img = document.createElement('img'); img.alt = ''; img.loading = 'lazy'; if(it.thumb) img.src = it.thumb;
   const meta = el('div', 'meta'); meta.append(el('div', 'name', it.title), el('div', 'sub', it.channel || ''));
   row.append(img, meta); actions.forEach(a => row.append(a)); return row;
 }
-function addToQueue(it, fresh){ send('add', { id:it.id, title:it.title }); upsert(it, fresh); if(fresh) renderLocal(); }
+function addToQueue(it, fresh, prio){ send('add', Object.assign({ id:it.id, title:it.title }, prio ? { prio:true } : {})); upsert(it, fresh); if(fresh) renderLocal(); }
 /* Báo nhận rõ ràng: nút đổi màu ngay, rồi chờ TV xác nhận (bài xuất hiện trong hàng chờ của TV) */
 let snackTimer = null;
 function snack(text, warn){
@@ -378,18 +448,36 @@ function confirmFromTv(s){
     snack(idx === s.cur ? '▶ Đang phát “' + p.title + '”' : '✓ Đã vào hàng chờ: “' + p.title + '” · thứ ' + ahead + ' trong hàng chờ');
   }
 }
+/* Hộp hỏi dùng chung (như SK Player): ảnh + tên bài + các nút */
+const thumbOf = id => /^[\w-]{11}$/.test(id || '') ? 'https://i.ytimg.com/vi/' + id + '/mqdefault.jpg' : '';
+function pickBox(title, thumb, buttons, horiz){
+  const img = $('pkImg'); if(thumb){ img.src = thumb; img.style.display = ''; } else img.style.display = 'none';
+  $('pkT').textContent = title;
+  const box = $('pkBtns'); box.replaceChildren(); box.classList.toggle('h', !!horiz);
+  buttons.forEach(([label, cls, fn]) => box.append(btn(label, cls, () => { closePick(); fn(); })));
+  $('pk').style.display = 'flex';
+}
+function closePick(){ $('pk').style.display = 'none'; }
+$('pk').addEventListener('click', e => { if(e.target === $('pk')) closePick(); });
 function addBtn(it, fresh){
-  const b = el('button', null, '＋ Chọn');
+  const b = el('button', 'pick', '＋ Chọn');
   let last = 0;
-  b.onclick = () => {
+  const add = prio => {
     const now = Date.now(); if(now - last < 700) return; last = now;          // chạm đúp vô tình: không thêm hai lần
-    addToQueue(it, fresh); reportPick(it.id); expectOnTv(it);
+    addToQueue(it, fresh, prio); reportPick(it.id); expectOnTv(it);
     try{ if(navigator.vibrate) navigator.vibrate(20); }catch(e){}
     b.textContent = '✓ Đã thêm'; b.classList.add('done');
     setTimeout(() => { b.textContent = '＋ Chọn'; b.classList.remove('done'); }, 2000);
   };
+  b.onclick = () => pickBox(it.title, it.thumb || thumbOf(it.id), [['CHỌN', '', () => add(false)], ['ƯU TIÊN', 'y', () => add(true)]]);
   return b;
 }
+/* Chạm vào cả dòng / thẻ bài cũng mở hộp chọn */
+$('paneSearch').addEventListener('click', e => {
+  if(e.target.closest('button, a, input, select')) return;
+  const row = e.target.closest('.row'); if(!row) return;
+  const b = row.querySelector('button.pick'); if(b) b.click();
+});
 function renderResults(items, title, extra){
   const box = $('results'); box.replaceChildren();
   const head = el('div', 'secHead'); head.append(el('b', null, title));
@@ -657,7 +745,7 @@ function suspectDead(id){
   }, 1500);
 }
 function khoRow(v, opts){
-  const it = kItem(v), row = el('div', 'row');
+  const it = kItem(v), row = el('div', 'row tap');
   row.dataset.vid = it.id;
   const img = document.createElement('img'); img.alt = ''; img.loading = 'lazy'; img.src = it.thumb;
   img.onload = () => { if(img.naturalWidth === 120 && img.naturalHeight === 90) suspectDead(it.id); };   // mqdefault thật là 320×180
@@ -668,7 +756,7 @@ function khoRow(v, opts){
   sub.append(document.createTextNode(fmtViews(v.views) + ' lượt xem' + (v.picks ? ' · chọn ' + v.picks + ' lần' : '') + ' · ' + it.channel));
   meta.append(el('div', 'name', it.title), sub);
   row.append(img, meta);
-  const wrap = el('div'); wrap.append(row);
+  const wrap = el('div', 'card'); wrap.append(row);
   if(opts.versions > 1){
     const vb = btn('▾ ' + (opts.versions - 1) + ' bản khác', 'more', async () => {
       const open = wrap.querySelector('.vers'); if(open){ open.remove(); vb.textContent = '▾ ' + (opts.versions - 1) + ' bản khác'; return; }
@@ -950,12 +1038,28 @@ const IC = {
 };
 $('replayBtn').innerHTML = IC.replay; $('playBtn').innerHTML = IC.play; $('nextBtn').innerHTML = IC.next; $('muteBtn').innerHTML = IC.vol;
 $('volLo').innerHTML = IC.low; $('volHi').innerHTML = IC.vol;
+[['sPlay', IC.play], ['sNext', IC.next], ['sReplay', IC.replay], ['sMute', IC.vol], ['sDown', IC.low], ['sUp', IC.vol]].forEach(([id, ic]) => { $(id).querySelector('.i').innerHTML = ic; });
+$('sPlay').onclick = () => send('play'); $('sNext').onclick = () => send('next'); $('sReplay').onclick = () => send('replay');
+$('sMute').onclick = () => $('muteBtn').click();
+function volStep(d){
+  const v = Math.max(0, Math.min(100, (+$('vol').value || 0) + d));
+  $('vol').value = v; volNum(v); volHold = Date.now(); volSend(v, true);
+}
+$('sDown').onclick = () => volStep(-5); $('sUp').onclick = () => volStep(5);
+/* Máy tính bảng xoay ngang (hoặc ?wide=1): bố cục hai cột như SK Player; điện thoại giữ dạng dọc */
+const WIDE_MQ = matchMedia('(orientation: landscape) and (min-width: 900px) and (min-height: 500px)');
+function applyWide(){
+  const w = params.get('wide') === '1' || (params.get('wide') !== '0' && WIDE_MQ.matches);
+  document.body.classList.toggle('wide', w);
+  if(w && curTab === 'queue') tab('search');
+}
+try{ WIDE_MQ.addEventListener('change', applyWide); }catch(e){ try{ WIDE_MQ.addListener(applyWide); }catch(e2){} }
 $('playBtn').onclick = () => send('play'); $('nextBtn').onclick = () => send('next');
 $('replayBtn').onclick = () => send('replay');
 $('muteBtn').onclick = () => { lastMuted = !lastMuted; paintMute(lastMuted); muteHold = Date.now(); send('mute'); };   // đổi icon ngay, TV xác nhận sau
 /* Âm lượng: trong lúc kéo và ngay sau khi thả, không để trạng thái cũ từ TV kéo thanh trượt về chỗ cũ */
 let volTimer, volDrag = false, volHold = 0, volSent = -1, muteHold = 0, lastMuted = false;
-const volNum = v => { $('volN').textContent = v; $('vol').style.setProperty('--p', v + '%'); };
+const volNum = v => { $('volN').textContent = v; $('sVolN').textContent = v; $('vol').style.setProperty('--p', v + '%'); };
 function volSend(v, now){
   clearTimeout(volTimer);
   const go = () => { if(v !== volSent){ volSent = v; send('vol', { value:v }); } };
@@ -965,7 +1069,8 @@ $('vol').addEventListener('input', e => { volHold = Date.now(); const v = +e.tar
 $('vol').addEventListener('change', e => { volHold = Date.now(); volSend(+e.target.value, true); });
 ['pointerdown','touchstart'].forEach(ev => $('vol').addEventListener(ev, () => { volDrag = true; volHold = Date.now(); }, { passive:true }));
 ['pointerup','pointercancel','touchend','touchcancel'].forEach(ev => window.addEventListener(ev, () => { if(volDrag){ volDrag = false; volHold = Date.now(); } }, { passive:true }));
-function paintMute(m){ $('muteBtn').innerHTML = m ? IC.mute : IC.vol; $('muteBtn').classList.toggle('off', !!m); }
+function paintMute(m){ $('muteBtn').innerHTML = m ? IC.mute : IC.vol; $('muteBtn').classList.toggle('off', !!m);
+  $('sMute').querySelector('.i').innerHTML = m ? IC.mute : IC.vol; $('sMute').classList.toggle('off', !!m); $('sMute').querySelector('.l').textContent = m ? 'Bật tiếng' : 'Tắt tiếng'; }
 
 /* ---------- Nhận trạng thái ---------- */
 bc.onmessage = ev => {
@@ -980,24 +1085,51 @@ bc.onmessage = ev => {
   $('playBtn').innerHTML = s.playing ? IC.pause : IC.play;
   if(Date.now() - muteHold > 1500){ lastMuted = !!s.muted; paintMute(lastMuted); }
   if(typeof s.volume === 'number' && !volDrag && Date.now() - volHold > 1500){ $('vol').value = s.volume; volNum(s.volume); volSent = s.volume; }
-  const q = s.queue || []; $('qCount').textContent = q.length;
+  const q = s.queue || [], cur = s.cur;
+  const up = q.filter((x, i) => i > cur).length;                      // số bài sắp hát (không tính bài đang hát)
+  $('qCount').textContent = q.length ? up + (cur >= 0 ? 1 : 0) : 0;
   confirmFromTv(s);
+  paintSide(s, q, cur);
   const box = $('queueList'); box.replaceChildren();
-  if(!q.length){ box.append(el('div', 'msg', 'Hàng chờ trống.')); return; }
-  q.forEach((it, i) => {
-    const isCur = i === s.cur, isDone = i < s.cur;
-    const row = el('div', 'row' + (isCur ? ' cur' : isDone ? ' done' : ''));
-    const meta = el('div', 'meta');
-    const sub = el('div', 'sub');
-    if(isCur){ const eq = el('span', 'eq'); eq.innerHTML = '<i></i><i></i><i></i>'; sub.append(eq, 'ĐANG HÁT'); }
-    else sub.textContent = isDone ? 'Đã hát' : 'Chờ';
-    meta.append(el('div', 'name', (i + 1) + '. ' + it.title), sub);
-    row.append(meta);
-    if(i > s.cur) row.append(btn('↑', 'ghost', () => send('prio', { index:i })));
-    row.append(btn('✕', 'ghost', () => send('remove', { index:i })));
-    box.append(row);
-  });
+  if(!q.length || (cur >= 0 && cur >= q.length)){ box.append(el('div', 'msg', 'Hàng chờ trống. Chọn bài ở tab Tìm bài.')); return; }
+  q.forEach((it, i) => { if(i >= Math.max(cur, 0)) box.append(queueRow(it, i, cur, i === cur ? null : i - Math.max(cur, 0))); });
 };
+/* Một dòng trong hàng chờ: chạm để mở hộp Ưu tiên / Đẩy lên / Xoá (bài đang hát: Hát lại / Qua bài) */
+function queueRow(it, i, cur, n){
+  const isCur = i === cur;
+  const row = el('div', 'row tap' + (isCur ? ' cur' : ''));
+  if(!isCur) row.append(el('div', 'num', String(n)));
+  const th = thumbOf(it.id);
+  if(th){ const img = document.createElement('img'); img.className = 'qth'; img.alt = ''; img.loading = 'lazy'; img.src = th; row.append(img); }
+  const meta = el('div', 'meta'), sub = el('div', 'sub');
+  if(isCur){ const eq = el('span', 'eq'); eq.innerHTML = '<i></i><i></i><i></i>'; sub.append(eq, 'ĐANG HÁT'); }
+  else sub.textContent = n === 1 ? 'Hát kế tiếp' : 'Chờ';
+  meta.append(el('div', 'name', it.title), sub); row.append(meta);
+  row.onclick = () => queueAsk(it, i, cur);
+  return row;
+}
+function queueAsk(it, i, cur){
+  if(i === cur) return pickBox(it.title, thumbOf(it.id), [['HÁT LẠI', '', () => send('replay')], ['QUA BÀI', 'y', () => send('next')]], true);
+  const b = [];
+  if(i > cur + 1) b.push(['ƯU TIÊN', 'y', () => { send('prio', { index:i }); snack('⏫ Hát ngay sau bài này: ' + it.title); }], ['ĐẨY LÊN', '', () => send('up', { index:i })]);
+  b.push(['XOÁ', 'r', () => send('remove', { index:i })]);
+  pickBox(it.title, thumbOf(it.id), b, true);
+}
+/* Cột phải trên máy tính bảng xoay ngang */
+function paintSide(s, q, cur){
+  const now = cur >= 0 ? q[cur] : null, th = $('sTh');
+  th.replaceChildren();
+  if(now && thumbOf(now.id)){ const img = document.createElement('img'); img.alt = ''; img.src = thumbOf(now.id); th.append(img); }
+  else th.append(el('span', 'idle', 'VUI LÒNG CHỌN BÀI HÁT'));
+  const tt = $('sTitle'); tt.replaceChildren();
+  if(now){ const eq = el('span', 'eq'); eq.innerHTML = '<i></i><i></i><i></i>'; tt.append(eq, now.title); } else tt.textContent = $('nowTitle').textContent;
+  $('sPlay').querySelector('.i').innerHTML = s.playing ? IC.pause : IC.play; $('sPlay').querySelector('.l').textContent = s.playing ? 'Dừng' : 'Phát';
+  const list = $('sList'); list.replaceChildren();
+  const nx = []; q.forEach((it, i) => { if(i > cur) nx.push([it, i]); });
+  $('sCount').textContent = nx.length;
+  if(!nx.length) list.append(el('div', 'msg', 'Chưa có bài kế tiếp.'));
+  nx.forEach(([it, i], k) => list.append(queueRow(it, i, cur, k + 1)));
+}
 
 /* ---------- Kênh phòng ---------- */
 const BANNER = {
@@ -1047,7 +1179,7 @@ $('roomTag').onclick = () => {
 };
 
 /* ---------- Khởi động ---------- */
-showQuota(); updateDetect(); renderLocal(); autoRefresh(); loadPlaylistNames(true); renderKho(); loadIndex();
+applyWide(); showQuota(); updateDetect(); renderLocal(); autoRefresh(); loadPlaylistNames(true); renderKho(); loadIndex();
 send('hello');
 </script>
 </body>
