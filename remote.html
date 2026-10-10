@@ -80,6 +80,8 @@
   .err{color:#fecdd3}
 
   #dock{position:fixed; left:0; right:0; bottom:0; background:rgba(21,21,31,.97); border-top:1px solid var(--line); padding:10px 16px calc(10px + env(safe-area-inset-bottom)); display:flex; flex-direction:column; gap:10px}
+  .ctrlRow .vn{min-width:26px; text-align:center; color:#FFD21A; font-size:14px; font-variant-numeric:tabular-nums}
+  @media (max-width:420px){ .ctrlRow{gap:6px !important} .ctrlRow button{width:42px !important; height:42px !important} .ctrlRow button svg{width:22px !important; height:22px !important} .ctrlRow button.primary{width:54px !important; height:54px !important} .ctrlRow .vn{min-width:24px; font-size:13px} }
   .ctrlRow{display:flex; gap:14px; align-items:center; justify-content:center}
   .ctrlRow button{width:54px; height:54px; flex:0 0 auto; background:#20202e; border:1px solid var(--line); color:var(--ink); border-radius:50%; display:flex; align-items:center; justify-content:center; padding:0}
   .ctrlRow button svg{width:26px; height:26px; fill:currentColor}
@@ -291,8 +293,11 @@
     <button class="primary" id="playBtn" aria-label="Phát / Dừng"></button>
     <button id="nextBtn" aria-label="Bài kế"></button>
     <button id="muteBtn" aria-label="Tắt / bật tiếng"></button>
+    <button id="dnBtn" aria-label="Giảm âm lượng"></button>
+    <b class="vn" id="volN">–</b>
+    <button id="upBtn" aria-label="Tăng âm lượng"></button>
   </div>
-  <div class="vol"><span class="vi" id="volLo"></span><input type="range" id="vol" min="0" max="100" value="100" aria-label="Âm lượng"><span class="vi" id="volHi"></span><b class="vn" id="volN">–</b></div>
+  <div class="vol" style="display:none"><span class="vi" id="volLo"></span><input type="range" id="vol" min="0" max="100" value="100" aria-label="Âm lượng"><span class="vi" id="volHi"></span></div>
 </div>
 
 <script>
@@ -1139,7 +1144,7 @@ const IC = {
   low:'<svg viewBox="0 0 24 24"><path d="M5 9v6h4l5 4V5L9 9z"/></svg>'
 };
 $('replayBtn').innerHTML = IC.replay; $('playBtn').innerHTML = IC.play; $('nextBtn').innerHTML = IC.next; $('muteBtn').innerHTML = IC.vol;
-$('volLo').innerHTML = IC.low; $('volHi').innerHTML = IC.vol;
+$('dnBtn').innerHTML = IC.low; $('upBtn').innerHTML = IC.vol; $('volLo').innerHTML = IC.low; $('volHi').innerHTML = IC.vol;
 [['sPlay', IC.play], ['sNext', IC.next], ['sReplay', IC.replay], ['sMute', IC.vol], ['sDown', IC.low], ['sUp', IC.vol]].forEach(([id, ic]) => { $(id).querySelector('.i').innerHTML = ic; });
 $('sPlay').onclick = () => send('play'); $('sNext').onclick = () => send('next'); $('sReplay').onclick = () => send('replay');
 $('sMute').onclick = () => $('muteBtn').click();
@@ -1147,7 +1152,7 @@ function volStep(d){
   const v = Math.max(0, Math.min(100, (+$('vol').value || 0) + d));
   $('vol').value = v; volNum(v); volHold = Date.now(); volSend(v, true);
 }
-$('sDown').onclick = () => volStep(-5); $('sUp').onclick = () => volStep(5);
+$('sDown').onclick = $('dnBtn').onclick = () => volStep(-5); $('sUp').onclick = $('upBtn').onclick = () => volStep(5);
 /* Máy tính bảng xoay ngang (hoặc ?wide=1): bố cục hai cột như SK Player; điện thoại giữ dạng dọc */
 const WIDE_MQ = matchMedia('(orientation: landscape) and (min-width: 900px) and (min-height: 500px)');
 function applyWide(){
