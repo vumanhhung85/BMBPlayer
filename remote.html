@@ -73,6 +73,7 @@
   .notice{background:#16142a; border:1px solid #2f2850; border-radius:12px; padding:10px 12px; margin:10px 0 4px; font-size:14px; line-height:1.5}
   .notice .secAct{margin-top:8px}
   .opt.low{color:var(--warn)}
+  .feedEnd{text-align:center; color:var(--quiet); font-size:13px; padding:14px 0 24px; min-height:2px}
   .vers{padding:0 0 6px 18px; border-left:2px solid var(--accent); margin:2px 0 8px}
   .vers .row img{width:72px; height:40px}
   .msg{color:var(--quiet); text-align:center; padding:26px 0; line-height:1.6}
@@ -788,29 +789,64 @@ function khoRow(v, opts){
   return wrap;
 }
 let hotCache = null, sugCache = [], hotAll = false, khoTimer = null, khoSeq = 0, lastKho = { q:null, n:0 };
+/* Cuộn xuống tới đáy thì tự nạp thêm: bài hot → bài khách hay chọn / mới / nhiều lượt xem (lọc trùng) */
+let feed = null, feedIO = null;
+function feedReset(){ feed = null; if(feedIO){ feedIO.disconnect(); feedIO = null; } }
+function feedStart(box, seq){
+  feedReset();
+  feed = { hot:0, more:null, mi:0, seen:new Set(), loading:false, done:false, box, seq, sent:el('div', 'feedEnd', '') };
+  box.append(feed.sent);
+  feedMore(true);
+  if('IntersectionObserver' in window){
+    feedIO = new IntersectionObserver(es => { if(es.some(e => e.isIntersecting)) feedMore(); }, { rootMargin:'600px 0px' });
+    feedIO.observe(feed.sent);
+  }
+}
+async function feedMore(first){
+  const f = feed; if(!f || f.loading || f.done || f.seq !== khoSeq) return;
+  f.loading = true;
+  try{
+    const N = first ? 15 : 20;
+    if(f.hot < hotCache.length){
+      const part = hotCache.slice(f.hot, f.hot + N);
+      part.forEach((h, i) => { f.seen.add(h.best.id); f.box.insertBefore(khoRow(h.best, { rank:f.hot + i + 1, versions:h.versions, key:h.key, tone:null }), f.sent); });
+      f.hot += part.length;
+    }else{
+      if(!f.more){
+        f.sent.textContent = 'Đang tải thêm…';
+        let d; try{ d = await kapi('/api/kho/new'); }catch(e){ d = { items:[] }; }
+        if(feed !== f) return;
+        f.more = (d.items || []).filter(v => !f.seen.has(v.id));
+        if(f.more.length) f.box.insertBefore(khoHead('⭐ Khách hay chọn · bài mới · nhiều lượt xem'), f.sent);
+      }
+      const part = f.more.slice(f.mi, f.mi + N);
+      part.forEach(v => { f.seen.add(v.id); f.box.insertBefore(khoRow(v, {}), f.sent); });
+      f.mi += part.length;
+      if(f.mi >= f.more.length){ f.done = true; f.sent.textContent = f.more.length ? 'Đã hết gợi ý. Gõ tên bài để tìm thêm.' : ''; }
+      else f.sent.textContent = '';
+    }
+  }finally{ f.loading = false; }
+  // màn hình còn trống (tablet to) → nạp tiếp cho đầy
+  if(feed === f && !f.done && f.sent.getBoundingClientRect().top < innerHeight + 500) setTimeout(() => feedMore(), 50);
+}
 function khoHead(title, act){ const head = el('div', 'secHead'); head.append(el('b', null, title)); if(act){ const a = el('span', 'secAct'); a.append(act); head.append(a); } return head; }
 async function renderKho(){
   const box = $('khoSec');
   if(!hasKho()){ box.replaceChildren(); return 0; }
   const raw = $('q').value.trim(), p = parseYT(raw), seq = ++khoSeq;
   if(raw !== gateFor && gateFor){ gateFor = ''; if($('results').querySelector('.notice')) $('results').replaceChildren(); }
+  if(raw) feedReset();
   if(p.vid || p.list){ box.replaceChildren(); return 0; }
   try{
     if(!raw){
       if(!hotCache){
         box.replaceChildren(khoHead('🔥 Bài hot'), el('div', 'hint', 'Đang tải…'));
-        const d = await kapi('/api/kho/hot?limit=40'); hotCache = d.items || []; sugCache = d.suggest || []; setQuota(d.quota);
+        const d = await kapi('/api/kho/hot?limit=100'); feedReset(); hotCache = d.items || []; sugCache = d.suggest || []; setQuota(d.quota);
       }
       if(seq !== khoSeq) return 0;
       box.replaceChildren(khoHead('🔥 Bài hot (' + hotCache.length + ')', btn('↻', 'ghost', () => { hotCache = null; renderKho(); })));
       if(!hotCache.length && !sugCache.length) box.append(el('div', 'msg', 'Kho chưa có bài. Thêm kênh karaoke ở trang kho.html, kho sẽ tự đầy dần.'));
-      const show = n => { hotCache.slice(0, n).forEach((h, i) => box.append(khoRow(h.best, { rank:i + 1, versions:h.versions, key:h.key, tone:null }))); };
-      if(hotCache.length > 15 && !hotAll){ show(15); box.append(btn('Xem thêm ' + (hotCache.length - 15) + ' bài hot', 'ghost', () => { hotAll = true; renderKho(); })); }
-      else show(hotCache.length);
-      if(hotCache.length < 10 && sugCache.length){
-        box.append(khoHead('🎵 Gợi ý từ kho'));
-        sugCache.forEach(v => box.append(khoRow(v, {})));
-      }
+      feedStart(box, seq);
       return 0;
     }
     if(raw.length < 2){ box.replaceChildren(); lastKho = { q:raw, n:0 }; return 0; }
