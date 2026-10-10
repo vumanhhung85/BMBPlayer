@@ -829,6 +829,47 @@ async function feedMore(first){
   // màn hình còn trống (tablet to) → nạp tiếp cho đầy
   if(feed === f && !f.done && f.sent.getBoundingClientRect().top < innerHeight + 500) setTimeout(() => feedMore(), 50);
 }
+/* Kết quả tìm: ít bài (≤ 6 nhóm) → trải phẳng MỌI bản phối, xếp theo lượt xem YouTube giảm dần (đan xen các nhóm) để khách thấy hết;
+   nhiều bài → gom nhóm như cũ, bấm "… bản khác" mở hộp chọn bản. Cuộn xuống tới đáy thì nạp tiếp. */
+const FLAT_MAX_GROUPS = 6, FLAT_CAP = 150, versCache = new Map();
+async function versionsOf(key, tone){
+  const k = key + '|' + tone; if(versCache.has(k)) return versCache.get(k);
+  const d = await kapi('/api/kho/versions?key=' + encodeURIComponent(key) + (tone != null ? '&tone=' + encodeURIComponent(tone) : ''));
+  const items = d.items || []; versCache.set(k, items); return items;
+}
+async function showGroups(box, groups, seq, suffix){
+  const n = groups.length, head = t => khoHead('Kho karaoke (' + t + suffix + ')');
+  const grouped = () => {
+    box.replaceChildren(head(n + (n >= 30 ? '+' : '') + ' bài'));
+    groups.forEach(x => box.append(khoRow(x.best, { versions:x.versions, key:x.key, tone:x.tone })));
+  };
+  if(n > FLAT_MAX_GROUPS || !groups.some(x => x.versions > 1)){ grouped(); return; }
+  box.replaceChildren(head(n + ' bài'), el('div', 'hint', 'Đang liệt kê đủ các bản phối…'));
+  let rows;
+  try{
+    const lists = await Promise.all(groups.map(x => x.versions > 1 ? versionsOf(x.key, x.tone != null ? x.tone : null) : Promise.resolve([x.best])));
+    const seen = new Set(); rows = [];
+    lists.forEach(l => l.forEach(v => { if(v && !seen.has(v.id)){ seen.add(v.id); rows.push(v); } }));
+  }catch(e){ if(seq === khoSeq) grouped(); return; }
+  if(seq !== khoSeq) return;
+  rows.sort((a, b) => (b.views || 0) - (a.views || 0));
+  rows = rows.slice(0, FLAT_CAP);
+  feedReset();
+  box.replaceChildren(head(rows.length + ' bản phối · nhiều lượt xem xếp trước'));
+  const sent = el('div', 'feedEnd', ''); box.append(sent);
+  let i = 0;
+  const more = () => {
+    if(seq !== khoSeq) return;
+    rows.slice(i, i + 30).forEach(v => box.insertBefore(khoRow(v, {}), sent)); i += 30;
+    if(i >= rows.length){ if(feedIO){ feedIO.disconnect(); feedIO = null; } sent.textContent = ''; }
+    else if(sent.getBoundingClientRect().top < innerHeight + 500) setTimeout(more, 50);
+  };
+  more();
+  if(i < rows.length && 'IntersectionObserver' in window){
+    feedIO = new IntersectionObserver(es => { if(es.some(e => e.isIntersecting)) more(); }, { rootMargin:'600px 0px' });
+    feedIO.observe(sent);
+  }
+}
 function khoHead(title, act){ const head = el('div', 'secHead'); head.append(el('b', null, title)); if(act){ const a = el('span', 'secAct'); a.append(act); head.append(a); } return head; }
 async function renderKho(){
   const box = $('khoSec');
@@ -853,17 +894,15 @@ async function renderKho(){
     const loc = localKho(raw, 30);
     if(loc && loc.length){
       lastKho = { q:raw, n:loc.length };
-      box.replaceChildren(khoHead('Kho karaoke (' + loc.length + (loc.length >= 30 ? '+' : '') + ' bài · trên máy)'));
-      loc.forEach(g => box.append(khoRow({ id:g.id, title:g.title, channel:g.channel, tone:g.tone, views:g.views, picks:g.picks }, { versions:g.versions, key:g.key, tone:g.tone })));
+      await showGroups(box, loc.map(g => ({ best:{ id:g.id, title:g.title, channel:g.channel, tone:g.tone, views:g.views, picks:g.picks }, versions:g.versions, key:g.key, tone:g.tone })), seq, ' · trên máy');
       return loc.length;
     }
     const d = await kapi('/api/kho/search?q=' + encodeURIComponent(raw) + '&limit=30');
     if(seq !== khoSeq) return 0;
     const g = d.groups || [];
     lastKho = { q:raw, n:g.length };
-    box.replaceChildren(khoHead('Kho karaoke (' + g.length + (g.length >= 30 ? '+' : '') + ' bài)'));
-    if(!g.length){ box.append(el('div', 'msg', quotaLeft() === 0 ? 'Kho chưa có bài khớp. Hôm nay đã hết lượt tìm YouTube, bấm Tìm để xem bài gần giống trong kho.' : 'Kho chưa có bài khớp. Bấm Tìm để tìm trên YouTube; bài tìm được sẽ tự vào kho.')); return 0; }
-    g.forEach(x => box.append(khoRow(x.best, { versions:x.versions, key:x.key, tone:x.tone })));
+    if(!g.length){ box.replaceChildren(khoHead('Kho karaoke (0 bài)'), el('div', 'msg', quotaLeft() === 0 ? 'Kho chưa có bài khớp. Hôm nay đã hết lượt tìm YouTube, bấm Tìm để xem bài gần giống trong kho.' : 'Kho chưa có bài khớp. Bấm Tìm để tìm trên YouTube; bài tìm được sẽ tự vào kho.')); return 0; }
+    await showGroups(box, g, seq, '');
     return g.length;
   }catch(e){
     if(seq !== khoSeq) return 0;
