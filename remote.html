@@ -1,0 +1,1305 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>BMBPlayer — Chọn bài & gọi phục vụ</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#0a0a0f">
+<style>
+  :root{ --bg:#0a0a0f; --panel:#15151f; --line:#2a2a3a; --ink:#f2f2f7; --quiet:#9a9ab0; --accent:#8b5cf6; --accent2:#c084fc; --good:#34d399; --warn:#fbbf24; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg); color:var(--ink); font-family:-apple-system,"Segoe UI",Roboto,Arial,sans-serif; min-height:100vh; display:flex; flex-direction:column}
+  #top{position:sticky; top:0; z-index:30; background:var(--bg); box-shadow:0 6px 18px rgba(0,0,0,.45)}
+  header{padding:8px 14px; background:linear-gradient(135deg,#1a1530,#0a0a0f); display:flex; align-items:center; gap:10px}
+  .logoImg{height:34px; width:auto; display:block}
+  header .room{margin-left:auto; background:linear-gradient(135deg,#FFD21A,#f5b800); color:#4a148c; font-size:14px; font-weight:900; padding:5px 14px; border-radius:999px; letter-spacing:.3px}
+  #gear{background:none; border:1px solid var(--line); color:var(--ink); border-radius:10px; padding:6px 10px; font-size:14px}
+
+  #now{padding:8px 14px; background:#16102a; border-top:1px solid var(--line); display:flex; align-items:center; gap:10px; font-size:14px}
+  #now .ic{flex:0 0 auto; width:26px; height:26px; border-radius:50%; background:linear-gradient(135deg,var(--accent),var(--accent2)); display:flex; align-items:center; justify-content:center; font-size:14px}
+  #now .t{font-weight:700; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; min-width:0}
+
+  #settings{display:none; padding:12px 16px; background:var(--panel); border-bottom:1px solid var(--line); font-size:13px; line-height:1.6}
+  #settings input{width:100%; background:#0e0e16; border:1px solid var(--line); color:var(--ink); border-radius:10px; padding:10px; font-size:14px; margin:6px 0}
+  #settings button{background:var(--accent); border:none; color:#fff; font-weight:700; border-radius:10px; padding:8px 14px; margin-top:4px}
+  #settings .hint{color:var(--quiet)}
+
+  .tabs{display:flex; gap:8px; padding:8px 10px 10px; background:var(--bg)}
+  .tabs button{flex:1; min-width:0; background:#14141c; border:1px solid var(--line); color:#7c7c92; padding:9px 4px 8px; border-radius:14px; font:inherit; font-weight:700; display:flex; flex-direction:column; align-items:center; gap:2px; opacity:.85}
+  .tabs .ti{font-size:21px; line-height:1; filter:grayscale(.7)} .tabs .tl{font-size:13px; white-space:nowrap}
+  .tabs .cnt{display:inline-block; min-width:20px; padding:0 6px; border-radius:99px; background:#2a2a3a; color:var(--ink); font-size:12px; line-height:19px}
+  .tabs button.on{background:linear-gradient(135deg,#7c3aed,#a855f7); border-color:#c4a1ff; color:#fff; opacity:1; box-shadow:0 4px 16px rgba(139,92,246,.55)}
+  .tabs button.on .ti{filter:none; font-size:23px} .tabs button.on .tl{font-size:14px} .tabs button.on .cnt{background:#fff; color:#6d28d9}
+  .tabs button.od{color:#a98a3a}
+  .tabs button.od.on{background:linear-gradient(135deg,#f59e0b,#fbbf24); border-color:#fde68a; color:#2b1400; box-shadow:0 4px 16px rgba(245,158,11,.5)}
+
+  #searchBox{display:flex; gap:8px; padding:12px 16px}
+  #searchBox input{flex:1; background:var(--panel); border:1px solid var(--line); color:var(--ink); border-radius:12px; padding:12px 14px; font-size:16px}
+  #searchBox button{background:linear-gradient(135deg,#7c3aed,#a855f7); border:none; color:#fff; font-weight:700; border-radius:12px; padding:0 18px; font-size:20px}
+  #detect{display:none; gap:8px; padding:0 16px 8px; flex-wrap:wrap}
+  #detect button, .secAct button{background:var(--accent); border:none; color:#fff; font-weight:700; border-radius:10px; padding:8px 12px; font-size:13px}
+  .secAct button.ghost{background:#20202e; border:1px solid var(--line)}
+  .opt{padding:0 16px 6px; color:var(--quiet); font-size:13px; display:flex; align-items:center; gap:8px; line-height:1.4}
+
+  .list{flex:1; overflow:auto; padding:0 16px 210px}
+  .secHead{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:14px 0 6px; font-size:14px}
+  .secAct{display:flex; gap:6px; flex:0 0 auto}
+  .hint{color:var(--quiet); font-size:12px; padding:0 0 6px; line-height:1.5}
+  .row{display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--line)}
+  .row img{width:96px; height:54px; object-fit:cover; border-radius:8px; background:#20202e; flex:0 0 auto}
+  .row .meta{flex:1; min-width:0}
+  .row .name{font-weight:600; font-size:14px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden}
+  .row .sub{color:var(--quiet); font-size:12px; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .row button{background:var(--accent); border:none; color:#fff; font-weight:700; border-radius:10px; padding:9px 12px; font-size:13px; flex:0 0 auto}
+  .row button.ghost{background:#20202e; border:1px solid var(--line)}
+  .row button.done{background:#059669}
+  #snack{position:fixed; left:50%; top:12px; transform:translate(-50%,-140%); z-index:50; max-width:calc(100% - 24px); background:#14532d; border:1px solid #22c55e; color:#dcfce7;
+    padding:10px 16px; border-radius:12px; font-size:14px; font-weight:600; box-shadow:0 8px 30px rgba(0,0,0,.5); transition:transform .25s; pointer-events:none; text-align:center}
+  #snack.show{transform:translate(-50%,0)}
+  #snack.warn{background:#3a2a10; border-color:#fbbf24; color:#fef3c7}
+  .row.cur{background:linear-gradient(135deg,#2a1856,#1b1530); border:2px solid #FFD21A; border-radius:14px; padding:10px 10px; margin:8px 0; box-shadow:0 0 0 3px rgba(255,210,26,.18),0 6px 22px rgba(139,92,246,.45)}
+  .row.cur .name{color:#fff; font-size:15px}
+  .row.cur .sub{color:#FFD21A; font-weight:800; letter-spacing:.5px}
+  .row.done{opacity:.4}
+  .eq{display:inline-flex; align-items:flex-end; gap:2px; height:12px; margin-right:6px; vertical-align:-1px} .eq i{display:block; width:3px; background:#FFD21A; border-radius:1px; animation:eq 1s ease-in-out infinite} .eq i:nth-child(1){height:60%} .eq i:nth-child(2){height:100%; animation-delay:.2s} .eq i:nth-child(3){height:45%; animation-delay:.4s}
+  @keyframes eq{50%{transform:scaleY(.35)}}
+  .row .tag{display:inline-block; font-size:11px; font-weight:700; padding:1px 7px; border-radius:999px; background:#2a2140; color:var(--accent2); margin-right:4px}
+  .row .tag.hot{background:#3a1f12; color:#fdba74}
+  .row.dead{opacity:.45} .row.dead .name{text-decoration:line-through}
+  .row .gone{color:#fca5a5; font-size:12px; font-weight:700; flex:0 0 auto; max-width:90px; text-align:right}
+  .row .more{background:none; border:none; color:var(--accent2); font-size:12px; font-weight:700; padding:4px 0 0; display:block}
+  .notice{background:#16142a; border:1px solid #2f2850; border-radius:12px; padding:10px 12px; margin:10px 0 4px; font-size:14px; line-height:1.5}
+  .notice .secAct{margin-top:8px}
+  .opt.low{color:var(--warn)}
+  .feedEnd{text-align:center; color:var(--quiet); font-size:13px; padding:14px 0 24px; min-height:2px}
+  .vers{padding:0 0 6px 18px; border-left:2px solid var(--accent); margin:2px 0 8px}
+  .vers .row img{width:72px; height:40px}
+  .msg{color:var(--quiet); text-align:center; padding:26px 0; line-height:1.6}
+  .err{color:#fecdd3}
+
+  #dock{position:fixed; left:0; right:0; bottom:0; background:rgba(21,21,31,.97); border-top:1px solid var(--line); padding:10px 16px calc(10px + env(safe-area-inset-bottom)); display:flex; flex-direction:column; gap:10px}
+  .ctrlRow .vn{min-width:26px; text-align:center; color:#FFD21A; font-size:14px; font-variant-numeric:tabular-nums}
+  @media (max-width:420px){ .ctrlRow{gap:6px !important} .ctrlRow button{width:42px !important; height:42px !important} .ctrlRow button svg{width:22px !important; height:22px !important} .ctrlRow button.primary{width:54px !important; height:54px !important} .ctrlRow .vn{min-width:24px; font-size:13px} }
+  .ctrlRow{display:flex; gap:14px; align-items:center; justify-content:center}
+  .ctrlRow button{width:54px; height:54px; flex:0 0 auto; background:#20202e; border:1px solid var(--line); color:var(--ink); border-radius:50%; display:flex; align-items:center; justify-content:center; padding:0}
+  .ctrlRow button svg{width:26px; height:26px; fill:currentColor}
+  .ctrlRow button.primary{width:68px; height:68px; background:linear-gradient(135deg,#7c3aed,#c084fc); border:none; box-shadow:0 6px 20px rgba(139,92,246,.6)} .ctrlRow button.primary svg{width:34px; height:34px}
+  .ctrlRow button:active{transform:scale(.94)} .ctrlRow button.off{color:#f87171}
+  .vol{display:flex; align-items:center; gap:12px; padding:0 4px}
+  .vol .vn{min-width:30px; text-align:right; color:#FFD21A; font-size:15px; font-variant-numeric:tabular-nums}
+  .vol input{-webkit-appearance:none; appearance:none; background:transparent; touch-action:none}
+  .vol input::-webkit-slider-runnable-track{height:8px; border-radius:99px; background:linear-gradient(90deg,#7c3aed,#c084fc var(--p,100%),#2c2c3c var(--p,100%))}
+  .vol input::-webkit-slider-thumb{-webkit-appearance:none; width:26px; height:26px; margin-top:-9px; border-radius:50%; background:#fff; border:3px solid #a855f7; box-shadow:0 2px 8px rgba(0,0,0,.5)}
+  .vol .vi{color:var(--quiet); display:flex} .vol .vi svg{width:20px; height:20px; fill:currentColor} .vol input{flex:1; accent-color:#a855f7; height:28px}
+  .roomOff #dock{ opacity:.4; pointer-events:none }
+  .row.tap{cursor:pointer} .row.tap:active{background:#1c1830}
+  .row .num{flex:0 0 auto; width:26px; text-align:center; color:var(--quiet); font-weight:800; font-size:14px}
+  .row img.qth{width:80px; height:45px}
+
+  /* ===== Hộp hỏi khi chọn bài / bấm bài trong hàng chờ (như SK Player) ===== */
+  .odCard.vmCard{padding:0; width:min(480px,100%); height:min(560px,calc(100vh - 36px)); max-height:none; display:flex; flex-direction:column; overflow:hidden; text-align:left}
+  .vmH{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 14px; border-bottom:1px solid var(--line)}
+  .vmH b{display:block; font-size:16px} .vmH small{color:var(--quiet); font-size:12px}
+  .vmH button{border:none; background:#20202e; color:#fff; border-radius:50%; width:34px; height:34px; font-size:16px}
+  .vmList{flex:1; overflow:auto; padding:6px 8px 10px} .vmList .card{margin:0}
+  .odCard.pkCard{padding:0 0 16px; overflow:hidden; width:min(440px,100%)}
+  .pkCard img{display:block; width:100%; aspect-ratio:16/9; object-fit:cover; background:#20202e}
+  .pkT{padding:12px 16px 4px; font-weight:700; font-size:15px; line-height:1.4; text-align:left}
+  .pkBtns{display:flex; flex-direction:column; gap:10px; padding:10px 16px 0}
+  .pkBtns.h{flex-direction:row} .pkBtns.h button{flex:1}
+  .pkBtns button{border:none; border-radius:12px; padding:14px 10px; font:inherit; font-weight:800; font-size:16px; color:#fff; background:linear-gradient(135deg,#7c3aed,#a855f7); letter-spacing:.3px}
+  .pkBtns button.y{background:linear-gradient(135deg,#f59e0b,#fbbf24); color:#2b1400}
+  .pkBtns button.r{background:#3a1520; color:#fecdd3; border:1px solid #7f1d1d}
+  .pkBtns button.g{background:#20202e; color:var(--ink); border:1px solid var(--line)}
+
+  /* ===== Máy tính bảng xoay ngang: trái tìm bài, phải bài đang hát + nút + bài kế tiếp (như SK Player) ===== */
+  #side{display:none}
+  body.wide{height:100vh; overflow:hidden; display:grid; grid-template-columns:minmax(0,1fr) clamp(300px,35vw,460px); grid-template-rows:auto minmax(0,1fr)}
+  body.wide #top{grid-column:1; grid-row:1; box-shadow:none}
+  body.wide #now, body.wide #tabQueue, body.wide #paneQueue, body.wide #dock{display:none !important}
+  body.wide .tabs{padding:6px 12px 8px} body.wide .tabs button{flex-direction:row; justify-content:center; gap:8px; padding:9px 8px}
+  body.wide .tabs .ti{font-size:19px} body.wide .tabs button.on .ti{font-size:20px}
+  body.wide #paneSearch, body.wide #paneOrder, body.wide #settings{grid-column:1; grid-row:2; overflow:auto; min-height:0}
+  body.wide .list{overflow:visible; padding-bottom:30px}
+  body.wide #odPane{padding-bottom:120px}
+  body.wide #odBar{right:clamp(300px,35vw,460px)}
+  body.wide #results, body.wide #khoSec{display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:12px; align-items:start}
+  body.wide #results > *, body.wide #khoSec > *{grid-column:1 / -1}
+  body.wide #results > .card, body.wide #khoSec > .card{grid-column:auto}
+  body.wide .card > .row, body.wide .row.card{flex-direction:column; align-items:stretch; gap:6px; border:none; background:#16161f; border-radius:12px; padding:0 0 10px; overflow:hidden}
+  body.wide .card > .row img, body.wide .row.card img{width:100%; height:auto; aspect-ratio:16/9; border-radius:0}
+  body.wide .card .meta{padding:0 10px}
+  body.wide .card .name{font-size:13.5px}
+  /* Không còn nút "Chọn": chạm vào cả dòng/thẻ bài để chọn (rowTap bấm nút ẩn này) */
+  button.pick{display:none !important}
+  body.wide #side{display:flex; flex-direction:column; grid-column:2; grid-row:1 / span 2; min-height:0; background:#100e1c; border-left:1px solid var(--line)}
+  .sNow{position:relative; flex:0 0 auto}
+  .sNow .th{aspect-ratio:16/9; max-height:30vh; background:linear-gradient(135deg,#2a1856,#0e0b1c); display:flex; align-items:center; justify-content:center; overflow:hidden}
+  .sNow .th img{width:100%; height:100%; object-fit:cover; display:block}
+  .sNow .idle{color:#c4b5fd; font-weight:800; letter-spacing:.5px; font-size:15px}
+  .sNow .tt{padding:8px 12px; font-weight:800; font-size:14px; line-height:1.35; background:#1a1430; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden}
+  .sNow .tt .eq{margin-right:8px}
+  .sCtl{display:grid; grid-template-columns:repeat(6,1fr); gap:4px; padding:10px 8px 6px; border-bottom:1px solid var(--line)}
+  .sCtl button{background:none; border:none; color:var(--ink); display:flex; flex-direction:column; align-items:center; gap:4px; padding:4px 0; font:inherit}
+  .sCtl .i{width:46px; height:46px; border-radius:50%; background:#241d3d; border:1px solid #3b2f63; display:flex; align-items:center; justify-content:center}
+  .sCtl .i svg{width:24px; height:24px; fill:currentColor}
+  .sCtl button.primary .i{background:linear-gradient(135deg,#7c3aed,#c084fc); border:none; box-shadow:0 4px 14px rgba(139,92,246,.55)}
+  .sCtl button.off .i{color:#f87171}
+  .sCtl .l{font-size:11px; font-weight:700; color:#c9c9dc; white-space:nowrap}
+  .sCtl button:active .i{transform:scale(.92)}
+  .sVol{display:flex; justify-content:center; gap:6px; font-size:12px; color:var(--quiet); padding:4px 0 8px; border-bottom:1px solid var(--line)} .sVol b{color:#FFD21A}
+  .sHead{padding:10px 12px 6px; font-size:12.5px; font-weight:800; color:#FFD21A; letter-spacing:.6px}
+  .sList{flex:1; overflow:auto; padding:0 10px 16px; min-height:0}
+  .sList .row{padding:8px 4px} .sList .row img{width:96px; height:54px}
+  .roomOff #side .sCtl{opacity:.4; pointer-events:none}
+
+  /* ===== Gọi phục vụ (nước có số lượng, dịch vụ bật/tắt) ===== */
+  .tabs button.od{ color:#fde68a }
+  .tabs button.od.on{ color:var(--ink); border-bottom-color:#f59e0b }
+  #odPane{ padding:6px 16px 170px }
+  .tabs button.od .tl{ color:inherit }
+  .odH{ font-size:13px; color:var(--quiet); font-weight:700; letter-spacing:.4px; margin:16px 2px 8px }
+  .svgrid{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px }
+  @media(min-width:520px){ .svgrid{ grid-template-columns:repeat(3,1fr) } }
+  .svbtn{ background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:14px 8px; display:flex; flex-direction:column; align-items:center; gap:6px; cursor:pointer; color:var(--ink); font:inherit }
+  .svbtn .ico{ font-size:26px; line-height:1 } .svbtn .tx{ font-size:13.5px; font-weight:600; text-align:center; line-height:1.3 }
+  .svbtn.on{ border-color:#f59e0b; background:#2a2010 } .svbtn.on .tx{ color:#fde68a }
+  .drow{ display:flex; align-items:center; justify-content:space-between; gap:10px; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:9px 10px 9px 14px; margin-bottom:8px }
+  .drow.on{ border-color:#f59e0b }
+  .drow .di{ display:flex; align-items:center; gap:10px; min-width:0 } .drow .dic{ font-size:22px } .drow .dtx{ font-size:15px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+  .qty{ display:flex; align-items:center; gap:4px; flex:0 0 auto }
+  .qty button{ width:36px; height:36px; border-radius:10px; border:1px solid var(--line); background:#20202e; color:var(--ink); font-size:19px; font-weight:800 }
+  .qty button:disabled{ opacity:.3 } .qty .qn{ width:26px; text-align:center; font-weight:800; font-size:17px; color:var(--quiet) } .drow.on .qn{ color:#fde68a }
+  #odNote{ width:100%; margin-top:14px; background:var(--panel); border:1px solid var(--line); color:var(--ink); border-radius:12px; padding:11px 13px; font:inherit; font-size:15px; resize:none; height:68px }
+  .odTiny{ color:var(--quiet); font-size:12px; text-align:center; margin-top:14px; line-height:1.6 }
+  .lsbtn{ display:block; width:100%; margin:10px 0 2px; padding:11px 14px; border-radius:12px; border:1px dashed var(--line); background:#14141c; color:var(--quiet); font:inherit; font-weight:700; font-size:14px }
+  #odBar{ position:fixed; left:0; right:0; bottom:0; z-index:20; background:var(--panel); border-top:1px solid var(--line); padding:10px 12px calc(10px + env(safe-area-inset-bottom)); display:none; gap:8px; align-items:center }
+  #odBar .sum{ flex:1; min-width:0; font-size:13px; color:var(--quiet); line-height:1.35 }
+  #odBar button{ border:none; border-radius:12px; padding:13px 16px; font-weight:800; font-size:15px; color:#fff; background:#20202e }
+  #odBar #odSendBtn{ background:linear-gradient(135deg,#f59e0b,#fbbf24); color:#2b1400 } #odBar button:disabled{ opacity:.5 }
+  .odOv{ position:fixed; inset:0; z-index:60; background:rgba(0,0,0,.72); display:none; align-items:center; justify-content:center; padding:18px }
+  .odCard{ background:var(--panel); border:1px solid var(--line); border-radius:18px; padding:22px 18px; width:min(420px,100%); max-height:calc(100vh - 36px); overflow:auto; text-align:center }
+  .odCard h3{ margin:0 0 6px; font-size:19px } .odCard p{ color:var(--quiet); font-size:14px; margin:0 0 12px; line-height:1.5 }
+  .odCard .row2{ display:flex; gap:8px; margin-top:14px } .odCard .row2 button{ flex:1; border:none; border-radius:12px; padding:12px; font-weight:700; color:#fff; background:#20202e }
+  .odCard .row2 .y{ background:linear-gradient(135deg,#f59e0b,#fbbf24); color:#2b1400 }
+  .odDot{ display:inline-block; width:9px; height:9px; border-radius:5px; background:#fbbf24; margin-right:7px } .odDot.go{ background:var(--good) }
+  .lsit{ border:1px solid var(--line); border-radius:12px; padding:9px 12px; margin-bottom:8px; text-align:left }
+  .lsit .h{ display:flex; justify-content:space-between; font-size:12px; color:var(--quiet) } .lsit .b{ font-size:14.5px; margin-top:4px; line-height:1.5 } .lsit .n{ font-size:12.5px; color:var(--quiet); font-style:italic }
+  .pill{ font-size:11.5px; font-weight:800; padding:2px 9px; border-radius:99px } .pill.moi{ background:#3a2a10; color:#fbbf24 } .pill.nhan{ background:#12361f; color:var(--good) } .pill.xong{ background:#20202e; color:var(--quiet) } .pill.huy{ background:#3a1515; color:#fca5a5 }
+</style>
+</head>
+<body>
+<script src="./phong-channel.js"></script>
+<script src="./quet-qr.js"></script>
+<div id="top">
+<header>
+  <img class="logoImg" src="Logo_BoomBox.png" alt="Boom Music Box">
+  <div class="room" id="roomTag" style="cursor:pointer">PHÒNG</div>
+  <button id="gear" aria-label="Cài đặt">⚙</button>
+</header>
+
+<div id="roomBanner" style="display:none;padding:12px 14px;background:#3a2a10;color:#fbbf24;font-weight:700;font-size:15px;text-align:center"></div>
+<div id="now"><div class="ic">♪</div><div class="t" id="nowTitle">—</div></div>
+
+<div class="tabs">
+  <button id="tabSearch" class="on"><span class="ti">🔍</span><span class="tl">Tìm bài</span></button>
+  <button id="tabQueue"><span class="ti">🎶</span><span class="tl">Hàng chờ <span class="cnt" id="qCount">0</span></span></button>
+  <button id="tabOrder" class="od" style="display:none"><span class="ti">🛎️</span><span class="tl">Gọi món</span></button>
+</div>
+</div>
+
+<div id="settings">
+  <b>Kết nối tới Worker</b> (khoá YouTube nằm trong Worker, không cần dán vào đây)
+  <input type="url" id="apiInput" value="https://nhac-playlist.vumanhhung85.workers.dev" placeholder="https://nhac-playlist.vumanhhung85.workers.dev" autocomplete="off">
+  <input type="password" id="passInput" placeholder="Mật khẩu truy cập (APP_PASS)" autocomplete="off">
+  <b>Kho karaoke</b> (Worker kho-karaoke, dùng chung mật khẩu ở trên)
+  <input type="url" id="khoInput" value="https://kho-karaoke.vumanhhung85.workers.dev" placeholder="https://kho-karaoke.vumanhhung85.workers.dev" autocomplete="off">
+  <button id="saveKey">Lưu</button> <button id="clearKey" style="background:#20202e;border:1px solid var(--line)">Xoá</button>
+  <div class="hint" style="margin-top:8px">
+    Hai thông tin này chỉ lưu trong trình duyệt của thiết bị này. Đổi khoá YouTube sau này chỉ cần đổi secret <code>YT_KEY</code> trong Worker, không phải sửa ở đây.<br>
+    Hạn mức mặc định mỗi dự án: <b>100 lượt tìm YouTube mỗi ngày</b> (tính riêng) và <b>10.000 đơn vị/ngày</b> cho các lệnh khác, dùng chung với mọi trang cùng Worker.
+    Thêm bài bằng link, nạp playlist và làm mới danh mục chỉ tốn khoảng 1 đơn vị mỗi lần.
+    Hạn mức reset lúc nửa đêm giờ Thái Bình Dương (khoảng 14h–15h giờ Việt Nam).
+  </div>
+</div>
+
+<div id="paneSearch">
+  <div id="searchBox">
+    <input id="q" type="search" placeholder="Gõ tên bài hát…" autocomplete="off" enterkeyhint="go">
+    <button id="goBtn" aria-label="Tìm">🔍</button>
+  </div>
+  <div id="detect"></div>
+  <div class="opt" id="quotaLine"></div>
+  <div class="opt" id="idxLine" style="display:none"></div>
+  <div class="opt" id="plBox" style="gap:6px;flex-wrap:wrap">
+    <label for="plSel" style="white-space:nowrap">Playlist đã lưu:</label>
+    <select id="plSel" style="flex:1;min-width:120px;padding:8px;border-radius:8px;background:#14141c;color:inherit;border:1px solid var(--line)"><option value="">(chưa tải)</option></select>
+    <button id="plOpen">Mở</button>
+    <button id="plReload" class="ghost" title="Tải lại danh sách">↻</button>
+  </div>
+  <div class="list">
+    <div id="results"></div>
+    <div id="khoSec"></div>
+    <div id="localSec"></div>
+  </div>
+</div>
+
+<div id="paneQueue" style="display:none"><div class="list" id="queueList"></div></div>
+
+<div id="paneOrder" style="display:none">
+  <div id="odPane">
+    <button class="lsbtn" id="odLsBtn">📋 Đơn đã gọi</button>
+    <div class="odH">CẦN HỖ TRỢ</div>
+    <div class="svgrid" id="odSv"></div>
+    <div class="odH">GỌI NƯỚC</div>
+    <div id="odDr"></div>
+    <textarea id="odNote" maxlength="200" placeholder="Ghi chú thêm cho nhân viên (không bắt buộc)…"></textarea>
+    <div class="odTiny">Nhân viên sẽ lên phòng trong ít phút.<br>Giá do nhân viên xác nhận trực tiếp.</div>
+  </div>
+</div>
+<div id="odBar"><div class="sum" id="odSum"></div><button id="odClear">Xoá</button><button id="odSendBtn">Gửi yêu cầu</button></div>
+<div class="odOv" id="odSent"><div class="odCard">
+  <div style="font-size:46px">🛎️</div><h3>Đã gửi yêu cầu</h3><p id="odSentList"></p>
+  <div><span class="odDot" id="odDot"></span><span id="odStTx">Đang chờ quầy tiếp nhận…</span></div>
+  <div class="row2"><button id="odSentClose">Đóng</button><button class="y" id="odSentLs">Xem đơn đã gọi</button></div>
+</div></div>
+<div class="odOv" id="odLs"><div class="odCard">
+  <h3>Đơn đã gọi</h3><p>Các yêu cầu phòng bạn đã gửi. Tình trạng tự cập nhật.</p>
+  <div id="odLsBox"></div>
+  <div class="row2"><button id="odLsClose">Đóng</button></div>
+</div></div>
+
+<aside id="side">
+  <div class="sNow"><div class="th" id="sTh"><span class="idle">VUI LÒNG CHỌN BÀI HÁT</span></div><div class="tt" id="sTitle">—</div></div>
+  <div class="sCtl">
+    <button class="primary" id="sPlay"><span class="i"></span><span class="l">Phát</span></button>
+    <button id="sNext"><span class="i"></span><span class="l">Qua bài</span></button>
+    <button id="sReplay"><span class="i"></span><span class="l">Hát lại</span></button>
+    <button id="sMute"><span class="i"></span><span class="l">Tắt tiếng</span></button>
+    <button id="sDown"><span class="i"></span><span class="l">Giảm âm</span></button>
+    <button id="sUp"><span class="i"></span><span class="l">Tăng âm</span></button>
+  </div>
+  <div class="sVol">Âm lượng <b id="sVolN">–</b></div>
+  <div class="sHead">BÀI KẾ TIẾP (<span id="sCount">0</span>)</div>
+  <div class="sList" id="sList"></div>
+</aside>
+<div class="odOv" id="vm"><div class="odCard vmCard"><div class="vmH"><div><b id="vmT"></b><small id="vmN"></small></div><button id="vmX" aria-label="Đóng">✕</button></div><div class="vmList" id="vmList"></div></div></div>
+<div class="odOv" id="pk"><div class="odCard pkCard"><img id="pkImg" alt=""><div class="pkT" id="pkT"></div><div class="pkBtns" id="pkBtns"></div></div></div>
+
+<div id="dock">
+  <div class="ctrlRow">
+    <button id="replayBtn" aria-label="Hát lại"></button>
+    <button class="primary" id="playBtn" aria-label="Phát / Dừng"></button>
+    <button id="nextBtn" aria-label="Bài kế"></button>
+    <button id="muteBtn" aria-label="Tắt / bật tiếng"></button>
+    <button id="dnBtn" aria-label="Giảm âm lượng"></button>
+    <b class="vn" id="volN">–</b>
+    <button id="upBtn" aria-label="Tăng âm lượng"></button>
+  </div>
+  <div class="vol" style="display:none"><span class="vi" id="volLo"></span><input type="range" id="vol" min="0" max="100" value="100" aria-label="Âm lượng"><span class="vi" id="volHi"></span></div>
+</div>
+
+<script>
+const params = new URLSearchParams(location.search);
+const ROOM0 = (params.get('room') || 'P1').toUpperCase();
+const bc = openRoomChannel('remote', ROOM0);       // có ?r=<QR trên TV> → khách; đã gán máy tính bảng → máy tính bảng; không có → như cũ (thử cục bộ)
+const GUEST = !!bc.ws;
+const ROOM = GUEST ? bc.roomId : ROOM0;
+let guestTok = '';                                   // vé khách do Worker phòng cấp khi phòng đang mở: chỉ đủ để tìm/chọn bài trong kho
+const $ = id => document.getElementById(id);
+const API_NAME = 'np_api', PASS_NAME = 'np_pass';          // dùng chung tên với nhac.html: nếu cùng địa chỉ trang thì chỉ cần nhập một lần
+const CAT_KEY = 'bmb_yt_catalog_v1';
+const COUNT_KEY = 'bmb_yt_search_count';
+const DAY = 86400000, MAX_AGE = 30 * DAY, REFRESH_AGE = 20 * DAY, MAX_CAT = 500;
+let roomName = '';
+const paintTag = () => { $('roomTag').textContent = 'PHÒNG ' + (roomName || (bc.ws ? '…' : ROOM)) + (bc.tablet ? ' · MÁY TÍNH BẢNG' : ''); };
+paintTag();
+
+const send = (action, extra) => bc.postMessage({ type:'cmd', payload:Object.assign({action}, extra||{}) });
+
+/* ---------- Tiện ích ---------- */
+function el(tag, cls, text){ const e = document.createElement(tag); if(cls) e.className = cls; if(text != null) e.textContent = text; return e; }
+function btn(label, cls, fn){ const b = el('button', cls, label); b.onclick = fn; return b; }
+const nd = s => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').replace(/Đ/g,'D').toLowerCase();
+const decode = s => new DOMParser().parseFromString(s || '', 'text/html').documentElement.textContent;
+const safeThumb = u => /^https:\/\/[\w.-]*ytimg\.com\//.test(u || '') ? u : '';
+const norm = it => ({ id:it.id, title:decode(it.title), channel:decode(it.channel), thumb:safeThumb(it.thumb) });
+const lsGet = k => { try{ return localStorage.getItem(k); }catch(e){ return null; } };
+const lsSet = (k, v) => { try{ localStorage.setItem(k, v); }catch(e){} };
+
+/* ---------- Kết nối Worker ---------- */
+try{ localStorage.removeItem('bmb_yt_api_key'); }catch(e){}   // bản cũ từng lưu khoá YouTube trong trình duyệt: không còn cần nữa
+const DEFAULT_API = 'https://nhac-playlist.vumanhhung85.workers.dev';
+const KHO_NAME = 'kho_api', DEFAULT_KHO = 'https://kho-karaoke.vumanhhung85.workers.dev';
+let cfg = { api: lsGet(API_NAME) || DEFAULT_API, pass: lsGet(PASS_NAME) || '', kho: lsGet(KHO_NAME) || DEFAULT_KHO };
+const hasCfg = () => !!(cfg.api && cfg.pass);
+if(GUEST){ $('gear').style.display = 'none'; }
+if(GUEST || bc.tablet) $('plBox').style.display = 'none';
+$('gear').onclick = () => { const s = $('settings'); if(s.style.display !== 'block'){ $('apiInput').value = cfg.api; $('passInput').value = cfg.pass; $('khoInput').value = cfg.kho; } s.style.display = s.style.display === 'block' ? 'none' : 'block'; };
+$('saveKey').onclick = () => {
+  cfg.api = $('apiInput').value.trim().replace(/\/+$/, ''); cfg.pass = $('passInput').value; cfg.kho = $('khoInput').value.trim().replace(/\/+$/, '');
+  lsSet(API_NAME, cfg.api); lsSet(PASS_NAME, cfg.pass); lsSet(KHO_NAME, cfg.kho);
+  $('settings').style.display = 'none'; msg('Đã lưu kết nối. Nhập tên bài hoặc dán link để bắt đầu.'); autoRefresh(); loadPlaylistNames(true); hotCache = null; quota = null; showQuota(); renderKho(); loadIndex();
+};
+$('clearKey').onclick = () => { try{ localStorage.removeItem(API_NAME); localStorage.removeItem(PASS_NAME); localStorage.removeItem(KHO_NAME); }catch(e){} cfg = { api:DEFAULT_API, pass:'', kho:DEFAULT_KHO }; $('apiInput').value = DEFAULT_API; $('passInput').value = ''; $('khoInput').value = DEFAULT_KHO; msg('Đã xoá thông tin kết nối.'); };
+$('apiInput').value = cfg.api; $('khoInput').value = cfg.kho;     // địa chỉ Worker điền sẵn, chỉ cần nhập mật khẩu
+if(!hasCfg() && !GUEST) $('settings').style.display = 'block';
+function needConfig(){ if(GUEST) return msg(guestTok ? 'Tính năng này dành cho nhân viên.' : 'Chưa nối được phòng, vui lòng đợi vài giây.', true); $('apiInput').value = cfg.api; $('khoInput').value = cfg.kho; $('passInput').value = cfg.pass; $('settings').style.display = 'block'; msg(cfg.api ? 'Nhập mật khẩu truy cập rồi bấm Lưu.' : 'Cần nhập địa chỉ Worker và mật khẩu (nút ⚙).', true); }
+
+async function api(path){
+  if(!hasCfg()){ needConfig(); const e = new Error('Chưa cấu hình kết nối'); e.reason = 'noconfig'; throw e; }
+  const res = await fetch(cfg.api + path, { headers:{ 'x-pass': cfg.pass } });
+  let data = {}; try{ data = await res.json(); }catch(e){}
+  if(!res.ok){ const e = new Error(data.error || ('Lỗi ' + res.status)); e.status = res.status; e.reason = data.reason || ''; throw e; }
+  return data;
+}
+function showApiError(e){
+  if(!e || e.reason === 'noconfig') return;
+  if(e.status === 401){ needConfig(); return msg('Sai mật khẩu hoặc địa chỉ Worker.', true); }
+  if(e.reason === 'origin') return msg('Worker từ chối địa chỉ trang này. Thêm ' + location.origin + ' vào biến ALLOWED_ORIGINS của Worker.', true);
+  if(e.reason === 'quotaExceeded'){ setCount(100); return msg('Hết lượt tìm hôm nay (100 lượt/ngày). Vẫn dùng được danh mục, link và playlist. Hạn mức reset khoảng 14h–15h giờ Việt Nam.', true); }
+  if(e.reason === 'notEmbeddable') return msg('Chủ video không cho phép phát nhúng nên player không phát được video này.', true);
+  if(e instanceof TypeError) return msg('Không kết nối được tới Worker (mạng, địa chỉ sai hoặc bị chặn CORS).', true);
+  msg(e.message || 'Có lỗi xảy ra', true);
+}
+
+/* ---------- Danh mục riêng (lưu trên trình duyệt này) ----------
+   Theo điều khoản YouTube, dữ liệu lấy từ API chỉ được lưu tối đa 30 ngày rồi phải xoá hoặc làm mới.
+   Vì vậy: mục nào quá 30 ngày bị xoá; mục quá 20 ngày được làm mới tự động (1 đơn vị cho mỗi 50 bài). */
+function loadCat(){
+  try{
+    const a = JSON.parse(lsGet(CAT_KEY) || '[]');
+    return (Array.isArray(a) ? a : []).filter(x => x && /^[\w-]{11}$/.test(x.id || '') && Date.now() - (+x.fetchedAt || 0) < MAX_AGE)
+      .map(x => ({ id:x.id, title:String(x.title||'').slice(0,200), channel:String(x.channel||'').slice(0,100), thumb:safeThumb(x.thumb),
+                   fetchedAt:+x.fetchedAt, lastUsed:+x.lastUsed || +x.fetchedAt }));
+  }catch(e){ return []; }
+}
+let catalog = loadCat();
+function saveCat(){ lsSet(CAT_KEY, JSON.stringify(catalog)); }
+function upsert(it, fresh){
+  const now = Date.now(); const i = catalog.findIndex(x => x.id === it.id);
+  if(i >= 0 && !fresh){ catalog[i].lastUsed = now; saveCat(); return; }   // bài lấy từ danh mục: không làm mới "tuổi" dữ liệu
+  const rec = { id:it.id, title:String(it.title||'').slice(0,200), channel:String(it.channel||'').slice(0,100), thumb:safeThumb(it.thumb), fetchedAt:now, lastUsed:now };
+  if(i >= 0) catalog[i] = rec; else catalog.push(rec);
+  if(catalog.length > MAX_CAT){ catalog.sort((a,b) => b.lastUsed - a.lastUsed); catalog = catalog.slice(0, MAX_CAT); }
+  saveCat();
+}
+function removeFromCat(id){ catalog = catalog.filter(x => x.id !== id); saveCat(); renderLocal(); }
+function clearCatalog(){ if(!confirm('Xoá toàn bộ danh mục bài đã lưu trên máy này?')) return; catalog = []; saveCat(); renderLocal(); }
+
+/* ---------- Đếm lượt tìm trong ngày (ước tính trên máy này) ---------- */
+const pacificDay = () => new Intl.DateTimeFormat('en-CA', { timeZone:'America/Los_Angeles' }).format(new Date());
+function getCount(){ try{ const o = JSON.parse(lsGet(COUNT_KEY) || '{}'); return o.d === pacificDay() ? (+o.n || 0) : 0; }catch(e){ return 0; } }
+function setCount(n){ lsSet(COUNT_KEY, JSON.stringify({ d:pacificDay(), n })); showQuota(); }
+let quota = null;   // { used, limit } do Worker kho đếm, chung cho mọi máy
+function setQuota(q){ if(q && typeof q.used === 'number'){ quota = q; showQuota(); } }
+function showQuota(){
+  const line = $('quotaLine');
+  line.textContent = ''; line.style.display = 'none'; line.classList.remove('low');
+  if(!hasKho()) return;
+  if(!quota) return;
+  const left = Math.max(0, quota.limit - quota.used);
+  if(left > 10) return;                       // chỉ nhắc khi sắp hết lượt tìm YouTube
+  line.style.display = '';
+  line.textContent = left ? 'Chỉ còn ' + left + ' lượt tìm thêm trên YouTube hôm nay.' : 'Đã hết lượt tìm thêm trên YouTube hôm nay, vẫn chọn được bài trong kho.';
+  line.classList.add('low');
+}
+
+/* ---------- Nhận diện link YouTube ---------- */
+function parseYT(input){
+  const out = { vid:null, list:null }; const s = (input || '').trim();
+  if(!s || /\s/.test(s)) return out;
+  try{
+    const u = new URL(/^https?:\/\//i.test(s) ? s : 'https://' + s);
+    const h = u.hostname.replace(/^(www|m|music)\./, '');
+    if(h === 'youtu.be') out.vid = u.pathname.slice(1).split('/')[0];
+    else if(h === 'youtube.com'){
+      if(u.pathname === '/watch') out.vid = u.searchParams.get('v');
+      else if(/^\/(shorts|embed|live)\//.test(u.pathname)) out.vid = u.pathname.split('/')[2];
+      out.list = u.searchParams.get('list');
+    }
+  }catch(e){}
+  if(out.vid && !/^[\w-]{11}$/.test(out.vid)) out.vid = null;
+  if(out.list && !/^[\w-]{10,64}$/.test(out.list)) out.list = null;
+  return out;
+}
+
+/* ---------- Hiển thị ---------- */
+function msg(text, err){ const b = $('results'); b.replaceChildren(); b.append(el('div', 'msg' + (err ? ' err' : ''), text)); }
+function rowEl(it, actions){
+  const row = el('div', 'row card tap');
+  const img = document.createElement('img'); img.alt = ''; img.loading = 'lazy'; if(it.thumb) img.src = it.thumb;
+  const meta = el('div', 'meta'); meta.append(el('div', 'name', it.title), el('div', 'sub', it.channel || ''));
+  row.append(img, meta); actions.forEach(a => row.append(a)); return row;
+}
+function addToQueue(it, fresh, prio){ send('add', Object.assign({ id:it.id, title:it.title }, prio ? { prio:true } : {})); upsert(it, fresh); if(fresh) renderLocal(); }
+/* Báo nhận rõ ràng: nút đổi màu ngay, rồi chờ TV xác nhận (bài xuất hiện trong hàng chờ của TV) */
+let snackTimer = null;
+function snack(text, warn){
+  let s = $('snack'); if(!s){ s = el('div'); s.id = 'snack'; document.body.append(s); }
+  s.textContent = text; s.classList.toggle('warn', !!warn); s.classList.add('show');
+  clearTimeout(snackTimer); snackTimer = setTimeout(() => s.classList.remove('show'), warn ? 5000 : 2600);
+}
+const pending = [];                                   // bài vừa chọn, chờ TV báo đã nhận: { id, title, at, timer }
+function expectOnTv(it){
+  const p = { title:it.title, at:Date.now() };
+  p.timer = setTimeout(() => { const i = pending.indexOf(p); if(i < 0) return; pending.splice(i, 1);
+    snack('⚠ TV chưa nhận “' + it.title + '”. Kiểm tra TV còn mở trang phát và mạng, rồi chọn lại.', true); }, 6000);
+  pending.push(p);
+}
+function confirmFromTv(s){
+  if(!pending.length) return;
+  const q = s.queue || [];
+  for(let k = pending.length - 1; k >= 0; k--){
+    const p = pending[k];
+    let idx = -1; for(let i = q.length - 1; i >= 0; i--){ if(q[i].title === p.title){ idx = i; break; } }
+    if(idx < 0) continue;
+    clearTimeout(p.timer); pending.splice(k, 1);
+    const ahead = idx - (s.cur >= 0 ? s.cur : 0);
+    snack(idx === s.cur ? '▶ Đang phát “' + p.title + '”' : '✓ Đã vào hàng chờ: “' + p.title + '” · thứ ' + ahead + ' trong hàng chờ');
+  }
+}
+/* Hộp hỏi dùng chung (như SK Player): ảnh + tên bài + các nút */
+const thumbOf = id => /^[\w-]{11}$/.test(id || '') ? 'https://i.ytimg.com/vi/' + id + '/mqdefault.jpg' : '';
+function pickBox(title, thumb, buttons, horiz){
+  const img = $('pkImg'); if(thumb){ img.src = thumb; img.style.display = ''; } else img.style.display = 'none';
+  $('pkT').textContent = title;
+  const box = $('pkBtns'); box.replaceChildren(); box.classList.toggle('h', !!horiz);
+  buttons.forEach(([label, cls, fn]) => box.append(btn(label, cls, () => { closePick(); fn(); })));
+  $('pk').style.display = 'flex';
+}
+function closePick(){ $('pk').style.display = 'none'; }
+$('vmX').onclick = closeVers; $('vm').addEventListener('click', e => { if(e.target === $('vm')) closeVers(); });
+$('pk').addEventListener('click', e => { if(e.target === $('pk')) closePick(); });
+function addBtn(it, fresh){
+  const b = el('button', 'pick', '＋ Chọn');
+  let last = 0;
+  const add = prio => {
+    const now = Date.now(); if(now - last < 700) return; last = now;          // chạm đúp vô tình: không thêm hai lần
+    addToQueue(it, fresh, prio); reportPick(it.id); expectOnTv(it);
+    try{ if(navigator.vibrate) navigator.vibrate(20); }catch(e){}
+    b.textContent = '✓ Đã thêm'; b.classList.add('done');
+    setTimeout(() => { b.textContent = '＋ Chọn'; b.classList.remove('done'); }, 2000);
+  };
+  b.onclick = () => pickBox(it.title, it.thumb || thumbOf(it.id), [['CHỌN', '', () => add(false)], ['ƯU TIÊN', 'y', () => add(true)]]);
+  return b;
+}
+/* Chạm vào cả dòng / thẻ bài cũng mở hộp chọn */
+const rowTap = e => {
+  if(e.target.closest('button, a, input, select')) return;
+  const row = e.target.closest('.row'); if(!row) return;
+  const b = row.querySelector('button.pick'); if(b) b.click();
+};
+$('paneSearch').addEventListener('click', rowTap); $('vmList').addEventListener('click', rowTap);
+function renderResults(items, title, extra){
+  const box = $('results'); box.replaceChildren();
+  const head = el('div', 'secHead'); head.append(el('b', null, title));
+  const act = el('span', 'secAct'); if(extra) act.append(extra); act.append(btn('Đóng', 'ghost', () => box.replaceChildren())); head.append(act);
+  box.append(head);
+  if(!items.length){ box.append(el('div', 'msg', 'Không có kết quả phù hợp.')); return; }
+  items.forEach(it => box.append(rowEl(it, [addBtn(it, true)])));
+}
+function renderLocal(){
+  const box = $('localSec'); box.replaceChildren();
+  if(GUEST || bc.tablet) return;   // khách / máy tính bảng phòng: không hiện danh mục cá nhân, cho gọn
+  const raw = $('q').value.trim(); const p = parseYT(raw);
+  const q = (p.vid || p.list) ? '' : nd(raw);
+  const list = catalog.filter(x => !q || nd(x.title).includes(q) || nd(x.channel).includes(q)).sort((a,b) => b.lastUsed - a.lastUsed);
+  const head = el('div', 'secHead'); head.append(el('b', null, 'Danh mục của tôi (' + catalog.length + ')'));
+  const act = el('span', 'secAct'); act.append(btn('Làm mới', 'ghost', () => refreshCatalog(true)), btn('Xoá hết', 'ghost', clearCatalog));
+  head.append(act); box.append(head);
+  if(!catalog.length){ box.append(el('div', 'msg', 'Danh mục trống. Bài nào bạn chọn sẽ được lưu ở đây để lần sau không cần tìm lại.')); return; }
+  if(!list.length){ box.append(el('div', 'msg', 'Không có bài nào trong danh mục khớp từ khoá. Bấm Tìm để tìm trên YouTube.')); return; }
+  list.slice(0, 40).forEach(it => box.append(rowEl(it, [addBtn(it, false), btn('✕', 'ghost', () => removeFromCat(it.id))])));
+  if(list.length > 40) box.append(el('div', 'hint', '…còn ' + (list.length - 40) + ' bài nữa, gõ từ khoá để lọc.'));
+}
+function updateDetect(){
+  const d = $('detect'); d.replaceChildren();
+  const p = parseYT($('q').value);
+  $('goBtn').textContent = (p.vid || p.list) ? 'Thêm' : 'Tìm';
+  if(p.vid) d.append(btn('＋ Thêm bài từ link', null, () => addByLink(p.vid)));
+  if(p.list && !/^RD/.test(p.list)) d.append(btn('≡ Nạp playlist', null, () => loadPlaylist(p.list)));
+  d.style.display = (p.vid || p.list) ? 'flex' : 'none';
+}
+
+/* ---------- Thêm bài bằng link ---------- */
+/* Đọc thông tin qua Worker nhac-playlist; không được thì qua Worker kho; vẫn không được thì phát theo ID (bài vẫn hát được) */
+async function viaEither(pathMain, pathKho){
+  let err = null;
+  if(hasCfg()){ try{ return await api(pathMain); }catch(e){ if(e.reason === 'notEmbeddable' || e.status === 400 || e.status === 404) throw e; err = e; } }
+  if(hasKho()){ try{ return await kapi(pathKho); }catch(e){ if(e.reason === 'notEmbeddable' || e.status === 400 || e.status === 404) throw e; err = e; } }
+  throw err || Object.assign(new Error('Chưa cấu hình kết nối'), { reason:'noconfig' });
+}
+async function addByLink(vid){
+  if(!hasCfg() && !hasKho()) return needConfig();
+  msg('Đang đọc thông tin video…');
+  let item;
+  try{ item = norm((await viaEither('/api/video?id=' + vid, '/api/kho/video?id=' + vid)).item); }
+  catch(e){
+    if(e.reason === 'notEmbeddable') return msg('Chủ video không cho phép phát nhúng nên player không phát được video này.', true);
+    // Không đọc được tên bài: vẫn thêm vào hàng chờ theo ID để không bị gián đoạn
+    send('add', { id:vid, title:'Bài từ link YouTube' }); reportPick(vid);
+    $('q').value = ''; updateDetect(); renderLocal(); renderKho();
+    return msg('Đã thêm vào hàng chờ. Tạm chưa đọc được tên bài (mạng chập chờn) nhưng bài vẫn phát bình thường.');
+  }
+  addToQueue(item, true); reportPick(item.id);
+  $('q').value = ''; updateDetect(); renderLocal(); renderKho();
+  msg('Đã thêm vào hàng chờ: ' + item.title);
+}
+
+/* ---------- Nạp playlist ---------- */
+async function loadPlaylist(list){
+  if(!hasCfg() && !hasKho()) return needConfig();
+  if(/^RD/.test(list)) return msg('Đây là danh sách “Mix” YouTube tự tạo, không đọc được qua API. Anh bấm “＋ Thêm bài từ link” để thêm riêng bài đang mở, hoặc dán link một playlist thật (list=PL…).', true);
+  msg('Đang nạp playlist…');
+  try{
+    const d = await viaEither('/api/import?list=' + list, '/api/kho/import?list=' + list);
+    const items = (d.items || []).map(norm);
+    const addAll = btn('＋ Thêm tất cả', null, () => {
+      if(items.length > 50 && !confirm('Thêm ' + items.length + ' bài vào hàng chờ?')) return;
+      items.forEach(it => { send('add', { id:it.id, title:it.title }); upsert(it, true); });
+      renderLocal(); msg('Đã thêm ' + items.length + ' bài vào hàng chờ.');
+    });
+    renderResults(items, 'Playlist: ' + items.length + ' bài phát nhúng được' + (d.skipped ? ' (bỏ ' + d.skipped + ' bài không phát được)' : ''), addAll);
+  }catch(e){
+    if(e.status === 404) return msg('Không đọc được playlist này (riêng tư hoặc đã bị xoá).', true);
+    showApiError(e);
+  }
+}
+
+/* ---------- Playlist đã lưu trên D1 (cùng dữ liệu với nhac.html) ---------- */
+const PL_KEY = 'bmb_yt_last_pl';
+async function loadPlaylistNames(quiet){
+  if(!hasCfg()){ if(!quiet) needConfig(); return; }
+  try{
+    const d = await api('/api/playlists');
+    const sel = $('plSel'), keep = sel.value || lsGet(PL_KEY) || '';
+    sel.replaceChildren();
+    (d.playlists || []).forEach(p => { const o = document.createElement('option'); o.value = p.name; o.textContent = p.name + ' (' + p.count + ')'; sel.append(o); });
+    if(!sel.options.length){ const o = document.createElement('option'); o.value = ''; o.textContent = '(chưa có playlist)'; sel.append(o); }
+    if([...sel.options].some(o => o.value === keep)) sel.value = keep;
+  }catch(e){ if(!quiet) showApiError(e); }
+}
+async function openSavedPlaylist(){
+  const name = $('plSel').value; if(!name) return msg('Chưa có playlist nào để mở.', true);
+  if(!hasCfg()) return needConfig();
+  lsSet(PL_KEY, name); msg('Đang mở playlist “' + name + '”…');
+  try{
+    const d = await api('/api/playlist?name=' + encodeURIComponent(name));
+    const all = (d.items || []), items = all.filter(v => !v.unavailable && v.embeddable !== false).map(norm);
+    const skipped = all.length - items.length;
+    const addAll = btn('＋ Thêm tất cả', null, () => {
+      if(items.length > 50 && !confirm('Thêm ' + items.length + ' bài vào hàng chờ?')) return;
+      items.forEach(it => { send('add', { id:it.id, title:it.title }); upsert(it, true); });
+      renderLocal(); msg('Đã thêm ' + items.length + ' bài từ “' + name + '” vào hàng chờ.');
+    });
+    renderResults(items, 'Playlist “' + name + '”: ' + items.length + ' bài' + (skipped ? ' (bỏ ' + skipped + ' bài không phát được)' : ''), addAll);
+  }catch(e){ showApiError(e); }
+}
+$('plOpen').onclick = openSavedPlaylist; $('plReload').onclick = () => loadPlaylistNames(false);
+$('plSel').addEventListener('change', () => lsSet(PL_KEY, $('plSel').value));
+
+/* ---------- Làm mới danh mục ---------- */
+async function refreshCatalog(manual){
+  if(!catalog.length){ if(manual) msg('Danh mục trống, không có gì để làm mới.'); return; }
+  if(!hasCfg()){ if(manual) needConfig(); return; }
+  try{
+    const ids = catalog.map(x => x.id), m = {};
+    for(let i = 0; i < ids.length; i += 50){
+      const d = await api('/api/videos?ids=' + ids.slice(i, i + 50).join(','));
+      (d.items || []).forEach(v => { m[v.id] = v; });
+    }
+    const now = Date.now(); const before = catalog.length;
+    catalog = catalog.filter(x => m[x.id] && m[x.id].embeddable).map(x => {
+      const v = norm(m[x.id]); return Object.assign(x, { title:v.title, channel:v.channel, thumb:v.thumb, fetchedAt:now }); });
+    saveCat(); renderLocal();
+    if(manual) msg('Đã làm mới danh mục' + (before > catalog.length ? ' (bỏ ' + (before - catalog.length) + ' bài không còn phát được).' : '.'));
+  }catch(e){ if(manual) showApiError(e); }
+}
+function autoRefresh(){ if(hasCfg() && catalog.some(x => Date.now() - x.fetchedAt > REFRESH_AGE)) refreshCatalog(false); }
+
+/* ---------- Tìm trên YouTube (100 lượt/ngày) ---------- */
+const cache = new Map();
+const kwTerm = raw => /karaoke/i.test(raw) ? raw : 'karaoke ' + raw;   // luôn tìm karaoke, chữ karaoke đứng đầu
+async function search(force){
+  const raw = $('q').value.trim(); if(!raw) return;
+  const term = kwTerm(raw);
+  if(hasKho()) return searchViaKho(raw, term, force);
+  if(!hasCfg()) return needConfig();
+  if(cache.has(term)){ renderResults(cache.get(term), 'Kết quả YouTube (đã lưu tạm, không tốn lượt tìm)'); return; }
+  msg('Đang tìm…');
+  try{
+    const d = await api('/api/search?q=' + encodeURIComponent(term));
+    setCount(getCount() + 1);
+    const items = (d.items || []).map(norm);
+    cache.set(term, items); renderResults(items, 'Kết quả YouTube');
+  }catch(e){ showApiError(e); }
+}
+
+/* Tìm qua Worker kho: ưu tiên kho tối đa, YouTube chỉ khi cần, không bao giờ để màn hình trống */
+let gateFor = '';
+async function searchViaKho(raw, term, force){
+  if(!force && gateFor === raw) force = true;          // bấm Tìm lần nữa = vẫn muốn tìm YouTube
+  if(cache.has(term)) return renderYT(cache.get(term), term, true);
+  if(!force){
+    const n = lastKho.q === raw ? lastKho.n : await renderKho();
+    logQuery(raw, n);
+    if(n > 0) return showGate(raw, n);
+  }
+  gateFor = '';
+  msg('Đang tìm “' + term + '” trên YouTube…');
+  let d;
+  try{ d = await kapi('/api/kho/ytsearch?q=' + encodeURIComponent(term)); }
+  catch(e){
+    if(e.status === 401 || e.reason === 'origin') return msg('Không dùng được kho: ' + khoWhy(e) + '. Kiểm tra ở nút ⚙.', true);
+    return renderFallback({ reason:'offline' }, raw, term);
+  }
+  setQuota(d.quota);
+  if(d.source === 'fallback') return renderFallback(d, raw, term);
+  cache.set(term, d); renderYT(d, term, d.source === 'cache');
+}
+function quotaLeft(){ return quota ? Math.max(0, quota.limit - quota.used) : null; }
+function ytBtn(label){
+  const left = quotaLeft();
+  return btn(label + (left != null && left <= 10 ? ' (còn ' + left + ' lượt)' : ''), 'ghost', () => search(true));
+}
+function showGate(raw, n){
+  gateFor = raw;
+  const box = $('results'); box.replaceChildren();
+  if(quotaLeft() !== 0){
+    const act = el('div', 'secAct'); act.append(ytBtn('🔎 Tìm thêm trên YouTube'));
+    box.append(act);
+  }
+  $('khoSec').scrollIntoView({ behavior:'smooth', block:'start' });
+}
+function resultsHead(title){
+  const head = el('div', 'secHead'); head.append(el('b', null, title));
+  const act = el('span', 'secAct'); act.append(btn('Đóng', 'ghost', () => { $('results').replaceChildren(); gateFor = ''; })); head.append(act);
+  return head;
+}
+function renderYT(d, term, fromCache){
+  const box = $('results'); box.replaceChildren();
+  box.append(resultsHead('YouTube: “' + term + '”'));
+  const items = d.items || [];
+  if(items.length) items.forEach(v => box.append(khoRow(v, {})));
+  else box.append(el('div', 'hint', 'YouTube không có bản phát được cho từ khoá này.'));
+  const g = d.groups || [];
+  if(!items.length && g.length){
+    box.append(el('div', 'secHead', 'Bài gần giống trong kho'));
+    g.forEach(x => box.append(khoRow(x.best, { versions:x.versions, key:x.key, tone:x.tone })));
+  }
+}
+const FALLBACK_MSG = {
+  limit:   '🎤 Hôm nay đã dùng hết lượt tìm YouTube (mở lại khoảng 14h–15h). Đây là những bài gần giống trong kho, bạn chọn hát luôn nhé:',
+  timeout: '🎤 YouTube đang phản hồi chậm. Trong lúc chờ, đây là những bài gần giống trong kho:',
+  error:   '🎤 Tạm thời chưa tìm được trên YouTube. Đây là những bài gần giống trong kho:',
+  nokey:   '🎤 Đây là những bài gần giống trong kho:',
+  offline: '🎤 Mạng đang chập chờn. Đây là những bài gần giống bạn đã lưu trên máy này:'
+};
+function renderFallback(d, raw, term){
+  const box = $('results'); box.replaceChildren();
+  const nt = el('div', 'notice'); nt.append(el('div', null, FALLBACK_MSG[d.reason] || FALLBACK_MSG.error));
+  if(d.reason === 'timeout' || d.reason === 'error' || d.reason === 'offline'){ const act = el('div', 'secAct'); act.append(btn('↻ Thử tìm lại', 'ghost', () => search(true))); nt.append(act); }
+  box.append(nt);
+  let n = 0;
+  (d.groups || []).forEach(x => { box.append(khoRow(x.best, { versions:x.versions, key:x.key, tone:x.tone })); n++; });
+  if(!n && (d.hot || []).length){ box.append(el('div', 'hint', 'Chưa có bài gần giống, bạn thử các bài đang hot:')); d.hot.forEach((h, i) => { box.append(khoRow(h.best, { rank:i + 1, versions:h.versions, key:h.key, tone:null })); n++; }); }
+  if(!n && (d.suggest || []).length){ box.append(el('div', 'hint', 'Gợi ý từ kho:')); d.suggest.forEach(v => { box.append(khoRow(v, {})); n++; }); }
+  if(!n){
+    // không gọi được Worker: dùng danh mục trên máy + bài hot đã tải
+    const words = nd(raw).split(/\s+/).filter(w => w.length > 1);
+    const loc = catalog.filter(x => words.some(w => nd(x.title).includes(w))).slice(0, 20);
+    loc.forEach(it => { box.append(rowEl(it, [addBtn(it, false)])); n++; });
+    if(!n && hotCache && hotCache.length){ box.append(el('div', 'hint', 'Các bài đang hot:')); hotCache.slice(0, 20).forEach((h, i) => { box.append(khoRow(h.best, { rank:i + 1, versions:h.versions, key:h.key, tone:null })); n++; }); }
+  }
+  if(!n) box.append(el('div', 'hint', 'Chưa có bài nào gần giống. Anh thử gõ tên ngắn hơn hoặc tên ca sĩ để tìm trong kho.'));
+}
+function khoWhy(e){ return e.status === 401 ? 'sai mật khẩu' : e.reason === 'origin' ? 'Worker kho chưa cho phép địa chỉ ' + location.origin : e instanceof TypeError ? 'không kết nối được tới Worker kho' : (e.message || 'lỗi'); }
+
+/* ---------- Kho karaoke (Worker kho-karaoke): tìm không tốn lượt, bài hot, ưu tiên bản được chọn nhiều ---------- */
+const hasKho = () => !!(cfg.kho && (cfg.pass || guestTok));
+const khoAuth = () => cfg.pass ? { 'x-pass':cfg.pass } : { 'x-guest':guestTok };   // nhân viên dùng mật khẩu; khách dùng vé do phòng cấp
+async function kapi(path, body){
+  const opt = body ? { method:'POST', headers:Object.assign({ 'content-type':'application/json' }, khoAuth()), body:JSON.stringify(body) } : { headers:khoAuth() };
+  const res = await fetch(cfg.kho + path, opt);
+  let data = {}; try{ data = await res.json(); }catch(e){}
+  if(!res.ok){ const e = new Error(data.error || ('Lỗi ' + res.status)); e.status = res.status; e.reason = data.reason || ''; throw e; }
+  return data;
+}
+function reportPick(id){ if(hasKho()) kapi('/api/kho/pick', { id }).catch(() => {}); }
+// Mỗi lần bấm Tìm (không phải từng phím gõ): kho ghi lại để đo tỉ lệ tìm hụt và tự đi tìm bài còn thiếu
+function logQuery(q, n){ if(hasKho() && q.length >= 3 && !parseYT(q).vid && !parseYT(q).list) kapi('/api/kho/qlog', { q, n }).catch(() => {}); }
+const TONE = { nam:'Tone Nam', nu:'Tone Nữ', 'song-ca':'Song ca', 'thieu-nam':'Thiếu giọng nam', 'thieu-nu':'Thiếu giọng nữ' };
+const fmtViews = n => n >= 1e6 ? (n / 1e6).toFixed(n >= 1e7 ? 0 : 1).replace('.', ',') + ' Tr' : n >= 1e3 ? Math.round(n / 1e3) + ' N' : String(n || 0);
+const kItem = v => ({ id:v.id, title:String(v.title || ''), channel:String(v.channel || ''), thumb:'https://i.ytimg.com/vi/' + v.id + '/mqdefault.jpg' });
+/* Bài đã bị gỡ khỏi YouTube: ảnh bìa trả về ảnh xám 120×90 (hoặc lỗi tải) → gom lại, nhờ kho kiểm (1 đơn vị/≤50 bài) và xoá ngay */
+const deadIds = new Set(), suspect = new Set();
+let checkTimer = null;
+const CHK = 'kho_chk';                       // bài đã kiểm là còn sống: nhớ 7 ngày để khỏi kiểm lại
+function chkMap(){ try{ const m = JSON.parse(lsGet(CHK) || '{}'), t = Date.now(); for(const k in m) if(t - m[k] > 7 * 864e5) delete m[k]; return m; }catch(e){ return {}; } }
+function markDead(id){
+  deadIds.add(id); hotCache = null;
+  document.querySelectorAll('[data-vid="' + id + '"]').forEach(r => {
+    if(r.classList.contains('dead')) return;
+    r.classList.add('dead');
+    const b = r.querySelector(':scope > button'); if(b) b.replaceWith(el('span', 'gone', 'Đã bị gỡ khỏi YouTube'));
+  });
+}
+function suspectDead(id){
+  if(deadIds.has(id) || suspect.has(id) || !hasKho() || chkMap()[id]) return;
+  suspect.add(id); clearTimeout(checkTimer);
+  checkTimer = setTimeout(async () => {
+    const ids = [...suspect].slice(0, 50); ids.forEach(i => suspect.delete(i));
+    try{
+      const d = await kapi('/api/kho/check', { ids, reason:'thumb' });
+      (d.removed || []).forEach(markDead);
+      const m = chkMap(), t = Date.now(); (d.ok || []).forEach(i => { m[i] = t; }); try{ localStorage.setItem(CHK, JSON.stringify(m)); }catch(e){}
+    }catch(e){}
+  }, 1500);
+}
+function closeVers(){ $('vm').style.display = 'none'; }
+async function openVers(it, opts){
+  $('vmT').textContent = it.title.replace(/\s*[\[(].*$/,'').trim() || it.title;
+  const box = $('vmList'); box.replaceChildren(el('div', 'hint', 'Đang tải các bản khác…'));
+  $('vm').style.display = 'flex';
+  try{
+    const d = await kapi('/api/kho/versions?key=' + encodeURIComponent(opts.key) + (opts.tone != null ? '&tone=' + encodeURIComponent(opts.tone) : ''));
+    box.replaceChildren();
+    const all = d.items || [], qs = qualitySplit(all), items = qs.good;
+    $('vmN').textContent = all.length + ' bản' + (qs.low.length ? ' · đang ẩn ' + qs.low.length + ' bản ít lượt xem' : '');
+    items.forEach(x => box.append(khoRow(x, {})));
+    lowBtn(box, qs.low, v => khoRow(v, {}));
+    if(!items.length) box.append(el('div', 'hint', 'Không có bản nào.'));
+  }catch(e){ box.replaceChildren(el('div', 'hint err', 'Không tải được: ' + (e.message || ''))); }
+}
+function khoRow(v, opts){
+  const it = kItem(v), row = el('div', 'row tap');
+  row.dataset.vid = it.id;
+  const img = document.createElement('img'); img.alt = ''; img.loading = 'lazy'; img.src = it.thumb;
+  img.onload = () => { if(img.naturalWidth === 120 && img.naturalHeight === 90) suspectDead(it.id); };   // mqdefault thật là 320×180
+  img.onerror = () => suspectDead(it.id);
+  const meta = el('div', 'meta'), sub = el('div', 'sub');
+  if(opts.rank) sub.append(el('span', 'tag hot', '🔥 ' + opts.rank));
+  if(v.tone && TONE[v.tone]) sub.append(el('span', 'tag', TONE[v.tone]));
+  sub.append(document.createTextNode(fmtViews(v.views) + ' lượt xem' + (v.picks ? ' · chọn ' + v.picks + ' lần' : '') + ' · ' + it.channel));
+  meta.append(el('div', 'name', it.title), sub);
+  row.append(img, meta);
+  const wrap = el('div', 'card'); wrap.append(row);
+  if(opts.versions > 1){
+    const vb = btn('▾ ' + (opts.versions - 1) + ' bản khác', 'more', () => openVers(it, opts));
+    meta.append(vb);
+  }
+  row.append(addBtn(it, true));
+  if(deadIds.has(it.id)) setTimeout(() => markDead(it.id), 0);
+  return wrap;
+}
+let hotCache = null, sugCache = [], hotAll = false, khoTimer = null, khoSeq = 0, lastKho = { q:null, n:0 };
+/* Cuộn xuống tới đáy thì tự nạp thêm: bài hot → bài khách hay chọn / mới / nhiều lượt xem (lọc trùng) */
+let feed = null, feedIO = null;
+function feedReset(){ feed = null; if(feedIO){ feedIO.disconnect(); feedIO = null; } }
+function feedStart(box, seq){
+  feedReset();
+  feed = { hot:0, more:null, mi:0, seen:new Set(), loading:false, done:false, box, seq, sent:el('div', 'feedEnd', '') };
+  box.append(feed.sent);
+  feedMore(true);
+  if('IntersectionObserver' in window){
+    feedIO = new IntersectionObserver(es => { if(es.some(e => e.isIntersecting)) feedMore(); }, { rootMargin:'600px 0px' });
+    feedIO.observe(feed.sent);
+  }
+}
+async function feedMore(first){
+  const f = feed; if(!f || f.loading || f.done || f.seq !== khoSeq) return;
+  f.loading = true;
+  try{
+    const N = first ? 15 : 20;
+    if(f.hot < hotCache.length){
+      const part = hotCache.slice(f.hot, f.hot + N);
+      part.forEach((h, i) => { f.seen.add(h.best.id); f.box.insertBefore(khoRow(h.best, { rank:f.hot + i + 1, versions:h.versions, key:h.key, tone:null }), f.sent); });
+      f.hot += part.length;
+    }else{
+      if(!f.more){
+        f.sent.textContent = 'Đang tải thêm…';
+        let d; try{ d = await kapi('/api/kho/new'); }catch(e){ d = { items:[] }; }
+        if(feed !== f) return;
+        f.more = (d.items || []).filter(v => !f.seen.has(v.id));
+        if(f.more.length) f.box.insertBefore(khoHead('⭐ Khách hay chọn · bài mới · nhiều lượt xem'), f.sent);
+      }
+      const part = f.more.slice(f.mi, f.mi + N);
+      part.forEach(v => { f.seen.add(v.id); f.box.insertBefore(khoRow(v, {}), f.sent); });
+      f.mi += part.length;
+      if(f.mi >= f.more.length){ f.done = true; f.sent.textContent = f.more.length ? 'Đã hết gợi ý. Gõ tên bài để tìm thêm.' : ''; }
+      else f.sent.textContent = '';
+    }
+  }finally{ f.loading = false; }
+  // màn hình còn trống (tablet to) → nạp tiếp cho đầy
+  if(feed === f && !f.done && f.sent.getBoundingClientRect().top < innerHeight + 500) setTimeout(() => feedMore(), 50);
+}
+/* Kết quả tìm: ít bài (≤ 6 nhóm) → trải phẳng MỌI bản phối, xếp theo lượt xem YouTube giảm dần (đan xen các nhóm) để khách thấy hết;
+   nhiều bài → gom nhóm như cũ, bấm "… bản khác" mở hộp chọn bản. Cuộn xuống tới đáy thì nạp tiếp. */
+/* Lọc chất lượng (tầng 1, luật đơn giản): kênh ⭐ luôn giữ; còn lại phải có chữ karaoke/beat/... trong tên hoặc kênh VÀ ≥ 100 lượt xem.
+   Chỉ lọc khi còn ≥ 2 bản tốt (bài mới ra ít lượt xem vẫn hiện); bản bị ẩn có nút "Hiện thêm". */
+const KARA_RE = /karaoke|kara\b|beat|instrumental|nhac nen|nhạc nền|lyric|tone (nam|nu|nữ)|playback/i, MIN_VIEWS = 100;
+function qualitySplit(list){
+  const good = [], low = [];
+  list.forEach(v => (v.star || (KARA_RE.test((v.title || '') + ' ' + (v.channel || '')) && (v.views || 0) >= MIN_VIEWS) ? good : low).push(v));
+  return good.length >= 2 ? { good, low } : { good:list, low:[] };
+}
+function lowBtn(box, low, mk, before){
+  if(!low.length) return;
+  const b = btn('Hiện thêm ' + low.length + ' bản ít lượt xem / không rõ là karaoke', 'ghost', () => { low.forEach(v => box.insertBefore(mk(v), b)); b.remove(); });
+  if(before) box.insertBefore(b, before); else box.append(b);
+}
+const FLAT_MAX_GROUPS = 6, FLAT_CAP = 150, versCache = new Map();
+async function versionsOf(key, tone){
+  const k = key + '|' + tone; if(versCache.has(k)) return versCache.get(k);
+  const d = await kapi('/api/kho/versions?key=' + encodeURIComponent(key) + (tone != null ? '&tone=' + encodeURIComponent(tone) : ''));
+  const items = d.items || []; versCache.set(k, items); return items;
+}
+async function showGroups(box, groups, seq, suffix){
+  const n = groups.length, head = t => khoHead('Kho karaoke (' + t + suffix + ')');
+  const grouped = () => {
+    box.replaceChildren(head(n + (n >= 30 ? '+' : '') + ' bài'));
+    groups.forEach(x => box.append(khoRow(x.best, { versions:x.versions, key:x.key, tone:x.tone })));
+  };
+  if(n > FLAT_MAX_GROUPS || !groups.some(x => x.versions > 1)){ grouped(); return; }
+  box.replaceChildren(head(n + ' bài'), el('div', 'hint', 'Đang liệt kê đủ các bản phối…'));
+  let rows;
+  try{
+    const lists = await Promise.all(groups.map(x => x.versions > 1 ? versionsOf(x.key, x.tone != null ? x.tone : null) : Promise.resolve([x.best])));
+    const seen = new Set(); rows = [];
+    lists.forEach(l => l.forEach(v => { if(v && !seen.has(v.id)){ seen.add(v.id); rows.push(v); } }));
+  }catch(e){ if(seq === khoSeq) grouped(); return; }
+  if(seq !== khoSeq) return;
+  rows.sort((a, b) => (b.views || 0) - (a.views || 0));
+  const qs = qualitySplit(rows); rows = qs.good.slice(0, FLAT_CAP);
+  feedReset();
+  box.replaceChildren(head(rows.length + ' bản phối · nhiều lượt xem xếp trước'));
+  const sent = el('div', 'feedEnd', ''); box.append(sent);
+  let i = 0, lowShown = false;
+  const more = () => {
+    if(seq !== khoSeq) return;
+    rows.slice(i, i + 30).forEach(v => box.insertBefore(khoRow(v, {}), sent)); i += 30;
+    if(i >= rows.length){ if(feedIO){ feedIO.disconnect(); feedIO = null; } sent.textContent = ''; if(!lowShown){ lowShown = true; lowBtn(box, qs.low.slice(0, 60), v => khoRow(v, {}), sent); } }
+    else if(sent.getBoundingClientRect().top < innerHeight + 500) setTimeout(more, 50);
+  };
+  more();
+  if(i < rows.length && 'IntersectionObserver' in window){
+    feedIO = new IntersectionObserver(es => { if(es.some(e => e.isIntersecting)) more(); }, { rootMargin:'600px 0px' });
+    feedIO.observe(sent);
+  }
+}
+function khoHead(title, act){ const head = el('div', 'secHead'); head.append(el('b', null, title)); if(act){ const a = el('span', 'secAct'); a.append(act); head.append(a); } return head; }
+async function renderKho(){
+  const box = $('khoSec');
+  if(!hasKho()){ box.replaceChildren(); return 0; }
+  const raw = $('q').value.trim(), p = parseYT(raw), seq = ++khoSeq;
+  if(raw !== gateFor && gateFor){ gateFor = ''; if($('results').querySelector('.notice')) $('results').replaceChildren(); }
+  if(raw) feedReset();
+  if(p.vid || p.list){ box.replaceChildren(); return 0; }
+  try{
+    if(!raw){
+      if(!hotCache){
+        box.replaceChildren(khoHead('🔥 Bài hot'), el('div', 'hint', 'Đang tải…'));
+        const d = await kapi('/api/kho/hot?limit=100'); feedReset(); hotCache = d.items || []; sugCache = d.suggest || []; setQuota(d.quota);
+      }
+      if(seq !== khoSeq) return 0;
+      box.replaceChildren(khoHead('🔥 Bài hot (' + hotCache.length + ')', btn('↻', 'ghost', () => { hotCache = null; renderKho(); })));
+      if(!hotCache.length && !sugCache.length) box.append(el('div', 'msg', 'Kho chưa có bài. Thêm kênh karaoke ở trang kho.html, kho sẽ tự đầy dần.'));
+      feedStart(box, seq);
+      return 0;
+    }
+    if(raw.length < 2){ box.replaceChildren(); lastKho = { q:raw, n:0 }; return 0; }
+    const loc = localKho(raw, 30);
+    if(loc && loc.length){
+      lastKho = { q:raw, n:loc.length };
+      await showGroups(box, loc.map(g => ({ best:{ id:g.id, title:g.title, channel:g.channel, tone:g.tone, views:g.views, picks:g.picks }, versions:g.versions, key:g.key, tone:g.tone })), seq, ' · trên máy');
+      return loc.length;
+    }
+    const d = await kapi('/api/kho/search?q=' + encodeURIComponent(raw) + '&limit=30');
+    if(seq !== khoSeq) return 0;
+    const g = d.groups || [];
+    lastKho = { q:raw, n:g.length };
+    if(!g.length){ box.replaceChildren(khoHead('Kho karaoke (0 bài)'), el('div', 'msg', quotaLeft() === 0 ? 'Kho chưa có bài khớp. Hôm nay đã hết lượt tìm YouTube, bấm Tìm để xem bài gần giống trong kho.' : 'Kho chưa có bài khớp. Bấm Tìm để tìm trên YouTube; bài tìm được sẽ tự vào kho.')); return 0; }
+    await showGroups(box, g, seq, '');
+    return g.length;
+  }catch(e){
+    if(seq !== khoSeq) return 0;
+    lastKho = { q:raw, n:0 };
+    if(e.status === 401 || e.reason === 'origin') box.replaceChildren(khoHead('Kho karaoke'), el('div', 'hint err', 'Không dùng được kho: ' + khoWhy(e) + '. Kiểm tra ở nút ⚙.'));
+    else box.replaceChildren(khoHead('Kho karaoke'), el('div', 'hint', 'Mạng đang chập chờn, kho sẽ hiện lại khi kết nối ổn. Danh mục trên máy vẫn dùng được ở bên dưới.'));
+    return 0;
+  }
+}
+function khoSoon(){ clearTimeout(khoTimer); if(IDX) renderKho(); else khoTimer = setTimeout(renderKho, 300); }   // có danh mục trên máy: tìm ngay, không chờ
+
+/* ---------- Danh mục kho trên máy (giống songs.dat của SmartK) ----------
+   Tải /api/kho/index tối đa 1 lần/ngày, lưu IndexedDB, quá 7 ngày thì xoá (dữ liệu YouTube không giữ quá 30 ngày).
+   Gõ là tìm ngay trên máy, kể cả gõ tắt chữ cái đầu: "slca" → Sai lầm của anh, "tnp" → Tình nhạt phai.
+   Trên máy không có thì mới hỏi Worker (FTS), rồi YouTube như trước. */
+const IDX_MAX_AGE = 7 * DAY;
+let IDX = null;
+const vnDay = t => new Date(t + 7 * 3600000).toISOString().slice(0, 10);
+const asc = s => nd(s).replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+function idbOpen(){
+  return new Promise((res, rej) => {
+    if(!window.indexedDB) return rej(new Error('no idb'));
+    const r = indexedDB.open('bmb_kho', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('kv');
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  });
+}
+async function idb(mode, fn){
+  const db = await idbOpen();
+  return new Promise(res => { const tx = db.transaction('kv', mode); const q = fn(tx.objectStore('kv')); tx.oncomplete = () => res(q && q.result); tx.onerror = tx.onabort = () => res(null); });
+}
+/* Dựng danh mục theo từng đợt nhỏ, nhường máy giữa các đợt: máy tính bảng yếu không bị đứng vài giây (lúc đó chạm ô tìm gõ không ăn) */
+async function prepIndex(d){
+  const rows = d.rows || [], chans = d.chans || [], list = new Array(rows.length);
+  for(let i = 0; i < rows.length; i++){
+    const r = rows[i], key = String(r[0] || ''), tw = asc(r[3]);
+    list[i] = { key, tone: r[1] || '', id: r[2], title: r[3], channel: chans[r[4]] || '', versions: r[5] || 1, hot: r[6] || 0, views: r[7] || 0, picks: r[8] || 0,
+             ab: key.split(' ').filter(Boolean).map(w => w[0]).join(''), hay: ' ' + key + ' ' + tw + ' ' };
+    if(i % 1500 === 1499) await new Promise(res => setTimeout(res, 16));
+  }
+  return { v: d.v, at: d.at, list };
+}
+function paintIdx(got){
+  const l = $('idxLine'); if(!IDX){ l.style.display = 'none'; return; }
+  if(GUEST || bc.tablet){ l.style.display = 'none'; return; }
+  l.style.display = ''; l.textContent = 'Danh mục trên máy: ' + IDX.list.length.toLocaleString('vi-VN') + ' bài · tải ' + new Date(got || IDX.at).toLocaleDateString('vi-VN') + ' · gõ tắt được, vd. “slca”.';
+}
+let idxLoading = false;
+async function loadIndex(){
+  if(!hasKho() || idxLoading) return;
+  idxLoading = true;
+  try{
+    let saved = null; try{ saved = await idb('readonly', st => st.get('index')); }catch(e){}
+    if(saved && (!saved.got || Date.now() - saved.got > IDX_MAX_AGE)){ try{ await idb('readwrite', st => st.delete('index')); }catch(e){} saved = null; }
+    if(saved && !IDX){ IDX = await prepIndex(saved.d); paintIdx(saved.got); if($('q').value.trim()) renderKho(); }
+    if(saved && saved.d.v === vnDay(Date.now())) return;                       // hôm nay đã tải
+    const res = await fetch(cfg.kho + '/api/kho/index', { headers: Object.assign({}, khoAuth(), saved && saved.etag ? { 'If-None-Match': saved.etag } : {}) });
+    if(res.status === 304 && saved){ saved.got = Date.now(); try{ await idb('readwrite', st => st.put(saved, 'index')); }catch(e){} paintIdx(saved.got); return; }
+    if(!res.ok) return;
+    const d = await res.json(), rec = { d, etag: res.headers.get('ETag') || '', got: Date.now() };
+    try{ await idb('readwrite', st => st.put(rec, 'index')); }catch(e){}
+    IDX = await prepIndex(d); paintIdx(rec.got);
+    if($('q').value.trim()) renderKho();
+  }catch(e){}
+  finally{ idxLoading = false; }
+}
+// Xếp hạng: khớp đủ chữ cái đầu > tên bài bắt đầu bằng chữ gõ > khớp đầu chuỗi viết tắt > khớp từng từ; bằng nhau thì bài hot, được chọn nhiều, nhiều lượt xem
+function localKho(raw, lim){
+  if(!IDX) return null;
+  const q = asc(raw); if(q.length < 2) return [];
+  let toks = q.split(' ').filter(w => !QN.has(w)); if(!toks.length) toks = q.split(' ');
+  const qs = toks.join(' '), one = toks.length === 1 ? toks[0] : null, abOk = one && /^[a-z]{2,10}$/.test(one);
+  const hits = [];
+  for(const g of IDX.list){
+    let tier = 0;
+    if(abOk && g.ab === one) tier = 4;
+    else if(g.key.startsWith(qs)) tier = 3;
+    else if(abOk && one.length >= 3 && g.ab.startsWith(one)) tier = 2;
+    else if(toks.every(t => g.hay.includes(' ' + t))) tier = 1;
+    if(tier) hits.push([tier, g]);
+  }
+  hits.sort((a, b) => b[0] - a[0] || b[1].hot - a[1].hot || b[1].picks - a[1].picks || b[1].views - a[1].views);
+  return hits.slice(0, lim).map(x => x[1]);
+}
+const QN = new Set(['karaoke', 'beat', 'tone', 'ton', 'nhac', 'song', 'bai', 'hat', 'lyric', 'lyrics', 'hd', 'mv']);
+
+/* ---------- Ô nhập thông minh: link bài → thêm; link playlist → nạp; còn lại → tìm ---------- */
+function go(){
+  const p = parseYT($('q').value);
+  if(p.vid) return addByLink(p.vid);
+  if(p.list) return loadPlaylist(p.list);
+  return search();
+}
+$('goBtn').onclick = go;
+$('q').addEventListener('keydown', e => { if(e.key === 'Enter') go(); });
+$('q').addEventListener('input', () => { updateDetect(); renderLocal(); khoSoon(); });
+
+/* ---------- Tabs ---------- */
+let curTab = 'search';
+function tab(which){
+  curTab = which;
+  $('paneSearch').style.display = which === 'search' ? '' : 'none';
+  $('paneQueue').style.display = which === 'queue' ? '' : 'none';
+  $('paneOrder').style.display = which === 'order' ? '' : 'none';
+  $('tabSearch').classList.toggle('on', which === 'search'); $('tabQueue').classList.toggle('on', which === 'queue'); $('tabOrder').classList.toggle('on', which === 'order');
+  $('dock').style.display = which === 'order' ? 'none' : '';             // tab gọi phục vụ: thanh gửi yêu cầu thay cho nút điều khiển bài
+  if(which === 'order'){ if(!OD.menu.length || Date.now() - OD.menuAt > 120000) odLoadMenu(); odRender(); }
+  else $('odBar').style.display = 'none';
+}
+$('tabSearch').onclick = () => tab('search'); $('tabQueue').onclick = () => tab('queue'); $('tabOrder').onclick = () => tab('order');
+
+/* ---------- Gọi phục vụ (trước đây là app Order): nước có số lượng, dịch vụ bật/tắt, không tính tiền ----------
+   Xác thực bằng chính mã vào phòng: khách = QR trên TV của lượt đang mở; máy tính bảng = mã máy tính bảng. */
+const OD = { menu:[], cart:{}, branch:'', orderId:'', pollT:null, lsT:null, menuAt:0, sending:false };
+const QTY_MAX = 20;
+function devId(){
+  let d = ''; try{ d = localStorage.getItem('bmb_dev') || ''; }catch(e){}
+  if(!d){ d = 'D' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); try{ localStorage.setItem('bmb_dev', d); }catch(e){} }
+  return d;
+}
+async function odApi(action, data){
+  const r = await fetch(phongApi() + '/api', { method:'POST', headers:{ 'content-type':'application/json' },
+    body: JSON.stringify(Object.assign({ action, dev: devId() }, data || {})) });
+  return r.json();
+}
+const odAuth = () => ({ r: bc.token, role: bc.tablet ? 'tablet' : 'remote' });
+const odItem = c => OD.menu.find(m => m.code === c);
+async function odLoadMenu(){
+  if(!OD.branch) return;
+  OD.menuAt = Date.now();
+  try{ const r = await odApi('menu.get', { branchId: OD.branch }); if(r && r.ok) OD.menu = r.items || []; }catch(e){}
+  Object.keys(OD.cart).forEach(c => { if(!odItem(c)) delete OD.cart[c]; });   // món vừa hết hàng / bị ẩn
+  odDraw(); odRender();
+}
+function odDraw(){
+  const sv = OD.menu.filter(m => m.type === 'SV'), dr = OD.menu.filter(m => m.type === 'DR');
+  const gSv = $('odSv'), gDr = $('odDr'); gSv.replaceChildren(); gDr.replaceChildren();
+  sv.forEach(m => { const b = el('button', 'svbtn'); b.dataset.c = m.code; b.append(el('div', 'ico', m.icon || '🛎️'), el('div', 'tx', m.label));
+    b.onclick = () => { if(OD.cart[m.code]) delete OD.cart[m.code]; else OD.cart[m.code] = 1; odRender(); }; gSv.append(b); });
+  dr.forEach(m => { const r = el('div', 'drow'); r.dataset.c = m.code;
+    const di = el('div', 'di'); di.append(el('span', 'dic', m.icon || '🥤'), el('span', 'dtx', m.label));
+    const q = el('div', 'qty'), mi = el('button', 'qm', '–'), n = el('span', 'qn', '0'), pl = el('button', 'qp', '+');
+    mi.onclick = () => odQty(m.code, -1); pl.onclick = () => odQty(m.code, 1);
+    q.append(mi, n, pl); r.append(di, q); gDr.append(r); });
+  if(!sv.length) gSv.append(el('div', 'odTiny', OD.menu.length ? 'Chưa có dịch vụ nào.' : 'Đang tải menu…'));
+  if(!dr.length) gDr.append(el('div', 'odTiny', OD.menu.length ? 'Chưa có nước nào.' : ''));
+}
+function odQty(c, d){ const n = (OD.cart[c] || 0) + d; if(n <= 0) delete OD.cart[c]; else OD.cart[c] = Math.min(n, QTY_MAX); odRender(); }
+function odRender(){
+  document.querySelectorAll('#odSv .svbtn').forEach(b => b.classList.toggle('on', !!OD.cart[b.dataset.c]));
+  document.querySelectorAll('#odDr .drow').forEach(r => { const n = OD.cart[r.dataset.c] || 0;
+    r.classList.toggle('on', n > 0); r.querySelector('.qn').textContent = n; r.querySelector('.qm').disabled = n <= 0; r.querySelector('.qp').disabled = n >= QTY_MAX; });
+  const ks = Object.keys(OD.cart);
+  $('odSum').textContent = ks.map(c => { const m = odItem(c); return (m ? m.label : c) + (m && m.type === 'DR' ? ' ×' + OD.cart[c] : ''); }).join(' · ');
+  $('odBar').style.display = curTab === 'order' && ks.length ? 'flex' : 'none';
+}
+async function odSend(){
+  const ks = Object.keys(OD.cart); if(!ks.length || OD.sending) return;
+  if(!bc.token){ snack('Máy chưa vào phòng. Quét mã QR trên TV của phòng.', true); return; }
+  OD.sending = true; $('odSendBtn').disabled = true;
+  const items = ks.map(c => ({ code:c, qty: OD.cart[c] }));
+  const listTx = ks.map(c => { const m = odItem(c); return (m ? m.label : c) + (m && m.type === 'DR' ? ' ×' + OD.cart[c] : ''); }).join(', ');
+  try{
+    const r = await odApi('don.tao', Object.assign({ items, note: $('odNote').value.slice(0, 200) }, odAuth()));
+    if(!r || !r.ok){
+      snack((r && r.msg) || 'Không gửi được, vui lòng thử lại hoặc báo nhân viên.', true);
+      if(r && (r.error === 'het_hang' || r.error === 'bad_item')) odLoadMenu();
+    }else{
+      OD.orderId = r.orderId; $('odSentList').textContent = listTx;
+      $('odStTx').textContent = 'Đang chờ quầy tiếp nhận…'; $('odDot').className = 'odDot';
+      $('odSent').style.display = 'flex';
+      OD.cart = {}; $('odNote').value = ''; odRender(); odPoll();
+    }
+  }catch(e){ snack('Mất kết nối mạng. Vui lòng thử lại hoặc báo nhân viên.', true); }
+  OD.sending = false; $('odSendBtn').disabled = false;
+}
+function odPoll(){
+  clearInterval(OD.pollT); let t = 0;
+  OD.pollT = setInterval(async () => {
+    if((t += 5) > 180){ clearInterval(OD.pollT); return; }
+    try{
+      const r = await odApi('don.trangThai', { orderId: OD.orderId }); if(!r || !r.ok) return;
+      if(r.status === 'NHAN'){ $('odStTx').textContent = 'Nhân viên đã tiếp nhận, đang mang lên…'; $('odDot').className = 'odDot go'; }
+      else if(r.status === 'XONG'){ $('odStTx').textContent = 'Đã phục vụ. Chúc quý khách vui vẻ!'; $('odDot').className = 'odDot go'; clearInterval(OD.pollT); setTimeout(odSentClose, 4000); }
+      else if(r.status === 'HUY'){ $('odStTx').textContent = 'Yêu cầu đã được huỷ. Vui lòng liên hệ quầy.'; clearInterval(OD.pollT); }
+    }catch(e){}
+  }, 5000);
+}
+function odSentClose(){ clearInterval(OD.pollT); $('odSent').style.display = 'none'; }
+const LS_TXT = { MOI:['moi','Đã gửi tới nhân viên'], NHAN:['nhan','Đang phục vụ'], XONG:['xong','Đã xong'], HUY:['huy','Đã huỷ'] };
+async function odLsLoad(){
+  try{
+    const r = await odApi('don.cuaPhong', odAuth()); const box = $('odLsBox');
+    if(!r || !r.ok){ box.replaceChildren(el('p', null, (r && r.msg) || 'Chưa xem được.')); return; }
+    box.replaceChildren();
+    if(!(r.orders || []).length){ box.append(el('p', null, 'Chưa có yêu cầu nào.')); return; }
+    r.orders.forEach(o => {
+      const st = LS_TXT[o.status] || ['xong', o.status], it = el('div', 'lsit'), h = el('div', 'h');
+      const d = new Date(o.at); h.append(el('span', null, String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0')), el('span', 'pill ' + st[0], st[1]));
+      const b = el('div', 'b', o.items.map(i => (i.icon ? i.icon + ' ' : '') + i.label + (i.type === 'DR' ? ' ×' + i.qty : '')).join(' · '));
+      it.append(h, b); if(o.note) it.append(el('div', 'n', '“' + o.note + '”')); box.append(it);
+    });
+  }catch(e){}
+}
+function odLsOpen(){ $('odLsBox').replaceChildren(el('p', null, 'Đang tải…')); $('odLs').style.display = 'flex'; odLsLoad(); clearInterval(OD.lsT); OD.lsT = setInterval(odLsLoad, 8000); }
+function odLsClose(){ $('odLs').style.display = 'none'; clearInterval(OD.lsT); }
+$('odSendBtn').onclick = odSend;
+$('odClear').onclick = () => { OD.cart = {}; $('odNote').value = ''; odRender(); };
+$('odLsBtn').onclick = odLsOpen; $('odLsClose').onclick = odLsClose;
+$('odSentClose').onclick = odSentClose; $('odSentLs').onclick = () => { odSentClose(); odLsOpen(); };
+
+/* ---------- Điều khiển ---------- */
+const IC = {
+  replay:'<svg viewBox="0 0 24 24"><path d="M12 5V2L7 6.5 12 11V8a5 5 0 1 1-5 5H5a7 7 0 1 0 7-8z"/></svg>',
+  play:'<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>',
+  pause:'<svg viewBox="0 0 24 24"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>',
+  next:'<svg viewBox="0 0 24 24"><path d="M6 6l9 6-9 6zM16 6h2.5v12H16z"/></svg>',
+  vol:'<svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 4V5L7 9zM16.5 12A4.5 4.5 0 0 0 14 8v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z"/></svg>',
+  mute:'<svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 4V5L7 9zM16.6 12l2.4-2.4-1.4-1.4-2.4 2.4-2.4-2.4-1.4 1.4 2.4 2.4-2.4 2.4 1.4 1.4 2.4-2.4 2.4 2.4 1.4-1.4z"/></svg>',
+  low:'<svg viewBox="0 0 24 24"><path d="M5 9v6h4l5 4V5L9 9z"/></svg>'
+};
+$('replayBtn').innerHTML = IC.replay; $('playBtn').innerHTML = IC.play; $('nextBtn').innerHTML = IC.next; $('muteBtn').innerHTML = IC.vol;
+$('dnBtn').innerHTML = IC.low; $('upBtn').innerHTML = IC.vol; $('volLo').innerHTML = IC.low; $('volHi').innerHTML = IC.vol;
+[['sPlay', IC.play], ['sNext', IC.next], ['sReplay', IC.replay], ['sMute', IC.vol], ['sDown', IC.low], ['sUp', IC.vol]].forEach(([id, ic]) => { $(id).querySelector('.i').innerHTML = ic; });
+$('sPlay').onclick = () => send('play'); $('sNext').onclick = () => send('next'); $('sReplay').onclick = () => send('replay');
+$('sMute').onclick = () => $('muteBtn').click();
+function volStep(d){
+  const v = Math.max(0, Math.min(100, (+$('vol').value || 0) + d));
+  $('vol').value = v; volNum(v); volHold = Date.now(); volSend(v, true);
+}
+$('sDown').onclick = $('dnBtn').onclick = () => volStep(-5); $('sUp').onclick = $('upBtn').onclick = () => volStep(5);
+/* Máy tính bảng xoay ngang (hoặc ?wide=1): bố cục hai cột như SK Player; điện thoại giữ dạng dọc */
+/* Bố cục rộng (máy tính bảng ngang). KHÔNG phụ thuộc chiều cao hiện tại: bàn phím ảo bật lên làm cao màn hình tụt < 500 →
+   trước đây tự chuyển về bố cục dọc giữa lúc đang gõ, ô tìm mất tiêu điểm (bấm vào ô không gõ được). Nay nhớ chiều cao lớn nhất đã thấy
+   của hướng hiện tại, và đang gõ trong ô nhập thì không đổi bố cục. */
+const WIDE_MQ = matchMedia('(orientation: landscape) and (min-width: 900px)');
+let maxH = 0, maxHLand = null;
+function applyWide(){
+  const land = WIDE_MQ.matches;
+  if(maxHLand !== land){ maxHLand = land; maxH = 0; }
+  maxH = Math.max(maxH, innerHeight);
+  const a = document.activeElement, typing = a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName);
+  if(typing && params.get('wide') == null) return;
+  const w = params.get('wide') === '1' || (params.get('wide') !== '0' && land && maxH >= 500);
+  document.body.classList.toggle('wide', w);
+  if(w && curTab === 'queue') tab('search');
+}
+try{ WIDE_MQ.addEventListener('change', applyWide); }catch(e){ try{ WIDE_MQ.addListener(applyWide); }catch(e2){} }
+addEventListener('resize', () => setTimeout(applyWide, 150));
+document.addEventListener('focusout', () => setTimeout(applyWide, 400));
+$('playBtn').onclick = () => send('play'); $('nextBtn').onclick = () => send('next');
+$('replayBtn').onclick = () => send('replay');
+$('muteBtn').onclick = () => { lastMuted = !lastMuted; paintMute(lastMuted); muteHold = Date.now(); send('mute'); };   // đổi icon ngay, TV xác nhận sau
+/* Âm lượng: trong lúc kéo và ngay sau khi thả, không để trạng thái cũ từ TV kéo thanh trượt về chỗ cũ */
+let volTimer, volDrag = false, volHold = 0, volSent = -1, muteHold = 0, lastMuted = false;
+const volNum = v => { $('volN').textContent = v; $('sVolN').textContent = v; $('vol').style.setProperty('--p', v + '%'); };
+function volSend(v, now){
+  clearTimeout(volTimer);
+  const go = () => { if(v !== volSent){ volSent = v; send('vol', { value:v }); } };
+  if(now) go(); else volTimer = setTimeout(go, 60);
+}
+$('vol').addEventListener('input', e => { volHold = Date.now(); const v = +e.target.value; volNum(v); volSend(v, false); });
+$('vol').addEventListener('change', e => { volHold = Date.now(); volSend(+e.target.value, true); });
+['pointerdown','touchstart'].forEach(ev => $('vol').addEventListener(ev, () => { volDrag = true; volHold = Date.now(); }, { passive:true }));
+['pointerup','pointercancel','touchend','touchcancel'].forEach(ev => window.addEventListener(ev, () => { if(volDrag){ volDrag = false; volHold = Date.now(); } }, { passive:true }));
+function paintMute(m){ $('muteBtn').innerHTML = m ? IC.mute : IC.vol; $('muteBtn').classList.toggle('off', !!m);
+  $('sMute').querySelector('.i').innerHTML = m ? IC.mute : IC.vol; $('sMute').classList.toggle('off', !!m); $('sMute').querySelector('.l').textContent = m ? 'Bật tiếng' : 'Tắt tiếng'; }
+
+/* ---------- Nhận trạng thái ---------- */
+bc.onmessage = ev => {
+  const m = ev.data || {};
+  if(m.type === 'dead' && /^[\w-]{11}$/.test(m.id || '')){ markDead(m.id); return; }
+  if(m.type !== 'state') return;
+  const s = m.payload || {};
+  $('nowTitle').textContent = s.apiFailed ? '⚠ Màn hình phát không tải được YouTube, xem hướng dẫn trên màn hình phát'
+    : s.needStart ? '⚠ TV đang chờ một lần bấm OK / chạm màn hình để bật tiếng'
+    : s.ready === false && s.cur >= 0 ? '⏳ Màn hình phát đang khởi động YouTube…'
+    : (s.nowTitle || '—');
+  $('playBtn').innerHTML = s.playing ? IC.pause : IC.play;
+  if(Date.now() - muteHold > 1500){ lastMuted = !!s.muted; paintMute(lastMuted); }
+  if(typeof s.volume === 'number' && !volDrag && Date.now() - volHold > 1500){ $('vol').value = s.volume; volNum(s.volume); volSent = s.volume; }
+  const q = s.queue || [], cur = s.cur;
+  const up = q.filter((x, i) => i > cur).length;                      // số bài sắp hát (không tính bài đang hát)
+  $('qCount').textContent = q.length ? up + (cur >= 0 ? 1 : 0) : 0;
+  confirmFromTv(s);
+  paintSide(s, q, cur);
+  const box = $('queueList'); box.replaceChildren();
+  if(!q.length || (cur >= 0 && cur >= q.length)){ box.append(el('div', 'msg', 'Hàng chờ trống. Chọn bài ở tab Tìm bài.')); return; }
+  q.forEach((it, i) => { if(i >= Math.max(cur, 0)) box.append(queueRow(it, i, cur, i === cur ? null : i - Math.max(cur, 0))); });
+};
+/* Một dòng trong hàng chờ: chạm để mở hộp Ưu tiên / Đẩy lên / Xoá (bài đang hát: Hát lại / Qua bài) */
+function queueRow(it, i, cur, n){
+  const isCur = i === cur;
+  const row = el('div', 'row tap' + (isCur ? ' cur' : ''));
+  if(!isCur) row.append(el('div', 'num', String(n)));
+  const th = thumbOf(it.id);
+  if(th){ const img = document.createElement('img'); img.className = 'qth'; img.alt = ''; img.loading = 'lazy'; img.src = th; row.append(img); }
+  const meta = el('div', 'meta'), sub = el('div', 'sub');
+  if(isCur){ const eq = el('span', 'eq'); eq.innerHTML = '<i></i><i></i><i></i>'; sub.append(eq, 'ĐANG HÁT'); }
+  else sub.textContent = n === 1 ? 'Hát kế tiếp' : 'Chờ';
+  meta.append(el('div', 'name', it.title), sub); row.append(meta);
+  row.onclick = () => queueAsk(it, i, cur);
+  return row;
+}
+function queueAsk(it, i, cur){
+  if(i === cur) return pickBox(it.title, thumbOf(it.id), [['HÁT LẠI', '', () => send('replay')], ['QUA BÀI', 'y', () => send('next')]], true);
+  const b = [];
+  if(i > cur + 1) b.push(['ƯU TIÊN', 'y', () => { send('prio', { index:i }); snack('⏫ Hát ngay sau bài này: ' + it.title); }], ['ĐẨY LÊN', '', () => send('up', { index:i })]);
+  b.push(['XOÁ', 'r', () => send('remove', { index:i })]);
+  pickBox(it.title, thumbOf(it.id), b, true);
+}
+/* Cột phải trên máy tính bảng xoay ngang */
+function paintSide(s, q, cur){
+  const now = cur >= 0 ? q[cur] : null, th = $('sTh');
+  th.replaceChildren();
+  if(now && thumbOf(now.id)){ const img = document.createElement('img'); img.alt = ''; img.src = thumbOf(now.id); th.append(img); }
+  else th.append(el('span', 'idle', 'VUI LÒNG CHỌN BÀI HÁT'));
+  const tt = $('sTitle'); tt.replaceChildren();
+  if(now){ const eq = el('span', 'eq'); eq.innerHTML = '<i></i><i></i><i></i>'; tt.append(eq, now.title); } else tt.textContent = $('nowTitle').textContent;
+  $('sPlay').querySelector('.i').innerHTML = s.playing ? IC.pause : IC.play; $('sPlay').querySelector('.l').textContent = s.playing ? 'Dừng' : 'Phát';
+  const list = $('sList'); list.replaceChildren();
+  const nx = []; q.forEach((it, i) => { if(i > cur) nx.push([it, i]); });
+  $('sCount').textContent = nx.length;
+  if(!nx.length) list.append(el('div', 'msg', 'Chưa có bài kế tiếp.'));
+  nx.forEach(([it, i], k) => list.append(queueRow(it, i, cur, k + 1)));
+}
+
+/* ---------- Kênh phòng ---------- */
+const BANNER = {
+  waiting:'Phòng chưa mở. Nhờ nhân viên mở phòng — trang sẽ tự nối lại.',
+  closed:'Phòng chưa mở. Nhờ nhân viên mở phòng.',
+  ended:'Phòng đã đóng. Cảm ơn quý khách! Muốn hát tiếp, hãy nhờ nhân viên mở phòng rồi quét mã QR mới trên TV.',
+  rotated: bc.tablet ? 'Máy tính bảng này đã được gỡ khỏi phòng (phòng đã gán máy khác). Bấm ô PHÒNG ở góc trên để gán lại.' : 'Mã QR này đã hết hiệu lực. Vui lòng quét mã QR mới ở góc trái màn hình TV.',
+  network:'Vui lòng kết nối wifi của quán rồi quét lại mã QR trên TV.',
+  full:'Phòng đã đủ số điện thoại kết nối. Vui lòng nhờ nhân viên hỗ trợ.',
+  replaced:'Phòng đã chuyển sang thiết bị khác.', expired:'Không nối được phòng. Vui lòng quét lại mã QR trên TV.',
+  offline:'Mất kết nối, đang nối lại…', connecting:'Đang nối vào phòng…'
+};
+function banner(t){ const b = $('roomBanner'); b.textContent = t || ''; b.style.display = t ? 'block' : 'none'; document.body.classList.toggle('roomOff', !!t); }
+if(GUEST){
+  bc.onroom = m => {
+    if(m.name && m.name !== roomName){ roomName = m.name; paintTag(); }
+    if(m.branch && m.branch !== OD.branch){ OD.branch = m.branch; $('tabOrder').style.display = ''; if(curTab === 'order') odLoadMenu(); }
+    if(m.gt){ const first = !guestTok; guestTok = m.gt; if(first){ showQuota(); renderKho(); loadIndex(); } }
+    if(m.open){ banner(''); send('hello'); } else banner(BANNER[m.reason === 'notopen' ? 'waiting' : 'closed']);
+  };
+  bc.onstatus = s => { if(s !== 'open' && s !== 'closed' && s !== 'waiting') banner(BANNER[s] || ''); else if(s === 'waiting') banner(BANNER.waiting); };
+}
+
+/* ---------- Máy tính bảng của phòng: bấm ô PHÒNG → quét QR khách ở góc trái TV → máy tự theo phòng qua mọi lượt ---------- */
+const tokFromQr = raw => { raw = String(raw || '').trim(); const m = raw.match(/[?&]r=([^&#\s]+)/); let t = m ? m[1] : raw; try{ t = decodeURIComponent(t); }catch(e){} return /^[A-Za-z0-9_-]{1,40}\.\d{1,6}\.[\w-]{22}$/.test(t) ? t : ''; };
+function assignTablet(){
+  openQrScanner({
+    title: 'Gán máy tính bảng vào phòng',
+    hint: 'Mở phòng trước, rồi quét mã QR đang hiện ở góc trái màn hình TV của phòng đặt máy này. Máy phải dùng wifi của quán.',
+    manualPlaceholder: 'hoặc dán liên kết QR của phòng',
+    onResult: async raw => {
+      const r = tokFromQr(raw);
+      if(!r) return 'Đây không phải mã QR phòng. Quét mã ở góc trái TV.';
+      const res = await fetch(phongApi() + '/api/tablet/claim', { method:'POST', headers:{ 'content-type':'application/json' }, body: JSON.stringify({ r }) });
+      let d = {}; try{ d = await res.json(); }catch(e){}
+      if(!res.ok || !d.tok) return d.error || ('Lỗi ' + res.status);
+      try{ localStorage.setItem(TB_KEY, d.tok); localStorage.setItem('bmb_tablet', '1'); }catch(e){ return 'Trình duyệt không cho lưu dữ liệu (chế độ ẩn danh?).'; }
+      snack('✓ Đã gán máy này vào phòng ' + (d.name || d.id));
+      setTimeout(() => location.replace(location.pathname), 800);
+      return true;
+    }
+  });
+}
+$('roomTag').onclick = () => {
+  if(GUEST && !bc.tablet){ snack('Bạn đang ở phòng ' + (roomName || '') + '. Đổi phòng: quét mã QR ở góc trái TV của phòng đó.', true); return; }
+  if(confirm(bc.tablet ? 'Đổi phòng cho máy tính bảng này?' : 'Gán máy này làm máy tính bảng chọn bài của một phòng?')) assignTablet();
+};
+
+/* ---------- Khởi động ---------- */
+applyWide(); showQuota(); updateDetect(); renderLocal(); autoRefresh(); loadPlaylistNames(true); renderKho(); loadIndex();
+send('hello');
+</script>
+</body>
+</html>

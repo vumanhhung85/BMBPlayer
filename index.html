@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BMB Player</title>
+<meta name="theme-color" content="#000000">
+<style>
+  :root{
+    --bg:#05050a; --panel:rgba(14,14,22,.92); --line:#2a2a3a;
+    --ink:#f2f2f7; --quiet:#a3a3ba; --accent:#8b5cf6; --accent2:#c084fc;
+    --good:#34d399; --warn:#fbbf24; --bad:#f43f5e;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{background:#000; color:var(--ink); font-family:-apple-system,"Segoe UI",Roboto,Arial,sans-serif; overflow:hidden; user-select:none; cursor:none}
+  body.ui{cursor:default}
+
+  /* ===== Màn hình phát: video tràn viền, không thanh tiêu đề ===== */
+  #stage{position:fixed; inset:0; background:#000}
+  #yt, #stage iframe{position:absolute; inset:0; width:100%; height:100%; border:0}
+
+  /* ===== Màn hình chờ (giống màn hình chờ của SK Player: logo, giờ, trạng thái sẵn sàng) ===== */
+  #idle{position:absolute; inset:0; z-index:5; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; padding:24px; text-align:center;
+    background:radial-gradient(1300px 700px at 50% 38%, #2a1f4a 0%, #120d22 45%, var(--bg) 78%)}
+  #idle::before{content:""; position:absolute; inset:0; opacity:.5;
+    background:radial-gradient(500px 300px at 15% 85%, rgba(192,132,252,.25), transparent 70%), radial-gradient(520px 320px at 88% 12%, rgba(139,92,246,.25), transparent 70%)}
+  #idle > *{position:relative}
+  .logo{height:clamp(80px,19vh,230px); width:auto; max-width:60vw; object-fit:contain; filter:drop-shadow(0 10px 40px rgba(139,92,246,.55))}
+  /* Logo nhỏ ở góc phải trên khi đang phát (nằm dưới màn hình chờ nên tự ẩn khi chờ) */
+  #cornerLogo{position:absolute; right:2vw; top:1.8vh; height:9vh; width:auto; z-index:4; opacity:.88; pointer-events:none; filter:drop-shadow(0 3px 10px rgba(0,0,0,.7))}
+  #idle h1{font-size:clamp(28px,5vw,64px); letter-spacing:.5px}
+  #idle h1 span{color:var(--accent2)}
+  #clock{font-size:clamp(40px,8vw,110px); font-weight:300; letter-spacing:3px; font-variant-numeric:tabular-nums; color:#fff; text-shadow:0 4px 30px rgba(139,92,246,.6)}
+  #dateLine{font-size:clamp(14px,2vw,26px); color:var(--quiet); margin-top:-8px}
+  #readyPill{display:inline-flex; align-items:center; gap:12px; background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.14); border-radius:999px;
+    padding:12px 26px; font-size:clamp(16px,2.2vw,30px); font-weight:700}
+  #readyPill i{width:14px;height:14px;border-radius:50%;background:var(--warn); box-shadow:0 0 12px var(--warn)}
+  #readyPill.ok i{background:var(--good); box-shadow:0 0 14px var(--good); animation:pulse 2s infinite}
+  #readyPill.bad i{background:var(--bad); box-shadow:0 0 14px var(--bad)}
+  @keyframes pulse{50%{opacity:.35}}
+  #hint{color:var(--quiet); font-size:clamp(14px,1.8vw,24px); max-width:60ch; line-height:1.6}
+  #roomNote{display:none; font-size:clamp(16px,2vw,26px); color:var(--warn); font-weight:700}
+  #setup{display:none; background:rgba(255,255,255,.06); border:1px solid rgba(251,191,36,.6); border-radius:16px; padding:18px 22px; max-width:min(94vw,900px); text-align:left}
+  #setup b{color:var(--warn); font-size:clamp(16px,2vw,26px)}
+  #setup p{color:var(--quiet); font-size:clamp(13px,1.5vw,19px); line-height:1.6; margin:6px 0 10px}
+  #setup p b{font-size:inherit; color:var(--ink)}
+  .pairWrap{display:flex; gap:clamp(14px,2.4vw,32px); align-items:center}
+  #pairQr{flex:0 0 auto; width:clamp(150px,24vh,300px); aspect-ratio:1; background:#fff; border-radius:14px; padding:8px; display:flex; align-items:center; justify-content:center; color:#555; font-size:13px}
+  #pairQr img{width:100%; height:100%; image-rendering:pixelated; display:block}
+  #pairCode{font:800 clamp(40px,7vw,92px)/1.05 ui-monospace,Consolas,monospace; letter-spacing:.08em; color:#fff; text-shadow:0 4px 24px rgba(139,92,246,.6)}
+  #pairSub{color:var(--quiet); font-size:clamp(12px,1.3vw,16px); margin-top:4px}
+  #setup details{margin-top:12px; color:var(--quiet); font-size:14px}
+  #setup summary{cursor:pointer; margin-bottom:8px}
+  #setup .f{display:flex; gap:10px}
+
+  /* ===== QR khách ở góc trái (chỉ khi phòng đang mở; đổi mỗi lượt mở phòng) ===== */
+  :root{--gqrS:clamp(96px,18.5vh,244px)}
+  #gqr{position:absolute; left:1.6vw; top:2vh; z-index:11; display:none; background:#fff; border-radius:14px; padding:.9vh .9vh .5vh; text-align:center; box-shadow:0 6px 30px rgba(0,0,0,.55); pointer-events:none}
+  #gqr .qw{position:relative; width:var(--gqrS); height:var(--gqrS)}
+  #gqr .qtag{position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); white-space:nowrap; line-height:1; text-align:center;
+    font-family:"Arial Black",Impact,"Segoe UI",Arial,sans-serif; font-weight:900; color:#FFD21A;
+    background:linear-gradient(180deg,#8f2fd8,#5b1fa8); border:solid #fff; border-radius:.3em; padding:.16em .3em .2em;
+    text-shadow:.045em 0 0 #3b0a73,-.045em 0 0 #3b0a73,0 .045em 0 #3b0a73,0 -.045em 0 #3b0a73,.035em .035em 0 #3b0a73,-.035em .035em 0 #3b0a73,.035em -.035em 0 #3b0a73,-.035em -.035em 0 #3b0a73;
+    box-shadow:0 0 0 .05em rgba(255,255,255,.9)}
+  #gqr img{width:var(--gqrS); height:var(--gqrS); display:block; image-rendering:pixelated}
+  #gqr .l{font:700 clamp(9px,1.35vh,17px)/1.25 Arial,sans-serif; color:#5b21b6; margin-top:.3vh}
+  #gqr .r{font:700 clamp(8px,1.1vh,14px)/1.2 Arial,sans-serif; color:#555}
+  body.hasqr #ovTitle{left:calc(1.6vw + var(--gqrS) + 4vh)}
+  #setup input{flex:1; min-width:0; background:#0e0e16; color:var(--ink); border:1px solid var(--line); border-radius:12px; padding:12px 14px; font-size:16px}
+  #setup button{background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; border:none; border-radius:12px; padding:0 20px; font-size:16px; font-weight:700; cursor:pointer}
+  #setup .err{color:#fecdd3; font-size:14px; margin-top:8px; min-height:1em}
+  #setup a{color:var(--quiet); font-size:13px}
+  #fileWarn{display:none; background:#2a2110; border:1px solid var(--warn); color:#fef3c7; padding:10px 16px; border-radius:12px; max-width:68ch; font-size:14px; line-height:1.55}
+  #diag{display:none; background:#2a1416; border:1px solid #7f1d1d; color:#fecdd3; padding:12px 16px; border-radius:12px; max-width:68ch; font-size:15px; line-height:1.6; text-align:left}
+  #diag button{margin-top:8px; background:#7f1d1d; color:#fff; border:none; border-radius:10px; padding:8px 14px; font-weight:700; cursor:pointer}
+
+  /* ===== Lớp phủ khi đang phát (nhỏ gọn, chừa góc dưới bên phải cho nút của YouTube) ===== */
+  .ov{position:absolute; z-index:8; pointer-events:none; opacity:0; transition:opacity .6s, transform .6s}
+  .ov.show{opacity:1; transform:none}
+  #ovTitle{left:2.2vw; top:2.4vh; transform:translateY(-12px); max-width:70vw; display:flex; gap:12px; align-items:center;
+    background:linear-gradient(90deg,rgba(0,0,0,.72),rgba(0,0,0,.35)); border-left:5px solid var(--accent2); border-radius:12px; padding:10px 20px}
+  #ovTitle .lbl{font-size:clamp(11px,1.2vw,16px); color:var(--accent2); font-weight:700; letter-spacing:1px}
+  #ovTitle .t{font-size:clamp(16px,2.4vw,34px); font-weight:700; text-shadow:0 2px 8px #000; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  #ovNext{left:2.2vw; bottom:5vh; transform:translateY(12px); max-width:66vw;
+    background:linear-gradient(90deg,rgba(0,0,0,.72),rgba(0,0,0,.35)); border-left:5px solid var(--good); border-radius:12px; padding:9px 20px}
+  #ovNext .lbl{font-size:clamp(11px,1.2vw,16px); color:var(--good); font-weight:700; letter-spacing:1px}
+  #ovNext .t{font-size:clamp(15px,2vw,28px); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  #ovCount{right:calc(2vw + 15vh); top:2.4vh; transform:translateY(-12px); background:rgba(0,0,0,.6); border-radius:999px; padding:6px 16px; font-size:clamp(13px,1.6vw,22px); font-weight:700}
+  #ovAdd{right:2.2vw; top:12.5vh; transform:translateX(16px); max-width:46vw; background:rgba(5,95,70,.85); border-left:5px solid var(--good); border-radius:12px; padding:9px 18px}
+  #ovAdd.show{transform:none}
+  #ovAdd .lbl{font-size:clamp(11px,1.2vw,16px); color:#a7f3d0; font-weight:700; letter-spacing:1px}
+  #ovAdd .t{font-size:clamp(14px,1.8vw,24px); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  #lock{left:50%; bottom:11vh; transform:translate(-50%,12px); text-align:center; z-index:12;
+    background:rgba(42,33,16,.95); border:2px solid var(--warn); color:#fef3c7; border-radius:16px; padding:14px 26px; font-size:clamp(16px,2.2vw,30px); font-weight:700; max-width:80vw}
+  #lock.show{transform:translate(-50%,0)}
+  #toast{left:50%; bottom:4vh; transform:translate(-50%,10px); z-index:20; background:#2a1220; border:1px solid var(--bad); color:#ffe4e6; padding:12px 18px; border-radius:12px;
+    max-width:min(90%,720px); font-size:clamp(13px,1.5vw,20px); line-height:1.55; white-space:pre-line; text-align:center}
+  #toast.show{transform:translate(-50%,0)}
+  /* Âm lượng hiện trên TV khi đổi từ remote / quầy / điều khiển TV */
+  #volOsd{right:2.2vw; top:50%; transform:translate(16px,-50%); z-index:15; display:flex; flex-direction:column; align-items:center; gap:1.4vh;
+    background:rgba(10,8,22,.82); border:2px solid rgba(192,132,252,.55); border-radius:22px; padding:2.2vh 1.4vw; min-width:clamp(64px,6vw,110px);
+    box-shadow:0 10px 40px rgba(0,0,0,.6)}
+  #volOsd.show{transform:translate(0,-50%)}
+  #volOsd svg{width:clamp(26px,3vw,48px); height:clamp(26px,3vw,48px); fill:#fff}
+  #volOsd .vb{width:clamp(10px,.9vw,16px); height:26vh; background:rgba(255,255,255,.15); border-radius:99px; overflow:hidden; display:flex; align-items:flex-end}
+  #volOsd .vb i{display:block; width:100%; background:linear-gradient(0deg,#7c3aed,#FFD21A); border-radius:99px; transition:height .15s}
+  #volOsd b{font-size:clamp(20px,2.6vw,42px); font-weight:800; color:#FFD21A; font-variant-numeric:tabular-nums}
+  #volOsd.muted b{color:#f87171} #volOsd.muted .vb i{background:#555}
+
+  #progress{position:absolute; left:0; right:0; bottom:0; height:3px; z-index:9; background:rgba(255,255,255,.08); pointer-events:none}
+  #progress i{display:block; height:100%; width:0; background:linear-gradient(90deg,var(--accent),var(--accent2))}
+
+  /* ===== Bảng điều khiển: ẩn mặc định, hiện khi di chuột / bấm phím (để thử trên máy tính) ===== */
+  #panel{position:absolute; left:0; right:0; bottom:0; z-index:15; background:var(--panel); border-top:1px solid var(--line);
+    transform:translateY(100%); transition:transform .25s}
+  body.ui #panel{transform:none}
+  /* TV thật trong phòng (đã gán phòng): remote lo mọi điều khiển → không hiện bảng điều khiển khi rê chuột */
+  body.inroom #panel{display:none}
+  #verTag{position:absolute; right:1.2vw; bottom:1.2vh; z-index:14; font-size:clamp(11px,1.05vw,15px); color:#cfcfe6; background:rgba(0,0,0,.55); border-radius:8px; padding:4px 10px;
+    opacity:0; transition:opacity .3s; pointer-events:none; font-variant-numeric:tabular-nums}
+  body.ui #verTag{opacity:.95}
+  body.idleOn #verTag{opacity:.55}
+  #controls{padding:10px 18px; display:flex; align-items:center; gap:12px; flex-wrap:wrap}
+  .btn{background:#20202e; border:1px solid var(--line); color:var(--ink); border-radius:12px; padding:10px 16px; font-size:15px; cursor:pointer}
+  .btn:hover{border-color:var(--accent)}
+  .btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent2)); border:none; font-weight:700}
+  .grp{display:flex; align-items:center; gap:8px; background:#0e0e16; border:1px solid var(--line); border-radius:12px; padding:6px 12px}
+  .grp label{color:var(--quiet); font-size:13px}
+  .spacer{flex:1}
+  #roomTag{background:var(--accent); color:#fff; font-weight:700; padding:4px 12px; border-radius:999px; font-size:14px}
+  #queueStrip{display:flex; gap:10px; padding:10px 18px; background:#0e0e16; border-top:1px solid var(--line); overflow-x:auto; min-height:58px; align-items:center}
+  .qchip{flex:0 0 auto; background:#1b1b28; border:1px solid var(--line); border-radius:10px; padding:8px 14px; display:flex; gap:10px; font-size:14px; max-width:320px}
+  .qchip .n{color:var(--accent2); font-weight:700}
+  .qchip .t{white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .qchip.cur{border-color:var(--accent); background:#241b3a}
+  .empty{color:var(--quiet); font-size:14px}
+  kbd{background:#000;border:1px solid var(--line);border-radius:6px;padding:1px 7px;font-size:12px}
+</style>
+</head>
+<body>
+<script src="./phong-channel.js"></script>
+<script src="./qrcode.js"></script>
+<div id="stage">
+  <div id="yt"></div>
+  <img id="cornerLogo" src="Logo_BoomBox.png" alt="">
+
+  <!-- Màn hình chờ: mở lên là sẵn sàng, không có nút phải bấm -->
+  <div id="idle">
+    <img class="logo" src="Logo_BoomBox.png" alt="Boom Music Box">
+    <h1>Boom Music Box <span>Player</span></h1>
+    <div id="clock">--:--</div>
+    <div id="dateLine"></div>
+    <div id="readyPill"><i></i><span id="readyTxt">Đang khởi động…</span></div>
+    <div id="roomNote"></div>
+    <p id="hint">Chọn bài trên điện thoại hoặc máy tính bảng — bài sẽ tự phát lên màn hình này.</p>
+    <div id="setup">
+      <div class="pairWrap">
+        <div id="pairQr">Đang lấy mã…</div>
+        <div>
+          <b>Màn hình này chưa gán phòng</b>
+          <p>Nhân viên mở trang <b>Quầy</b> → tab <b>TV &amp; phòng</b> → bấm <b>Gán TV</b> ở đúng phòng → quét mã QR này, hoặc nhập mã:</p>
+          <div id="pairCode">··· ···</div>
+          <div id="pairSub"></div>
+        </div>
+      </div>
+      <details>
+        <summary>Cách khác: dán liên kết TV (admin)</summary>
+        <div class="f"><input id="setupIn" type="url" placeholder="https://bmbplayer.boommusicbox.vn/index.html?r=…" autocomplete="off"><button id="setupBtn">Gán phòng</button></div>
+        <a href="?local=1" id="setupLocal">Chỉ thử trên máy này (không gán phòng)</a>
+      </details>
+      <div class="err" id="setupErr"></div>
+    </div>
+    <div id="fileWarn">Trang đang mở bằng <b>file://</b>. YouTube yêu cầu trang nhúng có địa chỉ http(s) nên video sẽ báo lỗi 153.
+      Hãy chạy <b>python -m http.server 8000</b> trong thư mục chứa file rồi mở <b>http://localhost:8000/</b>, hoặc đưa lên GitHub Pages.</div>
+    <div id="diag"></div>
+  </div>
+
+  <div id="gqr"><div class="qw"><img id="gqrImg" alt="QR chọn bài"><div class="qtag" id="gqrTag"></div></div><div class="l">QUÉT CHỌN BÀI · GỌI MÓN</div><div class="r" id="gqrRoom"></div></div>
+  <div class="ov" id="ovTitle"><div><div class="lbl">ĐANG HÁT</div><div class="t" id="ovTitleT"></div></div></div>
+  <div class="ov" id="ovNext"><div class="lbl">TIẾP THEO</div><div class="t" id="ovNextT"></div></div>
+  <div class="ov" id="ovCount"></div>
+  <div class="ov" id="ovAdd"><div class="lbl" id="ovAddL">ĐÃ THÊM</div><div class="t" id="ovAddT"></div></div>
+  <div class="ov" id="lock"></div>
+  <div class="ov" id="toast"></div>
+  <div class="ov" id="volOsd"><span id="volIc"></span><div class="vb"><i id="volBar"></i></div><b id="volNum">100</b></div>
+  <div id="progress"><i id="bar"></i></div>
+  <div id="verTag"></div>
+
+  <div id="panel">
+    <div id="controls">
+      <span id="roomTag">PHÒNG</span>
+      <button class="btn primary" id="playBtn">▶ Phát</button>
+      <button class="btn" id="nextBtn">⏭ Bài kế</button>
+      <button class="btn" id="replayBtn">↺ Hát lại</button>
+      <button class="btn" id="muteBtn">🔊 Tiếng: Bật</button>
+      <div class="grp"><label>Âm lượng</label><input type="range" id="vol" min="0" max="100" value="100" style="width:140px"></div>
+      <div class="spacer"></div>
+      <span class="empty">Phím: <kbd>Space</kbd> phát/dừng · <kbd>→</kbd> bài kế · <kbd>M</kbd> tắt tiếng · <kbd>F</kbd> toàn màn hình</span>
+      <button class="btn" id="fsBtn">⛶ Toàn màn hình</button>
+    </div>
+    <div id="queueStrip"><span class="empty">Hàng chờ trống — chọn bài từ remote.</span></div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   BMB Player — màn hình phát YouTube (IFrame Player API chính thức)
+   - Mở lên là sẵn sàng: tự nối kênh phòng, bài remote gửi tới tự phát, không có nút "Bắt đầu".
+   - Giao diện kiểu SK Player: video tràn viền, tên bài + "Tiếp theo" hiện như lớp phủ, màn hình chờ có đồng hồ.
+   - Không can thiệp luồng, không tải video, không chặn / ẩn quảng cáo. Lớp phủ chỉ nằm góc trái và giữa-dưới.
+   - Trình duyệt thường CHẶN tự phát có tiếng khi chưa ai chạm vào trang: lúc đó phát im lặng rồi bật tiếng
+     ngay khi có một lần bấm phím / chạm bất kỳ (xem #lock). Muốn bỏ hẳn bước này: dùng trình duyệt/app cho phép tự phát (xem hướng dẫn).
+   ============================================================ */
+const params = new URLSearchParams(location.search);
+const ROOM0 = (params.get('room') || 'P1').toUpperCase();
+const bc = openRoomChannel('tv', ROOM0);          // có ?r=<mã TV> hoặc đã gán → kênh riêng của phòng qua Worker bmbplayer; ?local=1 → BroadcastChannel (thử 1 máy)
+const ROOM = bc.ws ? bc.roomId : ROOM0;
+const $ = id => document.getElementById(id);
+const sleepless = () => {};
+let roomName = '';
+function paintRoomTag(extra){ $('roomTag').textContent = 'PHÒNG ' + (roomName || ROOM) + (extra ? ' · ' + extra : ''); }
+paintRoomTag();
+if(location.protocol === 'file:') $('fileWarn').style.display = 'block';
+
+let queue = [], cur = -1;
+let player = null, ready = false, apiReady = false;
+/* Phiên bản: web = giờ trang này được đăng lên GitHub (tự cập nhật), app = bản APK đang chạy (lấy từ user-agent) */
+(function(){
+  const m = /BMBPlayerApp\/([\w.]+) \((\w+)\)/.exec(navigator.userAgent);
+  const d = new Date(document.lastModified), pad = n => String(n).padStart(2, '0');
+  const web = isNaN(d) ? '?' : pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  $('verTag').textContent = (m ? 'App ' + m[1] + ' · ' : 'Trình duyệt · ') + 'Web ' + web;
+})();
+if(bc.ws) document.body.classList.add('inroom');
+new MutationObserver(() => document.body.classList.toggle('idleOn', $('idle').style.display !== 'none' && getComputedStyle($('idle')).display !== 'none'))
+  .observe($('idle'), { attributes:true, attributeFilter:['style'] });
+document.body.classList.toggle('idleOn', getComputedStyle($('idle')).display !== 'none');
+let userMuted = false;
+/* Âm lượng giữ ở trang (không đọc lại từ YouTube vì getVolume()/isMuted() trả giá trị cũ ngay sau khi đặt → remote bị bật về chỗ cũ).
+   Chạy trong app BMBPlayer (Android) thì điều khiển luôn âm lượng hệ thống của TV/box: remote, quầy, nút trên điều khiển TV dùng chung một mức. */
+const NATIVE = (() => { try{ return window.BMBNative && typeof BMBNative.getVolume === 'function' ? BMBNative : null; }catch(e){ return null; } })();
+let vol = (() => { try{ const v = parseInt(localStorage.getItem('bmb_vol'), 10); return v >= 0 && v <= 100 ? v : 100; }catch(e){ return 100; } })();
+if(NATIVE){ try{ const v = NATIVE.getVolume(); if(v >= 0) vol = v; }catch(e){} }          // người dùng chủ động tắt tiếng (khác với bị trình duyệt chặn)
+let lock = null;                // null | 'muted' (đang phát im lặng vì bị chặn) | 'tap' (chưa phát được, cần một lần chạm)
+let unlocked = false;           // đã có thao tác của người dùng trên trang này
+let roomOpen = !bc.ws, lastSession = null, connTxt = '';
+/* Chưa có mã phòng (mở trang gốc lần đầu, hoặc trình duyệt chế độ Khách/ẩn danh xoá mất mã đã nhớ) → hỏi gán phòng.
+   ?local=1 = chạy thử trong cùng trình duyệt (BroadcastChannel) như trước. */
+const needSetup = !bc.ws && !params.has('local');
+const TV_TOKEN_RE = /^[A-Za-z0-9_-]{1,40}\.\d{1,6}\.[\w-]{22}$/;
+if(needSetup){
+  $('setup').style.display = 'block'; $('hint').style.display = 'none';
+  const apply = () => {
+    const raw = $('setupIn').value.trim(); let tok = '', api = '';
+    try{ const u = new URL(raw); tok = u.searchParams.get('r') || ''; api = u.searchParams.get('api') || ''; }catch(e){ tok = raw; }
+    if(!TV_TOKEN_RE.test(tok)){ $('setupErr').textContent = 'Không đúng liên kết TV. Liên kết có dạng …/index.html?r=P1A2B….1.xxxx — lấy bằng nút "Chép liên kết TV" (không phải mã QR của khách).'; return; }
+    location.replace(location.pathname + '?r=' + encodeURIComponent(tok) + (api ? '&api=' + encodeURIComponent(api) : ''));
+  };
+  $('setupBtn').onclick = apply;
+  $('setupIn').addEventListener('keydown', e => { if(e.key === 'Enter') apply(); });
+}
+
+/* ---------- Gán phòng bằng mã 6 số: TV xin mã, nhân viên quét/nhập ở quay.html (tab TV & phòng), TV tự nhận mã phòng ---------- */
+const BASE = location.origin + location.pathname.replace(/[^/]*$/, '');
+function qrImg(text, cell, level){ const q = qrcode(0, level || 'M'); q.addData(text); q.make(); return q.createDataURL(cell || 8, 2); }
+function startPairing(){
+  let code = '', key = '', exp = 0, pollT = null;
+  const api = phongApi();
+  const err = t => { $('setupErr').textContent = t || ''; };
+  async function post(path, body){
+    const r = await fetch(api + path, { method:'POST', headers:{ 'content-type':'application/json' }, body: JSON.stringify(body || {}) });
+    let d = {}; try{ d = await r.json(); }catch(e){}
+    return { s: r.status, d };
+  }
+  async function fresh(){
+    clearTimeout(pollT);
+    try{
+      const r = await post('/api/tv/pair/new');
+      if(r.s === 429){ err(r.d.error || 'Xin mã quá nhiều lần, đợi một lát.'); pollT = setTimeout(fresh, 60000); return; }
+      if(r.s !== 200) throw new Error(r.d.error || ('Lỗi ' + r.s));
+      code = r.d.code; key = r.d.key; exp = r.d.exp; err('');
+      $('pairCode').textContent = code.slice(0, 3) + ' ' + code.slice(3);
+      const img = document.createElement('img'); img.alt = 'QR gán phòng'; img.src = qrImg(BASE + 'quay.html#gan=' + code, 8);
+      $('pairQr').replaceChildren(img);
+      paintExp(); pollT = setTimeout(poll, 2500);
+    }catch(e){
+      err('Chưa lấy được mã gán phòng (' + (e.message || 'mất mạng') + '). Đang thử lại…');
+      pollT = setTimeout(fresh, 8000);
+    }
+  }
+  function paintExp(){ const m = Math.max(0, Math.round((exp - Date.now()) / 60000)); $('pairSub').textContent = 'Mã đổi sau khoảng ' + m + ' phút · TV sẽ tự vào phòng ngay khi được gán'; }
+  async function poll(){
+    if(Date.now() > exp - 5000) return fresh();
+    try{
+      const r = await post('/api/tv/pair/poll', { code, key });
+      if(r.s === 200 && r.d.tok){
+        $('pairSub').textContent = 'Đã gán vào phòng ' + (r.d.name || r.d.id || '') + ' — đang vào phòng…';
+        location.replace(location.pathname + '?r=' + encodeURIComponent(r.d.tok));
+        return;
+      }
+      if(r.s === 404 || r.s === 403) return fresh();
+    }catch(e){ /* mất mạng: hỏi lại sau */ }
+    paintExp(); pollT = setTimeout(poll, 2500);
+  }
+  fresh();
+}
+
+/* ---------- QR khách ở góc trái màn hình (đổi mỗi lượt mở phòng) ---------- */
+/* Tên phòng ở giữa QR (vàng viền tím như logo): chữ vừa đủ lớn để thấy từ xa nhưng che ít ô QR (QR dùng mức sửa lỗi Q) */
+function tagPhong(el, side, name){
+  name = String(name || '').replace(/^\s*ph[oò]ng\s+/i, '').trim().toUpperCase();
+  if(!name){ el.style.display = 'none'; return; }
+  const n = name.length, k = n <= 2 ? .2 : n === 3 ? .17 : n === 4 ? .14 : n === 5 ? .115 : .095;
+  el.textContent = name.slice(0, 8); el.style.display = 'block';
+  el.style.fontSize = 'calc(' + side + ' * ' + k + ')'; el.style.borderWidth = '.07em';
+}
+let shownQr = '';
+function paintGuestQr(tok, name){
+  tok = tok || '';
+  if(name){ $('gqrRoom').textContent = 'Phòng ' + name; tagPhong($('gqrTag'), 'var(--gqrS)', name); }
+  if(tok === shownQr) return;
+  shownQr = tok;
+  if(!tok){ $('gqr').style.display = 'none'; document.body.classList.remove('hasqr'); return; }
+  $('gqrImg').src = qrImg(BASE + 'remote.html?r=' + encodeURIComponent(tok), 6, 'Q');   // mức Q: chừa chỗ cho tên phòng ở giữa
+  $('gqr').style.display = 'block'; document.body.classList.add('hasqr');
+}
+const HINT0 = $('hint').textContent;
+if(needSetup) startPairing();
+
+/* ---------- Màn hình chờ: giờ + trạng thái ---------- */
+function paintClock(){
+  const d = new Date();
+  $('clock').textContent = String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+  $('dateLine').textContent = d.toLocaleDateString('vi-VN', { weekday:'long', day:'numeric', month:'numeric', year:'numeric' });
+}
+paintClock(); setInterval(paintClock, 10000);
+function paintReady(){
+  const pill = $('readyPill'), t = $('readyTxt');
+  pill.className = '';
+  if(location.protocol === 'file:'){ pill.classList.add('bad'); t.textContent = 'Cần mở bằng http(s)'; return; }
+  if(!ready){ t.textContent = apiFailed ? 'Chưa tải được YouTube — đang thử lại…' : 'Đang khởi động YouTube…'; if(apiFailed) pill.classList.add('bad'); return; }
+  if(needSetup){ t.textContent = 'Chưa gán phòng'; return; }
+  if(!roomOpen){ t.textContent = 'Phòng chưa mở'; return; }
+  pill.classList.add('ok'); t.textContent = 'Sẵn sàng' + (connTxt ? ' · ' + connTxt : '');
+}
+
+/* ---------- Khởi tạo trình phát ---------- */
+/* Nạp YouTube IFrame API SAU khi đã khai báo hàm nhận (tránh API nạp từ bộ nhớ đệm quá nhanh gọi hàm trước khi nó tồn tại) */
+window.onYouTubeIframeAPIReady = () => { apiReady = true; makePlayer(); };
+let apiFailed = false;
+(function loadApi(){
+  const tag = document.createElement('script');
+  tag.src = 'https://www.youtube.com/iframe_api';
+  tag.onerror = () => { apiFailed = true; showDiag('api'); paintReady(); };
+  document.head.append(tag);
+})();
+const apiPoll = setInterval(() => {            // dự phòng: API đã có mà chưa gọi hàm nhận
+  if(ready){ clearInterval(apiPoll); return; }
+  if(!apiReady && window.YT && YT.Player && YT.loaded){ apiReady = true; makePlayer(); }
+}, 500);
+setTimeout(() => { if(!ready) showDiag(apiFailed ? 'api' : (player ? 'player' : 'api')); }, 12000);
+
+/* TV vừa bật thường chưa có mạng: tự tải lại cho tới khi YouTube lên (tối đa 40 lần/phiên) */
+function reloadIfStuck(){
+  if(ready) return;
+  let n = 0; try{ n = +sessionStorage.getItem('bmb_reload') || 0; sessionStorage.setItem('bmb_reload', n + 1); }catch(e){}
+  if(n < 40) location.reload();
+}
+setTimeout(reloadIfStuck, 30000);
+window.addEventListener('online', () => setTimeout(reloadIfStuck, 1500));
+
+function showDiag(kind){
+  if(ready) return;
+  const d = $('diag'); d.replaceChildren();
+  const t = document.createElement('div');
+  t.innerHTML = kind === 'api'
+    ? '<b>Không tải được trình phát YouTube.</b><br>Có thể mạng chưa có, hoặc tiện ích chặn quảng cáo / phần mềm diệt virus đang chặn YouTube trên tên miền <b></b>. Trang sẽ tự thử lại.'
+    : '<b>Trình phát YouTube chưa phản hồi.</b><br>Có thể tiện ích chặn quảng cáo đang chặn khung YouTube trên tên miền <b></b>. Trang sẽ tự thử lại.';
+  t.querySelectorAll('b')[1].textContent = location.hostname;
+  const b = document.createElement('button'); b.textContent = '↻ Tải lại ngay'; b.onclick = () => location.reload();
+  d.append(t, b); d.style.display = 'block'; $('idle').style.display = 'flex';
+  paintReady(); push();
+}
+function makePlayer(){
+  if(player || !apiReady) return;
+  // controls=0 + rel=0 + iv_load_policy=3: giao diện sạch hơn, đều là tham số chính thức của trình phát nhúng
+  const vars = { autoplay:1, controls:0, rel:0, playsinline:1, enablejsapi:1, iv_load_policy:3, fs:0, disablekb:1 };
+  if(location.protocol.startsWith('http')) vars.origin = location.origin;
+  player = new YT.Player('yt', {
+    width:'100%', height:'100%', playerVars: vars,
+    events:{ onReady, onStateChange, onError }
+  });
+}
+function onReady(){
+  ready = true; $('diag').style.display = 'none';
+  player.setVolume(NATIVE ? 100 : vol); $('vol').value = vol;
+  paintReady();
+  if(cur >= 0) load();       // remote đã gửi bài trong lúc YouTube đang khởi động → phát luôn
+  push();
+}
+function onStateChange(e){
+  const S = YT.PlayerState;
+  if(e.data === S.ENDED) next();
+  if(e.data === S.PLAYING){
+    if(lock === 'tap') setLock(null);
+    else if(lock === 'muted') setLock('muted');
+  }
+  $('playBtn').textContent = e.data === S.PLAYING ? '⏸ Dừng' : '▶ Phát';
+  push();
+}
+const ERRMSG = {
+  2:'Mã video không hợp lệ',
+  5:'Lỗi trình phát HTML5',
+  100:'Video đã bị xoá hoặc để riêng tư',
+  101:'Chủ video không cho phép phát nhúng',
+  150:'Chủ video không cho phép phát nhúng',
+  153:'Thiếu thông tin nguồn (Referer). Hãy mở trang qua http://localhost hoặc GitHub Pages, không mở bằng file://'
+};
+// Bài bị gỡ / cấm nhúng → báo kho karaoke kiểm lại và xoá ngay (dùng chung địa chỉ + mật khẩu đã lưu ở remote/kho trên cùng trang)
+const KHO_DEFAULT = 'https://kho-karaoke.vumanhhung85.workers.dev';
+function reportDead(id, done){
+  let kho = '', pass = '';
+  try{ kho = localStorage.getItem('kho_api') || KHO_DEFAULT; pass = localStorage.getItem('np_pass') || ''; }catch(e){}
+  if(!kho || !pass || !/^[\w-]{11}$/.test(id || '')) return;
+  fetch(kho + '/api/kho/check', { method:'POST', headers:{ 'x-pass':pass, 'content-type':'application/json' }, body:JSON.stringify({ ids:[id], reason:'player' }) })
+    .then(r => r.ok ? r.json() : null).then(d => { if(d && (d.removed || []).includes(id) && done) done(); }).catch(() => {});
+}
+function onError(e){
+  const it = queue[cur];
+  if(it && [100, 101, 150].includes(e.data)) reportDead(it.id, () => { bc.postMessage({ type:'dead', id:it.id }); toast('Đã gỡ "' + it.title + '" khỏi kho karaoke (không còn phát được trên YouTube).'); });
+  toast('Không phát được "' + (it ? it.title : '') + '"\n' + (ERRMSG[e.data] || ('Mã lỗi ' + e.data)) +
+        (e.data === 153 ? '' : '\nTự chuyển bài kế sau 4 giây.'));
+  if(e.data !== 153) setTimeout(next, 4000);
+}
+
+/* ---------- Lớp phủ ---------- */
+const timers = {};
+function flash(id, ms){ const el = $(id); el.classList.add('show'); clearTimeout(timers[id]); if(ms) timers[id] = setTimeout(() => el.classList.remove('show'), ms); }
+function hide(id){ clearTimeout(timers[id]); $(id).classList.remove('show'); }
+function toast(msg){ $('toast').textContent = msg; flash('toast', 7000); }
+function setLock(kind){
+  lock = kind;
+  const el = $('lock');
+  if(!kind){ hide('lock'); push(); return; }
+  el.textContent = kind === 'muted'
+    ? '🔇 Đang phát không tiếng (trình duyệt chặn). Bấm OK trên điều khiển TV hoặc chạm màn hình một lần để bật tiếng.'
+    : '▶ Bấm OK trên điều khiển TV hoặc chạm màn hình một lần để bắt đầu phát.';
+  flash('lock'); push();
+}
+function showNowOverlay(){
+  if(cur < 0 || !queue[cur]) return;
+  $('ovTitleT').textContent = queue[cur].title;
+  flash('ovTitle', 8000);
+  paintCount();
+}
+function paintCount(){
+  const left = queue.length - 1 - cur;
+  if(cur >= 0 && left > 0){ $('ovCount').textContent = 'Còn ' + left + ' bài chờ'; flash('ovCount', 8000); }
+  else hide('ovCount');
+}
+
+/* ---------- Hàng chờ ---------- */
+function render(){
+  const strip = $('queueStrip'); strip.replaceChildren();
+  if(!queue.length){ const s = document.createElement('span'); s.className='empty'; s.textContent='Hàng chờ trống — chọn bài từ remote.'; strip.append(s); return; }
+  queue.forEach((it,i)=>{
+    const c = document.createElement('div'); c.className = 'qchip' + (i===cur ? ' cur' : '');
+    const n = document.createElement('span'); n.className='n'; n.textContent = i+1;
+    const t = document.createElement('span'); t.className='t'; t.textContent = it.title;
+    c.append(n,t); strip.append(c);
+  });
+}
+let wd = null;
+function load(){
+  if(!ready) return;
+  clearTimeout(wd);
+  if(cur < 0 || cur >= queue.length){
+    player.stopVideo(); $('idle').style.display='flex'; setLock(null);
+    hide('ovTitle'); hide('ovNext'); hide('ovCount'); render(); push(); return;
+  }
+  $('idle').style.display = 'none';
+  player.loadVideoById(queue[cur].id);
+  if(!userMuted && lock !== 'muted') player.unMute();
+  showNowOverlay(); hide('ovNext');
+  render(); push();
+  const id = queue[cur].id;
+  wd = setTimeout(() => guard(id, 1), 3500);
+}
+/* Giữ bài phát được dù trình duyệt chặn tự phát có tiếng:
+   bước 1 → thử phát im lặng (trình duyệt cho phép); bước 2 → nếu vẫn không chạy, chờ một lần chạm. */
+function guard(id, stage){
+  if(!ready || cur < 0 || !queue[cur] || queue[cur].id !== id) return;
+  const st = player.getPlayerState();
+  if(st !== -1 && st !== 5) return;                      // đang phát / đang tải / đã dừng chủ ý → không can thiệp
+  if(stage === 1){
+    player.mute(); player.playVideo(); setLock('muted');
+    wd = setTimeout(() => guard(id, 2), 3500);
+  } else {
+    setLock('tap');
+  }
+}
+/* Hàng chờ chỉ gồm bài đang hát + bài sắp hát (như SK Player): hát xong / qua bài là bỏ khỏi danh sách, không giữ lịch sử */
+function addSong(it, prio){
+  if(!/^[\w-]{11}$/.test(it.id || '')) return;
+  const item = { id:it.id, title:String(it.title||'Bài không tên').slice(0,200) };
+  if(cur < 0){ queue.push(item); cur = queue.length - 1; load(); return; }    // không đang hát → phát ngay, không cần bấm gì
+  const at = prio ? cur + 1 : queue.length;
+  queue.splice(at, 0, item);
+  render(); push(); paintCount();
+  $('ovAddL').textContent = prio ? 'ƯU TIÊN · HÁT NGAY SAU BÀI NÀY' : 'ĐÃ THÊM · THỨ ' + (at - cur) + ' TRONG HÀNG CHỜ';   // báo ngay trên TV như SK Player
+  $('ovAddT').textContent = item.title; flash('ovAdd', 5000);
+}
+function next(){
+  if(cur >= 0 && cur < queue.length) queue.splice(cur, 1);                  // bỏ bài vừa hát
+  cur = queue.length ? Math.min(Math.max(cur, 0), queue.length - 1) : -1;
+  load(); paintCount();
+}
+function playPause(){
+  if(!ready){ toast(apiFailed ? 'Không tải được trình phát YouTube.' : 'Trình phát YouTube đang khởi động, thử lại sau vài giây.'); return; }
+  if(cur < 0 && queue.length){ cur = 0; load(); return; }
+  if(Date.now() - unlockAt < 800) return;
+  const st = player.getPlayerState();
+  if(st === YT.PlayerState.PLAYING) player.pauseVideo(); else player.playVideo();
+}
+function replay(){ if(ready && cur>=0){ player.seekTo(0,true); player.playVideo(); } }
+function applyMute(){ $('muteBtn').textContent = (userMuted ? '🔇 Tiếng: Tắt' : '🔊 Tiếng: Bật'); }
+function toggleMute(){
+  if(!ready) return;
+  userMuted = !userMuted;
+  if(userMuted) player.mute(); else if(lock !== 'muted') player.unMute();
+  applyMute(); volOsd(); push();
+}
+const VIC = {
+  on:'<svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 4V5L7 9zM16.5 12A4.5 4.5 0 0 0 14 8v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z"/></svg>',
+  off:'<svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 4V5L7 9zM16.6 12l2.4-2.4-1.4-1.4-2.4 2.4-2.4-2.4-1.4 1.4 2.4 2.4-2.4 2.4 1.4 1.4 2.4-2.4 2.4 2.4 1.4-1.4z"/></svg>'
+};
+function volOsd(){
+  const m = userMuted || vol === 0;
+  $('volIc').innerHTML = m ? VIC.off : VIC.on;
+  $('volBar').style.height = vol + '%';
+  $('volNum').textContent = userMuted ? 'TẮT' : vol;
+  $('volOsd').classList.toggle('muted', m);
+  flash('volOsd', 2200);
+}
+function setVol(v){
+  v = Math.max(0, Math.min(100, Math.round(v)));
+  if(v === vol && $('vol').value == v) return;
+  vol = v; $('vol').value = v;
+  if(NATIVE){ try{ NATIVE.setVolume(v); }catch(e){} if(ready) player.setVolume(100); }
+  else if(ready) player.setVolume(v);
+  try{ localStorage.setItem('bmb_vol', String(v)); }catch(e){}
+  if(userMuted && v > 0){ userMuted = false; if(ready && lock !== 'muted') player.unMute(); applyMute(); }   // kéo âm lượng lên = bật tiếng lại
+  volOsd(); push();
+}
+/* App Android báo khi âm lượng hệ thống đổi (nút trên điều khiển TV) */
+window.bmbSysVol = v => {
+  v = Math.max(0, Math.min(100, Math.round(+v || 0)));
+  if(v === vol) return;
+  vol = v; $('vol').value = v; volOsd(); push();
+};
+function prio(i){ // đưa bài i lên ngay sau bài đang hát
+  if(i <= cur || i >= queue.length) return;
+  const [it] = queue.splice(i,1); queue.splice(cur+1, 0, it); render(); push(); paintCount();
+}
+function up(i){ // đẩy bài i lên trước một bậc (không vượt qua bài đang hát)
+  if(i <= cur + 1 || i >= queue.length) return;
+  const t = queue[i]; queue[i] = queue[i-1]; queue[i-1] = t; render(); push();
+}
+function removeAt(i){
+  if(i<0 || i>=queue.length) return;
+  queue.splice(i,1);
+  if(i < cur) cur--;
+  else if(i === cur){ if(cur >= queue.length) cur = queue.length-1; load(); return; }
+  render(); push(); paintCount();
+}
+
+/* ---------- Thao tác người dùng (một lần chạm/phím bất kỳ là đủ) ---------- */
+let fsTried = false, unlockAt = 0;   // unlockAt: lần chạm vừa mở khoá phát → bỏ qua phím/nút Phát đi kèm (khỏi dừng ngay)
+function onGesture(){
+  unlocked = true;
+  if(!fsTried && !params.has('nofs')){ fsTried = true; try{ const p = document.documentElement.requestFullscreen(); if(p && p.catch) p.catch(sleepless); }catch(e){} }
+  keepAwake();
+  if(!ready) return;
+  if(lock === 'muted'){ if(!userMuted) player.unMute(); setLock(null); }
+  else if(lock === 'tap'){ player.playVideo(); if(!userMuted) player.unMute(); setLock(null); unlockAt = Date.now(); }
+}
+['pointerdown','touchstart','keydown'].forEach(ev => window.addEventListener(ev, onGesture, { passive:true }));
+
+let uiTimer;
+function showUI(){ document.body.classList.add('ui'); clearTimeout(uiTimer); uiTimer = setTimeout(() => document.body.classList.remove('ui'), 5000); }
+window.addEventListener('mousemove', showUI);
+
+$('playBtn').onclick = playPause; $('nextBtn').onclick = next; $('replayBtn').onclick = replay;
+$('muteBtn').onclick = toggleMute;
+$('vol').oninput = e => setVol(+e.target.value);
+const toggleFs = () => { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); };
+$('fsBtn').onclick = toggleFs;
+window.addEventListener('keydown', e => {
+  if(e.target && e.target.tagName === 'INPUT') return;          // đang gõ vào ô gán phòng: không coi là phím điều khiển
+  if(e.code==='Space'){ e.preventDefault(); playPause(); }
+  else if(e.code==='ArrowRight') next();
+  else if(e.key.toLowerCase()==='m') toggleMute();
+  else if(e.key.toLowerCase()==='f') toggleFs();
+  showUI();
+});
+
+/* Giữ màn hình sáng (Wake Lock chính thức, nơi trình duyệt hỗ trợ) */
+let wl = null;
+async function keepAwake(){
+  try{ if('wakeLock' in navigator && document.visibilityState === 'visible' && (!wl || wl.released)) wl = await navigator.wakeLock.request('screen'); }catch(e){}
+}
+document.addEventListener('visibilitychange', keepAwake); keepAwake();
+
+/* Thanh tiến độ + biểu ngữ "Tiếp theo" trong ~20 giây cuối */
+setInterval(()=>{
+  if(!ready || cur<0 || !queue[cur]){ $('bar').style.width='0'; return; }
+  const d = player.getDuration(), t = player.getCurrentTime();
+  if(d > 0){
+    $('bar').style.width = (t/d*100) + '%';
+    const nx = queue[cur+1];
+    if(nx && d - t <= 20 && d - t > 0.5 && player.getPlayerState() === 1){ $('ovNextT').textContent = nx.title; flash('ovNext'); }
+    else hide('ovNext');
+  }
+}, 500);
+
+/* ---------- Đồng bộ với remote ---------- */
+function push(){
+  bc.postMessage({ type:'state', payload:{
+    room:ROOM, ready, needStart: lock !== null && queue.length > 0, soundLocked: lock !== null, apiFailed: apiFailed || $('diag').style.display === 'block',
+    playing: ready && player.getPlayerState && player.getPlayerState()===1,
+    muted: userMuted,
+    volume: vol,
+    nowTitle: cur>=0 ? queue[cur].title : null,
+    cur, queue: queue.map(q=>({ id:q.id, title:q.title }))
+  }});
+}
+bc.onmessage = ev => {
+  const m = ev.data || {}; if(m.type !== 'cmd') return;
+  if(!roomOpen) return;
+  const c = m.payload || {};
+  switch(c.action){
+    case 'add': addSong(c, c.prio === true); break;
+    case 'up': up(+c.index); break;
+    case 'play': playPause(); break;
+    case 'next': next(); break;
+    case 'replay': replay(); break;
+    case 'mute': toggleMute(); break;
+    case 'vol': setVol(+c.value || 0); break;
+    case 'prio': prio(+c.index); break;
+    case 'remove': removeAt(+c.index); break;
+    case 'hello': push(); break;
+  }
+};
+/* ---------- Kênh phòng (chỉ khi mở bằng liên kết có ?r= hoặc TV đã nhớ mã) ---------- */
+function roomNote(t){ const n = $('roomNote'); n.textContent = t || ''; n.style.display = t ? 'block' : 'none'; }
+function resetSession(){
+  queue = []; cur = -1; setLock(null);
+  if(ready){ try{ player.stopVideo(); }catch(e){} }
+  $('idle').style.display = 'flex'; hide('ovTitle'); hide('ovNext'); hide('ovCount'); render();
+}
+if(bc.ws){
+  bc.onroom = m => {
+    if(m.replaced){ roomNote('Màn hình khác đã nhận phòng này'); return; }
+    if(lastSession !== null && m.session !== lastSession) resetSession();     // phòng đóng/mở lại = phiên hát mới, xoá hàng chờ cũ
+    lastSession = m.session; roomOpen = !!m.open;
+    if(m.name) roomName = m.name;
+    paintGuestQr(m.open ? m.qr : '', m.name);
+    if(!m.open){ resetSession(); roomNote('Phòng chưa mở — chờ nhân viên mở phòng'); paintRoomTag(); connTxt = ''; $('hint').textContent = HINT0; }
+    else {
+      roomNote('');
+      const n = (m.remotes || 0) + (m.tablets || 0);
+      connTxt = n ? n + ' máy đang nối' : 'chưa có máy chọn bài'; paintRoomTag(connTxt); push();
+      $('hint').textContent = 'Quét mã QR ở góc trái màn hình bằng điện thoại để chọn bài và gọi phục vụ.';
+    }
+    paintReady();
+  };
+  bc.onstatus = s => {
+    if(s === 'offline' || s === 'connecting'){ paintRoomTag('đang nối…'); connTxt = 'đang nối…'; }
+    if(s === 'replaced') roomNote('Màn hình khác đã nhận phòng này');
+    if(s === 'rotated'){ roomNote('Phòng này đã gán cho TV khác — chuyển sang màn hình gán phòng…'); paintGuestQr(''); setTimeout(() => location.replace(location.pathname), 2500); }
+    if(s === 'expired') roomNote('Mã TV không hợp lệ');
+    paintReady();
+  };
+}
+/* ---------- Tự cập nhật: TV chạy liên tục vẫn lấy bản mới sau khi đẩy lên GitHub ----------
+   Cứ 20 phút so nội dung index.html + phong-channel.js trên máy chủ với bản đang chạy (bỏ qua bộ nhớ đệm).
+   Có bản mới mà TV đang rảnh (không bài nào đang hát) → tự tải lại. Đang hát thì chờ lượt kiểm tra sau.
+   Ngoài ra mỗi sáng 4–5 giờ, nếu rảnh và đã chạy trên 6 tiếng → tải lại một lần cho sạch bộ nhớ. */
+(function(){
+  const FILES = [location.pathname, new URL('./phong-channel.js', location.href).pathname];
+  const BOOT = Date.now();
+  const hash = s => { let h = 2166136261; for(let i = 0; i < s.length; i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(16) + ':' + s.length; };
+  async function snapshot(){
+    const parts = [];
+    for(const f of FILES){
+      const r = await fetch(f + (f.includes('?') ? '&' : '?') + '_=' + Date.now(), { cache:'no-store' });
+      if(!r.ok) throw new Error('http ' + r.status);
+      parts.push(hash(await r.text()));
+    }
+    return parts.join('|');
+  }
+  const idle = () => cur < 0 && (!ready || !player.getPlayerState || player.getPlayerState() !== 1);
+  let base = null;
+  async function check(){
+    try{
+      const now = await snapshot();
+      if(base === null){ base = now; return; }
+      const changed = now !== base;
+      const h = new Date().getHours();
+      const morning = h >= 4 && h < 5 && Date.now() - BOOT > 6 * 3600 * 1000;
+      if((changed || morning) && idle()){ try{ sessionStorage.setItem('bmb_reload', '0'); }catch(e){} location.reload(); }
+    }catch(e){ /* mất mạng / máy chủ bận: bỏ qua, lần sau kiểm lại */ }
+  }
+  check();
+  setInterval(check, 20 * 60 * 1000);
+})();
+
+paintReady(); render(); push();
+</script>
+</body>
+</html>
