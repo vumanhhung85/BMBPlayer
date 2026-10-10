@@ -1154,13 +1154,24 @@ function volStep(d){
 }
 $('sDown').onclick = $('dnBtn').onclick = () => volStep(-5); $('sUp').onclick = $('upBtn').onclick = () => volStep(5);
 /* Máy tính bảng xoay ngang (hoặc ?wide=1): bố cục hai cột như SK Player; điện thoại giữ dạng dọc */
-const WIDE_MQ = matchMedia('(orientation: landscape) and (min-width: 900px) and (min-height: 500px)');
+/* Bố cục rộng (máy tính bảng ngang). KHÔNG phụ thuộc chiều cao hiện tại: bàn phím ảo bật lên làm cao màn hình tụt < 500 →
+   trước đây tự chuyển về bố cục dọc giữa lúc đang gõ, ô tìm mất tiêu điểm (bấm vào ô không gõ được). Nay nhớ chiều cao lớn nhất đã thấy
+   của hướng hiện tại, và đang gõ trong ô nhập thì không đổi bố cục. */
+const WIDE_MQ = matchMedia('(orientation: landscape) and (min-width: 900px)');
+let maxH = 0, maxHLand = null;
 function applyWide(){
-  const w = params.get('wide') === '1' || (params.get('wide') !== '0' && WIDE_MQ.matches);
+  const land = WIDE_MQ.matches;
+  if(maxHLand !== land){ maxHLand = land; maxH = 0; }
+  maxH = Math.max(maxH, innerHeight);
+  const a = document.activeElement, typing = a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName);
+  if(typing && params.get('wide') == null) return;
+  const w = params.get('wide') === '1' || (params.get('wide') !== '0' && land && maxH >= 500);
   document.body.classList.toggle('wide', w);
   if(w && curTab === 'queue') tab('search');
 }
 try{ WIDE_MQ.addEventListener('change', applyWide); }catch(e){ try{ WIDE_MQ.addListener(applyWide); }catch(e2){} }
+addEventListener('resize', () => setTimeout(applyWide, 150));
+document.addEventListener('focusout', () => setTimeout(applyWide, 400));
 $('playBtn').onclick = () => send('play'); $('nextBtn').onclick = () => send('next');
 $('replayBtn').onclick = () => send('replay');
 $('muteBtn').onclick = () => { lastMuted = !lastMuted; paintMute(lastMuted); muteHold = Date.now(); send('mute'); };   // đổi icon ngay, TV xác nhận sau
