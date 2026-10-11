@@ -28,7 +28,17 @@ Trên máy có Node (thư mục repo BMBPlayer, PowerShell):
    Tuỳ chọn: `LEGACY_SECRET` (giống bmb-quanly-worker — chỉ cần nếu còn tài khoản mật khẩu kiểu cũ).
    Không nhớ GUEST_SECRET của kho-karaoke: đặt giá trị mới ở đây, rồi vào Cloudflare → Worker **kho-karaoke** → Settings → Variables and Secrets → sửa `GUEST_SECRET` thành đúng giá trị đó.
 4. `npx wrangler deploy` → Worker `https://bmbplayer.vumanhhung85.workers.dev`.
-5. Đưa các trang lên GitHub (repo BMBPlayer) → Pages tự cập nhật. TV đang mở tự tải bản mới khi rảnh (hoặc Ctrl+F5).
+5. Trang HTML do chính Worker `bmbplayer` phục vụ (mục `[assets]` trong `wrangler.toml`, từ 10/2026 — thay GitHub Pages).
+   Push `main` → Cloudflare Workers Builds deploy cùng lúc cả trang lẫn API. File không công khai liệt kê trong `.assetsignore`.
+   TV đang mở tự tải bản mới khi rảnh (hoặc Ctrl+F5); dòng nhỏ góc TV "Web dd/mm hh:mm" là giờ deploy (lấy từ `/api/ver`).
+   Lùi bản: Cloudflare → Worker bmbplayer → Deployments → chọn bản cũ → Rollback.
+
+## Chuyển tên miền từ GitHub Pages sang Worker (làm một lần)
+1. Cloudflare → DNS của boommusicbox.vn: xoá bản ghi `bmbplayer` (CNAME trỏ `vumanhhung85.github.io`).
+2. Cloudflare → Workers & Pages → `bmbplayer` → Settings → Domains & Routes → Add → Custom domain → `bmbplayer.boommusicbox.vn`.
+3. Đợi vài phút (cấp chứng chỉ), mở `https://bmbplayer.boommusicbox.vn/quay.html` kiểm tra; góc TV phải hiện giờ deploy mới.
+4. Ổn định ~1 tuần: GitHub → repo BMBPlayer → Settings → Pages → tắt; xoá file `CNAME`; bỏ địa chỉ workers.dev khỏi `ALLOWED_ORIGINS`.
+   Muốn quay lại GitHub Pages: gỡ Custom domain ở bước 2, tạo lại CNAME `bmbplayer` → `vumanhhung85.github.io`.
 
 ## Chuyển CN03 sang (thay thẳng)
 1. Quầy CN03 mở `https://bmbplayer.boommusicbox.vn/quay.html`, đăng nhập tài khoản cũ.

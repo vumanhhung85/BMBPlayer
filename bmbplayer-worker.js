@@ -1619,7 +1619,16 @@ export default {
     if(req.method === 'OPTIONS') return new Response(null, { status: 204, headers: ch });
     const origin = req.headers.get('Origin'), originOk = !!origin && origins(env).includes(origin);
     const ip = req.headers.get('CF-Connecting-IP') || '';
-    if(u.pathname === '/' && req.method === 'GET') return new Response('BMBPlayer API', { headers: { 'content-type': 'text/plain; charset=utf-8' } });
+    // Trang gốc: mở trang TV (index.html) giống GitHub Pages trước đây; chưa có file tĩnh thì trả chữ như cũ
+    if(u.pathname === '/' && req.method === 'GET'){
+      if(env.ASSETS) return env.ASSETS.fetch(new Request(new URL('/index.html', u), req));
+      return new Response('BMBPlayer API', { headers: { 'content-type': 'text/plain; charset=utf-8' } });
+    }
+    // Phiên bản đang chạy (cùng lúc cho cả trang HTML và API vì deploy chung một lần)
+    if(u.pathname === '/api/ver' && req.method === 'GET'){
+      const v = env.CF_VERSION_METADATA || {};
+      return jres({ id: v.id || '', tag: v.tag || '', at: v.timestamp || '' }, 200, originOk ? { 'Access-Control-Allow-Origin': origin, 'Vary': 'Origin' } : {});
+    }
 
     /* Kết nối WebSocket của TV / máy tính bảng / điện thoại */
     if(u.pathname === '/ws'){

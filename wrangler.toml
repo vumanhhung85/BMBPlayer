@@ -1,4 +1,5 @@
 # Worker "bmbplayer" — một Worker cho cả BMBPlayer (chọn bài + gọi phục vụ + quầy + TV)
+# Từ 10/2026 Worker này phục vụ LUÔN các trang HTML (static assets), thay GitHub Pages: một lần push = một phiên bản cho cả trang lẫn API.
 # Deploy:  npx wrangler deploy        (chạy trong thư mục repo BMBPlayer)
 name = "bmbplayer"
 main = "bmbplayer-worker.js"
@@ -8,10 +9,24 @@ compatibility_date = "2025-01-01"
 keep_vars = true
 
 [vars]
-ALLOWED_ORIGINS = "https://bmbplayer.boommusicbox.vn"
+ALLOWED_ORIGINS = "https://bmbplayer.boommusicbox.vn,https://bmbplayer.vumanhhung85.workers.dev"
 NET_CHECK = "off"          # off = không kiểm mạng | warn = cho vào nhưng đánh dấu máy ngoài mạng quán | on = chặn điện thoại khách ngoài mạng quán
 TB_NET = "off"             # on = máy tính bảng phải cùng mạng chi nhánh lúc gán (chi nhánh có 2 đường mạng thì nên để off) | off = bỏ kiểm
 TV_NET = "on"              # on = TV chờ gán khác mạng chi nhánh thì hỏi xác nhận (chống gán nhầm TV chi nhánh khác) | off = bỏ kiểm
+
+# Trang HTML/ảnh/js ở thư mục gốc repo được phục vụ như file tĩnh (miễn phí, không giới hạn lượt).
+# Những file KHÔNG được công khai (code Worker, cấu hình, ghi chú) liệt kê trong .assetsignore.
+# html_handling = "none": giữ nguyên đuôi .html (link/QR đã in như remote.html?r=…, quay.html#gan=… không bị đổi thành /remote).
+# Đường dẫn không trùng file nào (/api, /ws, /nhac/ws…) tự chuyển vào Worker.
+[assets]
+directory = "."
+binding = "ASSETS"
+html_handling = "none"
+not_found_handling = "none"
+
+# Thông tin phiên bản đang chạy (giờ deploy) → TV hiện "Web dd/mm hh:mm" qua /api/ver
+[version_metadata]
+binding = "CF_VERSION_METADATA"
 
 # D1 dùng chung với app quản lý BMB (database cũ của Order)
 # database_id: Cloudflare → Storage & Databases → D1 → bmb_data, hoặc lệnh:  npx wrangler d1 list
