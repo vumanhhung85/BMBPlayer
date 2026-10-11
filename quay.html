@@ -275,7 +275,7 @@ td b{color:var(--txt)}
     <div class="wrap">
       <div class="topbar">
         <img src="Logo_BoomBox.png" alt="Boom">
-        <div class="tt"><b id="hTt">Quầy phục vụ</b><span>BMBPlayer · chọn bài &amp; gọi phục vụ</span></div>
+        <div class="tt"><b id="hTt">Quầy phục vụ</b><span>BMBPlayer · chọn bài &amp; gọi lễ tân</span></div>
         <div class="who"><select class="selcn" id="selCN" style="display:none" aria-label="Chọn chi nhánh"></select><span class="badge" id="whoTx"></span><button class="btn btn-ghost btn-sm" id="btnOut">Đăng xuất</button></div>
       </div>
       <div class="tabs">
@@ -290,16 +290,16 @@ td b{color:var(--txt)}
 
   <div class="pg on" id="p1">
     <div class="stats">
-      <div class="stat y"><div class="k">Đang chờ</div><div class="v" id="stMoi">0</div></div>
-      <div class="stat"><div class="k">Đang phục vụ</div><div class="v" id="stNhan">0</div></div>
-      <div class="stat g"><div class="k">Đã xong hôm nay</div><div class="v" id="stXong">0</div></div>
+      <div class="stat y"><div class="k">Đã gửi (chờ xác nhận)</div><div class="v" id="stMoi">0</div></div>
+      <div class="stat"><div class="k">Đã xác nhận</div><div class="v" id="stNhan">0</div></div>
+      <div class="stat g"><div class="k">Đã phục vụ hôm nay</div><div class="v" id="stXong">0</div></div>
       <div class="stat r"><div class="k">Đơn nghi ngờ</div><div class="v" id="stNghi">0</div></div>
     </div>
     <div class="sect-lbl">Phòng</div>
     <div class="rooms" id="rooms"></div>
     <div class="cols">
-      <div class="col c-moi"><h3><span class="dot"></span>Mới</h3><div id="cMoi"></div></div>
-      <div class="col c-nhan"><h3><span class="dot"></span>Đang phục vụ</h3><div id="cNhan"></div></div>
+      <div class="col c-moi"><h3><span class="dot"></span>Đã gửi</h3><div id="cMoi"></div></div>
+      <div class="col c-nhan"><h3><span class="dot"></span>Đã xác nhận</h3><div id="cNhan"></div></div>
       <div class="col c-nghi"><h3><span class="dot"></span>Đơn nghi ngờ</h3><div id="cNghi"></div></div>
     </div>
   </div>
@@ -322,7 +322,7 @@ td b{color:var(--txt)}
 
   <div class="pg" id="p3">
     <div class="hint">
-      Mỗi phòng có <b>1 TV</b> (hiện QR khách ở góc trái khi phòng mở — khách quét để <b>chọn bài và gọi phục vụ</b>) và có thể có <b>1 máy tính bảng</b>.
+      Mỗi phòng có <b>1 TV</b> (hiện QR khách ở góc trái khi phòng mở — khách quét để <b>chọn bài và gọi lễ tân</b>) và có thể có <b>1 máy tính bảng</b>.
       <b>Gán TV</b>: TV chưa gán phòng hiện mã 6 số + QR → bấm Gán TV ở đúng phòng rồi quét/nhập mã. Mỗi lần mở phòng là QR khách mới, khách lượt trước không vào lại được.
       Máy tính bảng tự gán: trên máy bấm ô PHÒNG → quét QR trên TV.
     </div>
@@ -458,7 +458,7 @@ td b{color:var(--txt)}
 <script src="./quet-qr.js"></script>
 <script>
 /* ============================================================
-   BMBPlayer — Quầy: hàng đợi gọi phục vụ, mở/đóng phòng, TV & phòng, menu, tài khoản (D1 bmb_data dùng chung với app quản lý BMB)
+   BMBPlayer — Quầy: hàng đợi gọi lễ tân, mở/đóng phòng, TV & phòng, menu, tài khoản (D1 bmb_data dùng chung với app quản lý BMB)
    ============================================================ */
 /* Địa chỉ Worker bmbplayer: mặc định bên dưới; thử nghiệm thì mở một lần với ?api=<địa chỉ> (trang tự nhớ) */
 function bmbApi(){
@@ -551,7 +551,7 @@ function favBadge(n){
 }
 function notify(n){
   if(!(window.Notification) || Notification.permission!=='granted') return;
-  try{ new Notification('Có '+n+' yêu cầu mới', {body:'Phòng đang chờ phục vụ', tag:'bmb'}); }catch(e){}
+  try{ new Notification('Có '+n+' yêu cầu mới', {body:'Khách gọi lễ tân, chờ xác nhận', tag:'bmb'}); }catch(e){}
 }
 
 /* ---------- đăng nhập ---------- */
@@ -865,11 +865,11 @@ function cardHtml(o){
      + (o.nghiNgo ? ' · <b style="color:var(--warn)">'+esc(o.lyDo)+'</b>' : '') + '</div>';
 
   if(o.status==='MOI'){
-    h += '<div class="ac"><button class="btn btn-y btn-sm" onclick="act(\''+o.id+'\',\'nhan\')">Tiếp nhận</button>'
+    h += '<div class="ac"><button class="btn btn-y btn-sm" onclick="act(\''+o.id+'\',\'nhan\')">Xác nhận</button>'
        + '<button class="btn btn-ghost btn-sm" onclick="act(\''+o.id+'\',\'huy\')">Huỷ</button></div>';
     if(o.nghiNgo && o.devId) h += '<div class="ac"><button class="btn btn-bad btn-sm" onclick="openChanModal(\''+o.id+'\')">Chặn thiết bị 24h</button></div>';
   }else if(o.status==='NHAN'){
-    h += '<div class="ac"><button class="btn btn-ok btn-sm" onclick="act(\''+o.id+'\',\'xong\')">Hoàn tất</button>'
+    h += '<div class="ac"><button class="btn btn-ok btn-sm" onclick="act(\''+o.id+'\',\'xong\')">Đã phục vụ</button>'
        + '<button class="btn btn-ghost btn-sm" onclick="act(\''+o.id+'\',\'huy\')">Huỷ</button></div>';
     if(o.items.some(function(i){return i.type==='DR';}) && !o.pos){
       var list = o.items.filter(function(i){return i.type==='DR';})
@@ -949,14 +949,14 @@ function drawToday(){
     chuaPos: ds.filter(function(o){ return o.status!=='HUY' && coDr(o) && !o.pos; }).length };
   $('lsTong').innerHTML = LS.dangTai ? '' :
       '<div class="stat"><div class="k">Tổng đơn</div><div class="v">'+t.tong+'</div></div>'
-    + '<div class="stat g"><div class="k">Hoàn tất</div><div class="v">'+t.xong+'</div></div>'
+    + '<div class="stat g"><div class="k">Đã phục vụ</div><div class="v">'+t.xong+'</div></div>'
     + '<div class="stat"><div class="k">Đã huỷ</div><div class="v">'+t.huy+'</div></div>'
     + '<div class="stat '+(t.chuaPos?'r':'')+'"><div class="k">Có nước, chưa nhập POS</div><div class="v">'+t.chuaPos+'</div></div>';
   if(LS.dangTai){ $('tbToday').innerHTML = '<tr><td colspan="8" class="mut">Đang tải…</td></tr>'; return; }
   $('tbToday').innerHTML = ds.map(function(o){
     var its = o.items.map(function(i){ return i.label + (i.qty>1?' ×'+i.qty:''); }).join(', ');
-    var st = {MOI:'<span class="pill p-w">Mới</span>', NHAN:'<span class="pill p-w">Đang phục vụ</span>',
-              XONG:'<span class="pill p-ok">Xong</span>', HUY:'<span class="pill p-n">Huỷ</span>'}[o.status] || esc(o.status);
+    var st = {MOI:'<span class="pill p-w">Đã gửi</span>', NHAN:'<span class="pill p-w">Đã xác nhận</span>',
+              XONG:'<span class="pill p-ok">Đã phục vụ</span>', HUY:'<span class="pill p-n">Huỷ</span>'}[o.status] || esc(o.status);
     var pos = coDr(o)
       ? (o.pos ? '<span class="pill p-ok">đã nhập</span>' : '<span class="pill p-w">chưa</span>') : '<span class="mut">—</span>';
     var pv = o.nhanSau==null ? '<span class="mut">—</span>' : (o.nhanSau<60 ? o.nhanSau+'s' : Math.round(o.nhanSau/60)+' phút');
@@ -1352,7 +1352,7 @@ function printReview(){
     + '<div class="ti">ĐÁNH GIÁ DỊCH VỤ</div>'
     + '<div class="q" data-u="'+esc(S.reviewUrl)+'"></div>'
     + '<div class="cap">Quét để chấm sao &amp; góp ý trên Google</div>'
-    + '<div class="sub">Không dùng để gọi nước — chọn bài &amp; gọi nước: quét mã trên TV</div>'
+    + '<div class="sub">Không dùng để gọi lễ tân — chọn bài &amp; gọi lễ tân: quét mã trên TV</div>'
     + '<div class="br">'+esc(S.bname||'')+'</div>'
     + '</div></div>';
   var cards = ''; for(var i=0;i<6;i++) cards += one;

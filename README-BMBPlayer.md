@@ -1,11 +1,11 @@
-# BMBPlayer — chọn bài hát + gọi phục vụ (một hệ thống)
+# BMBPlayer — chọn bài hát + gọi lễ tân (một hệ thống)
 
 **BMBPlayer = BMBPlayer + BMB Order cũ.** Một Worker, một repo, một tên miền: `https://bmbplayer.boommusicbox.vn`.
 
 | Trang | Ai dùng | Làm gì |
 |---|---|---|
-| `index.html` | TV trong phòng | Phát bài. Chưa gán phòng → hiện mã 6 số + QR. Phòng mở → QR khách ở góc trái (chọn bài + gọi món). Mỗi lượt mở phòng là QR mới. |
-| `remote.html` | Khách (quét QR trên TV), máy tính bảng trong phòng | Tab **Tìm bài**, **Hàng chờ**, **Phục vụ** (nước có số lượng, dịch vụ / báo sự cố). |
+| `index.html` | TV trong phòng | Phát bài. Chưa gán phòng → hiện mã 6 số + QR. Phòng mở → QR khách ở góc trái (chọn bài + gọi lễ tân). Mỗi lượt mở phòng là QR mới. Khi khách gọi lễ tân, TV hiện trạng thái từng yêu cầu: **Đã gửi → Lễ tân đã xác nhận → Đã phục vụ** (hoặc Đã huỷ); đã phục vụ/huỷ tự ẩn sau ~12 giây. |
+| `remote.html` | Khách (quét QR trên TV), máy tính bảng trong phòng | Tab **Tìm bài**, **Hàng chờ**, **Gọi lễ tân** (nước có số lượng, dịch vụ / báo sự cố). |
 | `quay.html` | Quầy, quản lý, admin | Hàng đợi đơn, mở/đóng phòng, lịch sử, menu, tài khoản quầy, tab **TV & phòng** (gán TV, QR khách, đổi QR, gỡ máy tính bảng, admin thêm/xoá phòng, in thẻ đánh giá). |
 | `kho.html`, `nhac.html` | Admin / nghe nhạc | Kho karaoke và nhạc TV — Worker `kho-karaoke`, `nhac-playlist` riêng, **không đổi**. |
 

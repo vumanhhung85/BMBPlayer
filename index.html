@@ -108,6 +108,17 @@
   #volOsd b{font-size:clamp(20px,2.6vw,42px); font-weight:800; color:#FFD21A; font-variant-numeric:tabular-nums}
   #volOsd.muted b{color:#f87171} #volOsd.muted .vb i{background:#555}
 
+  /* Yêu cầu gọi lễ tân của phòng: đã gửi → lễ tân đã xác nhận → đã phục vụ (khách nhìn TV là biết) */
+  #svc{position:absolute; left:1.6vw; bottom:7vh; z-index:12; display:flex; flex-direction:column; gap:1vh; width:min(40vw,700px); pointer-events:none}
+  #svc .c{background:rgba(10,8,22,.9); border:2px solid #FFD21A; border-radius:16px; padding:1.3vh 1.2vw; box-shadow:0 8px 34px rgba(0,0,0,.65); animation:svcIn .4s ease}
+  #svc .c.NHAN{border-color:#c084fc} #svc .c.XONG{border-color:#34d399} #svc .c.HUY{border-color:#f87171}
+  #svc .h{display:flex; align-items:center; gap:.8vw; font:800 clamp(16px,2.8vh,40px)/1.2 Arial,sans-serif; color:#FFD21A}
+  #svc .c.NHAN .h{color:#d8b4fe} #svc .c.XONG .h{color:#6ee7b7} #svc .c.HUY .h{color:#fca5a5}
+  #svc .h .e{font-size:1.5em; line-height:1}
+  #svc .b{font:700 clamp(14px,2.5vh,34px)/1.35 Arial,sans-serif; color:#fff; margin-top:.6vh}
+  #svc .m{font:600 clamp(12px,2vh,27px)/1.3 Arial,sans-serif; color:#cbbfe6; margin-top:.3vh}
+  @keyframes svcIn{from{opacity:0; transform:translateY(14px) scale(.97)} to{opacity:1; transform:none}}
+
   #progress{position:absolute; left:0; right:0; bottom:0; height:3px; z-index:9; background:rgba(255,255,255,.08); pointer-events:none}
   #progress i{display:block; height:100%; width:0; background:linear-gradient(90deg,var(--accent),var(--accent2))}
 
@@ -176,13 +187,14 @@
     <div id="diag"></div>
   </div>
 
-  <div id="gqr"><div class="qw"><img id="gqrImg" alt="QR chọn bài"><div class="qtag" id="gqrTag"></div></div><div class="l">QUÉT CHỌN BÀI · GỌI MÓN</div><div class="r" id="gqrRoom"></div></div>
+  <div id="gqr"><div class="qw"><img id="gqrImg" alt="QR chọn bài"><div class="qtag" id="gqrTag"></div></div><div class="l">QUÉT CHỌN BÀI · GỌI LỄ TÂN</div><div class="r" id="gqrRoom"></div></div>
   <div class="ov" id="ovTitle"><div><div class="lbl">ĐANG HÁT</div><div class="t" id="ovTitleT"></div></div></div>
   <div class="ov" id="ovNext"><div class="lbl">TIẾP THEO</div><div class="t" id="ovNextT"></div></div>
   <div class="ov" id="ovCount"></div>
   <div class="ov" id="ovAdd"><div class="lbl" id="ovAddL">ĐÃ THÊM</div><div class="t" id="ovAddT"></div></div>
   <div class="ov" id="lock"></div>
   <div class="ov" id="toast"></div>
+  <div id="svc"></div>
   <div class="ov" id="volOsd"><span id="volIc"></span><div class="vb"><i id="volBar"></i></div><b id="volNum">100</b></div>
   <div id="progress"><i id="bar"></i></div>
   <div id="verTag"></div>
@@ -639,7 +651,9 @@ function push(){
   }});
 }
 bc.onmessage = ev => {
-  const m = ev.data || {}; if(m.type !== 'cmd') return;
+  const m = ev.data || {};
+  if(m.type === 'svc'){ svcSet(m.list); return; }                 // trạng thái yêu cầu gọi lễ tân của phòng
+  if(m.type !== 'cmd') return;
   if(!roomOpen) return;
   const c = m.payload || {};
   switch(c.action){
@@ -655,10 +669,45 @@ bc.onmessage = ev => {
     case 'hello': push(); break;
   }
 };
+/* ---------- Yêu cầu gọi lễ tân: hiện trạng thái trên TV ---------- */
+const SVC_TXT = {
+  MOI:  ['ĐÃ GỬI YÊU CẦU', 'Đã gửi tới lễ tân, vui lòng chờ xác nhận', '🛎️'],
+  NHAN: ['LỄ TÂN ĐÃ XÁC NHẬN', 'Nhân viên đang mang lên phòng', '✅'],
+  XONG: ['ĐÃ PHỤC VỤ', 'Chúc quý khách vui vẻ!', '🎉'],
+  HUY:  ['YÊU CẦU ĐÃ HUỶ', 'Cần gì xin gọi lễ tân', '⚠️']
+};
+const SVC_SHOW_DONE_MS = 12000;            // đã phục vụ / đã huỷ: hiện 12 giây rồi ẩn
+let svcList = [], svcSeen = {}, svcSig = '';
+function svcSet(list){
+  const now = Date.now();
+  svcList = Array.isArray(list) ? list : [];
+  svcList.forEach(x => { const k = svcSeen[x.id]; if(!k || k.st !== x.st) svcSeen[x.id] = { st:x.st, at:now }; });
+  svcPaint();
+}
+function svcPaint(){
+  const now = Date.now();
+  const show = svcList.filter(x => (x.st === 'MOI' || x.st === 'NHAN') || (svcSeen[x.id] && now - svcSeen[x.id].at < SVC_SHOW_DONE_MS));
+  const sig = show.map(x => x.id + x.st).join('|');
+  if(sig === svcSig) return;                // không đổi thì không vẽ lại (giữ hiệu ứng)
+  svcSig = sig;
+  const box = $('svc'); box.replaceChildren();
+  show.forEach(x => {
+    const t = SVC_TXT[x.st] || SVC_TXT.MOI, c = document.createElement('div'); c.className = 'c ' + x.st;
+    const h = document.createElement('div'); h.className = 'h';
+    const e = document.createElement('span'); e.className = 'e'; e.textContent = t[2];
+    const hs = document.createElement('span'); hs.textContent = t[0]; h.append(e, hs);
+    const b = document.createElement('div'); b.className = 'b';
+    b.textContent = (x.items || []).map(i => (i.icon ? i.icon + ' ' : '') + i.label + (i.type === 'DR' && i.qty > 1 ? ' ×' + i.qty : '')).join(' · ');
+    const m = document.createElement('div'); m.className = 'm'; m.textContent = t[1];
+    c.append(h, b, m); box.append(c);
+  });
+}
+setInterval(svcPaint, 1000);
+
 /* ---------- Kênh phòng (chỉ khi mở bằng liên kết có ?r= hoặc TV đã nhớ mã) ---------- */
 function roomNote(t){ const n = $('roomNote'); n.textContent = t || ''; n.style.display = t ? 'block' : 'none'; }
 function resetSession(){
-  queue = []; cur = -1; setLock(null);
+  queue = []; cur = -1; setLock(null); svcSet([]);
   if(ready){ try{ player.stopVideo(); }catch(e){} }
   $('idle').style.display = 'flex'; hide('ovTitle'); hide('ovNext'); hide('ovCount'); render();
 }
@@ -674,7 +723,7 @@ if(bc.ws){
       roomNote('');
       const n = (m.remotes || 0) + (m.tablets || 0);
       connTxt = n ? n + ' máy đang nối' : 'chưa có máy chọn bài'; paintRoomTag(connTxt); push();
-      $('hint').textContent = 'Quét mã QR ở góc trái màn hình bằng điện thoại để chọn bài và gọi phục vụ.';
+      $('hint').textContent = 'Quét mã QR ở góc trái màn hình bằng điện thoại để chọn bài và gọi lễ tân.';
     }
     paintReady();
   };

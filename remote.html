@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>BMBPlayer — Chọn bài & gọi phục vụ</title>
+<title>BMBPlayer — Chọn bài & gọi lễ tân</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="theme-color" content="#0a0a0f">
@@ -155,7 +155,7 @@
   .sList .row{padding:8px 4px} .sList .row img{width:96px; height:54px}
   .roomOff #side .sCtl{opacity:.4; pointer-events:none}
 
-  /* ===== Gọi phục vụ (nước có số lượng, dịch vụ bật/tắt) ===== */
+  /* ===== Gọi lễ tân (nước có số lượng, dịch vụ bật/tắt) ===== */
   .tabs button.od{ color:#fde68a }
   .tabs button.od.on{ color:var(--ink); border-bottom-color:#f59e0b }
   #odPane{ padding:6px 16px 170px }
@@ -206,7 +206,7 @@
 <div class="tabs">
   <button id="tabSearch" class="on"><span class="ti">🔍</span><span class="tl">Tìm bài</span></button>
   <button id="tabQueue"><span class="ti">🎶</span><span class="tl">Hàng chờ <span class="cnt" id="qCount">0</span></span></button>
-  <button id="tabOrder" class="od" style="display:none"><span class="ti">🛎️</span><span class="tl">Gọi món</span></button>
+  <button id="tabOrder" class="od" style="display:none"><span class="ti">🛎️</span><span class="tl">Gọi lễ tân</span></button>
 </div>
 </div>
 
@@ -255,14 +255,14 @@
     <div class="svgrid" id="odSv"></div>
     <div class="odH">GỌI NƯỚC</div>
     <div id="odDr"></div>
-    <textarea id="odNote" maxlength="200" placeholder="Ghi chú thêm cho nhân viên (không bắt buộc)…"></textarea>
-    <div class="odTiny">Nhân viên sẽ lên phòng trong ít phút.<br>Giá do nhân viên xác nhận trực tiếp.</div>
+    <textarea id="odNote" maxlength="200" placeholder="Ghi chú thêm cho lễ tân (không bắt buộc)…"></textarea>
+    <div class="odTiny">Lễ tân sẽ lên phòng trong ít phút.<br>Giá do nhân viên xác nhận trực tiếp.</div>
   </div>
 </div>
 <div id="odBar"><div class="sum" id="odSum"></div><button id="odClear">Xoá</button><button id="odSendBtn">Gửi yêu cầu</button></div>
 <div class="odOv" id="odSent"><div class="odCard">
-  <div style="font-size:46px">🛎️</div><h3>Đã gửi yêu cầu</h3><p id="odSentList"></p>
-  <div><span class="odDot" id="odDot"></span><span id="odStTx">Đang chờ quầy tiếp nhận…</span></div>
+  <div style="font-size:46px">🛎️</div><h3>Đã gửi yêu cầu tới lễ tân</h3><p id="odSentList"></p>
+  <div><span class="odDot" id="odDot"></span><span id="odStTx">Đã gửi tới lễ tân, đang chờ xác nhận…</span></div>
   <div class="row2"><button id="odSentClose">Đóng</button><button class="y" id="odSentLs">Xem đơn đã gọi</button></div>
 </div></div>
 <div class="odOv" id="odLs"><div class="odCard">
@@ -1035,13 +1035,13 @@ function tab(which){
   $('paneQueue').style.display = which === 'queue' ? '' : 'none';
   $('paneOrder').style.display = which === 'order' ? '' : 'none';
   $('tabSearch').classList.toggle('on', which === 'search'); $('tabQueue').classList.toggle('on', which === 'queue'); $('tabOrder').classList.toggle('on', which === 'order');
-  $('dock').style.display = which === 'order' ? 'none' : '';             // tab gọi phục vụ: thanh gửi yêu cầu thay cho nút điều khiển bài
+  $('dock').style.display = which === 'order' ? 'none' : '';             // tab gọi lễ tân: thanh gửi yêu cầu thay cho nút điều khiển bài
   if(which === 'order'){ if(!OD.menu.length || Date.now() - OD.menuAt > 120000) odLoadMenu(); odRender(); }
   else $('odBar').style.display = 'none';
 }
 $('tabSearch').onclick = () => tab('search'); $('tabQueue').onclick = () => tab('queue'); $('tabOrder').onclick = () => tab('order');
 
-/* ---------- Gọi phục vụ (trước đây là app Order): nước có số lượng, dịch vụ bật/tắt, không tính tiền ----------
+/* ---------- Gọi lễ tân (trước đây là app Order): nước có số lượng, dịch vụ bật/tắt, không tính tiền ----------
    Xác thực bằng chính mã vào phòng: khách = QR trên TV của lượt đang mở; máy tính bảng = mã máy tính bảng. */
 const OD = { menu:[], cart:{}, branch:'', orderId:'', pollT:null, lsT:null, menuAt:0, sending:false };
 const QTY_MAX = 20;
@@ -1099,7 +1099,7 @@ async function odSend(){
       if(r && (r.error === 'het_hang' || r.error === 'bad_item')) odLoadMenu();
     }else{
       OD.orderId = r.orderId; $('odSentList').textContent = listTx;
-      $('odStTx').textContent = 'Đang chờ quầy tiếp nhận…'; $('odDot').className = 'odDot';
+      $('odStTx').textContent = 'Đã gửi tới lễ tân, đang chờ xác nhận…'; $('odDot').className = 'odDot';
       $('odSent').style.display = 'flex';
       OD.cart = {}; $('odNote').value = ''; odRender(); odPoll();
     }
@@ -1112,14 +1112,14 @@ function odPoll(){
     if((t += 5) > 180){ clearInterval(OD.pollT); return; }
     try{
       const r = await odApi('don.trangThai', { orderId: OD.orderId }); if(!r || !r.ok) return;
-      if(r.status === 'NHAN'){ $('odStTx').textContent = 'Nhân viên đã tiếp nhận, đang mang lên…'; $('odDot').className = 'odDot go'; }
+      if(r.status === 'NHAN'){ $('odStTx').textContent = 'Lễ tân đã xác nhận, đang mang lên…'; $('odDot').className = 'odDot go'; }
       else if(r.status === 'XONG'){ $('odStTx').textContent = 'Đã phục vụ. Chúc quý khách vui vẻ!'; $('odDot').className = 'odDot go'; clearInterval(OD.pollT); setTimeout(odSentClose, 4000); }
       else if(r.status === 'HUY'){ $('odStTx').textContent = 'Yêu cầu đã được huỷ. Vui lòng liên hệ quầy.'; clearInterval(OD.pollT); }
     }catch(e){}
   }, 5000);
 }
 function odSentClose(){ clearInterval(OD.pollT); $('odSent').style.display = 'none'; }
-const LS_TXT = { MOI:['moi','Đã gửi tới nhân viên'], NHAN:['nhan','Đang phục vụ'], XONG:['xong','Đã xong'], HUY:['huy','Đã huỷ'] };
+const LS_TXT = { MOI:['moi','Đã gửi'], NHAN:['nhan','Đã xác nhận'], XONG:['xong','Đã phục vụ'], HUY:['huy','Đã huỷ'] };
 async function odLsLoad(){
   try{
     const r = await odApi('don.cuaPhong', odAuth()); const box = $('odLsBox');

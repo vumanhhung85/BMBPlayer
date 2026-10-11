@@ -1,17 +1,17 @@
 /* ============================================================
    BMBPlayer — Worker "bmbplayer" (một Worker cho cả hệ thống, deploy MỘT lần bằng wrangler)
-   BMBPlayer = chọn bài hát + gọi phục vụ (trước đây là 2 app BMBPlayer và BMB Order)
+   BMBPlayer = chọn bài hát + gọi lễ tân (trước đây là 2 app BMBPlayer và BMB Order)
    ============================================================
    TRANG (GitHub Pages, https://bmbplayer.boommusicbox.vn):
      index.html  — TV: phát bài; chưa gán phòng thì hiện mã 6 số + QR để quầy gán; phòng mở thì hiện
-                   QR khách ở góc trái (QR này mở remote.html: chọn bài + gọi phục vụ). Mỗi lượt mở là QR mới.
-     remote.html — Khách / máy tính bảng trong phòng: tab Chọn bài + tab Gọi phục vụ.
+                   QR khách ở góc trái (QR này mở remote.html: chọn bài + gọi lễ tân). Mỗi lượt mở là QR mới.
+     remote.html — Khách / máy tính bảng trong phòng: tab Chọn bài + tab Gọi lễ tân.
      quay.html   — Quầy: hàng đợi đơn, mở/đóng phòng, lịch sử, menu, tài khoản, và tab TV & phòng
                    (gán TV, xem/đổi QR khách, gỡ máy tính bảng, admin thêm/xoá phòng, in thẻ đánh giá).
      kho.html, nhac.html — kho karaoke và nhạc TV (Worker kho-karaoke / nhac-playlist riêng, không đổi).
 
    ĐƯỜNG DẪN CỦA WORKER:
-     POST /api               — API quầy + gọi phục vụ (body JSON {action,...}), giữ đúng tên action cũ của Order.
+     POST /api               — API quầy + gọi lễ tân (body JSON {action,...}), giữ đúng tên action cũ của Order.
      GET  /ws                — WebSocket kênh phòng (TV / máy tính bảng / điện thoại khách).
      POST /api/tv/pair/*     — TV chưa gán phòng xin mã 6 số, chờ quầy gán.
      POST /api/tablet/claim  — máy tính bảng đổi QR trên TV lấy mã máy tính bảng của phòng.
@@ -53,6 +53,7 @@ const ID_RE = /^[A-Za-z0-9_-]{1,40}$/;                                  // mã p
 const TOKEN_RE = /^([A-Za-z0-9_-]{1,40})\.(\d{1,6})\.([\w-]{22})$/;
 const ACTIONS = new Set(['add', 'play', 'next', 'replay', 'mute', 'vol', 'prio', 'up', 'remove', 'hello']);
 const MAX_MSG = 4096, MAX_STATE = 32768, MAX_REMOTES = 2, RATE_PER_SEC = 15;
+const SVC_ACTIVE_MS = 2 * 3600 * 1000, SVC_DONE_MS = 15 * 1000;     // yêu cầu gọi lễ tân trên TV: đang xử lý hiện tối đa 2 giờ; xong/huỷ hiện 15 giây
 
 /* ---------- Mã ---------- */
 const b64uB = u8 => btoa(String.fromCharCode(...u8)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -477,6 +478,7 @@ async function donTao(env, body) {
       if (lan === 2 || !/UNIQUE|constraint/i.test(String(e && e.message || e))) throw e;
     }
   }
+  await baoLeTan(env, phong.id, { id, st: 'MOI', items, at: now });     // TV của phòng hiện "Đã gửi"
   return ok({ orderId: id });
 }
 
@@ -632,7 +634,7 @@ async function quayDon(env, body) {
   const orderId = s(body.orderId, 40);
   const act = s(body.act, 10);
   if (!orderId || !['nhan', 'huy', 'xong'].includes(act)) return fail('missing_or_bad_params');
-  const [don, loi2] = await donCuaChiNhanh(env, ss, orderId, 'chi_nhanh_id, trang_thai, dev_id');
+  const [don, loi2] = await donCuaChiNhanh(env, ss, orderId, 'chi_nhanh_id, trang_thai, dev_id, phong_id, items, tao_luc');
   if (loi2) return loi2;
 
   const now = Date.now();
@@ -655,6 +657,8 @@ async function quayDon(env, body) {
   }
   const r = await env.DB.prepare(sql).bind(...params).run();
   if (!r.meta.changes) return fail('khong_doi_duoc_trang_thai', 400, 'Đơn đã được người khác xử lý. Màn hình sẽ tự cập nhật.');
+  let items = []; try { items = JSON.parse(don.items); } catch (e) {}
+  await baoLeTan(env, don.phong_id, { id: orderId, st: act === 'nhan' ? 'NHAN' : act === 'xong' ? 'XONG' : 'HUY', items, at: don.tao_luc });   // TV hiện "Đã xác nhận / Đã phục vụ / Đã huỷ"
   return ok({});
 }
 
@@ -1068,7 +1072,7 @@ async function tkQuyenMenu(env, body) {
 }
 
 // ============================================================
-// Kênh phòng ↔ API quầy / gọi phục vụ
+// Kênh phòng ↔ API quầy / gọi lễ tân
 // ============================================================
 // Khách (QR trên TV, chỉ lượt đang mở) hoặc máy tính bảng (mã máy tính bảng) → phòng nào, vai trò gì
 async function kenhKhach(env, body) {
@@ -1086,6 +1090,11 @@ async function kenhKhach(env, body) {
 async function baoKenhPhong(env, roomId) {
   try { await call(roomStub(env, roomId), '/sync', { id: roomId }); }
   catch (e) { console.error('baoKenhPhong:', e); }
+}
+// Báo TV của phòng trạng thái yêu cầu gọi lễ tân (MOI đã gửi · NHAN đã xác nhận · XONG đã phục vụ · HUY đã huỷ) — lỗi thì bỏ qua, đơn vẫn đã lưu
+async function baoLeTan(env, phongId, don) {
+  try { await call(roomStub(env, phongId), '/svc', { id: phongId, don }); }
+  catch (e) { console.error('baoLeTan:', e); }
 }
 async function phongCuaChiNhanh(env, ss, roomId) {
   if (!roomId) return [null, fail('missing_roomId')];
@@ -1329,6 +1338,28 @@ export class Room extends DurableObject {
       for(const ws of list){ try{ ws.send(msg); }catch(e){} }
     }
   }
+  /* Yêu cầu gọi lễ tân của phòng (đã gửi / đã xác nhận / đã phục vụ / đã huỷ) — TV hiện để khách biết.
+     Còn hiện: đang chờ hoặc đã xác nhận (tối đa 2 giờ), đã phục vụ / đã huỷ thì chỉ ~15 giây rồi biến mất. */
+  svcView(list, now){
+    return (list || []).filter(x => (x.st === 'MOI' || x.st === 'NHAN') ? now - x.upd < SVC_ACTIVE_MS : now - x.upd < SVC_DONE_MS).slice(-6);
+  }
+  async svcSend(list, ws){
+    const msg = JSON.stringify({ type: 'svc', list });
+    for(const w of (ws ? [ws] : this.ctx.getWebSockets('tv'))){ try{ w.send(msg); }catch(e){} }
+  }
+  async svcPut(d){
+    const c = await this.cfg(), now = Date.now();
+    if(!c.open) return;                                // phòng đang đóng: không báo gì lên TV
+    const st = ['MOI', 'NHAN', 'XONG', 'HUY'].includes(d.st) ? d.st : 'MOI', id = String(d.id || '').slice(0, 40);
+    if(!id) return;
+    const items = (Array.isArray(d.items) ? d.items : []).slice(0, 12).map(i => ({ label: String(i.label || '').slice(0, 60), type: i.type === 'DR' ? 'DR' : 'SV', icon: String(i.icon || '').slice(0, 8), qty: Math.max(1, Math.min(99, +i.qty | 0 || 1)) }));
+    let list = (await this.ctx.storage.get('svc')) || [];
+    const row = { id, st, items, at: +d.at || now, upd: now }, i = list.findIndex(x => x.id === id);
+    if(i >= 0) list[i] = row; else list.push(row);
+    list = list.slice(-10);
+    await this.ctx.storage.put('svc', list);
+    await this.svcSend(this.svcView(list, now));
+  }
   async endGuests(){                                   // hết lượt: ngắt điện thoại khách (kể cả máy đang chờ phòng mở)
     const msg = JSON.stringify(await this.roomMsg(null, { open: false, reason: 'closed' }));
     for(const ws of this.ctx.getWebSockets('remote')){ try{ if((ws.deserializeAttachment() || {}).ok) ws.send(msg); ws.close(4001, 'closed'); }catch(e){} }
@@ -1336,12 +1367,12 @@ export class Room extends DurableObject {
   async applyOpen(c, mo){                              // lượt mới: phiên mới + QR khách mới (QR lượt trước chết luôn)
     await this.endGuests();
     await this.ctx.storage.put({ open: true, since: mo || Date.now(), moLuc: mo, session: c.session + 1, genQ: c.genQ + 1 });
-    await this.ctx.storage.delete('last');
+    await this.ctx.storage.delete(['last', 'svc']);
     await this.broadcastRoom();
   }
   async applyClose(c){
     await this.ctx.storage.put({ open: false, since: 0, moLuc: 0, session: c.session + 1 });
-    await this.ctx.storage.delete('last');
+    await this.ctx.storage.delete(['last', 'svc']);
     await this.endGuests();
     await this.broadcastRoom({ reason: 'closed' });     // TV và máy tính bảng vẫn nối, chỉ chuyển sang "phòng chưa mở"
   }
@@ -1385,7 +1416,7 @@ export class Room extends DurableObject {
     const u = new URL(req.url);
     if(u.pathname === '/ws') return this.connect(req, u);
     const body = await req.json().catch(() => ({}));
-    if(u.pathname === '/check'){                         // mã còn dùng được không: TV/máy tính bảng tự quên mã chết; gọi phục vụ kiểm mã khách
+    if(u.pathname === '/check'){                         // mã còn dùng được không: TV/máy tính bảng tự quên mã chết; gọi lễ tân kiểm mã khách
       const role = body.role === 'tv' ? 'tv' : body.role === 'remote' ? 'remote' : 'tablet', t = parseToken(body.r);
       if(t) await this.remember(t.id);
       const c = await this.syncDb(), gen = c[GEN[role]];
@@ -1395,6 +1426,7 @@ export class Room extends DurableObject {
     await this.remember(String(body.id || ''));
     if(u.pathname === '/status') return jres(await this.status());
     if(u.pathname === '/sync'){ const c = await this.syncDb(); return jres({ ok: true, open: c.open }); }
+    if(u.pathname === '/svc'){ await this.svcPut(body.don || {}); return jres({ ok: true }); }
     if(u.pathname === '/rotate'){
       const role = body.kind === 'tv' ? 'tv' : body.kind === 'tb' ? 'tablet' : 'remote', c = await this.cfg();
       const g = c[GEN[role]] + 1;
@@ -1466,6 +1498,7 @@ export class Room extends DurableObject {
       const extra = a0.role === 'remote' ? { gt: c.open ? await guestTicket(this.env, a0.id) : '' } : await this.roleExtra(c, a0.role);
       ws.send(JSON.stringify(await this.roomMsg(c, Object.assign({ id: a0.id, you: a0.role }, extra))));
       if(a0.role !== 'tv' && c.open){ const last = await this.ctx.storage.get('last'); if(last) ws.send(last); }
+      if(a0.role === 'tv' && c.open){ const v = this.svcView(await this.ctx.storage.get('svc'), Date.now()); if(v.length) await this.svcSend(v, ws); }   // TV vừa nối: hiện lại yêu cầu đang chờ
       return;
     }
     const a = ws.deserializeAttachment() || {}, now = Date.now();
@@ -1612,7 +1645,7 @@ export default {
     const u = new URL(req.url);
     if(!env.SECRET) return jres({ error: 'Worker chưa đặt secret SECRET' }, 500);
 
-    /* API quầy + gọi phục vụ (giữ nguyên cách gọi của quay.html cũ: POST JSON {action,...}) */
+    /* API quầy + gọi lễ tân (giữ nguyên cách gọi của quay.html cũ: POST JSON {action,...}) */
     if(u.pathname === '/api' || u.pathname === '/api/') return handleApi(req, env);
 
     const ch = cors(req, env);

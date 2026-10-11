@@ -1,4 +1,4 @@
-# Worker "bmbplayer" — một Worker cho cả BMBPlayer (chọn bài + gọi phục vụ + quầy + TV)
+# Worker "bmbplayer" — một Worker cho cả BMBPlayer (chọn bài + gọi lễ tân + quầy + TV)
 # Từ 10/2026 Worker này phục vụ LUÔN các trang HTML (static assets), thay GitHub Pages: một lần push = một phiên bản cho cả trang lẫn API.
 # Deploy:  npx wrangler deploy        (chạy trong thư mục repo BMBPlayer)
 name = "bmbplayer"
