@@ -123,8 +123,7 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
         Window w = getWindow();
-        w.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
-                | WindowManager.LayoutParams.FLAG_FULLSCREEN
+        w.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN
                 | WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
                 | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);
         if (Build.VERSION.SDK_INT >= 28) {
@@ -134,7 +133,6 @@ public class MainActivity extends Activity {
         }
         root = new FrameLayout(this);
         root.setBackgroundColor(Color.BLACK);
-        root.setKeepScreenOn(true);
         setContentView(root);
         hideBars();
         listenNetwork();
@@ -145,6 +143,7 @@ public class MainActivity extends Activity {
             mode = looksLikeTv() ? "tv" : "tablet";
             prefs.edit().putString(K_MODE, mode).apply();
         }
+        applyScreenPolicy();
         start();
     }
 
@@ -159,11 +158,52 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         hideBars();
+        applyScreenPolicy();
         if (web != null) web.onResume();
+    }
+
+    // Màn hình: TV luôn sáng; máy tính bảng KHÔNG giữ sáng — không chạm quá 3 phút thì tắt (tiết kiệm pin khi khách đã trả phòng)
+    private static final long TABLET_IDLE_MS = 3 * 60 * 1000L;
+    private final Runnable tabletIdle = () -> {
+        try {
+            getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            WindowManager.LayoutParams lp = getWindow().getAttributes();
+            lp.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_OFF;   // tắt đèn nền; hệ thống ngủ theo thời gian chờ của máy
+            getWindow().setAttributes(lp);
+        } catch (Throwable ignored) {}
+    };
+
+    private void applyScreenPolicy() {
+        ui.removeCallbacks(tabletIdle);
+        boolean tab = "tablet".equals(mode);
+        Window w = getWindow();
+        try {
+            WindowManager.LayoutParams lp = w.getAttributes();
+            lp.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE;
+            w.setAttributes(lp);
+        } catch (Throwable ignored) {}
+        if (tab) w.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        else w.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        if (root != null) root.setKeepScreenOn(!tab);
+        if (web != null) web.setKeepScreenOn(!tab);
+        if (tab) ui.postDelayed(tabletIdle, TABLET_IDLE_MS);
+    }
+
+    @Override
+    public boolean dispatchTouchEvent(MotionEvent ev) {
+        if ("tablet".equals(mode) && ev.getActionMasked() == MotionEvent.ACTION_DOWN) applyScreenPolicy();
+        return super.dispatchTouchEvent(ev);
+    }
+
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent ev) {
+        if ("tablet".equals(mode) && ev.getAction() == KeyEvent.ACTION_DOWN) applyScreenPolicy();
+        return super.dispatchKeyEvent(ev);
     }
 
     @Override
     protected void onPause() {
+        ui.removeCallbacks(tabletIdle);
         if (web != null) web.onPause();
         super.onPause();
     }
@@ -249,6 +289,7 @@ public class MainActivity extends Activity {
     private void chooseMode(String m) {
         mode = m;
         prefs.edit().putString(K_MODE, m).apply();
+        applyScreenPolicy();
         if (chooser != null) { root.removeView(chooser); chooser = null; }
         start();
     }
@@ -283,7 +324,7 @@ public class MainActivity extends Activity {
             return false;
         }
         web.setBackgroundColor(Color.BLACK);
-        web.setKeepScreenOn(true);
+        web.setKeepScreenOn(!"tablet".equals(mode));
         web.setFocusable(true);
         web.setFocusableInTouchMode(true);
         WebSettings s = web.getSettings();
@@ -553,7 +594,7 @@ public class MainActivity extends Activity {
         labels.add("⟳  Tải lại trang"); acts.add(this::loadHome);
         labels.add("tablet".equals(mode) ? "📺  Chuyển sang chế độ TV" : "📱  Chuyển sang chế độ máy tính bảng");
         acts.add(() -> confirm("Đổi chế độ?", "tablet".equals(mode) ? "Máy này sẽ thành TV phát bài." : "Máy này sẽ thành máy tính bảng chọn bài + gọi phục vụ.",
-                () -> { mode = "tablet".equals(mode) ? "tv" : "tablet"; prefs.edit().putString(K_MODE, mode).apply(); applyUserAgent(); loadHome(); }));
+                () -> { mode = "tablet".equals(mode) ? "tv" : "tablet"; prefs.edit().putString(K_MODE, mode).apply(); applyScreenPolicy(); applyUserAgent(); loadHome(); }));
         labels.add("▦  Mở ứng dụng khác…"); acts.add(this::showApps);
         labels.add("📶  Cài đặt Wi-Fi"); acts.add(() -> openSettings(Settings.ACTION_WIFI_SETTINGS));
         labels.add("⚙  Cài đặt Android"); acts.add(() -> openSettings(Settings.ACTION_SETTINGS));
