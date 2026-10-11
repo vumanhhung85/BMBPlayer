@@ -24,3 +24,14 @@ Ký v1 (jarsigner, Android 5–6) + căn lề 4 byte + v2 (Android 7+). Cần JD
 
 ## Cập nhật phiên bản app
 Tăng `versionCode` (và `versionName`) trong `android/app/build.gradle`, đẩy lên nhánh `android-apk`, ký bản mới bằng khoá cũ.
+
+## Chạy lâu dài (từ 1.8–1.9)
+- 1.8: máy tính bảng không giữ sáng màn hình; 3 phút không chạm thì tắt đèn nền (máy ngủ theo thời gian chờ trong Cài đặt). TV vẫn luôn sáng.
+- 1.9:
+  - Cứ 30 giây hỏi trang một lần; 3 phút không trả lời → dựng lại trình hiển thị (Android 10+ còn tự phát hiện trang đứng khi bấm quá 30 giây).
+  - TV: 4:30–5:00 sáng, nếu không có bài đang hát và trình hiển thị đã chạy ≥20 giờ → dựng lại cho sạch RAM (trang tự nhớ phòng). Trang TV vốn cũng tự tải lại 4–5 giờ sáng.
+  - Bộ nhớ đệm web >150 MB → tự dọn; máy báo thiếu RAM → bỏ đệm trong RAM. Menu nhân viên có nút "Dọn bộ nhớ đệm (giữ phòng đã gán)".
+  - Trình hiển thị hỏng liên tục (>3 lần / 2 phút) → nghỉ 30 giây rồi thử lại, tránh vòng lặp.
+  - App văng: TV tự mở lại sau 3 giây (tối đa 3 lần / 10 phút; Android 10+ cần quyền "Hiển thị trên ứng dụng khác" hoặc BMBPlayer là màn hình chính).
+  - Máy tính bảng tắt màn ≥10 phút rồi bật lại → nạp lại trang.
+  - Menu nhân viên có dòng "Tự phục hồi": đếm số lần treo / hiển thị hỏng / văng / làm mới đêm / dọn đệm và lần gần nhất — xem khi thử máy.

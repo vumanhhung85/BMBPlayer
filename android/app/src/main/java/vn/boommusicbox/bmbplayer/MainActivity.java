@@ -2,7 +2,9 @@ package vn.boommusicbox.bmbplayer;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.AlarmManager;
 import android.app.AlertDialog;
+import android.app.PendingIntent;
 import android.app.UiModeManager;
 import android.content.ActivityNotFoundException;
 import android.content.BroadcastReceiver;
@@ -27,6 +29,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.provider.Settings;
 import android.util.TypedValue;
 import android.view.Gravity;
@@ -54,7 +57,9 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.io.File;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -72,6 +77,9 @@ import java.util.regex.Pattern;
  *  - Toàn màn hình, giữ màn hình sáng, tự mở khi bật máy, có thể chọn làm màn hình chính.
  *  - Mất mạng / máy chủ lỗi: màn hình "Đang chờ mạng", tự tải lại khi có mạng.
  *  - WebView hỏng (máy yếu hết RAM): tự dựng lại, không văng app.
+ *  - Chạy lâu dài (1.9): canh trang treo (30 giây hỏi một lần, 3 phút không trả lời → dựng lại), TV dựng lại
+ *    trình hiển thị lúc 4:30–5:00 sáng khi rảnh, dọn bộ nhớ đệm khi quá lớn / máy báo thiếu RAM,
+ *    TV tự mở lại khi app văng, máy tính bảng nạp lại trang khi bật lại sau ≥10 phút tắt màn.
  *  - Menu ẩn cho nhân viên: nút MENU trên điều khiển, bấm QUAY LẠI 3 lần, hoặc chạm 5 lần góc trên bên phải.
  */
 public class MainActivity extends Activity {
@@ -108,6 +116,16 @@ public class MainActivity extends Activity {
     private int chooserLeft = 0;
     private AlertDialog openDialog;
 
+    // ---- Chạy lâu dài ----
+    private static final long WD_PING_MS = 30_000L;            // hỏi trang mỗi 30 giây
+    private static final long WD_STALL_MS = 3 * 60_000L;       // 3 phút không trả lời = treo
+    private static final long TABLET_WAKE_RELOAD_MS = 10 * 60_000L;
+    private static final long CACHE_MAX_BYTES = 150L * 1024 * 1024;
+    private static boolean crashHandlerSet = false;
+    private boolean resumed = false, selfKill = false;
+    private long lastPong = 0, webBornAt = 0, pausedAt = 0, unrespSince = 0, goneWindow = 0;
+    private int goneCount = 0;
+
     private final Runnable retry = new Runnable() {
         @Override public void run() {
             if (offline == null || offline.getVisibility() != View.VISIBLE) return;
@@ -122,6 +140,7 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+        installCrashRestart();
         Window w = getWindow();
         w.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN
                 | WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
@@ -160,6 +179,14 @@ public class MainActivity extends Activity {
         hideBars();
         applyScreenPolicy();
         if (web != null) web.onResume();
+        resumed = true;
+        long now = SystemClock.elapsedRealtime();
+        // Máy tính bảng tắt màn lâu rồi bật lại: nạp lại trang cho chắc dữ liệu mới, kết nối mới
+        if ("tablet".equals(mode) && pausedAt > 0 && now - pausedAt >= TABLET_WAKE_RELOAD_MS && web != null && chooser == null) loadHome();
+        pausedAt = 0;
+        lastPong = now;
+        ui.removeCallbacks(watchdog);
+        ui.postDelayed(watchdog, WD_PING_MS);
     }
 
     // Màn hình: TV luôn sáng; máy tính bảng KHÔNG giữ sáng — không chạm quá 3 phút thì tắt (tiết kiệm pin khi khách đã trả phòng)
@@ -191,6 +218,9 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onPause() {
+        resumed = false;
+        pausedAt = SystemClock.elapsedRealtime();
+        ui.removeCallbacks(watchdog);
         ui.removeCallbacks(tabletIdle);
         if (web != null) web.onPause();
         super.onPause();
@@ -291,6 +321,7 @@ public class MainActivity extends Activity {
         loadHome();
         ui.postDelayed(this::checkWebViewVersion, 1500);
         ui.postDelayed(this::maybeAskAutostart, 4000);
+        ui.postDelayed(() -> trimDiskCache(false), 60_000);
     }
 
     private String home() { return "tablet".equals(mode) ? URL_TABLET : URL_TV; }
@@ -311,6 +342,9 @@ public class MainActivity extends Activity {
             ui.postDelayed(() -> { if (web == null && createWeb()) { applyUserAgent(); loadHome(); } }, 10000);
             return false;
         }
+        webBornAt = lastPong = SystemClock.elapsedRealtime();
+        unrespSince = 0;
+        if (Build.VERSION.SDK_INT >= 29) watchRenderer(web);
         web.setBackgroundColor(Color.BLACK);
         web.setKeepScreenOn(!"tablet".equals(mode));
         web.setFocusable(true);
@@ -413,8 +447,15 @@ public class MainActivity extends Activity {
         public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
             // Trình hiển thị bị hệ thống tắt (thường do thiếu RAM): dựng lại, không để app văng
             if (view == web) {
+                long now = SystemClock.elapsedRealtime();
+                if (now - goneWindow > 120_000L) { goneWindow = now; goneCount = 0; }
+                goneCount++;
+                if (!selfKill) record("n_gone", detail != null && detail.didCrash() ? "trình hiển thị lỗi" : "trình hiển thị bị tắt (thiếu RAM)");
+                selfKill = false;
                 destroyWeb();
-                ui.postDelayed(() -> { if (createWeb()) { applyUserAgent(); loadHome(); } }, 800);
+                boolean storm = goneCount > 3;                       // hỏng liên tục: nghỉ 30 giây, tránh vòng lặp
+                if (storm) showOffline("Trình hiển thị lỗi nhiều lần, thử lại sau 30 giây…");
+                ui.postDelayed(() -> { if (web == null && createWeb()) { applyUserAgent(); loadHome(); } }, storm ? 30_000 : 800);
             }
             return true;
         }
@@ -595,6 +636,8 @@ public class MainActivity extends Activity {
         final boolean auto = prefs.getBoolean(K_AUTOSTART, true);
         labels.add(auto ? "☑  Tự mở khi bật máy: BẬT (bấm để tắt)" : "☐  Tự mở khi bật máy: TẮT (bấm để bật)");
         acts.add(() -> { prefs.edit().putBoolean(K_AUTOSTART, !auto).apply(); toast(auto ? "Đã tắt tự mở khi bật máy" : "Đã bật tự mở khi bật máy"); });
+        labels.add("🧹  Dọn bộ nhớ đệm (giữ phòng đã gán)"); acts.add(() -> trimDiskCache(true));
+        labels.add("ℹ  Tự phục hồi: " + statsLine()); acts.add(() -> {});
         labels.add("🗑  Xoá dữ liệu trang (gán lại phòng)");
         acts.add(() -> confirm("Xoá dữ liệu trang?", "Máy sẽ quên phòng đã gán, phải gán lại ở quầy (tab TV & phòng).", this::clearData));
         labels.add("✕  Thoát BMBPlayer"); acts.add(() -> { if (Build.VERSION.SDK_INT >= 21) finishAndRemoveTask(); else finish(); });
@@ -756,6 +799,172 @@ public class MainActivity extends Activity {
                 .setNegativeButton("Để sau", null)
                 .setOnDismissListener(d -> hideBars())
                 .show();
+    }
+
+    // ======================================================================
+    // Chạy lâu dài: canh treo, dựng lại hằng đêm, dọn bộ nhớ, tự mở lại khi văng
+    // ======================================================================
+    /** Hỏi trang: còn trả lời không, TV đang rảnh không (không bài nào đang hát). */
+    private static final String PROBE = "(function(){try{return (typeof cur==='number'&&cur<0&&!(typeof player!=='undefined'&&player&&player.getPlayerState&&player.getPlayerState()===1))?'idle':'busy'}catch(e){return 'busy'}})()";
+
+    private final Runnable watchdog = new Runnable() {
+        @Override public void run() {
+            ui.removeCallbacks(this);
+            ui.postDelayed(this, WD_PING_MS);
+            if (!resumed || web == null || chooser != null) return;
+            long now = SystemClock.elapsedRealtime();
+            if (offline != null && offline.getVisibility() == View.VISIBLE) { lastPong = now; return; }   // đang chờ mạng: việc của màn hình chờ
+            if (now - lastPong > WD_STALL_MS) {
+                lastPong = now;
+                record("n_hang", "trang không phản hồi");
+                restartRenderer();
+                return;
+            }
+            final WebView w = web;
+            try {
+                w.evaluateJavascript(PROBE, v -> {
+                    if (w != web) return;
+                    lastPong = SystemClock.elapsedRealtime();
+                    maybeNightly(v);
+                });
+            } catch (Throwable ignored) {}
+        }
+    };
+
+    /** TV: 4:30–5:00 sáng, trình hiển thị đã chạy ≥20 giờ và đang rảnh → dựng lại cho sạch bộ nhớ (trang tự nhớ phòng). */
+    private void maybeNightly(String probe) {
+        if (!"tv".equals(mode) || !"\"idle\"".equals(probe)) return;
+        Calendar c = Calendar.getInstance();
+        if (c.get(Calendar.HOUR_OF_DAY) != 4 || c.get(Calendar.MINUTE) < 30) return;
+        if (SystemClock.elapsedRealtime() - webBornAt < 20 * 3600_000L) return;
+        record("n_night", "làm mới hằng đêm");
+        trimDiskCache(false);
+        restartRenderer();
+    }
+
+    /** Dựng lại trình hiển thị: Android 10+ tắt hẳn tiến trình hiển thị (giải phóng hết RAM), máy cũ thì tạo WebView mới. */
+    private void restartRenderer() {
+        if (web == null) return;
+        if (Build.VERSION.SDK_INT >= 29) {
+            try {
+                android.webkit.WebViewRenderProcess p = web.getWebViewRenderProcess();
+                if (p != null) { selfKill = true; if (p.terminate()) return; selfKill = false; }   // onRenderProcessGone dựng lại
+            } catch (Throwable ignored) { selfKill = false; }
+        }
+        destroyWeb();
+        ui.postDelayed(() -> { if (web == null && createWeb()) { applyUserAgent(); loadHome(); } }, 800);
+    }
+
+    /** Android 10+: trang không phản hồi thao tác liên tục 30 giây → tắt tiến trình hiển thị để dựng lại. */
+    private void watchRenderer(WebView w) {
+        try {
+            w.setWebViewRenderProcessClient(new android.webkit.WebViewRenderProcessClient() {
+                @Override
+                public void onRenderProcessUnresponsive(WebView v, android.webkit.WebViewRenderProcess r) {
+                    if (v != web) return;
+                    long now = SystemClock.elapsedRealtime();
+                    if (unrespSince == 0) { unrespSince = now; return; }
+                    if (now - unrespSince < 30_000L || r == null) return;
+                    unrespSince = 0;
+                    record("n_hang", "trang đứng khi bấm");
+                    selfKill = true;
+                    try { if (!r.terminate()) { selfKill = false; restartRenderer(); } } catch (Throwable t) { selfKill = false; restartRenderer(); }
+                }
+
+                @Override
+                public void onRenderProcessResponsive(WebView v, android.webkit.WebViewRenderProcess r) {
+                    unrespSince = 0;
+                }
+            });
+        } catch (Throwable ignored) {}
+    }
+
+    /** Bộ nhớ đệm web (ảnh, file trang) quá lớn → xoá. Không đụng dữ liệu trang (phòng đã gán, đăng nhập). */
+    private void trimDiskCache(final boolean manual) {
+        final File dir = getCacheDir();
+        new Thread(() -> {
+            final long before = dirSize(dir, 0);
+            if (!manual && before < CACHE_MAX_BYTES) return;
+            ui.post(() -> {
+                try { if (web != null) web.clearCache(true); } catch (Throwable ignored) {}
+                if (manual) {
+                    new Thread(() -> {
+                        long after = dirSize(dir, 0);
+                        long freed = Math.max(0, before - after) / (1024 * 1024);
+                        ui.post(() -> { toast("Đã dọn bộ nhớ đệm (" + freed + " MB). Phòng đã gán vẫn giữ."); loadHome(); });
+                    }).start();
+                } else record("n_cache", "dọn bộ nhớ đệm " + (before / (1024 * 1024)) + " MB");
+            });
+        }).start();
+    }
+
+    private static long dirSize(File f, int depth) {
+        if (f == null || depth > 12) return 0;
+        if (f.isFile()) return f.length();
+        File[] kids = f.listFiles();
+        if (kids == null) return 0;
+        long n = 0;
+        for (File k : kids) n += dirSize(k, depth + 1);
+        return n;
+    }
+
+    @Override
+    public void onTrimMemory(int level) {
+        super.onTrimMemory(level);
+        // Máy báo sắp hết RAM khi đang chạy: bỏ bộ đệm trong RAM của WebView (không đụng ổ, không đụng dữ liệu trang)
+        if (level == TRIM_MEMORY_RUNNING_CRITICAL && web != null) { try { web.clearCache(false); } catch (Throwable ignored) {} }
+    }
+
+    @Override
+    public void onLowMemory() {
+        super.onLowMemory();
+        if (web != null) { try { web.clearCache(false); } catch (Throwable ignored) {} }
+    }
+
+    /** App văng (lỗi Java): TV tự mở lại sau 3 giây, tối đa 3 lần / 10 phút để không lặp vô hạn. */
+    private void installCrashRestart() {
+        if (crashHandlerSet) return;
+        crashHandlerSet = true;
+        final Context app = getApplicationContext();
+        final Thread.UncaughtExceptionHandler prev = Thread.getDefaultUncaughtExceptionHandler();
+        Thread.setDefaultUncaughtExceptionHandler((t, e) -> {
+            boolean restart = false;
+            try {
+                SharedPreferences sp = app.getSharedPreferences(PREFS, MODE_PRIVATE);
+                long now = System.currentTimeMillis();
+                int n = now - sp.getLong("crashAt", 0) < 10 * 60_000L ? sp.getInt("crashN", 0) + 1 : 1;
+                sp.edit().putLong("crashAt", now).putInt("crashN", n)
+                        .putInt("n_crash", sp.getInt("n_crash", 0) + 1)
+                        .putLong("t_last", now).putString("w_last", "app văng").commit();
+                if ("tv".equals(sp.getString(K_MODE, "")) && sp.getBoolean(K_AUTOSTART, true) && n <= 3) {
+                    Intent i = new Intent(app, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                    int fl = PendingIntent.FLAG_ONE_SHOT | (Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0);
+                    PendingIntent pi = PendingIntent.getActivity(app, 42, i, fl);
+                    AlarmManager am = (AlarmManager) app.getSystemService(Context.ALARM_SERVICE);
+                    if (am != null) { am.set(AlarmManager.ELAPSED_REALTIME, SystemClock.elapsedRealtime() + 3000, pi); restart = true; }
+                }
+            } catch (Throwable ignored) {}
+            if (restart || prev == null) {                     // tự mở lại: thoát êm, không hiện hộp "ứng dụng đã dừng" che TV
+                android.os.Process.killProcess(android.os.Process.myPid());
+                System.exit(10);
+            } else prev.uncaughtException(t, e);
+        });
+    }
+
+    private void record(String key, String what) {
+        try {
+            prefs.edit().putInt(key, prefs.getInt(key, 0) + 1)
+                    .putLong("t_last", System.currentTimeMillis()).putString("w_last", what).apply();
+        } catch (Throwable ignored) {}
+    }
+
+    private String statsLine() {
+        int g = prefs.getInt("n_gone", 0), h = prefs.getInt("n_hang", 0), c = prefs.getInt("n_crash", 0),
+            n = prefs.getInt("n_night", 0), k = prefs.getInt("n_cache", 0);
+        long t = prefs.getLong("t_last", 0);
+        String last = t == 0 ? "chưa lần nào" : prefs.getString("w_last", "") + " lúc "
+                + new java.text.SimpleDateFormat("dd/MM HH:mm", Locale.ROOT).format(new java.util.Date(t));
+        return "treo " + h + " · hiển thị " + g + " · văng " + c + " · đêm " + n + " · dọn " + k + " (cuối: " + last + ")";
     }
 
     // ======================================================================

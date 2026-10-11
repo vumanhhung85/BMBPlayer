@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- BMBPlayer — vỏ WebView cho TV / Android box / máy tính bảng trong phòng.
-     Nội dung là trang web https://bmbplayer.boommusicbox.vn: sửa trang trên GitHub là mọi máy tự cập nhật. -->
+     Nội dung là trang web https://bmb.id.vn: sửa trang trên GitHub là mọi máy tự cập nhật. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
