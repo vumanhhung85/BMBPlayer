@@ -59,3 +59,11 @@ Trên máy có Node (thư mục repo BMBPlayer, PowerShell):
 - Sửa Worker: luôn `npx wrangler deploy` (Durable Object không dán được vào ô sửa code của Dashboard).
 - Tên bảng trong D1 vẫn là `order_*` — chỉ là tên nội bộ, người dùng không thấy.
 - Phần chọn bài phát YouTube nhúng: điều khoản YouTube không cho dùng phục vụ khách thương mại — xem ghi chú bản quyền trước khi đưa cho khách thật.
+
+## Tên miền riêng vmh.io.vn (từ 10/2026)
+Tên miền chính thức của BMBPlayer: `https://bmbplayer.vmh.io.vn` (không dùng boommusicbox.vn nữa, để trang chủ/đặt phòng BMB không bị ảnh hưởng). Làm song song, địa chỉ cũ vẫn chạy cho tới khi chuyển xong:
+1. Cloudflare → Add a domain → `vmh.io.vn` (gói Free) → đổi nameserver của vmh.io.vn (ở nơi mua) sang 2 nameserver Cloudflare cấp.
+2. Workers & Pages → `bmbplayer` → Settings → Domains & Routes → Add → Custom domain → `bmbplayer.vmh.io.vn`.
+3. Worker `kho-karaoke` → Variables → `ALLOWED_ORIGINS` thêm `https://bmbplayer.vmh.io.vn` (nếu không, kho nhạc báo lỗi CORS ở địa chỉ mới).
+4. Mỗi TV/máy tính bảng/quầy mở địa chỉ mới (TV: sau khi mở, mã QR tự dùng địa chỉ mới). Quầy cần đăng nhập lại (đổi tên miền thì trình duyệt coi là trang khác).
+5. Ổn định ~1 tuần: bỏ `bmbplayer.boommusicbox.vn` khỏi `ALLOWED_ORIGINS`, tắt GitHub Pages, xoá `CNAME`.
