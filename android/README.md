@@ -1,6 +1,6 @@
 # BMBPlayer — ứng dụng Android (vỏ WebView)
 
-Ứng dụng chỉ là "khung" toàn màn hình mở trang `https://bmbplayer.boommusicbox.vn`. Sửa trang web là mọi máy tự cập nhật, **không phải cài lại APK**.
+Ứng dụng chỉ là "khung" toàn màn hình mở trang `https://bmb.id.vn` (từ bản 1.7; các bản ≤1.6 mở bmbplayer.boommusicbox.vn). Sửa trang web là mọi máy tự cập nhật, **không phải cài lại APK**.
 
 - Android 5.0 trở lên (cần WebView/Chrome bản 86 trở lên — app tự báo nếu cũ). TV box, Android TV, máy tính bảng, điện thoại.
 - Phát có tiếng ngay, không cần chạm. Toàn màn hình, giữ màn hình sáng.

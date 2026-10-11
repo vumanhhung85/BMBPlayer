@@ -66,7 +66,7 @@ import java.util.regex.Pattern;
 /**
  * BMBPlayer — vỏ WebView toàn màn hình cho TV / Android box / máy tính bảng trong phòng karaoke.
  *
- *  - Chế độ TV: mở https://bmbplayer.boommusicbox.vn/ (màn hình phát + QR khách).
+ *  - Chế độ TV: mở https://bmb.id.vn/ (màn hình phát + QR khách).
  *    Chế độ máy tính bảng: mở .../remote.html (chọn bài + gọi phục vụ, có quét QR bằng camera).
  *  - Phát có tiếng ngay, không cần chạm (setMediaPlaybackRequiresUserGesture(false)).
  *  - Toàn màn hình, giữ màn hình sáng, tự mở khi bật máy, có thể chọn làm màn hình chính.
@@ -81,7 +81,7 @@ public class MainActivity extends Activity {
     static final String K_AUTOSTART = "autostart";
     static final String K_ASK_OVERLAY = "askOverlay";    // số lần đã hỏi quyền tự mở
 
-    private static final String HOST = "bmbplayer.boommusicbox.vn";
+    private static final String HOST = "bmb.id.vn";
     private static final String URL_TV = "https://" + HOST + "/";
     private static final String URL_TABLET = "https://" + HOST + "/remote.html";
     private static final int MIN_WEBVIEW = 86;           // trang dùng tính năng có từ Chrome/WebView 86
@@ -336,7 +336,7 @@ public class MainActivity extends Activity {
     private static boolean allowed(Uri u) {
         if (u == null) return false;
         String h = u.getHost();
-        return "https".equals(u.getScheme()) && h != null && (h.equals("boommusicbox.vn") || h.endsWith(".boommusicbox.vn"));
+        return "https".equals(u.getScheme()) && h != null && (h.equals("bmb.id.vn") || h.endsWith(".bmb.id.vn") || h.equals("vmh.io.vn") || h.endsWith(".vmh.io.vn") || h.equals("boommusicbox.vn") || h.endsWith(".boommusicbox.vn"));
     }
 
     private class Client extends WebViewClient {
