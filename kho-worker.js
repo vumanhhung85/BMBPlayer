@@ -1103,7 +1103,12 @@ async function route(req, env, ctx, run) {
   if (!ok) return J({ error: 'Origin không được phép', reason: 'origin' }, 403, h);
   const url = new URL(req.url), p = url.pathname.replace(/\/+$/, '');
   if (p === '' || p === '/') return J({ ok: true, app: 'kho-karaoke' }, 200, h);
-  if (!(await guestAllowed(req, env, p)) && (!env.APP_PASS || req.headers.get('x-pass') !== env.APP_PASS)) return J({ error: 'Sai mật khẩu', reason: 'auth' }, 401, h);
+  if (!(await guestAllowed(req, env, p)) && (!env.APP_PASS || req.headers.get('x-pass') !== env.APP_PASS)) {
+    // khách (chỉ có vé, không có mật khẩu) bị từ chối → báo rõ lý do để biết cần sửa GUEST_SECRET, không phải mật khẩu
+    if (req.headers.get('x-guest') && !req.headers.get('x-pass'))
+      return J({ error: env.GUEST_SECRET ? 'Vé khách không hợp lệ: GUEST_SECRET của Worker kho khác Worker phòng (bmbplayer), hoặc vé đã hết hạn' : 'Worker kho chưa đặt secret GUEST_SECRET', reason: 'guest' }, 401, h);
+    return J({ error: 'Sai mật khẩu', reason: 'auth' }, 401, h);
+  }
   if (!env.DB) return J({ error: 'Worker chưa gắn D1 với tên DB' }, 500, h);
   const c = conf(env), now = Date.now();
   const rawEnv = env;

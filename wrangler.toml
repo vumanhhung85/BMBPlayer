@@ -3,6 +3,9 @@
 name = "bmbplayer"
 main = "bmbplayer-worker.js"
 compatibility_date = "2025-01-01"
+# Giữ biến đặt trong Dash khi deploy từ GitHub (không có dòng này, mỗi lần deploy sẽ XOÁ biến dạng Text đặt trong Dash).
+# Biến bí mật (SECRET, GUEST_SECRET, SESSION_SECRET, APP_PASS) phải đặt loại Secret — loại Secret không bao giờ bị deploy xoá.
+keep_vars = true
 
 [vars]
 ALLOWED_ORIGINS = "https://bmbplayer.boommusicbox.vn"

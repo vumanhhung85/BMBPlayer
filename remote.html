@@ -307,7 +307,7 @@ const ROOM0 = (params.get('room') || 'P1').toUpperCase();
 const bc = openRoomChannel('remote', ROOM0);       // có ?r=<QR trên TV> → khách; đã gán máy tính bảng → máy tính bảng; không có → như cũ (thử cục bộ)
 const GUEST = !!bc.ws;
 const ROOM = GUEST ? bc.roomId : ROOM0;
-let guestTok = '';                                   // vé khách do Worker phòng cấp khi phòng đang mở: chỉ đủ để tìm/chọn bài trong kho
+let guestTok = '', noTicket = false;                                   // vé khách do Worker phòng cấp khi phòng đang mở: chỉ đủ để tìm/chọn bài trong kho
 const $ = id => document.getElementById(id);
 const API_NAME = 'np_api', PASS_NAME = 'np_pass';          // dùng chung tên với nhac.html: nếu cùng địa chỉ trang thì chỉ cần nhập một lần
 const CAT_KEY = 'bmb_yt_catalog_v1';
@@ -716,14 +716,16 @@ function renderFallback(d, raw, term){
   }
   if(!n) box.append(el('div', 'hint', 'Chưa có bài nào gần giống. Anh thử gõ tên ngắn hơn hoặc tên ca sĩ để tìm trong kho.'));
 }
-function khoWhy(e){ return e.status === 401 ? 'sai mật khẩu' : e.reason === 'origin' ? 'Worker kho chưa cho phép địa chỉ ' + location.origin : e instanceof TypeError ? 'không kết nối được tới Worker kho' : (e.message || 'lỗi'); }
+function khoWhy(e){ return e.status === 401 ? (e.reason === 'guest' ? 'vé khách bị kho từ chối (GUEST_SECRET của Worker bmbplayer và kho-karaoke không giống nhau)' : 'sai mật khẩu') : e.reason === 'origin' ? 'Worker kho chưa cho phép địa chỉ ' + location.origin : e instanceof TypeError ? 'không kết nối được tới Worker kho' : (e.message || 'lỗi'); }
 
 /* ---------- Kho karaoke (Worker kho-karaoke): tìm không tốn lượt, bài hot, ưu tiên bản được chọn nhiều ---------- */
 const hasKho = () => !!(cfg.kho && (cfg.pass || guestTok));
-const khoAuth = () => cfg.pass ? { 'x-pass':cfg.pass } : { 'x-guest':guestTok };   // nhân viên dùng mật khẩu; khách dùng vé do phòng cấp
+let passBad = false;                                 // mật khẩu lưu trên máy bị kho từ chối mà phòng có cấp vé → dùng vé khách
+const khoAuth = () => (cfg.pass && !(passBad && guestTok)) ? { 'x-pass':cfg.pass } : { 'x-guest':guestTok };   // nhân viên dùng mật khẩu; khách dùng vé do phòng cấp
 async function kapi(path, body){
   const opt = body ? { method:'POST', headers:Object.assign({ 'content-type':'application/json' }, khoAuth()), body:JSON.stringify(body) } : { headers:khoAuth() };
   const res = await fetch(cfg.kho + path, opt);
+  if(res.status === 401 && opt.headers['x-pass'] && guestTok && !passBad){ passBad = true; return kapi(path, body); }   // mật khẩu cũ lệch → thử lại bằng vé khách
   let data = {}; try{ data = await res.json(); }catch(e){}
   if(!res.ok){ const e = new Error(data.error || ('Lỗi ' + res.status)); e.status = res.status; e.reason = data.reason || ''; throw e; }
   return data;
@@ -893,7 +895,12 @@ async function showGroups(box, groups, seq, suffix){
 function khoHead(title, act){ const head = el('div', 'secHead'); head.append(el('b', null, title)); if(act){ const a = el('span', 'secAct'); a.append(act); head.append(a); } return head; }
 async function renderKho(){
   const box = $('khoSec');
-  if(!hasKho()){ box.replaceChildren(); return 0; }
+  if(!hasKho()){
+    // khách đã vào phòng nhưng phòng không cấp vé kho → nói rõ thay vì để trống (thường do Worker bmbplayer thiếu secret GUEST_SECRET)
+    if(GUEST && noTicket) box.replaceChildren(khoHead('Kho karaoke'), el('div', 'hint err', 'Danh sách bài của quán chưa mở được cho phòng này, nhờ nhân viên kiểm tra (mã: thiếu vé kho). Vẫn tìm được trên YouTube bằng nút Tìm.'));
+    else box.replaceChildren();
+    return 0;
+  }
   const raw = $('q').value.trim(), p = parseYT(raw), seq = ++khoSeq;
   if(raw !== gateFor && gateFor){ gateFor = ''; if($('results').querySelector('.notice')) $('results').replaceChildren(); }
   if(raw) feedReset();
@@ -981,7 +988,7 @@ async function loadIndex(){
     if(saved && saved.d.v === vnDay(Date.now())) return;                       // hôm nay đã tải
     const res = await fetch(cfg.kho + '/api/kho/index', { headers: Object.assign({}, khoAuth(), saved && saved.etag ? { 'If-None-Match': saved.etag } : {}) });
     if(res.status === 304 && saved){ saved.got = Date.now(); try{ await idb('readwrite', st => st.put(saved, 'index')); }catch(e){} paintIdx(saved.got); return; }
-    if(!res.ok) return;
+    if(!res.ok){ if(res.status === 401 && cfg.pass && guestTok && !passBad){ passBad = true; setTimeout(loadIndex, 0); } return; }
     const d = await res.json(), rec = { d, etag: res.headers.get('ETag') || '', got: Date.now() };
     try{ await idb('readwrite', st => st.put(rec, 'index')); }catch(e){}
     IDX = await prepIndex(d); paintIdx(rec.got);
@@ -1266,7 +1273,8 @@ if(GUEST){
   bc.onroom = m => {
     if(m.name && m.name !== roomName){ roomName = m.name; paintTag(); }
     if(m.branch && m.branch !== OD.branch){ OD.branch = m.branch; $('tabOrder').style.display = ''; if(curTab === 'order') odLoadMenu(); }
-    if(m.gt){ const first = !guestTok; guestTok = m.gt; if(first){ showQuota(); renderKho(); loadIndex(); } }
+    if(m.gt){ const first = !guestTok; guestTok = m.gt; noTicket = false; if(first){ showQuota(); renderKho(); loadIndex(); } }
+    else if(m.open && !guestTok && !noTicket) setTimeout(() => { if(!guestTok && !noTicket){ noTicket = true; renderKho(); } }, 4000);   // chờ tin kèm vé tới (có thể tới sau tin phòng)
     if(m.open){ banner(''); send('hello'); } else banner(BANNER[m.reason === 'notopen' ? 'waiting' : 'closed']);
   };
   bc.onstatus = s => { if(s !== 'open' && s !== 'closed' && s !== 'waiting') banner(BANNER[s] || ''); else if(s === 'waiting') banner(BANNER.waiting); };
