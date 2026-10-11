@@ -36,6 +36,14 @@
   body.remote #remoteCard{display:flex}
   body.remote #playerWrap, body.remote #fsBtn{display:none}
 
+  /* Mã QR cố định trên TV: quét bằng điện thoại để mở trang điều khiển (đặt ngoài khung video, không che video) */
+  #nowRow{display:flex; align-items:center; gap:8px}
+  #nowCol{flex:1; min-width:0}
+  #tvQr{flex:0 0 auto; display:flex; flex-direction:column; align-items:center; gap:4px; padding:8px 16px 8px 0}
+  #tvQr .box{background:#fff; border-radius:10px; padding:6px; line-height:0}
+  #tvQr img{width:112px; height:112px; image-rendering:pixelated; display:block}
+  #tvQr span{font-size:11px; color:var(--quiet); white-space:nowrap}
+  body.remote #tvQr{display:none}
   #now{padding:12px 18px 4px}
   #now .nt{font-weight:700; font-size:clamp(16px,2vw,22px); line-height:1.35}
   #now .nc{color:var(--quiet); font-size:13px; margin-top:2px; min-height:18px}
@@ -141,6 +149,7 @@
       </div>
     </div>
     <div id="remoteCard"><img id="rcImg" alt=""><div id="rcStatus">Đang kết nối tới trang phát…</div></div>
+    <div id="nowRow"><div id="nowCol">
     <div id="now"><div class="nt" id="nowTitle">—</div><div class="nc" id="nowCh"></div></div>
     <div id="ctl">
       <button id="prevBtn" class="big" title="Bài trước (←)">⏮</button>
@@ -151,6 +160,7 @@
       <label class="vol">🔊 <input type="range" id="vol" min="0" max="100" value="100"></label>
       <button id="fsBtn" class="big" title="Toàn màn hình (F)">⛶</button>
     </div>
+    </div><div id="tvQr" title="Quét bằng điện thoại để chọn bài"><div class="box" id="tvQrImg"></div><span>Quét để chọn bài</span></div></div>
   </section>
 
   <aside id="side">
@@ -164,7 +174,7 @@
         <input id="q" type="search" placeholder="Tên bài, ca sĩ hoặc dán link YouTube…" autocomplete="off" enterkeyhint="go">
         <button id="goBtn">Tìm</button>
       </div>
-      <div class="hint">Dán link một bài để thêm thẳng, dán link playlist để nạp cả danh sách (không tốn lượt tìm). Tìm bằng chữ giới hạn khoảng 100 lượt/ngày.</div>
+      <div class="hint">Gõ tên bài là tìm ngay trong kho BMB (bản karaoke/beat, không tốn lượt). Bấm <b>Tìm</b> lần nữa để tìm trên YouTube (bản có lời, khoảng 100 lượt/ngày). Dán link bài hoặc playlist để thêm thẳng.</div>
       <div id="results"></div>
     </div>
   </aside>
@@ -642,11 +652,52 @@ async function go(){
       showResults(d.items, 'Playlist: ' + d.items.length + ' bài phát được' + (d.skipped ? ' (bỏ ' + d.skipped + ' bài không phát nhúng được)' : ''), addAll);
       return;
     }
-    msg('Đang tìm…');
-    const d = await api('/api/search?q=' + encodeURIComponent(raw));
-    showResults(d.items, 'Kết quả cho “' + raw + '”');
+    // Kho trước (không tốn lượt tìm YouTube); bấm Tìm lần nữa với cùng chữ → tìm YouTube
+    if(khoShownFor !== raw && await khoSearch(raw)) return;
+    await ytSearch(raw);
   }catch(e){ msg(''); apiFail(e); }
 }
+async function ytSearch(raw){
+  khoShownFor = '';
+  msg('Đang tìm trên YouTube…');
+  const d = await api('/api/search?q=' + encodeURIComponent(raw));
+  showResults(d.items, 'YouTube: “' + raw + '”');
+}
+
+/* ---------- Kho BMB (kho-karaoke): tìm bản karaoke/beat, không tốn lượt YouTube ----------
+   Dùng chung địa chỉ kho + mật khẩu đã lưu trên trang (kho_api, np_pass). Không ghi lượt chọn/lượt tìm hụt vào kho
+   (nghe nhạc cá nhân không làm lệch bảng bài hot và danh sách "tìm hụt" của quán). */
+let khoShownFor = '', khoTimer = null, khoSeq = 0;
+const khoBase = () => { try{ return (localStorage.getItem('kho_api') || KHO_DEFAULT).replace(/\/+$/, ''); }catch(e){ return KHO_DEFAULT; } };
+const TONE = { nam:'Tone Nam', nu:'Tone Nữ', 'song-ca':'Song ca', 'thieu-nam':'Thiếu giọng nam', 'thieu-nu':'Thiếu giọng nữ' };
+// trả về true nếu đã hiện kết quả kho (kể cả "không có bài"), false nếu không dùng được kho → để tìm YouTube luôn
+async function khoSearch(raw){
+  if(!cfg.pass) return false;
+  const seq = ++khoSeq;
+  let d;
+  try{
+    const res = await fetch(khoBase() + '/api/kho/search?q=' + encodeURIComponent(raw) + '&limit=30', { headers:{ 'x-pass': cfg.pass } });
+    d = await res.json().catch(() => ({}));
+    if(!res.ok){ if(seq === khoSeq) toast('Kho BMB: ' + (res.status === 401 ? 'sai mật khẩu (APP_PASS của kho-karaoke khác mật khẩu đã lưu)' : (d.error || 'lỗi ' + res.status)) + ' — tìm trên YouTube.', 'err'); return false; }
+  }catch(e){ return false; }
+  if(seq !== khoSeq || $('q').value.trim() !== raw) return true;    // đã gõ chữ khác
+  khoShownFor = raw;
+  const list = (d.groups || []).filter(g => g.best && /^[\w-]{11}$/.test(g.best.id)).map(g => ({
+    id: g.best.id, title: g.best.title, embeddable: true,
+    channel: [g.best.channel, TONE[g.tone] || '', g.versions > 1 ? g.versions + ' bản' : ''].filter(Boolean).join(' · '),
+    thumb: 'https://i.ytimg.com/vi/' + g.best.id + '/mqdefault.jpg' }));
+  const yt = el('button', 'ghost', '🔎 YouTube'); yt.title = 'Tìm bản có lời trên YouTube';
+  yt.onclick = () => ytSearch(raw).catch(e => { msg(''); apiFail(e); });
+  showResults(list, 'Kho BMB: ' + list.length + ' bài' + (list.length ? '' : ' — bấm Tìm lần nữa để tìm YouTube'), yt);
+  return true;
+}
+// gõ là tìm trong kho (đợi ngưng gõ 350 ms); link YouTube thì để nút Thêm xử lý
+$('q').addEventListener('input', () => {
+  clearTimeout(khoTimer);
+  const raw = $('q').value.trim(), p = parseYT(raw);
+  if(raw.length < 2 || p.vid || p.list || !cfg.pass) return;
+  khoTimer = setTimeout(() => { khoSearch(raw).catch(() => {}); }, 350);
+});
 $('goBtn').onclick = go;
 $('q').addEventListener('keydown', e => { if(e.key === 'Enter') go(); });
 $('q').addEventListener('input', () => { const p = parseYT($('q').value); $('goBtn').textContent = (p.vid || p.list) ? 'Thêm' : 'Tìm'; });
@@ -808,12 +859,23 @@ $('pairIn').addEventListener('keydown', e => { if(e.key === 'Enter') claim($('pa
 document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') wsKick(); });
 
 /* ---------- Khởi động ---------- */
+// TV: mã QR cố định dẫn tới trang điều khiển của phòng này. Điện thoại đã lưu mật khẩu thì tìm/thêm bài được ngay;
+// máy chưa có mật khẩu sẽ được hỏi mật khẩu (không có mật khẩu thì không làm gì được).
+if(!REMOTE && window.qrcode){
+  const url = location.origin + location.pathname + '?mode=remote&room=' + encodeURIComponent(ROOM) + '&qr=1';
+  try{ const q = qrcode(0, 'M'); q.addData(url); q.make(); const img = document.createElement('img'); img.alt = 'QR chọn bài'; img.src = q.createDataURL(5, 2); $('tvQrImg').append(img); }
+  catch(e){ $('tvQr').style.display = 'none'; }
+}else $('tvQr').style.display = 'none';
+const fromQr = params.get('qr') === '1';
+if(fromQr){ try{ history.replaceState(null, '', location.pathname + '?mode=remote&room=' + encodeURIComponent(ROOM)); }catch(e){} }
+if(REMOTE && fromQr) tab('add');                 // quét QR là để chọn bài → mở sẵn ô tìm
 paintModes(); renderList(); paintLink();
 const codeParam = (params.get('code') || '').replace(/\D/g, '');
 if(codeParam){ try{ history.replaceState(null, '', location.pathname + '?mode=remote&room=' + encodeURIComponent(ROOM)); }catch(e){} }
 if(REMOTE && !cfg.pass){
   if(codeParam) claim(codeParam);
-  else if(tokValid()){ $('rcStatus').textContent = 'Đang nối tới TV…'; wsConnect(); }
+  else if(tokValid() && !fromQr){ $('rcStatus').textContent = 'Đang nối tới TV…'; wsConnect(); }
+  else if(fromQr) openSettings();                // quét QR: nhập mật khẩu một lần, các lần sau quét là dùng được ngay
   else openPair();
 }else if(!cfg.api || !cfg.pass){ $('startInfo').textContent = cfg.api ? 'Nhập mật khẩu truy cập ở cửa sổ vừa mở.' : 'Bấm ⚙ để nhập địa chỉ Worker và mật khẩu.'; openSettings(); }
 else{ loadPlaylists(); wsConnect(); }
