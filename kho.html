@@ -19,6 +19,7 @@
   textarea{width:100%; min-height:110px; resize:vertical}
   button{background:var(--accent); border:none; color:#fff; font-weight:700; border-radius:10px; padding:8px 12px; font-size:13px; cursor:pointer}
   button.ghost{background:#20202e; border:1px solid var(--line); color:var(--ink)}
+  button.ic{padding:2px 8px; font-size:12px; line-height:1.4; border-radius:8px; color:var(--quiet)}
   button.danger{background:#3b1520; border:1px solid #5b2030; color:var(--bad)}
   button:disabled{opacity:.5}
   .line{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:6px 0}
@@ -109,7 +110,7 @@
   <div style="overflow:auto"><table id="missTable"></table></div>
 
   <h3>Ca sĩ / nhạc sĩ để tìm playlist <span class="hint" id="artHint"></span></h3>
-  <div class="hint">Tự lấy từ tiêu đề trong kho; người có bài anh hay chọn được ưu tiên. Muốn ưu tiên ai thì dán tên vào đây (mỗi dòng một người, có dấu hay không đều được).</div>
+  <div class="hint">Tự lấy từ tiêu đề trong kho; người có bài anh hay chọn được ưu tiên. Muốn ưu tiên ai thì dán tên vào đây (mỗi dòng một người, có dấu hay không đều được). Lỡ thêm nhầm thì bấm ✕ ở dòng đó.</div>
   <textarea id="artInput" class="links" placeholder="Đàm Vĩnh Hưng&#10;Trịnh Công Sơn&#10;Lam Trường"></textarea>
   <div class="line"><button id="artSave">Ưu tiên tìm các tên này</button></div>
   <div style="overflow:auto"><table id="artTable"></table></div>
@@ -496,9 +497,18 @@ async function loadGrow(){
       const act = el('td'); act.append(btn('Bỏ', 'ghost', async () => { try{ await api('/api/kho/grow/miss/drop', { q:m.q }); loadGrow(); }catch(e){ alert(e.message); } }));
       return [td(m.label || m.q), td(String(m.n), 'n'), td(st, m.searched ? (m.added ? 'ok' : 'hint') : 'hint'), act];
     }));
-    $('artHint').textContent = g.artistDone + '/' + g.artistTotal + ' đã tìm · thêm ' + fmt(g.artistAdded) + ' playlist';
-    table('artTable', [['Tiếp theo'], ['Bản trong kho', 'n'], ['']], g.artists.map(a => [td(a.name), td(fmt(a.n), 'n'),
-      td(a.prio >= 100 ? 'anh ưu tiên' : a.prio >= 10 ? 'bài anh hay chọn' : (a.searched_at ? 'đã tìm ' + ago(a.searched_at) : ''), 'hint')]));
+    $('artHint').textContent = g.artistDone + '/' + g.artistTotal + ' đã tìm · thêm ' + fmt(g.artistAdded) + ' playlist' + (g.artistMine ? ' · ' + g.artistMine + ' tên anh ưu tiên' : '') + (g.artistHidden ? ' · đã xoá ' + g.artistHidden : '');
+    table('artTable', [['Tiếp theo'], ['Bản trong kho', 'n'], [''], ['']], g.artists.map(a => {
+      const x = el('td', 'n');
+      x.append(btn('✕', 'ghost ic', async ev => {
+        if(!confirm('Xoá “' + a.name + '” khỏi danh sách tìm playlist?\n(Playlist đã thêm vẫn giữ. Muốn dùng lại thì dán tên vào ô bên trên.)')) return;
+        ev.target.disabled = true;
+        try{ await api('/api/kho/grow/artists/drop', { name:a.name }); ev.target.closest('tr').remove(); }
+        catch(e){ ev.target.disabled = false; alert(e.message); }
+      }));
+      x.lastChild.title = 'Xoá tên này';
+      return [td(a.name), td(fmt(a.n), 'n'), td(a.prio >= 100 ? 'anh ưu tiên' : a.prio >= 10 ? 'bài anh hay chọn' : (a.searched_at ? 'đã tìm ' + ago(a.searched_at) : ''), 'hint'), x];
+    }));
     $('candHint').textContent = g.candChecked + ' kênh đã xem · ' + g.candAdded + ' lần thêm nguồn';
     table('candTable', [['Kênh'], ['Bản trong kho', 'n'], ['Karaoke/50 mới nhất', 'n'], ['Kết quả']], g.cand.map(x => [td(x.title), td(String(x.n), 'n'),
       td(x.sampled ? x.karaoke + '/' + x.sampled : '—', 'n'), td(x.action + ' · ' + ago(x.at), /^thêm/.test(x.action) ? 'ok' : 'hint')]));
