@@ -225,12 +225,15 @@ if(location.protocol === 'file:') $('fileWarn').style.display = 'block';
 
 let queue = [], cur = -1;
 let player = null, ready = false, apiReady = false;
-/* Phiên bản: web = giờ trang này được đăng lên GitHub (tự cập nhật), app = bản APK đang chạy (lấy từ user-agent) */
+/* Phiên bản: web = giờ bản đang chạy được deploy (Cloudflare: /api/ver cùng tên miền; trước đây GitHub Pages: giờ sửa file),
+   app = bản APK đang chạy (lấy từ user-agent) */
 (function(){
-  const m = /BMBPlayerApp\/([\w.]+) \((\w+)\)/.exec(navigator.userAgent);
-  const d = new Date(document.lastModified), pad = n => String(n).padStart(2, '0');
-  const web = isNaN(d) ? '?' : pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
-  $('verTag').textContent = (m ? 'App ' + m[1] + ' · ' : 'Trình duyệt · ') + 'Web ' + web;
+  const m = /BMBPlayerApp\/([\w.]+) \((\w+)\)/.exec(navigator.userAgent), pad = n => String(n).padStart(2, '0');
+  const show = d => { const web = isNaN(d) ? '?' : pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+    $('verTag').textContent = (m ? 'App ' + m[1] + ' · ' : 'Trình duyệt · ') + 'Web ' + web; };
+  show(new Date(document.lastModified));
+  if(location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+    fetch('/api/ver', { cache:'no-store' }).then(r => r.ok ? r.json() : null).then(v => { if(v && v.at) show(new Date(v.at)); }).catch(() => {});
 })();
 if(bc.ws) document.body.classList.add('inroom');
 new MutationObserver(() => document.body.classList.toggle('idleOn', $('idle').style.display !== 'none' && getComputedStyle($('idle')).display !== 'none'))

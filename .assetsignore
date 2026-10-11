@@ -1,0 +1,17 @@
+# File KHÔNG phục vụ công khai khi Worker bmbplayer phát các trang tĩnh (cú pháp giống .gitignore)
+.git
+.github
+.wrangler
+node_modules
+.assetsignore
+.gitignore
+wrangler.toml
+bmbplayer-worker.js
+kho-worker.js
+*.sql
+*.md
+CNAME
+package.json
+package-lock.json
+.dev.vars*
+.env*
