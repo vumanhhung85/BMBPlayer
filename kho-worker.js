@@ -780,7 +780,7 @@ async function refreshArtists(env, now) {
         LEFT JOIN channels c ON c.id = COALESCE(v.src, v.channel_id) GROUP BY a)
       WHERE a IS NOT NULL AND length(a) BETWEEN 4 AND 40 AND cnt >= 3
       ON CONFLICT(name) DO UPDATE SET n = excluded.n WHERE artists.n <> excluded.n`),
-    env.DB.prepare(`UPDATE artists SET prio = 10 WHERE prio < 10 AND name IN (SELECT ${A} FROM pick_log p JOIN videos v ON v.id = p.id
+    env.DB.prepare(`UPDATE artists SET prio = 10 WHERE prio BETWEEN 0 AND 9 AND name IN (SELECT ${A} FROM pick_log p JOIN videos v ON v.id = p.id
         LEFT JOIN channels c ON c.id = COALESCE(v.src, v.channel_id) WHERE p.ts >= ?1)`).bind(now - 90 * DAY),
     env.DB.prepare(`INSERT INTO meta (k, v) VALUES ('artists_at', ?1) ON CONFLICT(k) DO UPDATE SET v = excluded.v`).bind(String(now))
   ]);
@@ -789,7 +789,7 @@ async function plsearchJob(env, run, c, now) {
   const left = await searchLeft(env, run, c, 'pl', c.plSearch);
   if (left <= 0) return { job: 'plsearch', idle: true, reason: 'hết lượt tìm playlist hôm nay' };
   await refreshArtists(env, now);
-  const a = await env.DB.prepare(`SELECT name FROM artists WHERE searched_at < ?1
+  const a = await env.DB.prepare(`SELECT name FROM artists WHERE searched_at < ?1 AND prio >= 0
       ORDER BY prio DESC, CASE WHEN n BETWEEN 3 AND 60 THEN 0 ELSE 1 END, n DESC LIMIT 1`).bind(now - 90 * DAY).first();
   if (!a) return { job: 'plsearch', idle: true };
   const d = await yt(env, run, 'search', { part: 'snippet', type: 'playlist', regionCode: 'VN', relevanceLanguage: 'vi', maxResults: 50, q: 'karaoke ' + a.name }, 0);
@@ -1290,9 +1290,10 @@ async function route(req, env, ctx, run) {
       const [mis, misN, art, artN, near, nearN, cand, candN] = await Promise.all([
         all(`SELECT q, label, n, at, searched, added, found FROM misses WHERE found = 0 ORDER BY searched ASC, n DESC, at DESC LIMIT 40`),
         all(`SELECT SUM(CASE WHEN searched = 0 AND found = 0 THEN 1 ELSE 0 END) AS wait, COUNT(*) AS total FROM misses`),
-        all(`SELECT name, n, prio, searched_at, added FROM artists ORDER BY CASE WHEN searched_at < ?1 THEN 0 ELSE 1 END, prio DESC,
+        all(`SELECT name, n, prio, searched_at, added FROM artists WHERE prio >= 0 ORDER BY CASE WHEN searched_at < ?1 THEN 0 ELSE 1 END, prio DESC,
             CASE WHEN n BETWEEN 3 AND 60 THEN 0 ELSE 1 END, n DESC LIMIT 25`, now - 90 * DAY),
-        all(`SELECT COUNT(*) AS total, SUM(CASE WHEN searched_at > 0 THEN 1 ELSE 0 END) AS done, SUM(added) AS added FROM artists`),
+        all(`SELECT SUM(CASE WHEN prio >= 0 THEN 1 ELSE 0 END) AS total, SUM(CASE WHEN prio >= 0 AND searched_at > 0 THEN 1 ELSE 0 END) AS done, SUM(added) AS added,
+            SUM(CASE WHEN prio < 0 THEN 1 ELSE 0 END) AS hidden, SUM(CASE WHEN prio >= 100 THEN 1 ELSE 0 END) AS mine FROM artists`),
         all(`SELECT id, title, channel, kw, at FROM near_miss ORDER BY at DESC LIMIT 40`),
         all(`SELECT kw, COUNT(*) AS n FROM near_miss GROUP BY kw`),
         all(`SELECT title, n, karaoke, sampled, action, at FROM cand ORDER BY at DESC LIMIT 25`),
@@ -1300,7 +1301,7 @@ async function route(req, env, ctx, run) {
       ]);
       const au = await env.DB.prepare(`SELECT COUNT(*) AS n, SUM(enabled) AS on_, SUM(added_total) AS vids FROM channels WHERE auto = 1`).first();
       return J({ misses: mis, missWait: misN[0].wait || 0, missTotal: misN[0].total || 0, artists: art, artistTotal: artN[0].total || 0, artistDone: artN[0].done || 0,
-        artistAdded: artN[0].added || 0, near, nearByKw: nearN, kwOn: [...kwOn], kwOptions: EXTRA_LABEL, cand, candChecked: candN[0].n || 0, candAdded: candN[0].added || 0,
+        artistAdded: artN[0].added || 0, artistHidden: artN[0].hidden || 0, artistMine: artN[0].mine || 0, near, nearByKw: nearN, kwOn: [...kwOn], kwOptions: EXTRA_LABEL, cand, candChecked: candN[0].n || 0, candAdded: candN[0].added || 0,
         autoSources: au.n || 0, autoOn: au.on_ || 0, autoVideos: au.vids || 0 }, 200, h);
     }
     // Duyệt từ khoá mở rộng → lưu, rồi nhận lại ngay các bài đã bị loại vì từ khoá đó (≤600 bài, ≈1 đơn vị/50)
@@ -1323,6 +1324,13 @@ async function route(req, env, ctx, run) {
       if (names.length) await env.DB.prepare(`INSERT INTO artists (name, n, prio, searched_at) SELECT value, 0, 100, 0 FROM json_each(?1) WHERE true
           ON CONFLICT(name) DO UPDATE SET prio = 100, searched_at = 0`).bind(JSON.stringify(names)).run();
       return J({ ok: true, added: names.length }, 200, h);
+    }
+    // Xoá một tên khỏi danh sách tìm playlist (lỡ thêm nhầm, hoặc tên rác lấy từ tiêu đề): đánh dấu prio = -1 để việc tự cập nhật
+    // danh sách không thêm lại; muốn dùng lại thì dán tên đó vào ô ưu tiên. Playlist đã thêm từ tên này vẫn giữ nguyên.
+    if (p === '/api/kho/grow/artists/drop' && req.method === 'POST') {
+      const name = String(body.name || '').slice(0, 60);
+      const r = await env.DB.prepare(`UPDATE artists SET prio = -1 WHERE name = ?1`).bind(name).run();
+      return J({ ok: true, changed: (r.meta && r.meta.changes) || 0 }, 200, h);
     }
     if (p === '/api/kho/grow/miss/drop' && req.method === 'POST') {
       await env.DB.prepare(`DELETE FROM misses WHERE q = ?1`).bind(String(body.q || '')).run();
