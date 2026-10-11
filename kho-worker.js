@@ -59,13 +59,16 @@ const LOCK_MS = 9 * 60000;
 const RUN_WRITE_CAP = 100000;     // một lượt chạy/một yêu cầu ghi quá số dòng này → chặn ngay (chắc chắn là lỗi lặp)
 const SCAN_MAX_SOURCES = 30;      // một lượt quét kiểm tối đa bấy nhiêu nguồn
 const SCAN_MS = 20000;            // ... và không quá 20 giây
+const REFRESH_MS = 15000;         // một lượt làm mới chạy tối đa bấy nhiêu mili giây
+const PRUNED_AT = 3650 * DAY;     // bản đã dọn khỏi kho: ghi vào `rejected` với mốc ở tương lai xa → không bị xoá sau 30 ngày, không bị nạp lại
 const LATE_MS = 3 * DAY;          // nguồn trễ hạn kiểm bổ sung quá 3 ngày → cảnh báo trên kho.html
 const YT = 'https://www.googleapis.com/youtube/v3/';
 const ID_RE = /^[\w-]{11}$/;
 
 const num = (v, d) => { const n = parseInt(v, 10); return Number.isFinite(n) && n > 0 ? n : d; };
 const conf = env => ({ pages: Math.min(num(env.PAGES_PER_TICK, 4), 10), budget: num(env.DAILY_UNIT_BUDGET, 5000), hotSearch: num(env.HOT_SEARCH_PER_DAY, 20), searchLimit: num(env.SEARCH_LIMIT, 100), writeLimit: num(env.DAILY_WRITE_LIMIT, 1000000),
-  gapSearch: num(env.GAP_SEARCH_PER_DAY, 30), plSearch: num(env.PL_SEARCH_PER_DAY, 25), reserve: num(env.SEARCH_RESERVE, 25), discoverPerDay: num(env.DISCOVER_PER_DAY, 80) });
+  gapSearch: num(env.GAP_SEARCH_PER_DAY, 30), plSearch: num(env.PL_SEARCH_PER_DAY, 25), reserve: num(env.SEARCH_RESERVE, 25), discoverPerDay: num(env.DISCOVER_PER_DAY, 80),
+  refreshMax: Math.min(num(env.REFRESH_PER_RUN, 1500), 4000) });
 const AUTO_MIN_NEW = 5;           // nguồn tự thêm mang về ít hơn số bản mới này sau lần quét đầu → tự tắt
 const CACHE_FRESH = 7 * DAY;      // cùng một từ khoá đã tìm trong 7 ngày → trả lại kết quả cũ, không tốn lượt
 let cacheReady = false;
@@ -313,13 +316,21 @@ async function ingest(env, rows, now) {
     env.DB.prepare(`INSERT INTO videos_fts (rowid, txt) SELECT v.rid, MAX(json_extract(j.value,'$.txt')) FROM json_each(?1) j JOIN videos v ON v.id = json_extract(j.value,'$.id') GROUP BY v.rid`).bind(J)
   ]);
 }
-async function removeIds(env, ids, now) {
+// Làm mới chỉ cập nhật lượt xem/độ tăng/mốc làm mới (không đụng tiêu đề, khoá bài, bảng tìm kiếm) → ~3 dòng ghi/bản thay vì ~8
+async function refreshStats(env, rows, now) {
+  if (!rows.length) return;
+  const J = JSON.stringify(rows.map(r => ({ id: r.id, vw: r.views })));
+  await env.DB.prepare(`UPDATE videos SET views_delta = MAX(0, (j.vw - videos.views) * 86400000.0 / (?2 - videos.fetched_at)), views = j.vw, fetched_at = ?2
+      FROM (SELECT json_extract(value,'$.id') AS jid, json_extract(value,'$.vw') AS vw FROM json_each(?1)) AS j
+      WHERE videos.id = j.jid AND ?2 - videos.fetched_at > 43200000`).bind(J, now).run();
+}
+async function removeIds(env, ids, now, rejAt) {
   if (!ids.length) return;
   const J = JSON.stringify(ids);
   await env.DB.batch([
     env.DB.prepare(`DELETE FROM videos_fts WHERE rowid IN (SELECT rid FROM videos WHERE id IN (SELECT value FROM json_each(?1)))`).bind(J),
     env.DB.prepare(`DELETE FROM videos WHERE id IN (SELECT value FROM json_each(?1))`).bind(J),
-    env.DB.prepare(`INSERT OR IGNORE INTO rejected (id, at) SELECT value, ?2 FROM json_each(?1)`).bind(J, now)
+    env.DB.prepare(`INSERT OR IGNORE INTO rejected (id, at) SELECT value, ?2 FROM json_each(?1)`).bind(J, rejAt || now)
   ]);
 }
 // Lấy chi tiết ≤50 id, lưu bài đạt, loại (và nhớ) bài không đạt.
@@ -330,8 +341,8 @@ async function fetchAndIngest(env, run, ids, now, opt) {
   opt = opt || {};
   const d = await yt(env, run, 'videos', { part: 'snippet,contentDetails,statistics,status', id: ids.join(',') }, 1);
   const items = d.items || [];
-  const modes = opt.mode ? {} : await orderModes(env, items);
-  const rows = [], near = [];
+  const modes = (opt.mode || opt.refresh) ? {} : await orderModes(env, items);
+  const rows = [], near = opt.refresh ? null : [];
   for (const v of items) {
     const r = toRow(v, opt.mode || modes[v.id], near);
     if (r) { r.src = opt.src || null; rows.push(r); }
@@ -339,9 +350,9 @@ async function fetchAndIngest(env, run, ids, now, opt) {
   const okIds = new Set(rows.map(r => r.id));
   const bad = ids.filter(i => !okIds.has(i));
   if (!(await writesBlocked(env, run, conf(env)))) {   // chạm trần ghi hôm nay → vẫn trả kết quả, chỉ không lưu kho
-    await ingest(env, rows, now);
+    if (opt.refresh) await refreshStats(env, rows, now); else await ingest(env, rows, now);
     await removeIds(env, bad, now);
-    if (near.length) await env.DB.prepare(`INSERT INTO near_miss (id, title, channel, channel_id, kw, at)
+    if (near && near.length) await env.DB.prepare(`INSERT INTO near_miss (id, title, channel, channel_id, kw, at)
         SELECT json_extract(value,'$.id'), json_extract(value,'$.title'), json_extract(value,'$.cht'), json_extract(value,'$.ch'), json_extract(value,'$.kw'), ?2
         FROM json_each(?1) WHERE true ON CONFLICT(id) DO UPDATE SET at = excluded.at`).bind(JSON.stringify(near), now).run();
   }
@@ -358,6 +369,43 @@ async function picksById(env, ids, since) {
   const r = await env.DB.prepare(`SELECT id, COUNT(*) AS n FROM pick_log WHERE id IN (SELECT value FROM json_each(?1)) AND ts >= ?2 GROUP BY id`).bind(JSON.stringify(ids), since || 0).all();
   (r.results || []).forEach(x => { m[x.id] = x.n; });
   return m;
+}
+
+
+/* ---------------- Dọn kho (CHỈ chạy khi anh bấm trên kho.html, không có trong Cron) ----------------
+   Xếp các bản của cùng một bài theo: số lần anh chọn (nhiều trước) → kênh gắn sao → lượt xem. Bản bị coi là thừa khi
+     (a) nằm ngoài `keep` bản đầu của bài VÀ ngoài `perTone` bản đầu của từng giọng, hoặc
+     (b) lượt xem < `minViews`, nằm ngoài `minKeep` bản đầu của bài, và không phải bản đầu của giọng đó.
+   Không bao giờ dọn: bản anh từng chọn, bản của kênh gắn sao, bản ưu tiên của bài hot. */
+function cleanParams(b) {
+  const n = (v, d, lo, hi) => { v = Number(v); return Number.isFinite(v) ? Math.min(hi, Math.max(lo, Math.floor(v))) : d; };
+  return { keep: n(b.keep, 8, 3, 30), perTone: n(b.perTone, 2, 1, 5), minViews: n(b.minViews, 500, 0, 1000000), minKeep: n(b.minKeep, 2, 1, 5) };
+}
+const CLEAN_CTE = `WITH pk AS (SELECT id, COUNT(*) AS n FROM pick_log GROUP BY id),
+  r AS (SELECT v.id, v.title, v.channel, v.channel_id, v.views, v.song_key, v.tone, COALESCE(pk.n, 0) AS picks, COALESCE(c.star, 0) AS star,
+          CASE WHEN v.id IN (SELECT best_id FROM hot_songs WHERE best_id IS NOT NULL) THEN 1 ELSE 0 END AS best,
+          ROW_NUMBER() OVER (PARTITION BY v.song_key ORDER BY COALESCE(pk.n, 0) DESC, COALESCE(c.star, 0) DESC, v.views DESC, v.rid) AS rn,
+          ROW_NUMBER() OVER (PARTITION BY v.song_key, v.tone ORDER BY COALESCE(pk.n, 0) DESC, COALESCE(c.star, 0) DESC, v.views DESC, v.rid) AS rt
+        FROM videos v LEFT JOIN pk ON pk.id = v.id LEFT JOIN channels c ON c.id = v.channel_id),
+  cand AS (SELECT id, title, channel, channel_id, views, song_key, rn, rt,
+             CASE WHEN rn > ?1 AND rt > ?2 THEN 'thua' ELSE 'itxem' END AS why
+           FROM r WHERE picks = 0 AND star = 0 AND best = 0
+             AND ((rn > ?1 AND rt > ?2) OR (views < ?3 AND rn > ?4 AND rt > 1)))`;
+async function cleanPreview(env, q) {
+  const bind = [q.keep, q.perTone, q.minViews, q.minKeep];
+  const one = (sql) => env.DB.prepare(CLEAN_CTE + ' ' + sql).bind(...bind).first();
+  const all = (sql) => env.DB.prepare(CLEAN_CTE + ' ' + sql).bind(...bind).all();
+  const [tot, chs, smp, vid] = await Promise.all([
+    one(`SELECT COUNT(*) AS n, SUM(CASE WHEN why = 'thua' THEN 1 ELSE 0 END) AS thua, SUM(CASE WHEN why = 'itxem' THEN 1 ELSE 0 END) AS itxem, COUNT(DISTINCT song_key) AS songs FROM cand`),
+    all(`SELECT channel, COUNT(*) AS n FROM cand GROUP BY channel_id ORDER BY n DESC LIMIT 8`),
+    all(`SELECT id, title, channel, views, why FROM cand ORDER BY views ASC LIMIT 12`),
+    env.DB.prepare(`SELECT COUNT(*) AS n FROM videos`).first()
+  ]);
+  return { total: tot.n || 0, thua: tot.thua || 0, itxem: tot.itxem || 0, songs: tot.songs || 0, channels: chs.results || [], sample: smp.results || [], videos: vid.n || 0 };
+}
+async function cleanIds(env, q, limit) {
+  const r = await env.DB.prepare(CLEAN_CTE + ` SELECT id FROM cand ORDER BY views ASC, id LIMIT ?5`).bind(q.keep, q.perTone, q.minViews, q.minKeep, limit).all();
+  return (r.results || []).map(x => x.id);
 }
 
 /* ---------------- Các việc định kỳ ---------------- */
@@ -434,6 +482,7 @@ async function scanJob(env, run, c, now) {
   const t0 = Date.now(), list = [], tried = [], maxPages = c.pages * 2;
   let pages = 0, seen = 0, added = 0, rejected = 0, stop = null;
   while (tried.length < SCAN_MAX_SOURCES && pages < maxPages && Date.now() - t0 < SCAN_MS) {
+    if (softLeft(run, c) <= 0) { stop = null; break; }     // còn lại chỉ là phần dành cho làm mới → không quét thêm
     const ch = await env.DB.prepare(`SELECT * FROM channels WHERE enabled = 1 AND (full_done = 0 OR next_scan <= ?1)
         AND id NOT IN (SELECT value FROM json_each(?2))
         ORDER BY full_done ASC, (page_token IS NULL) ASC, star DESC, next_scan ASC, added_at ASC LIMIT 1`).bind(now, JSON.stringify(tried)).first();
@@ -476,6 +525,7 @@ async function scanJob(env, run, c, now) {
   }
   if (!list.length) {
     if (stop) throw stop;
+    if (softLeft(run, c) <= 0) return { job: 'idle', idle: true, reason: 'giữ lại ' + (run.reserve || 0) + ' đơn vị cho việc làm mới các bản đã có (quét tiếp từ ngày mới)' };
     return { job: 'scan', idle: true };
   }
   if (stop && !list.some(x => x.p > 0)) throw stop;
@@ -485,30 +535,53 @@ async function scanJob(env, run, c, now) {
   return rep;
 }
 
+// Đơn vị YouTube còn dùng được cho việc KHÁC ngoài làm mới (giữ lại phần làm mới cần cho cả kho)
+function softLeft(run, c) { return c.budget - (run.reserve || 0) - run.used - run.units; }
+// Mỗi bản phải làm mới trong 7 ngày (hạn cứng 30 ngày): N bản ≈ N/50 đơn vị mỗi 7 ngày (200k bản ≈ 570 đơn vị/ngày); dành thêm 50% cho dư
+function refreshReserve(vcount) { return vcount ? Math.ceil(vcount / 50 / 7 * 1.5) + 20 : 20; }
+
 async function refreshJob(env, run, c, now) {
-  // xoá phần quá hạn 30 ngày (phòng khi làm mới không kịp) và dọn bảng phụ
-  const stale = (await env.DB.prepare(`SELECT id FROM videos WHERE fetched_at < ?1 LIMIT 500`).bind(now - MAX_AGE).all()).results || [];
-  if (stale.length) await removeIds(env, stale.map(x => x.id), now);
-  await ensureCache(env);
-  await env.DB.batch([
-    env.DB.prepare(`DELETE FROM yt_cache WHERE at < ?1`).bind(now - MAX_AGE),
-    env.DB.prepare(`DELETE FROM rejected WHERE at < ?1`).bind(now - MAX_AGE),
-    env.DB.prepare(`DELETE FROM pick_log WHERE ts < ?1`).bind(now - 365 * DAY),
-    env.DB.prepare(`DELETE FROM meta WHERE (k LIKE 'units:%' OR k LIKE 'search:%' OR k LIKE 'writes:%') AND k NOT IN (?1, ?2, ?3)`).bind('units:' + run.day, 'search:' + run.day, 'writes:' + run.day),
-    env.DB.prepare(`DELETE FROM meta WHERE k LIKE 'sc:%' AND k NOT LIKE ?1`).bind('%:' + run.day),
-    env.DB.prepare(`DELETE FROM misses WHERE at < ?1`).bind(now - 120 * DAY),
-    env.DB.prepare(`DELETE FROM qstat WHERE day < ?1`).bind(pacificDayOf(now - 60 * DAY)),
-    env.DB.prepare(`DELETE FROM cand WHERE at < ?1`).bind(now - 180 * DAY),
-    env.DB.prepare(`DELETE FROM near_miss WHERE id NOT IN (SELECT id FROM near_miss ORDER BY at DESC LIMIT 600)`)
-  ]);
-  const due = (await env.DB.prepare(`SELECT id FROM videos WHERE fetched_at < ?1 ORDER BY fetched_at LIMIT ?2`).bind(now - REFRESH_AGE, c.pages * 50).all()).results || [];
-  if (!due.length) return { job: 'refresh', idle: true, purged: stale.length };
-  let ok = 0, gone = 0;
-  for (let i = 0; i < due.length; i += 50) {
-    const r = await fetchAndIngest(env, run, due.slice(i, i + 50).map(x => x.id), now);
-    ok += r.added; gone += r.rejected;
+  // dọn dẹp định kỳ (mỗi giờ một lần): xoá phần quá hạn 30 ngày, dọn bảng phụ, đếm số bản để tính phần đơn vị dành cho làm mới
+  const hk = await metaGet(env, ['hk_at']);
+  let purged = 0;
+  if (now - (+hk.hk_at || 0) > 3600000) {
+    for (let i = 0; i < 20; i++) {                       // phần quá 30 ngày chưa làm mới kịp (nếu có), 500 bản mỗi vòng
+      const stale = (await env.DB.prepare(`SELECT id FROM videos WHERE fetched_at < ?1 LIMIT 500`).bind(now - MAX_AGE).all()).results || [];
+      if (!stale.length) break;
+      await removeIds(env, stale.map(x => x.id), now);
+      purged += stale.length;
+    }
+    await ensureCache(env);
+    const vc = await env.DB.prepare(`SELECT COUNT(*) AS n FROM videos`).first();
+    await env.DB.batch([
+      env.DB.prepare(`DELETE FROM yt_cache WHERE at < ?1`).bind(now - MAX_AGE),
+      env.DB.prepare(`DELETE FROM rejected WHERE at < ?1`).bind(now - MAX_AGE),
+      env.DB.prepare(`DELETE FROM pick_log WHERE ts < ?1`).bind(now - 365 * DAY),
+      env.DB.prepare(`DELETE FROM meta WHERE (k LIKE 'units:%' OR k LIKE 'search:%' OR k LIKE 'writes:%') AND k NOT IN (?1, ?2, ?3)`).bind('units:' + run.day, 'search:' + run.day, 'writes:' + run.day),
+      env.DB.prepare(`DELETE FROM meta WHERE k LIKE 'sc:%' AND k NOT LIKE ?1`).bind('%:' + run.day),
+      env.DB.prepare(`DELETE FROM misses WHERE at < ?1`).bind(now - 120 * DAY),
+      env.DB.prepare(`DELETE FROM qstat WHERE day < ?1`).bind(pacificDayOf(now - 60 * DAY)),
+      env.DB.prepare(`DELETE FROM cand WHERE at < ?1`).bind(now - 180 * DAY),
+      env.DB.prepare(`DELETE FROM near_miss WHERE id NOT IN (SELECT id FROM near_miss ORDER BY at DESC LIMIT 600)`),
+      env.DB.prepare(`INSERT INTO meta (k, v) VALUES ('vcount', ?1) ON CONFLICT(k) DO UPDATE SET v = excluded.v`).bind(String(vc.n || 0)),
+      env.DB.prepare(`INSERT INTO meta (k, v) VALUES ('hk_at', ?1) ON CONFLICT(k) DO UPDATE SET v = excluded.v`).bind(String(now))
+    ]);
   }
-  return { job: 'refresh', refreshed: ok, removed: gone, purged: stale.length };
+  // Bản cũ nhất làm mới trước. Mỗi lượt lấy tối đa refreshMax bản (mặc định 1500 = 30 đơn vị), dừng khi hết giờ hoặc chạm trần đơn vị.
+  const due = (await env.DB.prepare(`SELECT id FROM videos WHERE fetched_at < ?1 ORDER BY fetched_at LIMIT ?2`).bind(now - REFRESH_AGE, c.refreshMax).all()).results || [];
+  if (!due.length) return { job: 'refresh', idle: true, purged };
+  const t0 = Date.now();
+  let ok = 0, gone = 0, tried = 0, err = null;
+  try {
+    for (let i = 0; i < due.length && Date.now() - t0 < REFRESH_MS; i += 50) {
+      if (run.used + run.units >= c.budget) { err = new Error('Đã chạm trần đơn vị hôm nay — làm mới dừng giữa chừng'); break; }
+      const r = await fetchAndIngest(env, run, due.slice(i, i + 50).map(x => x.id), now, { refresh: true });
+      ok += r.added; gone += r.rejected; tried += Math.min(50, due.length - i);
+    }
+  } catch (e) { if (!tried) throw e; err = e; }
+  const rep = { job: 'refresh', refreshed: ok, removed: gone, purged, queued: due.length, tried };
+  if (err) { rep.error = String(err.message || err); rep.reason = err.reason || ''; }
+  return rep;
 }
 
 // Ghép bài hot (chưa có song_key) với kho: so từng cụm tên trong tiêu đề MV với song_key
@@ -788,7 +861,8 @@ async function tick(env, force) {
   let rep;
   try {
     await ensureSchema(env); await loadKw(env);
-    const m = await metaGet(env, ['units:' + run.day, 'search:' + run.day, 'hot_at', 'tick', 'writes:' + run.day]);
+    const m = await metaGet(env, ['units:' + run.day, 'search:' + run.day, 'hot_at', 'tick', 'writes:' + run.day, 'vcount']);
+    run.reserve = Math.min(refreshReserve(+m.vcount || 0), Math.floor(c.budget * 0.5));
     run.used = +m['units:' + run.day] || 0; run.searchUsed = +m['search:' + run.day] || 0;
     run.writesBefore = +m['writes:' + run.day] || 0; run.writeStop = run.writesBefore >= c.writeLimit;
     const t = (+m.tick || 0) + 1;
@@ -800,15 +874,27 @@ async function tick(env, force) {
       else if (now - (+m.hot_at || 0) > HOT_EVERY) order = ['hot', 'scan', 'refresh'];
       else order = [['refresh', 'scan', 'hotsearch', 'discover'], ['hotsearch', 'scan', 'gap', 'refresh'], ['scan', 'discover', 'refresh', 'gap'],
                     ['gap', 'scan', 'plsearch', 'refresh'], ['discover', 'scan', 'refresh', 'plsearch'], ['plsearch', 'scan', 'refresh', 'hotsearch']][t % 6];
-      for (const j of order) { rep = await JOBS[j](env, run, c, now); if (!rep.idle) break; }
-      if (rep.idle && order.length > 1) rep = { job: 'idle', idle: true, reason: 'kho đã cập nhật đủ, chưa có việc mới' };
+      for (const j of order) {
+        if (j !== 'refresh' && j !== 'hot' && softLeft(run, c) <= 0) { rep = { job: 'idle', idle: true, reason: 'giữ lại ' + run.reserve + ' đơn vị cho việc làm mới các bản đã có' }; continue; }
+        rep = await JOBS[j](env, run, c, now); if (!rep.idle) break;
+      }
+      if (rep.idle && order.length > 1) rep = { job: 'idle', idle: true, reason: rep.reason || 'kho đã cập nhật đủ, chưa có việc mới' };
       // Quét kênh là việc làm kho lớn lên, nhưng trước đây chỉ chạy khi việc đứng trước nó rảnh (làm mới gần như luôn có việc)
       // → lượt tự chạy (không phải bấm tay một việc) luôn quét kèm, nếu việc chính chưa phải quét và còn đơn vị/còn trần ghi
-      if ((!force || force === 'auto') && rep.job !== 'scan' && rep.job !== 'error' && !run.quotaHit && !run.writeStop && run.used + run.units < c.budget) {
-        try {
-          const s = await scanJob(env, run, c, Date.now());
-          if (!s.idle) rep.scan = { sources: s.sources, pages: s.pages, added: s.added, rejected: s.rejected, error: s.error || null };
-        } catch (e) { rep.scan = { error: String(e.message || e) }; }
+      if ((!force || force === 'auto') && rep.job !== 'error' && !run.quotaHit && !run.writeStop) {
+        // làm mới trước (giữ cho các bản đã có không bị quá hạn 30 ngày), rồi mới quét thêm nguồn mới
+        if (rep.job !== 'refresh' && run.used + run.units < c.budget) {
+          try {
+            const s = await refreshJob(env, run, c, Date.now());
+            if (!s.idle) rep.refresh = { refreshed: s.refreshed, removed: s.removed, tried: s.tried, queued: s.queued, error: s.error || null };
+          } catch (e) { rep.refresh = { error: String(e.message || e) }; }
+        }
+        if (rep.job !== 'scan' && !run.quotaHit && !run.writeStop && softLeft(run, c) > 0) {
+          try {
+            const s = await scanJob(env, run, c, Date.now());
+            if (!s.idle) rep.scan = { sources: s.sources, pages: s.pages, added: s.added, rejected: s.rejected, error: s.error || null };
+          } catch (e) { rep.scan = { error: String(e.message || e) }; }
+        }
       }
     }
     await env.DB.prepare(`INSERT INTO meta (k, v) VALUES ('tick', ?1) ON CONFLICT(k) DO UPDATE SET v = excluded.v`).bind(String(t)).run();
@@ -1237,6 +1323,28 @@ async function route(req, env, ctx, run) {
       await env.DB.prepare(`DELETE FROM misses WHERE q = ?1`).bind(String(body.q || '')).run();
       return J({ ok: true }, 200, h);
     }
+    if (p === '/api/kho/clean' && req.method === 'POST') {
+      const q = cleanParams(body);
+      if (body.mode !== 'apply') {
+        const pv = await cleanPreview(env, q);
+        const wm = await metaGet(env, ['writes:' + run.day]);
+        done();
+        return J(Object.assign({ ok: true, mode: 'preview', params: q, after: pv.videos - pv.total, estWrites: pv.total * 10,
+          writesToday: +wm['writes:' + run.day] || 0, writeLimit: c.writeLimit }, pv), 200, h);
+      }
+      // Dọn thật: mỗi yêu cầu xoá tối đa 2000 bản, kho.html gọi lặp. `expectMax` = số bản đã xem trước; nếu bây giờ nhiều hơn → dừng (dữ liệu đã đổi)
+      const expectMax = Math.floor(Number(body.expectMax));
+      if (!Number.isFinite(expectMax) || expectMax < 0) return J({ error: 'Thiếu số bản đã xem trước (expectMax) — hãy bấm Xem trước rồi mới dọn', reason: 'noexpect' }, 400, h);
+      const cnt = await env.DB.prepare(CLEAN_CTE + ` SELECT COUNT(*) AS n FROM cand`).bind(q.keep, q.perTone, q.minViews, q.minKeep).first();
+      const total = cnt.n || 0;
+      if (total > expectMax) return J({ error: 'Số bản sẽ dọn (' + total + ') nhiều hơn lúc xem trước (' + expectMax + ') — dữ liệu đã đổi, hãy xem trước lại', reason: 'changed', total }, 409, h);
+      if (!total) { done(); return J({ ok: true, mode: 'apply', removed: 0, remaining: 0 }, 200, h); }
+      if (await writesBlocked(env, run, c)) return J({ error: 'Hôm nay đã chạm trần dòng ghi D1 — để ngày mai dọn tiếp', reason: 'writelimit', remaining: total }, 429, h);
+      const ids = await cleanIds(env, q, Math.min(2000, Math.max(1, Math.floor(Number(body.limit)) || 2000)));
+      await removeIds(env, ids, now, now + PRUNED_AT);
+      done();
+      return J({ ok: true, mode: 'apply', removed: ids.length, remaining: Math.max(0, total - ids.length) }, 200, h);
+    }
     if (p === '/api/kho/stats' && req.method === 'GET') {
       const one = (sql, ...b) => env.DB.prepare(sql).bind(...b).first();
       const [v, s, ch, hs, hq, pk] = await Promise.all([
@@ -1249,12 +1357,13 @@ async function route(req, env, ctx, run) {
         one(`SELECT COUNT(*) AS n FROM hot_songs`),
         one(`SELECT COUNT(*) AS n FROM hot WHERE song_key IS NULL AND searched = 0`), one(`SELECT COUNT(*) AS n FROM pick_log WHERE ts >= ?1`, now - 30 * DAY)
       ]);
-      const m = await metaGet(env, ['units:' + run.day, 'search:' + run.day, 'last', 'hot_at', 'writes:' + run.day, 'keybad:0', 'keybad:1'].concat(CATS.map(k => 'sc:' + k + ':' + run.day)));
+      const m = await metaGet(env, ['units:' + run.day, 'search:' + run.day, 'last', 'hot_at', 'writes:' + run.day, 'keybad:0', 'keybad:1', 'vcount'].concat(CATS.map(k => 'sc:' + k + ':' + run.day)));
       const wk = now - 7 * DAY;
-      const [ns, nv, qs] = await Promise.all([
+      const [ns, nv, qs, rd] = await Promise.all([
         one(`SELECT COUNT(*) AS n FROM (SELECT song_key FROM videos GROUP BY song_key HAVING MIN(IFNULL(added_at, 0)) >= ?1)`, wk),
         one(`SELECT COUNT(*) AS n FROM videos WHERE added_at >= ?1`, wk),
-        one(`SELECT SUM(q) AS q, SUM(miss) AS miss FROM qstat WHERE day >= ?1`, pacificDayOf(wk))
+        one(`SELECT SUM(q) AS q, SUM(miss) AS miss FROM qstat WHERE day >= ?1`, pacificDayOf(wk)),
+        one(`SELECT COUNT(*) AS n, MIN(fetched_at) AS oldest FROM (SELECT fetched_at FROM videos WHERE fetched_at < ?1 LIMIT 300000)`, now - REFRESH_AGE)
       ]);
       const cat = {}; CATS.forEach(k => { cat[k] = +m['sc:' + k + ':' + run.day] || 0; });
       let last = null; try { last = JSON.parse(m.last || 'null'); } catch (e) {}
@@ -1266,7 +1375,7 @@ async function route(req, env, ctx, run) {
         pagesPerTick: c.pages, hotAt: +m.hot_at || 0, last, keys,
         writesToday: +m['writes:' + run.day] || 0, writeLimit: c.writeLimit,
         searchLimit: c.searchLimit, reserve: c.reserve, cat, catLimit: { hot: c.hotSearch, gap: c.gapSearch, pl: c.plSearch, disc: c.discoverPerDay },
-        newSongs7: ns.n || 0, newVersions7: nv.n || 0, q7: qs.q || 0, miss7: qs.miss || 0 }, 200, h);
+        refreshDue: rd.n || 0, refreshOldest: rd.oldest || 0, refreshReserve: Math.min(refreshReserve(+m.vcount || v.n), Math.floor(c.budget * 0.5)), newSongs7: ns.n || 0, newVersions7: nv.n || 0, q7: qs.q || 0, miss7: qs.miss || 0 }, 200, h);
     }
     if (p === '/api/kho/run' && req.method === 'POST') {
       const job = ['auto', 'scan', 'refresh', 'hot', 'hotsearch', 'rehot', 'gap', 'discover', 'plsearch'].includes(body.job) ? body.job : 'auto';
