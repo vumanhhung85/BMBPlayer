@@ -40,6 +40,13 @@ Trên máy có Node (thư mục repo BMBPlayer, PowerShell):
 4. Ổn định ~1 tuần: GitHub → repo BMBPlayer → Settings → Pages → tắt; xoá file `CNAME`; bỏ địa chỉ workers.dev khỏi `ALLOWED_ORIGINS`.
    Muốn quay lại GitHub Pages: gỡ Custom domain ở bước 2, tạo lại CNAME `bmbplayer` → `vumanhhung85.github.io`.
 
+## Telegram báo yêu cầu gọi lễ tân
+
+- Khi khách gửi yêu cầu, và khi lễ tân **xác nhận / đã phục vụ / huỷ**, bot gửi tin cho **quản lý (`manager`) và nhân viên quầy (`quay`) của đúng chi nhánh**: phòng, món, ghi chú, người xử lý, giờ.
+- Dùng chung bot và tài khoản đã kết nối của app quản lý BMB: token đọc từ `cai_dat.tg_bot_token` trong D1 `bmb_data` (không cần đặt secret mới); người nhận là `tai_khoan` đang hoạt động, đã kết nối Telegram (`tg_chat_id`) và không tạm dừng (`tg_tam_dung = 0`). Ai chưa kết nối thì bỏ qua. Admin và kỹ thuật không nhận.
+- Không có giờ im lặng ban đêm (quán mở đến 6 giờ sáng, quầy luôn có người). Muốn tắt hẳn: thêm biến `TG_LETAN` = `0` ở Dash (Variable, không phải Secret).
+- Lỗi Telegram (mạng, bot bị chặn…) không làm hỏng việc gửi/xử lý yêu cầu; tin gửi nền sau khi đã trả lời khách.
+
 ## Chuyển CN03 sang (thay thẳng)
 1. Quầy CN03 mở `https://bmbplayer.boommusicbox.vn/quay.html`, đăng nhập tài khoản cũ.
 2. Mỗi TV: mở `https://bmbplayer.boommusicbox.vn/` → hiện mã 6 số. Quầy → tab **TV & phòng** → **Gán TV** ở đúng phòng → quét QR trên TV (hoặc quét QR trên TV bằng camera điện thoại → mở thẳng trang quầy).

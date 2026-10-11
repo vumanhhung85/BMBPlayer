@@ -44,7 +44,7 @@
               APP_PASS (mật khẩu nhac.html) · tuỳ chọn: LEGACY_SECRET, NHAC_PASS
      Biến   : ALLOWED_ORIGINS (mặc định https://bmbplayer.boommusicbox.vn), NET_CHECK (off|warn|on), TB_NET (on|off)
      Binding: D1 DB → bmb_data ; Durable Object ROOM → Room, REG → Registry, NHAC → NhacRoom
-   CHƯA CÓ: escalation SLA qua Telegram; học IP chi nhánh
+   TELEGRAM: yêu cầu gọi lễ tân (mới / xác nhận / đã phục vụ / huỷ) báo cho quản lý + nhân viên quầy chi nhánh (xem tgLeTan). CHƯA CÓ: nhắc lại khi quá hạn (SLA); học IP chi nhánh
    ============================================================ */
 import { DurableObject } from 'cloudflare:workers';
 
@@ -311,7 +311,7 @@ async function rlDonRac(env) {
 // ============================================================
 // Router
 // ============================================================
-async function handleApi(request, env) {
+async function handleApi(request, env, ctx) {
     const origin = request.headers.get('Origin');
     const originOk = !origin || origins(env).includes(origin);
 
@@ -339,13 +339,13 @@ async function handleApi(request, env) {
     try {
       switch (action) {
         case 'menu.get':                 res = await menuGet(env, body); break;
-        case 'don.tao':                  res = await donTao(env, body); break;   // khách / máy tính bảng: mã kênh phòng (body.r, body.role)
+        case 'don.tao':                  res = await donTao(env, body, ctx); break;   // khách / máy tính bảng: mã kênh phòng (body.r, body.role)
         case 'don.trangThai':            res = await donTrangThai(env, body); break;
         case 'don.cuaPhong':             res = await donCuaPhong(env, body); break;
         case 'auth.dangNhap':
         case 'auth.login':               res = await authDangNhap(env, body, ip); break;
         case 'quay.feed':                res = await quayFeed(env, body); break;
-        case 'quay.don':                 res = await quayDon(env, body); break;
+        case 'quay.don':                 res = await quayDon(env, body, ctx); break;
         case 'quay.phong':               res = await quayPhong(env, body); break;
         case 'quay.tv':                  res = await quayTv(env, body); break;
         case 'quay.ganTv':               res = await quayGanTv(env, body, ip); break;
@@ -394,7 +394,7 @@ async function menuGet(env, body) {
   return ok({ items: results.sort(sapMon).map(m => ({ code: m.code, label: m.label, type: m.loai, icon: m.icon, nhom: m.nhom })) });
 }
 
-async function donTao(env, body) {
+async function donTao(env, body, ctx) {
   const rawItems = Array.isArray(body.items) ? body.items : [];
   if (!rawItems.length) return fail('empty_items');
   if (rawItems.length > MAX_ITEMS) return fail('too_many_items', 400, 'Đơn có quá nhiều món.');
@@ -479,6 +479,7 @@ async function donTao(env, body) {
     }
   }
   await baoLeTan(env, phong.id, { id, st: 'MOI', items, at: now });     // TV của phòng hiện "Đã gửi"
+  chayNen(ctx, tgLeTan(env, { id, cn: phong.chi_nhanh_id, phong: phong.ten_phong, items, note: ghiChu, st: 'MOI', nguon, nghiNgo: dongPhong }));   // Telegram quản lý + nhân viên quầy
   return ok({ orderId: id });
 }
 
@@ -628,13 +629,13 @@ async function donCuaChiNhanh(env, ss, orderId, cot) {
   return [don, null];
 }
 
-async function quayDon(env, body) {
+async function quayDon(env, body, ctx) {
   const [ss, loi] = await canPhien(env, body);
   if (loi) return loi;
   const orderId = s(body.orderId, 40);
   const act = s(body.act, 10);
   if (!orderId || !['nhan', 'huy', 'xong'].includes(act)) return fail('missing_or_bad_params');
-  const [don, loi2] = await donCuaChiNhanh(env, ss, orderId, 'chi_nhanh_id, trang_thai, dev_id, phong_id, items, tao_luc');
+  const [don, loi2] = await donCuaChiNhanh(env, ss, orderId, 'chi_nhanh_id, trang_thai, dev_id, phong_id, ten_phong, items, ghi_chu, tao_luc');
   if (loi2) return loi2;
 
   const now = Date.now();
@@ -658,7 +659,9 @@ async function quayDon(env, body) {
   const r = await env.DB.prepare(sql).bind(...params).run();
   if (!r.meta.changes) return fail('khong_doi_duoc_trang_thai', 400, 'Đơn đã được người khác xử lý. Màn hình sẽ tự cập nhật.');
   let items = []; try { items = JSON.parse(don.items); } catch (e) {}
-  await baoLeTan(env, don.phong_id, { id: orderId, st: act === 'nhan' ? 'NHAN' : act === 'xong' ? 'XONG' : 'HUY', items, at: don.tao_luc });   // TV hiện "Đã xác nhận / Đã phục vụ / Đã huỷ"
+  const stMoi = act === 'nhan' ? 'NHAN' : act === 'xong' ? 'XONG' : 'HUY';
+  await baoLeTan(env, don.phong_id, { id: orderId, st: stMoi, items, at: don.tao_luc });   // TV hiện "Đã xác nhận / Đã phục vụ / Đã huỷ"
+  chayNen(ctx, tgLeTan(env, { id: orderId, cn: don.chi_nhanh_id, phong: don.ten_phong, items, note: don.ghi_chu, st: stMoi, nguoi: ss.u }));
   return ok({});
 }
 
@@ -1069,6 +1072,59 @@ async function tkQuyenMenu(env, body) {
   if (loi2) return loi2;
   await env.DB.prepare('UPDATE tai_khoan SET order_sua_menu = ? WHERE username = ?').bind(body.bat ? 1 : 0, tk.username).run();
   return ok({});
+}
+
+// ============================================================
+// Telegram: báo yêu cầu gọi lễ tân cho quản lý + nhân viên quầy của đúng chi nhánh
+// ============================================================
+// Dùng chung bot và tài khoản đã kết nối của app quản lý BMB (bmb-quanly-worker):
+//   token bot  = cai_dat.tg_bot_token (D1 bmb_data, không phải secret của Worker này)
+//   người nhận = tai_khoan của chi nhánh: vai trò manager / quay, đang hoạt động, đã kết nối (tg_chat_id) và không tạm dừng (tg_tam_dung = 0)
+// Gửi khi: có yêu cầu mới · lễ tân xác nhận · đã phục vụ · đã huỷ. Không có giờ im lặng ban đêm (quán mở tới 6 giờ sáng, quầy luôn có người).
+// Tắt cả tính năng: đặt biến TG_LETAN = "0". Lỗi Telegram không bao giờ làm hỏng việc gửi/xử lý yêu cầu.
+const TG_TIEUDE = { MOI: '🛎️ <b>Yêu cầu gọi lễ tân mới</b>', NHAN: '✅ <b>Lễ tân đã xác nhận</b>', XONG: '🎉 <b>Đã phục vụ</b>', HUY: '⚠️ <b>Yêu cầu đã huỷ</b>' };
+const escHtml = t => String(t == null ? '' : t).replace(/[&<>]/g, c => c === '&' ? '&amp;' : c === '<' ? '&lt;' : '&gt;');
+const hhmmVn = ms => { const d = new Date(ms + VN_MS); return String(d.getUTCHours()).padStart(2, '0') + ':' + String(d.getUTCMinutes()).padStart(2, '0'); };
+// Chạy nền (không bắt khách chờ Telegram); không có ctx (thử nghiệm) thì cứ để chạy
+function chayNen(ctx, p) { if (ctx && ctx.waitUntil) ctx.waitUntil(p); }
+
+async function tgLeTan(env, d) {
+  try {
+    if (String(env.TG_LETAN || '1') === '0' || !d.cn || !env.DB) return;
+    const lenh = [
+      env.DB.prepare(`SELECT gia_tri FROM cai_dat WHERE khoa = 'tg_bot_token'`),
+      env.DB.prepare(
+        `SELECT tg_chat_id FROM tai_khoan
+         WHERE chi_nhanh_id = ? AND vai_tro IN ('manager', 'quay') AND hoat_dong = 1 AND tg_chat_id <> '' AND tg_tam_dung = 0`
+      ).bind(d.cn)
+    ];
+    if (d.nguoi) lenh.push(env.DB.prepare('SELECT ho_ten FROM tai_khoan WHERE username = ?').bind(d.nguoi));
+    const rs = await env.DB.batch(lenh);
+    const token = String((rs[0].results[0] || {}).gia_tri || '').trim();
+    const chats = [...new Set(rs[1].results.map(r => String(r.tg_chat_id).trim()).filter(Boolean))];
+    if (!token || !chats.length) return;
+
+    const mon = (d.items || []).map(i => '• ' + (i.icon ? escHtml(i.icon) + ' ' : '') + escHtml(i.label) + (i.type === 'DR' && i.qty > 1 ? ' ×' + (+i.qty | 0) : '')).join('\n');
+    const nguoi = d.nguoi ? (((rs[2] && rs[2].results[0]) || {}).ho_ten || d.nguoi) : '';
+    const dong = [TG_TIEUDE[d.st] || TG_TIEUDE.MOI, 'Phòng: <b>' + escHtml(d.phong) + '</b> · #' + escHtml(String(d.id).slice(-6).toUpperCase()), mon];
+    if (d.note) dong.push('Ghi chú: “' + escHtml(String(d.note).slice(0, 200)) + '”');
+    if (d.st === 'MOI') {
+      dong.push('Gửi từ: ' + (d.nguon === 'TABLET' ? 'máy tính bảng' : 'điện thoại khách'));
+      if (d.nghiNgo) dong.push('⚠️ Phòng đang ở trạng thái đóng lúc khách gửi');
+    } else if (nguoi) {
+      dong.push((d.st === 'NHAN' ? 'Xác nhận: ' : d.st === 'XONG' ? 'Phục vụ: ' : 'Huỷ: ') + escHtml(nguoi));
+    }
+    dong.push('🕒 ' + hhmmVn(Date.now()));
+    const text = dong.join('\n');
+
+    await Promise.allSettled(chats.map(chat =>
+      fetch('https://api.telegram.org/bot' + token + '/sendMessage', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ chat_id: chat, text, parse_mode: 'HTML', disable_web_page_preview: true }),
+        signal: AbortSignal.timeout(5000)
+      }).then(r => r.text())      // đọc hết để giải phóng kết nối; không ghi nội dung (tránh lộ chat/token vào log)
+    ));
+  } catch (e) { console.error('tgLeTan:', e && e.name); }   // không ghi e.message: có thể chứa địa chỉ có token
 }
 
 // ============================================================
@@ -1641,12 +1697,12 @@ const call = (stub, path, body) => stub.fetch('https://do' + path, body === unde
 const callR = (stub, path, body) => stub.fetch('https://do' + path, { method: 'POST', body: JSON.stringify(body) }).then(async r => ({ status: r.status, data: await r.json() }));
 
 export default {
-  async fetch(req, env){
+  async fetch(req, env, ctx){
     const u = new URL(req.url);
     if(!env.SECRET) return jres({ error: 'Worker chưa đặt secret SECRET' }, 500);
 
     /* API quầy + gọi lễ tân (giữ nguyên cách gọi của quay.html cũ: POST JSON {action,...}) */
-    if(u.pathname === '/api' || u.pathname === '/api/') return handleApi(req, env);
+    if(u.pathname === '/api' || u.pathname === '/api/') return handleApi(req, env, ctx);
 
     const ch = cors(req, env);
     if(req.method === 'OPTIONS') return new Response(null, { status: 204, headers: ch });
