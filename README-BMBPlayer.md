@@ -60,10 +60,9 @@ Trên máy có Node (thư mục repo BMBPlayer, PowerShell):
 - Tên bảng trong D1 vẫn là `order_*` — chỉ là tên nội bộ, người dùng không thấy.
 - Phần chọn bài phát YouTube nhúng: điều khoản YouTube không cho dùng phục vụ khách thương mại — xem ghi chú bản quyền trước khi đưa cho khách thật.
 
-## Tên miền riêng vmh.io.vn (từ 10/2026)
-Tên miền chính thức của BMBPlayer: `https://bmbplayer.vmh.io.vn` (không dùng boommusicbox.vn nữa, để trang chủ/đặt phòng BMB không bị ảnh hưởng). Làm song song, địa chỉ cũ vẫn chạy cho tới khi chuyển xong:
-1. Cloudflare → Add a domain → `vmh.io.vn` (gói Free) → đổi nameserver của vmh.io.vn (ở nơi mua) sang 2 nameserver Cloudflare cấp.
-2. Workers & Pages → `bmbplayer` → Settings → Domains & Routes → Add → Custom domain → `bmbplayer.vmh.io.vn`.
-3. Worker `kho-karaoke` → Variables → `ALLOWED_ORIGINS` thêm `https://bmbplayer.vmh.io.vn` (nếu không, kho nhạc báo lỗi CORS ở địa chỉ mới).
-4. Mỗi TV/máy tính bảng/quầy mở địa chỉ mới (TV: sau khi mở, mã QR tự dùng địa chỉ mới). Quầy cần đăng nhập lại (đổi tên miền thì trình duyệt coi là trang khác).
-5. Ổn định ~1 tuần: bỏ `bmbplayer.boommusicbox.vn` khỏi `ALLOWED_ORIGINS`, tắt GitHub Pages, xoá `CNAME`.
+## Tên miền
+Địa chỉ chính thức của BMBPlayer (dùng trong mọi tài liệu, hướng dẫn, QR, link gửi nhân viên): `https://bmbplayer.boommusicbox.vn/`.
+`bmbplayer.vmh.io.vn` chỉ là **tên gõ tắt** cho người quản trị dễ nhớ; cùng một Worker `bmbplayer`, hai địa chỉ luôn chạy đúng cùng một phiên bản. Cả hai phải có trong `ALLOWED_ORIGINS` (Worker `bmbplayer` trong `wrangler.toml`, Worker `kho-karaoke` trong Dash).
+Lưu ý: đăng nhập và dữ liệu lưu trên máy tách riêng theo địa chỉ, nên mỗi thiết bị nên dùng một địa chỉ cố định (thiết bị quán dùng địa chỉ chính thức).
+
+Gắn tên miền gõ tắt (đã làm 10/2026): Cloudflare → Add a domain `vmh.io.vn` (Free) → đổi nameserver ở nhà đăng ký sang 2 nameserver Cloudflare → Workers & Pages → `bmbplayer` → Domains & Routes → Custom domain → `bmbplayer.vmh.io.vn`.
