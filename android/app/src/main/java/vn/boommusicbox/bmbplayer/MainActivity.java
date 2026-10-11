@@ -190,12 +190,6 @@ public class MainActivity extends Activity {
     }
 
     @Override
-    public boolean dispatchTouchEvent(MotionEvent ev) {
-        if ("tablet".equals(mode) && ev.getActionMasked() == MotionEvent.ACTION_DOWN) applyScreenPolicy();
-        return super.dispatchTouchEvent(ev);
-    }
-
-    @Override
     protected void onPause() {
         ui.removeCallbacks(tabletIdle);
         if (web != null) web.onPause();
@@ -566,6 +560,7 @@ public class MainActivity extends Activity {
 
     @Override
     public boolean dispatchTouchEvent(MotionEvent ev) {
+        if ("tablet".equals(mode) && ev.getActionMasked() == MotionEvent.ACTION_DOWN) applyScreenPolicy();
         if (ev.getActionMasked() == MotionEvent.ACTION_DOWN) {
             if (chooser != null) chooserLeft = -1;
             int corner = dp(72);
