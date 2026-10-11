@@ -55,16 +55,16 @@
   #setup .f{display:flex; gap:10px}
 
   /* ===== QR khách ở góc trái (chỉ khi phòng đang mở; đổi mỗi lượt mở phòng) ===== */
-  :root{--gqrS:clamp(96px,18.5vh,244px)}
-  #gqr{position:absolute; left:1.6vw; top:2vh; z-index:11; display:none; background:#fff; border-radius:14px; padding:.9vh .9vh .5vh; text-align:center; box-shadow:0 6px 30px rgba(0,0,0,.55); pointer-events:none}
-  #gqr .qw{position:relative; width:var(--gqrS); height:var(--gqrS)}
+  :root{--gqrS:clamp(106px,20.35vh,268px)}
+  #gqr{position:absolute; left:1.6vw; top:2vh; z-index:11; display:none; background:#fff; border-radius:14px; box-sizing:content-box; width:var(--gqrS); padding:.9vh .9vh .5vh; text-align:center; box-shadow:0 6px 30px rgba(0,0,0,.55); pointer-events:none}
+  #gqr .qw{position:relative; width:var(--gqrS); height:var(--gqrS); margin:0 auto}
   #gqr .qtag{position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); white-space:nowrap; line-height:1; text-align:center;
     font-family:"Arial Black",Impact,"Segoe UI",Arial,sans-serif; font-weight:900; color:#FFD21A;
     background:linear-gradient(180deg,#8f2fd8,#5b1fa8); border:solid #fff; border-radius:.3em; padding:.16em .3em .2em;
     text-shadow:.045em 0 0 #3b0a73,-.045em 0 0 #3b0a73,0 .045em 0 #3b0a73,0 -.045em 0 #3b0a73,.035em .035em 0 #3b0a73,-.035em .035em 0 #3b0a73,.035em -.035em 0 #3b0a73,-.035em -.035em 0 #3b0a73;
     box-shadow:0 0 0 .05em rgba(255,255,255,.9)}
   #gqr img{width:var(--gqrS); height:var(--gqrS); display:block; image-rendering:pixelated}
-  #gqr .l{font:700 clamp(9px,1.35vh,17px)/1.25 Arial,sans-serif; color:#5b21b6; margin-top:.3vh}
+  #gqr .l{font:800 clamp(9px,1.5vh,19px)/1.25 "Segoe UI",Roboto,Arial,sans-serif; color:#5b21b6; margin-top:.4vh}
   #gqr .r{font:700 clamp(8px,1.1vh,14px)/1.2 Arial,sans-serif; color:#555}
   body.hasqr #ovTitle{left:calc(1.6vw + var(--gqrS) + 4vh)}
   #setup input{flex:1; min-width:0; background:#0e0e16; color:var(--ink); border:1px solid var(--line); border-radius:12px; padding:12px 14px; font-size:16px}
@@ -109,7 +109,7 @@
   #volOsd.muted b{color:#f87171} #volOsd.muted .vb i{background:#555}
 
   /* Yêu cầu gọi lễ tân của phòng: đã gửi → lễ tân đã xác nhận → đã phục vụ (khách nhìn TV là biết) */
-  #svc{position:absolute; left:1.6vw; top:calc(2vh + var(--gqrS) + 7.2vh); z-index:12; display:flex; flex-direction:column; gap:1vh; width:calc(var(--gqrS) + 1.8vh); pointer-events:none}
+  #svc{position:absolute; left:1.6vw; top:calc(2vh + var(--gqrS) + 8.2vh); z-index:12; display:flex; flex-direction:column; gap:1vh; width:calc(var(--gqrS) + 1.8vh); pointer-events:none}
   #svc .c{box-sizing:border-box; width:100%; background:#fff; border-radius:14px; border-left:1.1vh solid #f59e0b; padding:.9vh .9vh .9vh .8vh; box-shadow:0 6px 30px rgba(0,0,0,.55); animation:svcIn .4s ease}
   #svc .c.NHAN{border-left-color:#7c3aed} #svc .c.XONG{border-left-color:#10b981} #svc .c.HUY{border-left-color:#ef4444}
   #svc .h{display:flex; align-items:center; gap:.5vh; font:800 clamp(10px,1.6vh,21px)/1.15 "Segoe UI",Roboto,Arial,sans-serif; color:#5b21b6; text-transform:uppercase; letter-spacing:.02em}
@@ -187,7 +187,7 @@
     <div id="diag"></div>
   </div>
 
-  <div id="gqr"><div class="qw"><img id="gqrImg" alt="QR chọn bài"><div class="qtag" id="gqrTag"></div></div><div class="l">QUÉT CHỌN BÀI · GỌI LỄ TÂN</div><div class="r" id="gqrRoom"></div></div>
+  <div id="gqr"><div class="qw"><img id="gqrImg" alt="QR chọn bài"><div class="qtag" id="gqrTag"></div></div><div class="l">QUÉT CHỌN BÀI<br>GỌI LỄ TÂN</div><div class="r" id="gqrRoom"></div></div>
   <div class="ov" id="ovTitle"><div><div class="lbl">ĐANG HÁT</div><div class="t" id="ovTitleT"></div></div></div>
   <div class="ov" id="ovNext"><div class="lbl">TIẾP THEO</div><div class="t" id="ovNextT"></div></div>
   <div class="ov" id="ovCount"></div>
@@ -326,7 +326,7 @@ function startPairing(){
 function tagPhong(el, side, name){
   name = String(name || '').replace(/^\s*ph[oò]ng\s+/i, '').trim().toUpperCase();
   if(!name){ el.style.display = 'none'; return; }
-  const n = name.length, k = n <= 2 ? .2 : n === 3 ? .17 : n === 4 ? .14 : n === 5 ? .115 : .095;
+  const n = name.length, k = n <= 2 ? .17 : n === 3 ? .15 : n === 4 ? .125 : n === 5 ? .105 : .09;
   el.textContent = name.slice(0, 8); el.style.display = 'block';
   el.style.fontSize = 'calc(' + side + ' * ' + k + ')'; el.style.borderWidth = '.07em';
 }
