@@ -196,12 +196,6 @@ public class MainActivity extends Activity {
     }
 
     @Override
-    public boolean dispatchKeyEvent(KeyEvent ev) {
-        if ("tablet".equals(mode) && ev.getAction() == KeyEvent.ACTION_DOWN) applyScreenPolicy();
-        return super.dispatchKeyEvent(ev);
-    }
-
-    @Override
     protected void onPause() {
         ui.removeCallbacks(tabletIdle);
         if (web != null) web.onPause();
@@ -546,6 +540,7 @@ public class MainActivity extends Activity {
     // ======================================================================
     @Override
     public boolean dispatchKeyEvent(KeyEvent e) {
+        if ("tablet".equals(mode) && e.getAction() == KeyEvent.ACTION_DOWN) applyScreenPolicy();
         if (chooser != null && e.getAction() == KeyEvent.ACTION_DOWN) chooserLeft = -1;   // có người bấm: thôi tự chọn
         int k = e.getKeyCode();
         if (k == KeyEvent.KEYCODE_MENU || k == KeyEvent.KEYCODE_SETTINGS) {
