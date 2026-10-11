@@ -114,6 +114,74 @@
   #pairModal .btns{display:flex; gap:8px; margin-top:12px}
   #pairModal .btns button{flex:1; background:#20202e; border:1px solid var(--line); border-radius:10px; padding:11px; font-weight:600}
   #pairModal .btns button.pri{background:var(--accent); border:none; color:#fff}
+  .tabs .ti{display:none} .tabs .cnt{font-size:12px; color:var(--quiet)}
+
+  /* ===== Điện thoại (?mode=remote): bố cục học theo remote.html — thanh trên cố định (logo, playlist, bài đang phát, 2 tab lớn),
+     danh sách cuộn, thanh điều khiển tròn cố định dưới đáy ===== */
+  body.remote{display:block; overflow:auto; min-height:100vh}
+  body.remote main{display:block; overflow:visible}
+  body.remote #rTop{position:sticky; top:0; z-index:30; background:var(--bg); box-shadow:0 6px 18px rgba(0,0,0,.45)}
+  body.remote header{padding:8px 12px; gap:8px; border-bottom:none}
+  body.remote header .logo{width:34px; height:34px; border-radius:50%}
+  body.remote header .ttl{display:none}
+  body.remote header select{background:linear-gradient(135deg,#FFD21A,#f5b800); color:#4a148c; border:none; border-radius:999px; font-weight:900; padding:6px 12px; max-width:46vw; font-size:14px}
+  body.remote header .ico{padding:6px 9px; font-size:14px}
+  body.remote #link{font-size:0; padding:0; width:10px; height:10px; border-radius:50%; background:var(--quiet)} body.remote #link.on{background:var(--good)}
+  body.remote #now{padding:8px 14px; background:#16102a; border-top:1px solid var(--line); display:flex; align-items:center; gap:10px; font-size:14px}
+  body.remote #now::before{content:"♪"; flex:0 0 auto; width:26px; height:26px; border-radius:50%; background:linear-gradient(135deg,var(--accent),var(--accent2)); display:flex; align-items:center; justify-content:center; font-size:14px}
+  body.remote #now .nt{font-size:14px; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden}
+  body.remote #now .nc{display:none}
+  body.remote #remoteCard{display:block; padding:3px 14px 5px; background:#16102a}
+  body.remote #rcImg{display:none}
+  body.remote #rcStatus{font-size:12px; color:#c4b5fd}
+  body.remote .tabs{display:flex; gap:8px; padding:8px 10px 10px; background:var(--bg); border-bottom:none}
+  body.remote .tabs button{flex:1; min-width:0; background:#14141c; border:1px solid var(--line); color:#7c7c92; padding:9px 4px 8px; border-radius:14px; font-weight:700; display:flex; flex-direction:column; align-items:center; gap:2px}
+  body.remote .tabs .ti{display:block; font-size:21px; line-height:1; filter:grayscale(.7)} body.remote .tabs .tl{font-size:13px; white-space:nowrap}
+  body.remote .tabs .cnt{display:inline-block; min-width:20px; padding:0 6px; border-radius:99px; background:#2a2a3a; color:var(--ink); line-height:19px}
+  body.remote .tabs button.on{background:linear-gradient(135deg,#7c3aed,#a855f7); border-color:#c4a1ff; color:#fff; box-shadow:0 4px 16px rgba(139,92,246,.55)}
+  body.remote .tabs button.on .ti{filter:none; font-size:23px} body.remote .tabs button.on .tl{font-size:14px} body.remote .tabs button.on .cnt{background:#fff; color:#6d28d9}
+  body.remote #tAdd{order:-1}
+  body.remote #side{border:none}
+  body.remote .pane{padding:0 16px 190px; overflow:visible; min-height:0}
+  body.remote #addBox{padding:12px 0 4px}
+  body.remote #addBox button{background:linear-gradient(135deg,#7c3aed,#a855f7)}
+  body.remote .row{gap:12px; padding:10px 0; border-radius:0}
+  body.remote .row img{width:96px; height:54px; border-radius:8px}
+  body.remote .row .n{display:none}
+  body.remote .row.cur{background:linear-gradient(135deg,#2a1856,#1b1530); border:2px solid #FFD21A; border-radius:14px; padding:10px; margin:8px 0; box-shadow:0 0 0 3px rgba(255,210,26,.18),0 6px 22px rgba(139,92,246,.45)}
+  body.remote .row.cur .name{color:#fff; font-size:15px}
+  body.remote .row.cur .sub{color:#FFD21A; font-weight:800; letter-spacing:.5px}
+  /* điện thoại: dòng bài gọn, nút sắp xếp/xoá ẩn sau nút ⋯ */
+  body.remote #paneList .row{flex-wrap:wrap}
+  body.remote .acts{display:none; width:100%; justify-content:flex-end; gap:8px; padding-top:6px}
+  body.remote .row.open .acts{display:flex}
+  body.remote .acts button{padding:7px 14px; font-size:14px}
+  .rowMore{display:none}
+  body.remote .rowMore{display:block; flex:0 0 auto; background:#20202e; border:1px solid var(--line); border-radius:50%; width:36px; height:36px; font-size:18px; line-height:1; color:var(--quiet)}
+  body.remote .row.open .rowMore{color:#FFD21A; border-color:#FFD21A}
+  body.remote .addBtn{border-radius:10px; padding:9px 12px}
+  .eq{display:inline-flex; align-items:flex-end; gap:2px; height:12px; margin-right:6px; vertical-align:-1px}
+  .eq i{display:block; width:3px; background:#FFD21A; border-radius:1px; animation:eq 1s ease-in-out infinite}
+  .eq i:nth-child(1){height:60%} .eq i:nth-child(2){height:100%; animation-delay:.2s} .eq i:nth-child(3){height:75%; animation-delay:.4s}
+  .eq.stop i{animation:none}
+  @keyframes eq{50%{transform:scaleY(.35)}}
+  #dock{display:none}
+  body.remote #dock{display:flex; position:fixed; left:0; right:0; bottom:0; z-index:40; flex-direction:column; gap:10px; background:rgba(21,21,31,.97); border-top:1px solid var(--line); padding:10px 16px calc(10px + env(safe-area-inset-bottom))}
+  body.remote #ctl{display:flex; gap:14px; align-items:center; justify-content:center; padding:0; flex-wrap:nowrap}
+  body.remote #ctl .big{width:54px; height:54px; flex:0 0 auto; background:#20202e; border:1px solid var(--line); border-radius:50%; display:flex; align-items:center; justify-content:center; padding:0; font-size:0}
+  body.remote #ctl .big svg{width:26px; height:26px; fill:currentColor}
+  body.remote #ctl .big.pri{width:68px; height:68px; background:linear-gradient(135deg,#7c3aed,#c084fc); border:none; box-shadow:0 6px 20px rgba(139,92,246,.6)} body.remote #ctl .big.pri svg{width:34px; height:34px}
+  body.remote #ctl .big.on{background:#2a1856; color:#FFD21A; border-color:#FFD21A}
+  body.remote #ctl .big:active{transform:scale(.94)}
+  body.remote #ctl .vol{display:none}
+  body.remote #volRow{display:flex; align-items:center; gap:12px; padding:0 4px}
+  #volRow{display:none}
+  #volRow .vi{color:var(--quiet); display:flex} #volRow .vi svg{width:20px; height:20px; fill:currentColor}
+  #volRow input{flex:1; -webkit-appearance:none; appearance:none; background:transparent; height:28px; accent-color:#a855f7; touch-action:none}
+  #volRow input::-webkit-slider-runnable-track{height:8px; border-radius:99px; background:linear-gradient(90deg,#7c3aed,#c084fc var(--p,100%),#2c2c3c var(--p,100%))}
+  #volRow input::-webkit-slider-thumb{-webkit-appearance:none; width:26px; height:26px; margin-top:-9px; border-radius:50%; background:#fff; border:3px solid #a855f7; box-shadow:0 2px 8px rgba(0,0,0,.5)}
+  #volRow .vn{min-width:30px; text-align:right; color:#FFD21A; font-size:15px; font-variant-numeric:tabular-nums}
+  @media (max-width:420px){ body.remote #ctl{gap:8px} body.remote #ctl .big{width:46px; height:46px} body.remote #ctl .big svg{width:22px; height:22px} body.remote #ctl .big.pri{width:58px; height:58px} }
   @media (max-width:480px){ header{gap:6px; padding:8px 10px} header .ttl{display:none} header select{max-width:150px} #link{font-size:11px; padding:3px 8px} }
   @media (min-width:900px){
     main{display:grid; grid-template-columns:1fr 430px; overflow:hidden}
@@ -165,8 +233,8 @@
 
   <aside id="side">
     <div class="tabs">
-      <button id="tList" class="on">Danh sách (<span id="cnt">0</span>)</button>
-      <button id="tAdd">Thêm bài</button>
+      <button id="tList" class="on"><span class="ti">🎶</span><span class="tl">Danh sách <span class="cnt" id="cnt">0</span></span></button>
+      <button id="tAdd"><span class="ti">🔍</span><span class="tl">Tìm bài</span></button>
     </div>
     <div id="paneList" class="pane"></div>
     <div id="paneAdd" class="pane" style="display:none">
@@ -320,7 +388,7 @@ async function loadPlaylist(name, keep){
     startId = (!REMOTE && !keep && saved && saved.name === name && items.some(i => i.id === saved.id && playable(i))) ? saved.id : null;
     buildOrder(keepId); renderList();
     const n = order.length;
-    $('startInfo').textContent = n ? ('Playlist “' + name + '” có ' + n + ' bài phát được.') : ('Playlist “' + name + '” đang trống. Vào tab “Thêm bài” để thêm.');
+    $('startInfo').textContent = n ? ('Playlist “' + name + '” có ' + n + ' bài phát được.') : ('Playlist “' + name + '” đang trống. Vào tab “Tìm bài” để thêm.');
     $('plSel').value = name;
     publishList();
   }catch(e){ apiFail(e); }
@@ -423,7 +491,7 @@ function unlock(){ unlocked = true; $('startOverlay').style.display = 'none'; se
 function start(){
   unlock();
   if(!ready){ pendingStart = true; makePlayer(); return; }
-  if(!order.length){ toast('Playlist đang trống. Vào tab “Thêm bài” để thêm nhạc.'); return; }
+  if(!order.length){ toast('Playlist đang trống. Vào tab “Tìm bài” để thêm nhạc.'); return; }
   if(startId){ buildOrder(startId); playAt(pos); } else { buildOrder(); playAt(0); }
 }
 async function playId(id){
@@ -502,6 +570,7 @@ async function pollCmds(){
 
 /* ---------- Trang điều khiển: đọc trạng thái của trang phát ---------- */
 let lastStatePlaylist = null;
+let lastPlaying = null;
 function applyRemoteState(d){
   const st = d.state, online = !!st && d.age != null && d.age < 90000;
   let status;
@@ -514,10 +583,10 @@ function applyRemoteState(d){
   $('nowTitle').textContent = st.title ? decode(st.title) : '—';
   $('nowCh').textContent = st.channel ? decode(st.channel) : '';
   const th = safeThumb(st.thumb); if(th && $('rcImg').getAttribute('src') !== th) $('rcImg').src = th;
-  $('playBtn').textContent = st.playing ? '⏸' : '▶';
+  setPlayIcon(st.playing);
   shuffle = !!st.shuffle; repeat = st.repeat || 'all'; paintModes();
-  if(document.activeElement !== $('vol') && typeof st.vol === 'number') $('vol').value = st.vol;
-  if((st.id || null) !== curId){ curId = st.id || null; renderList(); }
+  if(document.activeElement !== $('vol') && typeof st.vol === 'number'){ $('vol').value = st.vol; paintVol(); }
+  if((st.id || null) !== curId || !!st.playing !== lastPlaying){ curId = st.id || null; lastPlaying = !!st.playing; renderList(); }
   if(st.playlist && st.playlist !== lastStatePlaylist){            // theo sát playlist đang phát trên TV
     lastStatePlaylist = st.playlist;
     if(!PAIRED() && st.playlist !== curName && playlists.some(p => p.name === st.playlist)){ $('plSel').value = st.playlist; loadPlaylist(st.playlist, false); }
@@ -534,18 +603,22 @@ async function pollState(){
 /* ---------- Danh sách bài ---------- */
 function renderList(){
   const box = $('paneList'); box.replaceChildren(); $('cnt').textContent = items.length;
-  if(!items.length){ box.append(el('div', 'msg', 'Playlist trống. Vào tab “Thêm bài” để tìm hoặc dán link YouTube.')); return; }
+  if(!items.length){ box.append(el('div', 'msg', 'Playlist trống. Vào tab “Tìm bài” để tìm hoặc dán link YouTube.')); return; }
   items.forEach((it, i) => {
     const off = !playable(it);
     const row = el('div', 'row' + (it.id === curId ? ' cur' : '') + (off ? ' off' : ''));
     const img = document.createElement('img'); img.alt = ''; img.loading = 'lazy'; if(it.thumb) img.src = it.thumb;
     const meta = el('div', 'meta');
-    meta.append(el('div', 'name', it.title), el('div', 'sub', off ? (it.unavailable ? 'Không còn khả dụng' : 'Không phát nhúng được') : it.channel));
+    const sub = el('div', 'sub', off ? (it.unavailable ? 'Không còn khả dụng' : 'Không phát nhúng được') : it.channel);
+    if(REMOTE && it.id === curId && !off){ sub.textContent = ''; const eq = el('span', 'eq' + (lastPlaying ? '' : ' stop')); eq.innerHTML = '<i></i><i></i><i></i>'; sub.append(eq, document.createTextNode(lastPlaying === false ? 'ĐANG DỪNG' : 'ĐANG PHÁT')); }
+    meta.append(el('div', 'name', it.title), sub);
     const acts = el('div', 'acts');
     const mk = (label, title, fn) => { const b = el('button', null, label); b.title = title; b.onclick = ev => { ev.stopPropagation(); fn(); }; return b; };
     acts.append(mk('⇧', 'Đưa lên đầu', () => moveItem(it.id, 'top')), mk('↑', 'Lên', () => moveItem(it.id, 'up')),
                 mk('↓', 'Xuống', () => moveItem(it.id, 'down')), mk('✕', 'Xoá khỏi playlist', () => removeItem(it.id)));
-    row.append(el('div', 'n', String(i + 1)), img, meta, acts);
+    const more = el('button', 'rowMore', '⋯'); more.title = 'Sắp xếp / xoá';
+    more.onclick = ev => { ev.stopPropagation(); row.classList.toggle('open'); };
+    row.append(el('div', 'n', String(i + 1)), img, meta, more, acts);
     row.onclick = () => {
       if(off) return;
       if(REMOTE){ curId = it.id; renderList(); return sendCmd('playid', { id: it.id }); }
@@ -709,9 +782,23 @@ function tab(w){
 }
 $('tList').onclick = () => tab('list'); $('tAdd').onclick = () => tab('add');
 $('startBtn').onclick = start;
+/* Biểu tượng nút tròn cho giao diện điện thoại (giống remote.html) */
+const ICON = {
+  prev:'<svg viewBox="0 0 24 24"><path d="M6 6h2.5v12H6zM18 6v12l-9-6z"/></svg>',
+  play:'<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>',
+  pause:'<svg viewBox="0 0 24 24"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>',
+  next:'<svg viewBox="0 0 24 24"><path d="M6 6l9 6-9 6zM16 6h2.5v12H16z"/></svg>',
+  shuffle:'<svg viewBox="0 0 24 24"><path d="M10.6 9.2 5.4 4 4 5.4l5.2 5.2zM14.5 4l2 2L4 18.6 5.4 20 18 7.5l2 2V4zm.3 9.4-1.4 1.4 3.1 3.1-2 2H20v-5.5l-2 2z"/></svg>',
+  repeat:'<svg viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2z"/></svg>',
+  repeat1:'<svg viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2zm-4-2V9h-1l-2 1v1h1.5v4z"/></svg>',
+  vol:'<svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 4V5L7 9zM16.5 12A4.5 4.5 0 0 0 14 8v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z"/></svg>'
+};
+function setPlayIcon(playing){ if(REMOTE) $('playBtn').innerHTML = playing ? ICON.pause : ICON.play; else $('playBtn').textContent = playing ? '⏸' : '▶'; }
+function paintVol(){ const v = +$('vol').value || 0; $('vol').style.setProperty('--p', v + '%'); const n = $('volN'); if(n) n.textContent = v; }
 function paintModes(){
   $('shufBtn').classList.toggle('on', shuffle);
-  $('repBtn').textContent = repeat === 'one' ? '🔂' : '🔁';
+  if(REMOTE) $('repBtn').innerHTML = repeat === 'one' ? ICON.repeat1 : ICON.repeat;
+  else $('repBtn').textContent = repeat === 'one' ? '🔂' : '🔁';
   $('repBtn').classList.toggle('on', repeat !== 'off');
   $('repBtn').title = 'Lặp: ' + (repeat === 'all' ? 'cả danh sách' : repeat === 'one' ? 'một bài' : 'tắt') + ' (R)';
 }
@@ -727,6 +814,7 @@ const act = {
 $('playBtn').onclick = act.toggle; $('nextBtn').onclick = act.next; $('prevBtn').onclick = act.prev;
 $('shufBtn').onclick = act.shuffle; $('repBtn').onclick = act.repeat;
 let volTimer;
+$('vol').addEventListener('input', paintVol);
 $('vol').oninput = e => {
   const v = +e.target.value;
   if(REMOTE){ clearTimeout(volTimer); volTimer = setTimeout(() => sendCmd('vol', { value: v }), 150); }
@@ -859,6 +947,24 @@ $('pairIn').addEventListener('keydown', e => { if(e.key === 'Enter') claim($('pa
 document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') wsKick(); });
 
 /* ---------- Khởi động ---------- */
+if(REMOTE){
+  // Bố cục điện thoại theo kiểu remote.html: chuyển các phần có sẵn (giữ nguyên id/xử lý) vào thanh trên và thanh dưới
+  document.body.classList.add('remote');
+  const top = el('div'); top.id = 'rTop';
+  top.append(document.querySelector('header'), $('now'), $('remoteCard'), document.querySelector('.tabs'));
+  document.body.prepend(top);
+  const dock = el('div'); dock.id = 'dock';
+  const vr = el('div'); vr.id = 'volRow';
+  const vi = el('span', 'vi'); vi.innerHTML = ICON.vol;
+  vr.append(vi, $('vol'), el('b', 'vn')); vr.lastChild.id = 'volN';
+  dock.append($('ctl'), vr); document.body.append(dock);
+  $('fsBtn').remove();
+  ['prevBtn', 'nextBtn', 'shufBtn'].forEach(id => { $(id).innerHTML = ICON[{ prevBtn:'prev', nextBtn:'next', shufBtn:'shuffle' }[id]]; });
+  // thứ tự giống remote: trộn · lùi · phát · qua · lặp
+  $('ctl').prepend($('shufBtn')); $('ctl').append($('repBtn'));
+  setPlayIcon(false); paintVol();
+  tab('add');                                    // điện thoại mở là vào Tìm bài (như remote.html)
+}
 // TV: mã QR cố định dẫn tới trang điều khiển của phòng này. Điện thoại đã lưu mật khẩu thì tìm/thêm bài được ngay;
 // máy chưa có mật khẩu sẽ được hỏi mật khẩu (không có mật khẩu thì không làm gì được).
 if(!REMOTE && window.qrcode){
