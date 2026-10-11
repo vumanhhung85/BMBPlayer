@@ -1,6 +1,6 @@
 # BMBPlayer — chọn bài hát + gọi lễ tân (một hệ thống)
 
-**BMBPlayer = BMBPlayer + BMB Order cũ.** Một Worker, một repo, một tên miền: `https://bmbplayer.boommusicbox.vn`.
+**BMBPlayer = BMBPlayer + BMB Order cũ.** Một Worker, một repo, một tên miền: `https://bmb.id.vn`.
 
 | Trang | Ai dùng | Làm gì |
 |---|---|---|
@@ -34,11 +34,13 @@ Trên máy có Node (thư mục repo BMBPlayer, PowerShell):
    Lùi bản: Cloudflare → Worker bmbplayer → Deployments → chọn bản cũ → Rollback.
 
 ## Chuyển tên miền từ GitHub Pages sang Worker (làm một lần)
-1. Cloudflare → DNS của boommusicbox.vn: xoá bản ghi `bmbplayer` (CNAME trỏ `vumanhhung85.github.io`).
-2. Cloudflare → Workers & Pages → `bmbplayer` → Settings → Domains & Routes → Add → Custom domain → `bmbplayer.boommusicbox.vn`.
-3. Đợi vài phút (cấp chứng chỉ), mở `https://bmbplayer.boommusicbox.vn/quay.html` kiểm tra; góc TV phải hiện giờ deploy mới.
-4. Ổn định ~1 tuần: GitHub → repo BMBPlayer → Settings → Pages → tắt; xoá file `CNAME`; bỏ địa chỉ workers.dev khỏi `ALLOWED_ORIGINS`.
-   Muốn quay lại GitHub Pages: gỡ Custom domain ở bước 2, tạo lại CNAME `bmbplayer` → `vumanhhung85.github.io`.
+Địa chỉ chính thức: `https://bmb.id.vn` (chốt 11/10/2026). Gắn bằng Custom domain của Worker, không cần GitHub Pages.
+1. Cloudflare → Add a domain `bmb.id.vn` (Free) → đổi nameserver ở nhà đăng ký sang 2 nameserver Cloudflare cấp → chờ Active (đã làm).
+2. Cloudflare → Workers & Pages → `bmbplayer` → Settings → Domains & Routes → Add → Custom domain → để trống ô Subdomain (tên miền gốc) (đã làm).
+3. Mở `https://bmb.id.vn/quay.html` kiểm tra; góc TV phải hiện giờ deploy mới.
+4. Trong thời gian chạy song song, các địa chỉ cũ vẫn hoạt động: `bmbplayer.vmh.io.vn` (Worker, tên gõ tắt cũ) và `bmbplayer.boommusicbox.vn` (GitHub Pages, DNS ở Mắt Bão). Mọi tài liệu, QR, link gửi nhân viên chỉ dùng `https://bmb.id.vn`.
+5. Chạy ổn một thời gian: GitHub → repo BMBPlayer → Settings → Pages → tắt; xoá file `CNAME`; bỏ `bmbplayer.boommusicbox.vn` (và địa chỉ không dùng) khỏi `ALLOWED_ORIGINS`; chuyển repo Private (chú ý: link tải APK dạng raw.githubusercontent trên nhánh `android-apk` sẽ không còn mở công khai, cần chỗ phát hành khác).
+   Quay lại Pages nếu cần: gỡ Custom domain ở bước 2, tạo lại CNAME `bmbplayer` → `vumanhhung85.github.io` ở nơi quản lý DNS của boommusicbox.vn (Mắt Bão).
 
 ## Telegram báo yêu cầu gọi lễ tân
 
@@ -48,9 +50,9 @@ Trên máy có Node (thư mục repo BMBPlayer, PowerShell):
 - Lỗi Telegram (mạng, bot bị chặn…) không làm hỏng việc gửi/xử lý yêu cầu; tin gửi nền sau khi đã trả lời khách.
 
 ## Chuyển CN03 sang (thay thẳng)
-1. Quầy CN03 mở `https://bmbplayer.boommusicbox.vn/quay.html`, đăng nhập tài khoản cũ.
-2. Mỗi TV: mở `https://bmbplayer.boommusicbox.vn/` → hiện mã 6 số. Quầy → tab **TV & phòng** → **Gán TV** ở đúng phòng → quét QR trên TV (hoặc quét QR trên TV bằng camera điện thoại → mở thẳng trang quầy).
-3. Máy tính bảng trong phòng: mở `https://bmbplayer.boommusicbox.vn/remote.html` (hoặc "Thêm vào màn hình chính") → mở phòng → bấm ô **PHÒNG** → quét QR góc trái TV. Máy dùng wifi quán.
+1. Quầy CN03 mở `https://bmb.id.vn/quay.html`, đăng nhập tài khoản cũ.
+2. Mỗi TV: mở `https://bmb.id.vn/` → hiện mã 6 số. Quầy → tab **TV & phòng** → **Gán TV** ở đúng phòng → quét QR trên TV (hoặc quét QR trên TV bằng camera điện thoại → mở thẳng trang quầy).
+3. Máy tính bảng trong phòng: mở `https://bmb.id.vn/remote.html` (hoặc "Thêm vào màn hình chính") → mở phòng → bấm ô **PHÒNG** → quét QR góc trái TV. Máy dùng wifi quán.
 4. Gỡ thẻ QR dán bàn cũ (không còn dùng).
 5. Chạy ổn rồi: chép 3 file chuyển hướng (`index.html`, `quay.html`, `sw.js` — gửi kèm riêng, không nằm trong repo này) vào repo **BMB_Order** (để máy còn mở order.boommusicbox.vn tự chuyển sang), sau đó xoá Worker `bmb-order-worker` (và `bmb-phong` nếu đã từng deploy), cuối cùng gỡ tên miền order.
 
@@ -60,9 +62,8 @@ Trên máy có Node (thư mục repo BMBPlayer, PowerShell):
 - Tên bảng trong D1 vẫn là `order_*` — chỉ là tên nội bộ, người dùng không thấy.
 - Phần chọn bài phát YouTube nhúng: điều khoản YouTube không cho dùng phục vụ khách thương mại — xem ghi chú bản quyền trước khi đưa cho khách thật.
 
-## Tên miền
-Địa chỉ chính thức của BMBPlayer (dùng trong mọi tài liệu, hướng dẫn, QR, link gửi nhân viên): `https://bmbplayer.boommusicbox.vn/`.
-`bmbplayer.vmh.io.vn` chỉ là **tên gõ tắt** cho người quản trị dễ nhớ; cùng một Worker `bmbplayer`, hai địa chỉ luôn chạy đúng cùng một phiên bản. Cả hai phải có trong `ALLOWED_ORIGINS` (Worker `bmbplayer` trong `wrangler.toml`, Worker `kho-karaoke` trong Dash).
-Lưu ý: đăng nhập và dữ liệu lưu trên máy tách riêng theo địa chỉ, nên mỗi thiết bị nên dùng một địa chỉ cố định (thiết bị quán dùng địa chỉ chính thức).
-
-Gắn tên miền gõ tắt (đã làm 10/2026): Cloudflare → Add a domain `vmh.io.vn` (Free) → đổi nameserver ở nhà đăng ký sang 2 nameserver Cloudflare → Workers & Pages → `bmbplayer` → Domains & Routes → Custom domain → `bmbplayer.vmh.io.vn`.
+## Tên miền (quy ước tài liệu)
+- Địa chỉ chính thức duy nhất trong mọi tài liệu, hướng dẫn, QR, link gửi nhân viên: `https://bmb.id.vn/` (trang TV `/`, quầy `/quay.html`, khách/máy tính bảng `/remote.html`).
+- `bmbplayer.vmh.io.vn` và `bmbplayer.boommusicbox.vn` chỉ là địa chỉ cũ chạy song song trong thời gian chuyển; sẽ bỏ sau khi tắt GitHub Pages.
+- Một Worker `bmbplayer` nhận mọi tên miền đã nằm trong Cloudflare (`bmb.id.vn`, `vmh.io.vn`) và luôn cùng một phiên bản. `boommusicbox.vn` không nằm trong Cloudflare nên chỉ chạy qua GitHub Pages.
+- Tất cả địa chỉ đang dùng phải có trong `ALLOWED_ORIGINS` của Worker `bmbplayer` (`wrangler.toml`) và của Worker `kho-karaoke` (Dash). Đăng nhập và dữ liệu lưu trên máy tách riêng theo địa chỉ, nên mỗi thiết bị dùng một địa chỉ cố định; mã QR trên TV theo địa chỉ TV đang mở.

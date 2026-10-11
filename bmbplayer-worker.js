@@ -2,7 +2,7 @@
    BMBPlayer — Worker "bmbplayer" (một Worker cho cả hệ thống, deploy MỘT lần bằng wrangler)
    BMBPlayer = chọn bài hát + gọi lễ tân (trước đây là 2 app BMBPlayer và BMB Order)
    ============================================================
-   TRANG (GitHub Pages, https://bmbplayer.boommusicbox.vn):
+   TRANG (Worker static assets, https://bmb.id.vn):
      index.html  — TV: phát bài; chưa gán phòng thì hiện mã 6 số + QR để quầy gán; phòng mở thì hiện
                    QR khách ở góc trái (QR này mở remote.html: chọn bài + gọi lễ tân). Mỗi lượt mở là QR mới.
      remote.html — Khách / máy tính bảng trong phòng: tab Chọn bài + tab Gọi lễ tân.
@@ -42,7 +42,7 @@
      Secret : SESSION_SECRET (GIỐNG HỆT bmb-order-worker cũ → phiên quầy đang mở không bị đá ra),
               SECRET (chuỗi ngẫu nhiên dài, ký mã TV/QR), GUEST_SECRET (GIỐNG HỆT kho-karaoke),
               APP_PASS (mật khẩu nhac.html) · tuỳ chọn: LEGACY_SECRET, NHAC_PASS
-     Biến   : ALLOWED_ORIGINS (mặc định https://bmbplayer.boommusicbox.vn), NET_CHECK (off|warn|on), TB_NET (on|off)
+     Biến   : ALLOWED_ORIGINS (mặc định https://bmb.id.vn), NET_CHECK (off|warn|on), TB_NET (on|off)
      Binding: D1 DB → bmb_data ; Durable Object ROOM → Room, REG → Registry, NHAC → NhacRoom
    TELEGRAM: yêu cầu gọi lễ tân (mới / xác nhận / đã phục vụ / huỷ) báo cho quản lý + nhân viên quầy chi nhánh (xem tgLeTan). CHƯA CÓ: nhắc lại khi quá hạn (SLA); học IP chi nhánh
    ============================================================ */
@@ -72,7 +72,7 @@ async function mkToken(env, id, kind, gen){ return id + '.' + gen + '.' + await 
 function parseToken(t){ const m = TOKEN_RE.exec(String(t || '')); return m ? { id: m[1], gen: +m[2], sig: m[3] } : null; }
 
 /* ---------- Tiện ích ---------- */
-const origins = env => String(env.ALLOWED_ORIGINS || 'https://bmbplayer.boommusicbox.vn').split(',').map(s => s.trim()).filter(Boolean);
+const origins = env => String(env.ALLOWED_ORIGINS || 'https://bmb.id.vn').split(',').map(s => s.trim()).filter(Boolean);
 function cors(req, env){
   const o = req.headers.get('Origin');
   const h = { 'Vary': 'Origin', 'Access-Control-Allow-Headers': 'content-type, x-pass', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS' };
