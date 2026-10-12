@@ -281,7 +281,7 @@ td b{color:var(--txt)}
       <div class="tabs">
         <div class="tab on" data-p="p1">📋 Hàng đợi<span class="n zero" id="nMoi"></span></div>
         <div class="tab" data-p="p2">📅 Lịch sử đơn</div>
-        <div class="tab" data-p="p3" id="tabTv">📺 TV &amp; phòng</div>
+        <div class="tab" data-p="p3" id="tabTv">📺 TV &amp; MTB</div>
         <div class="tab" data-p="p5" id="tabCaiDat" style="display:none">🍺 Menu</div>
         <div class="tab" data-p="p6" id="tabTaiKhoan" style="display:none">👥 Tài khoản quầy</div>
       </div>
@@ -323,7 +323,7 @@ td b{color:var(--txt)}
   <div class="pg" id="p3">
     <div class="hint">
       Mỗi phòng có <b>1 TV</b> (hiện QR khách ở góc trái khi phòng mở — khách quét để <b>chọn bài và gọi lễ tân</b>) và có thể có <b>1 máy tính bảng</b>.
-      <b>Gán TV</b>: TV chưa gán phòng hiện mã 6 số + QR → bấm Gán TV ở đúng phòng rồi quét/nhập mã. Mỗi lần mở phòng là QR khách mới, khách lượt trước không vào lại được.
+      <b>Gán TV</b>: TV chưa gán phòng hiện mã 6 số + QR → bấm Gán TV &amp; MTB ở đúng phòng rồi quét/nhập mã. Mỗi lần mở phòng là QR khách mới, khách lượt trước không vào lại được.
       <b>Máy tính bảng</b>: máy chưa gán hiện mã 6 số + QR → quét bằng điện thoại này rồi bấm Gán máy tính bảng ở đúng phòng. Đã gán thì máy tự quét QR trên TV để đổi phòng.
     </div>
     <div class="ganbar" id="ganBar"></div>
@@ -710,7 +710,7 @@ function drawTv(){
       + '</div><div class="ac">';
     if(canGan) h += b('gan', GANNET.same === false ? 'btn-bad' : 'btn-y', GANNET.same === false ? 'Vẫn gán (chắc chắn '+tenMay().toLowerCase()+' ở đây)' : 'Gán '+tenMay().toLowerCase()+' này vào đây');
     h += x.open ? b('dong', 'btn-ghost', 'Đóng phòng') : b('mo', canGan ? 'btn-ghost' : 'btn-y', 'Mở phòng');
-    if(!GAN) h += b('quet', 'btn-ghost', '📺 Gán TV');
+    if(!GAN) h += b('quet', 'btn-ghost', '📺 Gán TV &amp; MTB');
     if(x.open && x.tokQr) h += b('qr', 'btn-ghost', 'QR khách') + b('doiqr', 'btn-ghost', 'Đổi QR khách');
     if(x.tv) h += b('gotv', 'btn-ghost', 'Gỡ TV');
     if(S.quanLy && x.tablets) h += b('gomtb', 'btn-ghost', 'Gỡ máy tính bảng');
@@ -757,8 +757,8 @@ function tvAct(act, id){
   }
   if(act==='quet'){
     openQrScanner({
-      title: 'Gán TV vào phòng ' + x.roomName,
-      hint: 'Quét mã QR đang hiện trên màn hình TV chưa gán phòng.',
+      title: 'Gán TV hoặc máy tính bảng vào phòng ' + x.roomName,
+      hint: 'Quét mã QR đang hiện trên màn hình TV hoặc máy tính bảng chưa gán phòng.',
       manualPlaceholder: 'hoặc nhập mã 6 số trên TV', numeric: true,
       manualHint: x.tv ? 'Phòng này đang có TV — gán TV mới thì TV cũ trở về màn hình gán phòng.' : '',
       onResult: function(raw){ var c = maGan(raw); return c ? ganTv(id, c) : Promise.resolve('Đây không phải mã gán phòng trên TV (mã 6 số).'); }
