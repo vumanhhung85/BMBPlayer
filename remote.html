@@ -206,6 +206,8 @@
   #pair .pErr{color:#fecdd3; font-size:14px; margin-top:6px; min-height:1px}
   #pair .pScan{border:none; border-radius:14px; padding:14px 22px; font:inherit; font-weight:800; font-size:16px; color:#fff; background:linear-gradient(135deg,#7c3aed,#a855f7); box-shadow:0 6px 20px rgba(139,92,246,.5); display:none}
   #pair .pScan.show{display:inline-block}
+  #pair .pBack{border:1px solid var(--line); border-radius:14px; padding:12px 20px; font:inherit; font-weight:700; font-size:15px; color:var(--ink); background:#20202e; display:none}
+  #pair .pBack.show{display:inline-block}
   #pair .pNote{color:var(--quiet); font-size:12.5px; max-width:560px; line-height:1.5}
 </style>
 </head>
@@ -231,6 +233,7 @@
     </div>
   </div>
   <button class="pScan" id="pairScan">📷 Quét QR trên TV để vào phòng</button>
+  <button class="pBack" id="pairBack">← Quay lại phòng đang dùng</button>
   <div class="pNote" id="pairNote"></div>
 </div>
 <div id="top">
@@ -1249,7 +1252,11 @@ function assignTablet(){
         body: JSON.stringify({ r, dv: lsGet(DV_KEY) || '', tb: bc.tablet ? bc.token : '' }) });
       let d = {}; try{ d = await res.json(); }catch(e){}
       if(!res.ok || !d.tok){
-        if(d.need === 'pair'){ try{ localStorage.removeItem(DV_KEY); }catch(e){} $('pairScan').classList.remove('show'); }
+        if(d.need === 'pair'){                         // máy chuyển sang chi nhánh khác / bị thu hồi: hiện mã 6 số để quầy chi nhánh này gán
+          try{ localStorage.removeItem(DV_KEY); }catch(e){}
+          setTimeout(() => showPair('Máy chưa được phép vào phòng này (máy của chi nhánh khác, hoặc đã bị thu hồi). Nhờ nhân viên quầy chi nhánh này quét mã bên trên để gán.'), 0);
+          return true;
+        }
         return d.error || ('Lỗi ' + res.status);
       }
       const bad = saveTablet(d); if(bad) return bad;
@@ -1265,6 +1272,7 @@ function showPair(why){
   $('pairNote').textContent = why || '';
   const hasDv = !!lsGet(DV_KEY);
   $('pairScan').classList.toggle('show', hasDv);
+  $('pairBack').classList.toggle('show', !!(bc.tablet && bc.status !== 'rotated' && lsGet(TB_KEY)));   // vẫn còn phòng cũ: cho quay lại
   $('pairH').textContent = hasDv ? 'Máy tính bảng chưa vào phòng' : 'Máy tính bảng chưa gán phòng';
   if(pairing) return; pairing = true;
   const BASE = location.origin + location.pathname.replace(/[^/]*$/, '');
@@ -1306,9 +1314,10 @@ function showPair(why){
   fresh();
 }
 $('pairScan').onclick = assignTablet;
+$('pairBack').onclick = () => $('pair').classList.remove('show');
 $('roomTag').onclick = () => {
   if(GUEST && !bc.tablet){ snack('Bạn đang ở phòng ' + (roomName || '') + '. Đổi phòng: quét mã QR ở góc trái TV của phòng đó.', true); return; }
-  if(bc.tablet){ if(confirm('Đổi phòng cho máy tính bảng này?')) assignTablet(); return; }
+  if(bc.tablet){ if(confirm('Đổi phòng cho máy tính bảng này?\n\nOK: quét QR trên TV (cùng chi nhánh). Máy chuyển sang chi nhánh khác: cứ quét, máy sẽ hiện mã để quầy chi nhánh mới gán.')) assignTablet(); return; }
   if(IS_TB_DEV || confirm('Gán máy này làm máy tính bảng chọn bài của một phòng? Cần nhân viên quầy quét mã để cho phép.')){ try{ localStorage.setItem('bmb_tablet', '1'); }catch(e){} showPair(); }
 };
 
