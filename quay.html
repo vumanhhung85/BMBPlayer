@@ -324,13 +324,14 @@ td b{color:var(--txt)}
     <div class="hint">
       Mỗi phòng có <b>1 TV</b> (hiện QR khách ở góc trái khi phòng mở — khách quét để <b>chọn bài và gọi lễ tân</b>) và có thể có <b>1 máy tính bảng</b>.
       <b>Gán TV</b>: TV chưa gán phòng hiện mã 6 số + QR → bấm Gán TV ở đúng phòng rồi quét/nhập mã. Mỗi lần mở phòng là QR khách mới, khách lượt trước không vào lại được.
-      Máy tính bảng tự gán: trên máy bấm ô PHÒNG → quét QR trên TV.
+      <b>Máy tính bảng</b>: máy chưa gán hiện mã 6 số + QR → quét bằng điện thoại này rồi bấm Gán máy tính bảng ở đúng phòng. Đã gán thì máy tự quét QR trên TV để đổi phòng.
     </div>
     <div class="ganbar" id="ganBar"></div>
     <div class="mrow" id="phongAdmin" style="display:none;background:transparent;border-style:dashed">
       <input class="lb" id="phongMoi" maxlength="600" placeholder="Thêm phòng — nhiều phòng cách nhau dấu phẩy, vd: P1, P2, P3, VIP1">
       <button class="btn btn-y btn-sm" id="btnPhongThem">+ Thêm phòng</button>
     </div>
+    <button class="btn btn-ghost btn-sm" id="btnThuHoiMtb" style="display:none;margin:6px 8px 6px 0;border-color:#ff8f8f;color:#ff8f8f">🔒 Thu hồi mọi máy tính bảng</button>
     <button class="btn btn-ghost btn-sm" id="btnPrintRv" style="margin:6px 0 6px;border-color:#2BB673;color:#2BB673">⭐ In QR ĐÁNH GIÁ (thẻ riêng, không số phòng)</button>
     <div class="hint" id="rvHint" style="margin:4px 0 6px">Dùng đường dẫn Google Maps của chi nhánh.</div>
     <div class="tvgrid" id="tvList"><div class="mut">Đang tải…</div></div>
@@ -597,6 +598,7 @@ function hienTheoQuyen(){
   $('mauAdmin').style.display    = S.vaiTro==='admin' ? '' : 'none';
   $('tabTaiKhoan').style.display = S.quanLy  ? '' : 'none';
   $('phongAdmin').style.display  = S.vaiTro==='admin' ? '' : 'none';   /* phòng cố định — chỉ admin thêm/xoá */
+  $('btnThuHoiMtb').style.display = S.quanLy ? '' : 'none';
   $('selCN').style.display       = S.vaiTro==='admin' ? '' : 'none';
 }
 function veChonChiNhanh(){
@@ -654,7 +656,8 @@ var BASE = location.origin + location.pathname.replace(/[^/]*$/, '');
 function maGan(raw){ raw = String(raw||''); var m = raw.match(/[#&?]gan=(\d{6})/) || raw.replace(/\s/g,'').match(/^(\d{6})$/); return m ? m[1] : ''; }
 var GAN = maGan(location.hash);
 var TV = { rooms:[], tm:null };
-var GANNET = { code:'', same:null, canForce:false };   // TV chờ gán có cùng mạng chi nhánh không (null: đang kiểm)
+var GANNET = { code:'', same:null, canForce:false, kind:'tv' };   // TV / máy tính bảng chờ gán có cùng mạng chi nhánh không (null: đang kiểm)
+function tenMay(){ return GANNET.kind === 'tb' ? 'Máy tính bảng' : 'TV'; }
 function kiemMang(){
   if(!GAN){ GANNET = { code:'', same:null, canForce:false }; return; }
   if(GANNET.code === GAN) return;
@@ -662,7 +665,7 @@ function kiemMang(){
   var c = GAN;
   api('quay.tvCheck', {code:c}).then(function(r){
     if(GAN !== c) return;
-    if(r && r.ok) GANNET = { code:c, same:!!r.same, canForce:!!r.canForce };
+    if(r && r.ok) GANNET = { code:c, same:!!r.same, canForce:!!r.canForce, kind: r.kind === 'tb' ? 'tb' : 'tv' };
     else GANNET = { code:c, same:null, canForce:false, err:(r && r.msg) || 'Mã không đúng hoặc đã hết hạn.' };
     drawTv();
   }).catch(function(){});
@@ -673,11 +676,11 @@ function boGan(){ GAN = ''; history.replaceState(null, '', location.pathname + l
 function veGanBar(){
   var g = $('ganBar');
   if(!GAN){ g.style.display = 'none'; return; }
-  var m = '<b>'+GAN.slice(0,3)+' '+GAN.slice(3)+'</b>', kq = GANNET.same;
+  var m = '<b>'+GAN.slice(0,3)+' '+GAN.slice(3)+'</b>', kq = GANNET.same, ten = tenMay(), ic = GANNET.kind === 'tb' ? '📱' : '📺';
   g.innerHTML = kq === false
-    ? '<span style="color:#ffb86b">⚠️ TV mã '+m+' đang ở <b>mạng chưa từng thấy</b> của chi nhánh này. Có thể do quán có 2 đường mạng / nhà mạng vừa đổi IP — hoặc đây là TV của chi nhánh khác. Chỉ gán nếu chắc chắn TV đang ở đây.</span> <button class="btn btn-ghost btn-sm" id="btnBoGan">Bỏ</button>'
+    ? '<span style="color:#ffb86b">⚠️ '+ten+' mã '+m+' đang ở <b>mạng chưa từng thấy</b> của chi nhánh này. Có thể do quán có 2 đường mạng / nhà mạng vừa đổi IP — hoặc đây là máy của chi nhánh khác. Chỉ gán nếu chắc chắn máy đang ở đây.</span> <button class="btn btn-ghost btn-sm" id="btnBoGan">Bỏ</button>'
     : GANNET.err ? '<span style="color:#ff8f8f">⚠️ '+esc(GANNET.err)+'</span> <button class="btn btn-ghost btn-sm" id="btnBoGan">Bỏ</button>'
-    : '<span>📺 TV mã '+m+(kq === true ? ' (cùng mạng chi nhánh)' : ' — đang kiểm tra mạng…')+' đang chờ gán — bấm <u>Gán TV này vào đây</u> ở đúng phòng.</span> <button class="btn btn-ghost btn-sm" id="btnBoGan">Bỏ</button>';
+    : '<span>'+ic+' '+ten+' mã '+m+(kq === true ? ' (cùng mạng chi nhánh)' : ' — đang kiểm tra mạng…')+' đang chờ gán — bấm <u>Gán '+ten.toLowerCase()+' này vào đây</u> ở đúng phòng.</span> <button class="btn btn-ghost btn-sm" id="btnBoGan">Bỏ</button>';
   g.style.display = 'flex';
   $('btnBoGan').addEventListener('click', boGan);
 }
@@ -705,7 +708,7 @@ function drawTv(){
       + '<span class="chip">'+x.remotes+' điện thoại</span>'
       + (x.offNet ? '<span class="chip warn">'+x.offNet+' máy ngoài mạng quán</span>' : '')
       + '</div><div class="ac">';
-    if(canGan) h += b('gan', GANNET.same === false ? 'btn-bad' : 'btn-y', GANNET.same === false ? 'Vẫn gán (chắc chắn TV ở đây)' : 'Gán TV này vào đây');
+    if(canGan) h += b('gan', GANNET.same === false ? 'btn-bad' : 'btn-y', GANNET.same === false ? 'Vẫn gán (chắc chắn '+tenMay().toLowerCase()+' ở đây)' : 'Gán '+tenMay().toLowerCase()+' này vào đây');
     h += x.open ? b('dong', 'btn-ghost', 'Đóng phòng') : b('mo', canGan ? 'btn-ghost' : 'btn-y', 'Mở phòng');
     if(!GAN) h += b('quet', 'btn-ghost', '📺 Gán TV');
     if(x.open && x.tokQr) h += b('qr', 'btn-ghost', 'QR khách') + b('doiqr', 'btn-ghost', 'Đổi QR khách');
@@ -735,12 +738,12 @@ function tagPhong(el, side, name){
 function ganTv(id, code, force){
   return api('quay.ganTv', {roomId:id, code:code, force:!!force}).then(function(r){
     if(r && !r.ok && r.error === 'khac_mang'){
-      if(r.canForce && !force && confirm(r.msg + '\n\nVẫn gán TV này vào phòng?')) return ganTv(id, code, true);
+      if(r.canForce && !force && confirm(r.msg + '\n\nVẫn gán ' + tenMay().toLowerCase() + ' này vào phòng?')) return ganTv(id, code, true);
       return r.msg;
     }
     if(!r || !r.ok) return (r && r.msg) || 'Không gán được, thử lại.';
     GAN = ''; history.replaceState(null, '', location.pathname + location.search);
-    toast('Đã gán TV vào phòng ' + r.roomName + ' — TV tự vào phòng sau vài giây.');
+    toast(r.kind === 'tb' ? 'Đã gán máy tính bảng vào phòng ' + r.roomName + ' — máy tự vào phòng sau vài giây.' : 'Đã gán TV vào phòng ' + r.roomName + ' — TV tự vào phòng sau vài giây.');
     drawTv(); setTimeout(loadTv, 3000);
     return true;
   }).catch(function(){ return 'Mất kết nối.'; });
@@ -779,10 +782,14 @@ function tvAct(act, id){
     api('quay.goTv', {roomId:id}).then(function(r){ if(!r || !r.ok) alert((r&&r.msg)||'Không gỡ được.'); sauTv(); }); return;
   }
   if(act==='gomtb'){
-    if(!confirm('Gỡ máy tính bảng khỏi phòng '+x.roomName+'? Máy phải quét lại QR trên TV mới dùng được.')) return;
+    if(!confirm('Gỡ máy tính bảng khỏi phòng '+x.roomName+'? Máy phải quét lại QR trên TV mới dùng được (máy mất / nghi bị lấy thì dùng nút Thu hồi mọi máy tính bảng).')) return;
     api('quay.goMtb', {roomId:id}).then(function(r){ if(!r || !r.ok) alert((r&&r.msg)||'Không gỡ được.'); sauTv(); }); return;
   }
   if(act==='lktv'){ chep(BASE + 'index.html?r=' + encodeURIComponent(x.tokTv), 'Đã chép liên kết TV'); return; }
+}
+function thuHoiMtb(){
+  if(!confirm('Thu hồi MỌI máy tính bảng của chi nhánh?\n\nDùng khi mất máy hoặc nghi máy bị mang ra ngoài. Mọi máy tính bảng bị gỡ khỏi phòng và phải nhờ quầy quét mã gán lại từng máy.')) return;
+  api('quay.thuHoiMtb', {}).then(function(r){ if(!r || !r.ok) return alert((r&&r.msg)||'Không thu hồi được.'); toast('Đã thu hồi máy tính bảng ở ' + r.rooms + ' phòng.'); sauTv(); });
 }
 function chep(t, okTx){
   if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(function(){ toast(okTx); }, function(){ prompt('Chép liên kết:', t); });
@@ -1390,6 +1397,7 @@ $('lsTruoc').addEventListener('click', function(){ datNgayLS(congNgay(LS.ngay ||
 $('lsSau').addEventListener('click', function(){ datNgayLS(congNgay(LS.ngay || ngayHomNay(), 1)); });
 $('lsHomNay').addEventListener('click', function(){ datNgayLS(ngayHomNay()); });
 $('btnPrintRv').addEventListener('click', printReview);
+$('btnThuHoiMtb').addEventListener('click', thuHoiMtb);
 $('btnChonMau').addEventListener('click', moChonMau);
 $('btnChonMauOk').addEventListener('click', xacNhanChonMau);
 $('btnChonMauHuy').addEventListener('click', function(){ $('modalChonMau').classList.remove('show'); });

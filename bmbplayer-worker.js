@@ -13,8 +13,9 @@
    ĐƯỜNG DẪN CỦA WORKER:
      POST /api               — API quầy + gọi lễ tân (body JSON {action,...}), giữ đúng tên action cũ của Order.
      GET  /ws                — WebSocket kênh phòng (TV / máy tính bảng / điện thoại khách).
-     POST /api/tv/pair/*     — TV chưa gán phòng xin mã 6 số, chờ quầy gán.
-     POST /api/tablet/claim  — máy tính bảng đổi QR trên TV lấy mã máy tính bảng của phòng.
+     POST /api/tv/pair/*     — TV (hoặc máy tính bảng, kind:'tb') chưa gán phòng xin mã 6 số, chờ quầy gán.
+                               Máy tính bảng gán xong nhận thêm quyền thiết bị (dv) của chi nhánh.
+     POST /api/tablet/claim  — máy tính bảng ĐÃ có quyền thiết bị quét QR trên TV để vào/đổi phòng (cùng chi nhánh).
      POST /api/tokcheck      — TV / máy tính bảng hỏi mã còn dùng được không.
      /nhac/ws, /api/nhac/*   — kênh tức thì của nhac.html (nghe nhạc trên TV).
 
@@ -70,6 +71,23 @@ async function guestTicket(env, id){
 const same = (a, b) => { a = String(a); b = String(b); let d = a.length ^ b.length; for(let i = 0; i < Math.max(a.length, b.length); i++) d |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0); return d === 0; };
 async function mkToken(env, id, kind, gen){ return id + '.' + gen + '.' + await hmac(env.SECRET, id + '|' + kind + '|' + gen); }
 function parseToken(t){ const m = TOKEN_RE.exec(String(t || '')); return m ? { id: m[1], gen: +m[2], sig: m[3] } : null; }
+/* Quyền thiết bị của máy tính bảng: dv.<chi nhánh (base64url)>.<đời>.<ngẫu nhiên>.<chữ ký>
+   Quầy cấp khi gán máy tính bảng bằng mã 6 số. Có quyền này máy mới tự quét QR trên TV để vào/đổi phòng (cùng chi nhánh).
+   Quản lý bấm "Thu hồi mọi máy tính bảng" → tăng đời của chi nhánh → mọi quyền cũ hết hiệu lực. */
+const DV_RE = /^dv\.([A-Za-z0-9_-]{1,80})\.(\d{1,6})\.([A-Za-z0-9_-]{10})\.([\w-]{22})$/;
+const b64uS = t => b64uB(enc.encode(String(t)));
+const unb64uS = t => { try{ const b = atob(String(t).replace(/-/g, '+').replace(/_/g, '/')); return new TextDecoder().decode(Uint8Array.from(b, c => c.charCodeAt(0))); }catch(e){ return ''; } };
+async function devGen(env, branch, bump){ const r = await callR(regStub(env), '/dev/gen', { branch: String(branch || ''), bump: !!bump }); return +(r.data && r.data.gen) || 0; }
+async function mkDev(env, branch){
+  const gen = await devGen(env, branch), rnd = b64uB(crypto.getRandomValues(new Uint8Array(8))).slice(0, 10);
+  return 'dv.' + b64uS(branch) + '.' + gen + '.' + rnd + '.' + await hmac(env.SECRET, 'dev|' + branch + '|' + gen + '|' + rnd);
+}
+async function devOk(env, t){                         // trả mã chi nhánh nếu quyền thiết bị còn hiệu lực
+  const m = DV_RE.exec(String(t || '')); if(!m) return '';
+  const branch = unb64uS(m[1]), gen = +m[2];
+  if(!branch || !same(m[4], await hmac(env.SECRET, 'dev|' + branch + '|' + gen + '|' + m[3]))) return '';
+  return gen === await devGen(env, branch) ? branch : '';
+}
 
 /* ---------- Tiện ích ---------- */
 const origins = env => String(env.ALLOWED_ORIGINS || 'https://bmb.id.vn').split(',').map(s => s.trim()).filter(Boolean);
@@ -352,6 +370,7 @@ async function handleApi(request, env, ctx) {
         case 'quay.tvCheck':             res = await quayTvCheck(env, body, ip); break;
         case 'quay.doiQr':               res = await quayDoiQr(env, body); break;
         case 'quay.goMtb':               res = await quayGoMtb(env, body); break;
+        case 'quay.thuHoiMtb':           res = await quayThuHoiMtb(env, body); break;
         case 'quay.goTv':                res = await quayGoTv(env, body); break;
         case 'quay.pos':                 res = await quayPos(env, body); break;
         case 'quay.chan':                res = await quayChan(env, body); break;
@@ -1192,11 +1211,11 @@ async function mangCo(env, branch, ip) {
 async function tvCungMang(env, ss, code, ip) {
   const pk = await callR(regStub(env), '/tvpair/peek', { code, ip });
   if (pk.status !== 200) return { err: fail('bad_code', pk.status, pk.data.error) };
-  const tvIp = String(pk.data.ip || '');
-  if ((env.TV_NET || 'on') === 'off' || !tvIp) return { same: true, tvIp };      // tắt kiểm / mã cũ chưa ghi IP: không chặn
-  if (tvIp === netKey(ip)) return { same: true, tvIp };
+  const tvIp = String(pk.data.ip || ''), kind = pk.data.kind === 'tb' ? 'tb' : 'tv';
+  if ((env.TV_NET || 'on') === 'off' || !tvIp) return { same: true, tvIp, kind };      // tắt kiểm / mã cũ chưa ghi IP: không chặn
+  if (tvIp === netKey(ip)) return { same: true, tvIp, kind };
   const m = await mangCo(env, ss.b, tvIp);
-  return { same: m.has, tvIp };
+  return { same: m.has, tvIp, kind };
 }
 const MSG_KHAC_MANG = 'TV này đang ở mạng chưa từng thấy của chi nhánh. Có thể do chi nhánh có 2 đường mạng hoặc nhà mạng vừa đổi IP — hoặc đây là TV của chi nhánh khác. Chỉ gán nếu chắc chắn TV đang ở chi nhánh này.';
 async function quayTvCheck(env, body, ip) {
@@ -1206,7 +1225,7 @@ async function quayTvCheck(env, body, ip) {
   if (code.length !== 6) return fail('bad_code', 400, 'Mã trên TV gồm 6 chữ số.');
   const r = await tvCungMang(env, ss, code, ip);
   if (r.err) return r.err;
-  return ok({ same: r.same, canForce: true });
+  return ok({ same: r.same, canForce: true, kind: r.kind });
 }
 // ---------- quay.ganTv {roomId, code}: gán TV đang hiện mã 6 số vào phòng (TV cũ của phòng bị đẩy về màn gán) ----------
 async function quayGanTv(env, body, ip) {
@@ -1218,14 +1237,16 @@ async function quayGanTv(env, body, ip) {
   if (code.length !== 6) return fail('bad_code', 400, 'Mã trên TV gồm 6 chữ số.');
   const net = await tvCungMang(env, ss, code, ip);
   if (net.err) return net.err;
-  if (!net.same && body.force !== true) return fail('khac_mang', 403, MSG_KHAC_MANG, { canForce: true });
-  const { gen } = await call(roomStub(env, p.id), '/rotate', { id: p.id, kind: 'tv' });
-  const tok = await mkToken(env, p.id, 'tv', gen);
-  const st = await callR(regStub(env), '/tvpair/set', { code, tok, id: p.id, name: p.ten_phong });
+  const tb = net.kind === 'tb';                                         // mã 6 số do máy tính bảng xin (lần đầu / bị thu hồi)
+  if (!net.same && body.force !== true) return fail('khac_mang', 403, tb ? MSG_KHAC_MANG.replace(/TV/g, 'Máy tính bảng') : MSG_KHAC_MANG, { canForce: true, kind: net.kind });
+  const { gen } = await call(roomStub(env, p.id), '/rotate', { id: p.id, kind: net.kind });   // máy cũ của phòng (TV / máy tính bảng) bị đẩy ra
+  const tok = await mkToken(env, p.id, net.kind, gen);
+  const dv = tb ? await mkDev(env, p.chi_nhanh_id) : '';
+  const st = await callR(regStub(env), '/tvpair/set', { code, tok, id: p.id, name: p.ten_phong, dv });
   if (st.status !== 200) return fail('bad_code', st.status, st.data.error);
-  await mangHoc(env, ss.b, net.tvIp);                                  // TV đã gán: nhớ IP này là của chi nhánh
-  await env.DB.prepare('INSERT INTO nhat_ky (luc, loai, noi_dung) VALUES (?,?,?)').bind(Date.now(), 'TV_GAN', ss.u + ' @' + ss.b + ': ' + p.ten_phong + (net.same ? '' : ' (xác nhận dù khác mạng)')).run();
-  return ok({ roomName: p.ten_phong });
+  await mangHoc(env, ss.b, net.tvIp);                                  // máy đã gán: nhớ IP này là của chi nhánh
+  await env.DB.prepare('INSERT INTO nhat_ky (luc, loai, noi_dung) VALUES (?,?,?)').bind(Date.now(), tb ? 'MTB_GAN' : 'TV_GAN', ss.u + ' @' + ss.b + ': ' + p.ten_phong + (net.same ? '' : ' (xác nhận dù khác mạng)')).run();
+  return ok({ roomName: p.ten_phong, kind: net.kind });
 }
 // ---------- quay.doiQr {roomId}: QR khách mới ngay giữa lượt (điện thoại đang nối bị ngắt) ----------
 async function quayDoiQr(env, body) {
@@ -1254,6 +1275,16 @@ async function quayGoMtb(env, body) {
   if (loi2) return loi2;
   await call(roomStub(env, p.id), '/rotate', { id: p.id, kind: 'tb' });
   return ok({});
+}
+// ---------- quay.thuHoiMtb: thu hồi MỌI máy tính bảng của chi nhánh (mất máy, nghi bị lộ): gỡ khỏi mọi phòng + quyền tự quét QR hết hiệu lực ----------
+async function quayThuHoiMtb(env, body) {
+  const [ss, loi] = await canPhien(env, body, 'quanLy');
+  if (loi) return loi;
+  await devGen(env, ss.b, true);
+  const { results } = await env.DB.prepare('SELECT id FROM order_phong WHERE chi_nhanh_id = ?').bind(ss.b).all();
+  for (const p of results || []) await call(roomStub(env, p.id), '/rotate', { id: p.id, kind: 'tb' });
+  await env.DB.prepare('INSERT INTO nhat_ky (luc, loai, noi_dung) VALUES (?,?,?)').bind(Date.now(), 'MTB_THU_HOI', ss.u + ' @' + ss.b + ': ' + (results || []).length + ' phòng').run();
+  return ok({ rooms: (results || []).length });
 }
 
 
@@ -1287,7 +1318,7 @@ export class Registry extends DurableObject {
       let code;
       do{ code = rndCode(); }while(old.has('t:' + code) && old.get('t:' + code).exp >= now);
       const key = rndKey(), exp = now + TVPAIR_MS;
-      await this.ctx.storage.put('t:' + code, { key, exp, tok: '', ip: netKey(body.ip) });
+      await this.ctx.storage.put('t:' + code, { key, exp, tok: '', ip: netKey(body.ip), kind: body.kind === 'tb' ? 'tb' : 'tv' });
       return jres({ code, key, exp });
     }
     if(u.pathname === '/tvpair/poll'){
@@ -1296,22 +1327,29 @@ export class Registry extends DurableObject {
       if(!same(String(body.key || ''), v.key)) return jres({ error: 'key' }, 403);
       if(!v.tok) return jres({ wait: true });
       await this.ctx.storage.delete(k);
-      return jres({ tok: v.tok, id: v.id, name: v.name || '' });
+      return jres({ tok: v.tok, id: v.id, name: v.name || '', dv: v.dv || '' });
     }
     if(u.pathname === '/tvpair/peek'){
       if(await this.limited('rp:', body.ip, 30)) return jres({ error: 'Nhập sai quá nhiều lần, đợi 10 phút.' }, 429);
       const v = await this.ctx.storage.get('t:' + String(body.code || ''));
       if(!v || v.exp < Date.now()) return jres({ error: 'Mã trên TV không đúng hoặc đã hết hạn. Xem lại mã đang hiện trên TV.' }, 404);
       if(v.tok) return jres({ error: 'Mã này vừa được dùng. Đợi TV hiện mã mới.' }, 409);
-      return jres({ ok: true, ip: v.ip || '' });
+      return jres({ ok: true, ip: v.ip || '', kind: v.kind || 'tv' });
     }
     if(u.pathname === '/tvpair/set'){
       const k = 't:' + String(body.code || ''), v = await this.ctx.storage.get(k);
       if(!v || v.exp < Date.now()) return jres({ error: 'Mã trên TV đã hết hạn.' }, 404);
-      v.tok = String(body.tok || ''); v.id = String(body.id || ''); v.name = String(body.name || '').slice(0, 60);
+      v.tok = String(body.tok || ''); v.id = String(body.id || ''); v.name = String(body.name || '').slice(0, 60); v.dv = String(body.dv || '');
       v.exp = Date.now() + 60000;                       // TV hỏi lại 2–3 giây/lần nên 1 phút là thừa
       await this.ctx.storage.put(k, v);
       return jres({ ok: true });
+    }
+
+    /* Đời quyền thiết bị máy tính bảng của từng chi nhánh (tăng khi quản lý thu hồi) */
+    if(u.pathname === '/dev/gen'){
+      const k = 'dg:' + String(body.branch || ''); let g = (await this.ctx.storage.get(k)) || 1;
+      if(body.bump){ g++; await this.ctx.storage.put(k, g); }
+      return jres({ gen: g });
     }
 
     /* IP công cộng của từng chi nhánh (tự học, nhớ 45 ngày, tối đa 10 IP) */
@@ -1730,7 +1768,8 @@ export default {
     /* TV chưa gán phòng: xin mã 6 số, rồi hỏi lại tới khi quầy gán (không cần mật khẩu, chỉ đúng tên miền) */
     if(u.pathname === '/api/tv/pair/new' && req.method === 'POST'){
       if(!originOk) return jres({ error: 'origin' }, 403, ch);
-      const r = await callR(regStub(env), '/tvpair/new', { ip });
+      const body = await req.json().catch(() => ({}));
+      const r = await callR(regStub(env), '/tvpair/new', { ip, kind: body.kind === 'tb' ? 'tb' : 'tv' });   // kind tb: máy tính bảng chưa gán xin mã
       return jres(r.data, r.status, ch);
     }
     if(u.pathname === '/api/tv/pair/poll' && req.method === 'POST'){
@@ -1739,12 +1778,27 @@ export default {
       const r = await callR(regStub(env), '/tvpair/poll', { code: String(body.code || '').replace(/\D/g, ''), key: String(body.key || '') });
       return jres(r.data, r.status, ch);
     }
-    /* Máy tính bảng: đổi QR khách đang hiện trên TV lấy mã máy tính bảng của phòng */
+    /* Máy tính bảng ĐÃ được quầy cho phép (có quyền thiết bị dv, hoặc đang giữ mã máy tính bảng còn hiệu lực)
+       đổi QR khách đang hiện trên TV lấy mã máy tính bảng của phòng đó (đổi phòng trong cùng chi nhánh).
+       Điện thoại khách có QR nhưng không có quyền thiết bị → bị từ chối (trước đây ai có QR cũng chiếm được máy tính bảng của phòng). */
     if(u.pathname === '/api/tablet/claim' && req.method === 'POST'){
       if(!originOk) return jres({ error: 'origin' }, 403, ch);
       const body = await req.json().catch(() => ({})), t = parseToken(body.r);
       if(!t) return jres({ error: 'Không phải mã QR phòng. Quét mã ở góc trái TV.' }, 400, ch);
+      const ph = await env.DB.prepare('SELECT chi_nhanh_id FROM order_phong WHERE id = ?').bind(t.id).first();
+      if(!ph) return jres({ error: 'Không có phòng này.' }, 404, ch);
+      let branch = await devOk(env, body.dv);
+      if(!branch){                                       // máy gán từ bản cũ (chưa có dv): mã máy tính bảng đang dùng được thì vẫn cho
+        const cur = parseToken(body.tb);
+        if(cur){
+          const ck = await call(roomStub(env, cur.id), '/check', { r: body.tb, role: 'tablet' }).catch(() => ({}));
+          if(ck.valid){ const p0 = await env.DB.prepare('SELECT chi_nhanh_id FROM order_phong WHERE id = ?').bind(cur.id).first(); branch = p0 ? p0.chi_nhanh_id : ''; }
+        }
+      }
+      if(!branch) return jres({ error: 'Máy này chưa được quầy cho phép làm máy tính bảng. Nhờ nhân viên quầy quét mã gán đang hiện trên máy.', need: 'pair' }, 403, ch);
+      if(branch !== ph.chi_nhanh_id) return jres({ error: 'Máy tính bảng này thuộc chi nhánh khác. Nhờ nhân viên quầy gán lại.', need: 'pair' }, 403, ch);
       const r = await callR(roomStub(env, t.id), '/tbclaim', { r: body.r, ip });
+      if(r.status === 200 && r.data.tok) r.data.dv = await mkDev(env, branch);
       return jres(r.data, r.status, ch);
     }
     if(u.pathname === '/api/tokcheck' && req.method === 'POST'){

@@ -116,12 +116,13 @@
 
   /* ===== Máy tính bảng xoay ngang: trái tìm bài, phải bài đang hát + nút + bài kế tiếp (như SK Player) ===== */
   #side{display:none}
-  body.wide{height:100vh; overflow:hidden; display:grid; grid-template-columns:minmax(0,1fr) clamp(300px,35vw,460px); grid-template-rows:auto minmax(0,1fr)}
+  body.wide{height:100vh; overflow:hidden; display:grid; grid-template-columns:minmax(0,1fr) clamp(300px,35vw,460px); grid-template-rows:auto auto minmax(0,1fr)}
   body.wide #top{grid-column:1; grid-row:1; box-shadow:none}
   body.wide #now, body.wide #tabQueue, body.wide #paneQueue, body.wide #dock{display:none !important}
   body.wide .tabs{padding:6px 12px 8px} body.wide .tabs button{flex-direction:row; justify-content:center; gap:8px; padding:9px 8px}
   body.wide .tabs .ti{font-size:19px} body.wide .tabs button.on .ti{font-size:20px}
-  body.wide #paneSearch, body.wide #paneOrder, body.wide #settings{grid-column:1; grid-row:2; overflow:auto; min-height:0}
+  body.wide #settings{grid-column:1; grid-row:2; max-height:45vh; overflow:auto}
+  body.wide #paneSearch, body.wide #paneOrder{grid-column:1; grid-row:3; overflow:auto; min-height:0}
   body.wide .list{overflow:visible; padding-bottom:30px}
   body.wide #odPane{padding-bottom:120px}
   body.wide #odBar{right:clamp(300px,35vw,460px)}
@@ -134,7 +135,7 @@
   body.wide .card .name{font-size:13.5px}
   /* Không còn nút "Chọn": chạm vào cả dòng/thẻ bài để chọn (rowTap bấm nút ẩn này) */
   button.pick{display:none !important}
-  body.wide #side{display:flex; flex-direction:column; grid-column:2; grid-row:1 / span 2; min-height:0; background:#100e1c; border-left:1px solid var(--line)}
+  body.wide #side{display:flex; flex-direction:column; grid-column:2; grid-row:1 / span 3; min-height:0; background:#100e1c; border-left:1px solid var(--line)}
   .sNow{position:relative; flex:0 0 auto}
   .sNow .th{aspect-ratio:16/9; max-height:30vh; background:linear-gradient(135deg,#2a1856,#0e0b1c); display:flex; align-items:center; justify-content:center; overflow:hidden}
   .sNow .th img{width:100%; height:100%; object-fit:cover; display:block}
@@ -188,11 +189,50 @@
   .lsit{ border:1px solid var(--line); border-radius:12px; padding:9px 12px; margin-bottom:8px; text-align:left }
   .lsit .h{ display:flex; justify-content:space-between; font-size:12px; color:var(--quiet) } .lsit .b{ font-size:14.5px; margin-top:4px; line-height:1.5 } .lsit .n{ font-size:12.5px; color:var(--quiet); font-style:italic }
   .pill{ font-size:11.5px; font-weight:800; padding:2px 9px; border-radius:99px } .pill.moi{ background:#3a2a10; color:#fbbf24 } .pill.nhan{ background:#12361f; color:var(--good) } .pill.xong{ background:#20202e; color:var(--quiet) } .pill.huy{ background:#3a1515; color:#fca5a5 }
+
+  /* ===== Máy tính bảng chưa gán phòng: hiện mã 6 số + QR để quầy gán (giống TV), không nhập mật khẩu trên máy ===== */
+  #pair{position:fixed; inset:0; z-index:70; background:radial-gradient(circle at 30% 20%,#2a1856,#0a0a0f 70%); display:none; flex-direction:column; align-items:center; justify-content:center; gap:18px; padding:20px; overflow:auto; text-align:center}
+  #pair.show{display:flex}
+  #pair .pLogo{height:64px}
+  #pair h2{font-size:22px; font-weight:900; color:#fff}
+  #pair .pBox{display:flex; gap:28px; align-items:center; justify-content:center; flex-wrap:wrap; background:#15121f; border:1px solid #3b2f63; border-radius:20px; padding:20px 24px; max-width:760px}
+  #pair .pQr{background:#fff; border-radius:14px; padding:10px; width:220px; height:220px; display:flex; align-items:center; justify-content:center}
+  #pair .pQr img{width:200px; height:200px; image-rendering:pixelated; display:block}
+  #pair .pInfo{text-align:left; max-width:360px}
+  #pair .pL{color:var(--quiet); font-size:13px; font-weight:700; letter-spacing:.6px}
+  #pair .pCode{font-size:52px; font-weight:900; letter-spacing:6px; color:#FFD21A; font-variant-numeric:tabular-nums; line-height:1.15; margin:2px 0 10px}
+  #pair ol{padding-left:20px; color:#dcdcf0; font-size:15px; line-height:1.55}
+  #pair .pSub{color:var(--quiet); font-size:13px; margin-top:10px}
+  #pair .pErr{color:#fecdd3; font-size:14px; margin-top:6px; min-height:1px}
+  #pair .pScan{border:none; border-radius:14px; padding:14px 22px; font:inherit; font-weight:800; font-size:16px; color:#fff; background:linear-gradient(135deg,#7c3aed,#a855f7); box-shadow:0 6px 20px rgba(139,92,246,.5); display:none}
+  #pair .pScan.show{display:inline-block}
+  #pair .pNote{color:var(--quiet); font-size:12.5px; max-width:560px; line-height:1.5}
 </style>
 </head>
 <body>
 <script src="./phong-channel.js"></script>
 <script src="./quet-qr.js"></script>
+<script src="./qrcode.js"></script>
+<div id="pair">
+  <img class="pLogo" src="Logo_BoomBox.png" alt="Boom Music Box">
+  <h2 id="pairH">Máy tính bảng chưa gán phòng</h2>
+  <div class="pBox">
+    <div class="pQr" id="pairQr"></div>
+    <div class="pInfo">
+      <div class="pL">MÃ GÁN</div>
+      <div class="pCode" id="pairCode">··· ···</div>
+      <ol>
+        <li>Nhân viên quầy dùng điện thoại <b>đã đăng nhập quầy</b> quét mã QR này (hoặc vào tab TV &amp; phòng nhập mã 6 số).</li>
+        <li>Bấm <b>Gán máy tính bảng này vào đây</b> ở đúng phòng.</li>
+        <li>Máy tự vào phòng sau vài giây.</li>
+      </ol>
+      <div class="pSub" id="pairSub"></div>
+      <div class="pErr" id="pairErr"></div>
+    </div>
+  </div>
+  <button class="pScan" id="pairScan">📷 Quét QR trên TV để vào phòng</button>
+  <div class="pNote" id="pairNote"></div>
+</div>
 <div id="top">
 <header>
   <img class="logoImg" src="Logo_BoomBox.png" alt="Boom Music Box">
@@ -233,12 +273,6 @@
   <div id="detect"></div>
   <div class="opt" id="quotaLine"></div>
   <div class="opt" id="idxLine" style="display:none"></div>
-  <div class="opt" id="plBox" style="gap:6px;flex-wrap:wrap">
-    <label for="plSel" style="white-space:nowrap">Playlist đã lưu:</label>
-    <select id="plSel" style="flex:1;min-width:120px;padding:8px;border-radius:8px;background:#14141c;color:inherit;border:1px solid var(--line)"><option value="">(chưa tải)</option></select>
-    <button id="plOpen">Mở</button>
-    <button id="plReload" class="ghost" title="Tải lại danh sách">↻</button>
-  </div>
   <div class="list">
     <div id="results"></div>
     <div id="khoSec"></div>
@@ -309,6 +343,9 @@ const GUEST = !!bc.ws;
 const ROOM = GUEST ? bc.roomId : ROOM0;
 let guestTok = '', noTicket = false;                                   // vé khách do Worker phòng cấp khi phòng đang mở: chỉ đủ để tìm/chọn bài trong kho
 const $ = id => document.getElementById(id);
+/* Máy tính bảng của quán: app BMBPlayer chế độ máy tính bảng, hoặc trình duyệt từng được gán / mở với ?tb=1 */
+const IS_TB_DEV = /BMBPlayerApp\/\S+ \(tablet\)/.test(navigator.userAgent) || params.get('tb') === '1' || (() => { try{ return localStorage.getItem('bmb_tablet') === '1'; }catch(e){ return false; } })();
+const DV_KEY = 'bmb_tb_dv';                                  // quyền thiết bị do quầy cấp khi gán (để tự quét QR đổi phòng)
 const API_NAME = 'np_api', PASS_NAME = 'np_pass';          // dùng chung tên với nhac.html: nếu cùng địa chỉ trang thì chỉ cần nhập một lần
 const CAT_KEY = 'bmb_yt_catalog_v1';
 const COUNT_KEY = 'bmb_yt_search_count';
@@ -335,18 +372,17 @@ const DEFAULT_API = 'https://nhac-playlist.vumanhhung85.workers.dev';
 const KHO_NAME = 'kho_api', DEFAULT_KHO = 'https://kho-karaoke.vumanhhung85.workers.dev';
 let cfg = { api: lsGet(API_NAME) || DEFAULT_API, pass: lsGet(PASS_NAME) || '', kho: lsGet(KHO_NAME) || DEFAULT_KHO };
 const hasCfg = () => !!(cfg.api && cfg.pass);
-if(GUEST){ $('gear').style.display = 'none'; }
-if(GUEST || bc.tablet) $('plBox').style.display = 'none';
+if(GUEST || IS_TB_DEV){ $('gear').style.display = 'none'; }
 $('gear').onclick = () => { const s = $('settings'); if(s.style.display !== 'block'){ $('apiInput').value = cfg.api; $('passInput').value = cfg.pass; $('khoInput').value = cfg.kho; } s.style.display = s.style.display === 'block' ? 'none' : 'block'; };
 $('saveKey').onclick = () => {
   cfg.api = $('apiInput').value.trim().replace(/\/+$/, ''); cfg.pass = $('passInput').value; cfg.kho = $('khoInput').value.trim().replace(/\/+$/, '');
   lsSet(API_NAME, cfg.api); lsSet(PASS_NAME, cfg.pass); lsSet(KHO_NAME, cfg.kho);
-  $('settings').style.display = 'none'; msg('Đã lưu kết nối. Nhập tên bài hoặc dán link để bắt đầu.'); autoRefresh(); loadPlaylistNames(true); hotCache = null; quota = null; showQuota(); renderKho(); loadIndex();
+  $('settings').style.display = 'none'; msg('Đã lưu kết nối. Nhập tên bài hoặc dán link để bắt đầu.'); hotCache = null; quota = null; showQuota(); renderKho(); loadIndex();
 };
 $('clearKey').onclick = () => { try{ localStorage.removeItem(API_NAME); localStorage.removeItem(PASS_NAME); localStorage.removeItem(KHO_NAME); }catch(e){} cfg = { api:DEFAULT_API, pass:'', kho:DEFAULT_KHO }; $('apiInput').value = DEFAULT_API; $('passInput').value = ''; $('khoInput').value = DEFAULT_KHO; msg('Đã xoá thông tin kết nối.'); };
 $('apiInput').value = cfg.api; $('khoInput').value = cfg.kho;     // địa chỉ Worker điền sẵn, chỉ cần nhập mật khẩu
-if(!hasCfg() && !GUEST) $('settings').style.display = 'block';
-function needConfig(){ if(GUEST) return msg(guestTok ? 'Tính năng này dành cho nhân viên.' : 'Chưa nối được phòng, vui lòng đợi vài giây.', true); $('apiInput').value = cfg.api; $('khoInput').value = cfg.kho; $('passInput').value = cfg.pass; $('settings').style.display = 'block'; msg(cfg.api ? 'Nhập mật khẩu truy cập rồi bấm Lưu.' : 'Cần nhập địa chỉ Worker và mật khẩu (nút ⚙).', true); }
+if(!hasCfg() && !GUEST && !IS_TB_DEV) $('settings').style.display = 'block';
+function needConfig(){ if(GUEST || IS_TB_DEV) return msg(guestTok ? 'Tính năng này dành cho nhân viên.' : 'Chưa nối được phòng, vui lòng đợi vài giây.', true); $('apiInput').value = cfg.api; $('khoInput').value = cfg.kho; $('passInput').value = cfg.pass; $('settings').style.display = 'block'; msg(cfg.api ? 'Nhập mật khẩu truy cập rồi bấm Lưu.' : 'Cần nhập địa chỉ Worker và mật khẩu (nút ⚙).', true); }
 
 async function api(path){
   if(!hasCfg()){ needConfig(); const e = new Error('Chưa cấu hình kết nối'); e.reason = 'noconfig'; throw e; }
@@ -359,35 +395,14 @@ function showApiError(e){
   if(!e || e.reason === 'noconfig') return;
   if(e.status === 401){ needConfig(); return msg('Sai mật khẩu hoặc địa chỉ Worker.', true); }
   if(e.reason === 'origin') return msg('Worker từ chối địa chỉ trang này. Thêm ' + location.origin + ' vào biến ALLOWED_ORIGINS của Worker.', true);
-  if(e.reason === 'quotaExceeded'){ setCount(100); return msg('Hết lượt tìm hôm nay (100 lượt/ngày). Vẫn dùng được danh mục, link và playlist. Hạn mức reset khoảng 14h–15h giờ Việt Nam.', true); }
+  if(e.reason === 'quotaExceeded'){ setCount(100); return msg('Hết lượt tìm hôm nay (100 lượt/ngày). Vẫn chọn được bài trong kho và thêm bằng link. Hạn mức reset khoảng 14h–15h giờ Việt Nam.', true); }
   if(e.reason === 'notEmbeddable') return msg('Chủ video không cho phép phát nhúng nên player không phát được video này.', true);
   if(e instanceof TypeError) return msg('Không kết nối được tới Worker (mạng, địa chỉ sai hoặc bị chặn CORS).', true);
   msg(e.message || 'Có lỗi xảy ra', true);
 }
 
-/* ---------- Danh mục riêng (lưu trên trình duyệt này) ----------
-   Theo điều khoản YouTube, dữ liệu lấy từ API chỉ được lưu tối đa 30 ngày rồi phải xoá hoặc làm mới.
-   Vì vậy: mục nào quá 30 ngày bị xoá; mục quá 20 ngày được làm mới tự động (1 đơn vị cho mỗi 50 bài). */
-function loadCat(){
-  try{
-    const a = JSON.parse(lsGet(CAT_KEY) || '[]');
-    return (Array.isArray(a) ? a : []).filter(x => x && /^[\w-]{11}$/.test(x.id || '') && Date.now() - (+x.fetchedAt || 0) < MAX_AGE)
-      .map(x => ({ id:x.id, title:String(x.title||'').slice(0,200), channel:String(x.channel||'').slice(0,100), thumb:safeThumb(x.thumb),
-                   fetchedAt:+x.fetchedAt, lastUsed:+x.lastUsed || +x.fetchedAt }));
-  }catch(e){ return []; }
-}
-let catalog = loadCat();
-function saveCat(){ lsSet(CAT_KEY, JSON.stringify(catalog)); }
-function upsert(it, fresh){
-  const now = Date.now(); const i = catalog.findIndex(x => x.id === it.id);
-  if(i >= 0 && !fresh){ catalog[i].lastUsed = now; saveCat(); return; }   // bài lấy từ danh mục: không làm mới "tuổi" dữ liệu
-  const rec = { id:it.id, title:String(it.title||'').slice(0,200), channel:String(it.channel||'').slice(0,100), thumb:safeThumb(it.thumb), fetchedAt:now, lastUsed:now };
-  if(i >= 0) catalog[i] = rec; else catalog.push(rec);
-  if(catalog.length > MAX_CAT){ catalog.sort((a,b) => b.lastUsed - a.lastUsed); catalog = catalog.slice(0, MAX_CAT); }
-  saveCat();
-}
-function removeFromCat(id){ catalog = catalog.filter(x => x.id !== id); saveCat(); renderLocal(); }
-function clearCatalog(){ if(!confirm('Xoá toàn bộ danh mục bài đã lưu trên máy này?')) return; catalog = []; saveCat(); renderLocal(); }
+/* Không còn "Danh mục của tôi": mỗi lượt khách khác nhau nên máy không lưu bài đã chọn. Xoá dữ liệu cũ của bản trước. */
+try{ localStorage.removeItem(CAT_KEY); localStorage.removeItem('bmb_yt_last_pl'); }catch(e){}
 
 /* ---------- Đếm lượt tìm trong ngày (ước tính trên máy này) ---------- */
 const pacificDay = () => new Intl.DateTimeFormat('en-CA', { timeZone:'America/Los_Angeles' }).format(new Date());
@@ -434,7 +449,7 @@ function rowEl(it, actions){
   const meta = el('div', 'meta'); meta.append(el('div', 'name', it.title), el('div', 'sub', it.channel || ''));
   row.append(img, meta); actions.forEach(a => row.append(a)); return row;
 }
-function addToQueue(it, fresh, prio){ send('add', Object.assign({ id:it.id, title:it.title }, prio ? { prio:true } : {})); upsert(it, fresh); if(fresh) renderLocal(); }
+function addToQueue(it, fresh, prio){ send('add', Object.assign({ id:it.id, title:it.title }, prio ? { prio:true } : {})); }
 /* Báo nhận rõ ràng: nút đổi màu ngay, rồi chờ TV xác nhận (bài xuất hiện trong hàng chờ của TV) */
 let snackTimer = null;
 function snack(text, warn){
@@ -501,20 +516,6 @@ function renderResults(items, title, extra){
   if(!items.length){ box.append(el('div', 'msg', 'Không có kết quả phù hợp.')); return; }
   items.forEach(it => box.append(rowEl(it, [addBtn(it, true)])));
 }
-function renderLocal(){
-  const box = $('localSec'); box.replaceChildren();
-  if(GUEST || bc.tablet) return;   // khách / máy tính bảng phòng: không hiện danh mục cá nhân, cho gọn
-  const raw = $('q').value.trim(); const p = parseYT(raw);
-  const q = (p.vid || p.list) ? '' : nd(raw);
-  const list = catalog.filter(x => !q || nd(x.title).includes(q) || nd(x.channel).includes(q)).sort((a,b) => b.lastUsed - a.lastUsed);
-  const head = el('div', 'secHead'); head.append(el('b', null, 'Danh mục của tôi (' + catalog.length + ')'));
-  const act = el('span', 'secAct'); act.append(btn('Làm mới', 'ghost', () => refreshCatalog(true)), btn('Xoá hết', 'ghost', clearCatalog));
-  head.append(act); box.append(head);
-  if(!catalog.length){ box.append(el('div', 'msg', 'Danh mục trống. Bài nào bạn chọn sẽ được lưu ở đây để lần sau không cần tìm lại.')); return; }
-  if(!list.length){ box.append(el('div', 'msg', 'Không có bài nào trong danh mục khớp từ khoá. Bấm Tìm để tìm trên YouTube.')); return; }
-  list.slice(0, 40).forEach(it => box.append(rowEl(it, [addBtn(it, false), btn('✕', 'ghost', () => removeFromCat(it.id))])));
-  if(list.length > 40) box.append(el('div', 'hint', '…còn ' + (list.length - 40) + ' bài nữa, gõ từ khoá để lọc.'));
-}
 function updateDetect(){
   const d = $('detect'); d.replaceChildren();
   const p = parseYT($('q').value);
@@ -541,11 +542,11 @@ async function addByLink(vid){
     if(e.reason === 'notEmbeddable') return msg('Chủ video không cho phép phát nhúng nên player không phát được video này.', true);
     // Không đọc được tên bài: vẫn thêm vào hàng chờ theo ID để không bị gián đoạn
     send('add', { id:vid, title:'Bài từ link YouTube' }); reportPick(vid);
-    $('q').value = ''; updateDetect(); renderLocal(); renderKho();
+    $('q').value = ''; updateDetect(); renderKho();
     return msg('Đã thêm vào hàng chờ. Tạm chưa đọc được tên bài (mạng chập chờn) nhưng bài vẫn phát bình thường.');
   }
   addToQueue(item, true); reportPick(item.id);
-  $('q').value = ''; updateDetect(); renderLocal(); renderKho();
+  $('q').value = ''; updateDetect(); renderKho();
   msg('Đã thêm vào hàng chờ: ' + item.title);
 }
 
@@ -559,8 +560,8 @@ async function loadPlaylist(list){
     const items = (d.items || []).map(norm);
     const addAll = btn('＋ Thêm tất cả', null, () => {
       if(items.length > 50 && !confirm('Thêm ' + items.length + ' bài vào hàng chờ?')) return;
-      items.forEach(it => { send('add', { id:it.id, title:it.title }); upsert(it, true); });
-      renderLocal(); msg('Đã thêm ' + items.length + ' bài vào hàng chờ.');
+      items.forEach(it => send('add', { id:it.id, title:it.title }));
+      msg('Đã thêm ' + items.length + ' bài vào hàng chờ.');
     });
     renderResults(items, 'Playlist: ' + items.length + ' bài phát nhúng được' + (d.skipped ? ' (bỏ ' + d.skipped + ' bài không phát được)' : ''), addAll);
   }catch(e){
@@ -568,57 +569,6 @@ async function loadPlaylist(list){
     showApiError(e);
   }
 }
-
-/* ---------- Playlist đã lưu trên D1 (cùng dữ liệu với nhac.html) ---------- */
-const PL_KEY = 'bmb_yt_last_pl';
-async function loadPlaylistNames(quiet){
-  if(!hasCfg()){ if(!quiet) needConfig(); return; }
-  try{
-    const d = await api('/api/playlists');
-    const sel = $('plSel'), keep = sel.value || lsGet(PL_KEY) || '';
-    sel.replaceChildren();
-    (d.playlists || []).forEach(p => { const o = document.createElement('option'); o.value = p.name; o.textContent = p.name + ' (' + p.count + ')'; sel.append(o); });
-    if(!sel.options.length){ const o = document.createElement('option'); o.value = ''; o.textContent = '(chưa có playlist)'; sel.append(o); }
-    if([...sel.options].some(o => o.value === keep)) sel.value = keep;
-  }catch(e){ if(!quiet) showApiError(e); }
-}
-async function openSavedPlaylist(){
-  const name = $('plSel').value; if(!name) return msg('Chưa có playlist nào để mở.', true);
-  if(!hasCfg()) return needConfig();
-  lsSet(PL_KEY, name); msg('Đang mở playlist “' + name + '”…');
-  try{
-    const d = await api('/api/playlist?name=' + encodeURIComponent(name));
-    const all = (d.items || []), items = all.filter(v => !v.unavailable && v.embeddable !== false).map(norm);
-    const skipped = all.length - items.length;
-    const addAll = btn('＋ Thêm tất cả', null, () => {
-      if(items.length > 50 && !confirm('Thêm ' + items.length + ' bài vào hàng chờ?')) return;
-      items.forEach(it => { send('add', { id:it.id, title:it.title }); upsert(it, true); });
-      renderLocal(); msg('Đã thêm ' + items.length + ' bài từ “' + name + '” vào hàng chờ.');
-    });
-    renderResults(items, 'Playlist “' + name + '”: ' + items.length + ' bài' + (skipped ? ' (bỏ ' + skipped + ' bài không phát được)' : ''), addAll);
-  }catch(e){ showApiError(e); }
-}
-$('plOpen').onclick = openSavedPlaylist; $('plReload').onclick = () => loadPlaylistNames(false);
-$('plSel').addEventListener('change', () => lsSet(PL_KEY, $('plSel').value));
-
-/* ---------- Làm mới danh mục ---------- */
-async function refreshCatalog(manual){
-  if(!catalog.length){ if(manual) msg('Danh mục trống, không có gì để làm mới.'); return; }
-  if(!hasCfg()){ if(manual) needConfig(); return; }
-  try{
-    const ids = catalog.map(x => x.id), m = {};
-    for(let i = 0; i < ids.length; i += 50){
-      const d = await api('/api/videos?ids=' + ids.slice(i, i + 50).join(','));
-      (d.items || []).forEach(v => { m[v.id] = v; });
-    }
-    const now = Date.now(); const before = catalog.length;
-    catalog = catalog.filter(x => m[x.id] && m[x.id].embeddable).map(x => {
-      const v = norm(m[x.id]); return Object.assign(x, { title:v.title, channel:v.channel, thumb:v.thumb, fetchedAt:now }); });
-    saveCat(); renderLocal();
-    if(manual) msg('Đã làm mới danh mục' + (before > catalog.length ? ' (bỏ ' + (before - catalog.length) + ' bài không còn phát được).' : '.'));
-  }catch(e){ if(manual) showApiError(e); }
-}
-function autoRefresh(){ if(hasCfg() && catalog.some(x => Date.now() - x.fetchedAt > REFRESH_AGE)) refreshCatalog(false); }
 
 /* ---------- Tìm trên YouTube (100 lượt/ngày) ---------- */
 const cache = new Map();
@@ -708,11 +658,8 @@ function renderFallback(d, raw, term){
   if(!n && (d.hot || []).length){ box.append(el('div', 'hint', 'Chưa có bài gần giống, bạn thử các bài đang hot:')); d.hot.forEach((h, i) => { box.append(khoRow(h.best, { rank:i + 1, versions:h.versions, key:h.key, tone:null })); n++; }); }
   if(!n && (d.suggest || []).length){ box.append(el('div', 'hint', 'Gợi ý từ kho:')); d.suggest.forEach(v => { box.append(khoRow(v, {})); n++; }); }
   if(!n){
-    // không gọi được Worker: dùng danh mục trên máy + bài hot đã tải
-    const words = nd(raw).split(/\s+/).filter(w => w.length > 1);
-    const loc = catalog.filter(x => words.some(w => nd(x.title).includes(w))).slice(0, 20);
-    loc.forEach(it => { box.append(rowEl(it, [addBtn(it, false)])); n++; });
-    if(!n && hotCache && hotCache.length){ box.append(el('div', 'hint', 'Các bài đang hot:')); hotCache.slice(0, 20).forEach((h, i) => { box.append(khoRow(h.best, { rank:i + 1, versions:h.versions, key:h.key, tone:null })); n++; }); }
+    // không gọi được Worker: dùng bài hot đã tải
+    if(hotCache && hotCache.length){ box.append(el('div', 'hint', 'Các bài đang hot:')); hotCache.slice(0, 20).forEach((h, i) => { box.append(khoRow(h.best, { rank:i + 1, versions:h.versions, key:h.key, tone:null })); n++; }); }
   }
   if(!n) box.append(el('div', 'hint', 'Chưa có bài nào gần giống. Anh thử gõ tên ngắn hơn hoặc tên ca sĩ để tìm trong kho.'));
 }
@@ -935,7 +882,7 @@ async function renderKho(){
     if(seq !== khoSeq) return 0;
     lastKho = { q:raw, n:0 };
     if(e.status === 401 || e.reason === 'origin') box.replaceChildren(khoHead('Kho karaoke'), el('div', 'hint err', 'Không dùng được kho: ' + khoWhy(e) + '. Kiểm tra ở nút ⚙.'));
-    else box.replaceChildren(khoHead('Kho karaoke'), el('div', 'hint', 'Mạng đang chập chờn, kho sẽ hiện lại khi kết nối ổn. Danh mục trên máy vẫn dùng được ở bên dưới.'));
+    else box.replaceChildren(khoHead('Kho karaoke'), el('div', 'hint', 'Mạng đang chập chờn, kho sẽ hiện lại khi kết nối ổn.'));
     return 0;
   }
 }
@@ -1025,7 +972,7 @@ function go(){
 }
 $('goBtn').onclick = go;
 $('q').addEventListener('keydown', e => { if(e.key === 'Enter') go(); });
-$('q').addEventListener('input', () => { updateDetect(); renderLocal(); khoSoon(); });
+$('q').addEventListener('input', () => { updateDetect(); khoSoon(); });
 
 /* ---------- Tabs ---------- */
 let curTab = 'search';
@@ -1262,7 +1209,7 @@ const BANNER = {
   waiting:'Phòng chưa mở. Nhờ nhân viên mở phòng — trang sẽ tự nối lại.',
   closed:'Phòng chưa mở. Nhờ nhân viên mở phòng.',
   ended:'Phòng đã đóng. Cảm ơn quý khách! Muốn hát tiếp, hãy nhờ nhân viên mở phòng rồi quét mã QR mới trên TV.',
-  rotated: bc.tablet ? 'Máy tính bảng này đã được gỡ khỏi phòng (phòng đã gán máy khác). Bấm ô PHÒNG ở góc trên để gán lại.' : 'Mã QR này đã hết hiệu lực. Vui lòng quét mã QR mới ở góc trái màn hình TV.',
+  rotated: 'Mã QR này đã hết hiệu lực. Vui lòng quét mã QR mới ở góc trái màn hình TV.',
   network:'Vui lòng kết nối wifi của quán rồi quét lại mã QR trên TV.',
   full:'Phòng đã đủ số điện thoại kết nối. Vui lòng nhờ nhân viên hỗ trợ.',
   replaced:'Phòng đã chuyển sang thiết bị khác.', expired:'Không nối được phòng. Vui lòng quét lại mã QR trên TV.',
@@ -1277,36 +1224,97 @@ if(GUEST){
     else if(m.open && !guestTok && !noTicket) setTimeout(() => { if(!guestTok && !noTicket){ noTicket = true; renderKho(); } }, 4000);   // chờ tin kèm vé tới (có thể tới sau tin phòng)
     if(m.open){ banner(''); send('hello'); } else banner(BANNER[m.reason === 'notopen' ? 'waiting' : 'closed']);
   };
-  bc.onstatus = s => { if(s !== 'open' && s !== 'closed' && s !== 'waiting') banner(BANNER[s] || ''); else if(s === 'waiting') banner(BANNER.waiting); };
+  bc.onstatus = s => { if(bc.tablet && s === 'rotated') return showPair('Máy tính bảng đã được gỡ khỏi phòng (hoặc phòng đã gán máy khác).');
+    if(s !== 'open' && s !== 'closed' && s !== 'waiting') banner(BANNER[s] || ''); else if(s === 'waiting') banner(BANNER.waiting); };
 }
 
-/* ---------- Máy tính bảng của phòng: bấm ô PHÒNG → quét QR khách ở góc trái TV → máy tự theo phòng qua mọi lượt ---------- */
+/* ---------- Máy tính bảng của phòng ----------
+   Lần đầu (hoặc bị thu hồi): máy hiện mã 6 số + QR, nhân viên quầy (đã đăng nhập) quét và chọn phòng → máy nhận mã phòng + quyền thiết bị.
+   Những lần sau: bấm ô PHÒNG → quét QR khách ở góc trái TV để đổi phòng (chỉ máy đã có quyền thiết bị mới đổi được, điện thoại khách thì không). */
 const tokFromQr = raw => { raw = String(raw || '').trim(); const m = raw.match(/[?&]r=([^&#\s]+)/); let t = m ? m[1] : raw; try{ t = decodeURIComponent(t); }catch(e){} return /^[A-Za-z0-9_-]{1,40}\.\d{1,6}\.[\w-]{22}$/.test(t) ? t : ''; };
+function saveTablet(d){
+  try{ localStorage.setItem(TB_KEY, d.tok); localStorage.setItem('bmb_tablet', '1'); if(d.dv) localStorage.setItem(DV_KEY, d.dv); }
+  catch(e){ return 'Trình duyệt không cho lưu dữ liệu (chế độ ẩn danh?).'; }
+  return '';
+}
 function assignTablet(){
   openQrScanner({
-    title: 'Gán máy tính bảng vào phòng',
-    hint: 'Mở phòng trước, rồi quét mã QR đang hiện ở góc trái màn hình TV của phòng đặt máy này. Máy phải dùng wifi của quán.',
+    title: bc.tablet ? 'Đổi phòng cho máy tính bảng' : 'Vào phòng',
+    hint: 'Mở phòng trước, rồi quét mã QR đang hiện ở góc trái màn hình TV của phòng đặt máy này.',
     manualPlaceholder: 'hoặc dán liên kết QR của phòng',
     onResult: async raw => {
       const r = tokFromQr(raw);
       if(!r) return 'Đây không phải mã QR phòng. Quét mã ở góc trái TV.';
-      const res = await fetch(phongApi() + '/api/tablet/claim', { method:'POST', headers:{ 'content-type':'application/json' }, body: JSON.stringify({ r }) });
+      const res = await fetch(phongApi() + '/api/tablet/claim', { method:'POST', headers:{ 'content-type':'application/json' },
+        body: JSON.stringify({ r, dv: lsGet(DV_KEY) || '', tb: bc.tablet ? bc.token : '' }) });
       let d = {}; try{ d = await res.json(); }catch(e){}
-      if(!res.ok || !d.tok) return d.error || ('Lỗi ' + res.status);
-      try{ localStorage.setItem(TB_KEY, d.tok); localStorage.setItem('bmb_tablet', '1'); }catch(e){ return 'Trình duyệt không cho lưu dữ liệu (chế độ ẩn danh?).'; }
-      snack('✓ Đã gán máy này vào phòng ' + (d.name || d.id));
+      if(!res.ok || !d.tok){
+        if(d.need === 'pair'){ try{ localStorage.removeItem(DV_KEY); }catch(e){} $('pairScan').classList.remove('show'); }
+        return d.error || ('Lỗi ' + res.status);
+      }
+      const bad = saveTablet(d); if(bad) return bad;
+      snack('✓ Đã vào phòng ' + (d.name || d.id));
       setTimeout(() => location.replace(location.pathname), 800);
       return true;
     }
   });
 }
+let pairing = false;
+function showPair(why){
+  $('pair').classList.add('show');
+  $('pairNote').textContent = why || '';
+  const hasDv = !!lsGet(DV_KEY);
+  $('pairScan').classList.toggle('show', hasDv);
+  $('pairH').textContent = hasDv ? 'Máy tính bảng chưa vào phòng' : 'Máy tính bảng chưa gán phòng';
+  if(pairing) return; pairing = true;
+  const BASE = location.origin + location.pathname.replace(/[^/]*$/, '');
+  let code = '', key = '', exp = 0, t = null;
+  const err = x => { $('pairErr').textContent = x || ''; };
+  async function post(path, body){
+    const r = await fetch(phongApi() + path, { method:'POST', headers:{ 'content-type':'application/json' }, body: JSON.stringify(body || {}) });
+    let d = {}; try{ d = await r.json(); }catch(e){}
+    return { s: r.status, d };
+  }
+  const paintExp = () => { $('pairSub').textContent = 'Mã đổi sau khoảng ' + Math.max(0, Math.round((exp - Date.now()) / 60000)) + ' phút.'; };
+  async function fresh(){
+    clearTimeout(t);
+    try{
+      const r = await post('/api/tv/pair/new', { kind:'tb' });
+      if(r.s === 429){ err(r.d.error || 'Xin mã quá nhiều lần, đợi một lát.'); t = setTimeout(fresh, 60000); return; }
+      if(r.s !== 200) throw new Error(r.d.error || ('Lỗi ' + r.s));
+      code = r.d.code; key = r.d.key; exp = r.d.exp; err('');
+      $('pairCode').textContent = code.slice(0, 3) + ' ' + code.slice(3);
+      const q = qrcode(0, 'M'); q.addData(BASE + 'quay.html#gan=' + code); q.make();
+      const img = document.createElement('img'); img.alt = 'QR gán máy tính bảng'; img.src = q.createDataURL(6, 1);
+      $('pairQr').replaceChildren(img);
+      paintExp(); t = setTimeout(poll, 2500);
+    }catch(e){ err('Chưa lấy được mã gán (' + (e.message || 'mất mạng') + '). Đang thử lại…'); t = setTimeout(fresh, 8000); }
+  }
+  async function poll(){
+    if(Date.now() > exp - 5000) return fresh();
+    try{
+      const r = await post('/api/tv/pair/poll', { code, key });
+      if(r.s === 200 && r.d.tok){
+        const bad = saveTablet(r.d); if(bad){ err(bad); return; }
+        $('pairSub').textContent = 'Đã gán vào phòng ' + (r.d.name || r.d.id || '') + ' — đang vào phòng…';
+        location.replace(location.pathname); return;
+      }
+      if(r.s === 404 || r.s === 403) return fresh();
+    }catch(e){}
+    paintExp(); t = setTimeout(poll, 2500);
+  }
+  fresh();
+}
+$('pairScan').onclick = assignTablet;
 $('roomTag').onclick = () => {
   if(GUEST && !bc.tablet){ snack('Bạn đang ở phòng ' + (roomName || '') + '. Đổi phòng: quét mã QR ở góc trái TV của phòng đó.', true); return; }
-  if(confirm(bc.tablet ? 'Đổi phòng cho máy tính bảng này?' : 'Gán máy này làm máy tính bảng chọn bài của một phòng?')) assignTablet();
+  if(bc.tablet){ if(confirm('Đổi phòng cho máy tính bảng này?')) assignTablet(); return; }
+  if(IS_TB_DEV || confirm('Gán máy này làm máy tính bảng chọn bài của một phòng? Cần nhân viên quầy quét mã để cho phép.')){ try{ localStorage.setItem('bmb_tablet', '1'); }catch(e){} showPair(); }
 };
 
 /* ---------- Khởi động ---------- */
-applyWide(); showQuota(); updateDetect(); renderLocal(); autoRefresh(); loadPlaylistNames(true); renderKho(); loadIndex();
+applyWide(); showQuota(); updateDetect(); renderKho(); loadIndex();
+if(!bc.ws && IS_TB_DEV) showPair();          // máy tính bảng chưa gán: chỉ hiện màn gán, không hỏi mật khẩu
 send('hello');
 </script>
 </body>

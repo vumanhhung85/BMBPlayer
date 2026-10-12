@@ -52,7 +52,10 @@ Trên máy có Node (thư mục repo BMBPlayer, PowerShell):
 ## Chuyển CN03 sang (thay thẳng)
 1. Quầy CN03 mở `https://bmb.id.vn/quay.html`, đăng nhập tài khoản cũ.
 2. Mỗi TV: mở `https://bmb.id.vn/` → hiện mã 6 số. Quầy → tab **TV & phòng** → **Gán TV** ở đúng phòng → quét QR trên TV (hoặc quét QR trên TV bằng camera điện thoại → mở thẳng trang quầy).
-3. Máy tính bảng trong phòng: mở `https://bmb.id.vn/remote.html` (hoặc "Thêm vào màn hình chính") → mở phòng → bấm ô **PHÒNG** → quét QR góc trái TV. Máy dùng wifi quán.
+3. Máy tính bảng trong phòng (app BMBPlayer chế độ máy tính bảng, hoặc `https://bmb.id.vn/remote.html?tb=1`):
+   - **Lần đầu**: máy hiện mã 6 số + QR (không nhập mật khẩu, không thấy địa chỉ Worker). Nhân viên dùng điện thoại **đã đăng nhập quầy** quét QR đó → bấm **Gán máy tính bảng này vào đây** ở đúng phòng → máy tự vào phòng và nhận *quyền thiết bị* của chi nhánh.
+   - **Lần sau** (đổi phòng): bấm ô **PHÒNG** → quét QR góc trái TV (phòng phải đang mở). Chỉ máy đã có quyền thiết bị của cùng chi nhánh mới làm được; điện thoại khách quét QR không chiếm được máy tính bảng của phòng.
+   - Mất máy / nghi bị mang đi: quản lý bấm **🔒 Thu hồi mọi máy tính bảng** ở tab TV & phòng → mọi máy tính bảng của chi nhánh bị gỡ, quyền cũ hết hiệu lực, phải nhờ quầy gán lại từng máy.
 4. Gỡ thẻ QR dán bàn cũ (không còn dùng).
 5. Chạy ổn rồi: chép 3 file chuyển hướng (`index.html`, `quay.html`, `sw.js` — gửi kèm riêng, không nằm trong repo này) vào repo **BMB_Order** (để máy còn mở order.boommusicbox.vn tự chuyển sang), sau đó xoá Worker `bmb-order-worker` (và `bmb-phong` nếu đã từng deploy), cuối cùng gỡ tên miền order.
 
