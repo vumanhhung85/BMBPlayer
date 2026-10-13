@@ -36,6 +36,10 @@
   .tabs button.od.on{background:linear-gradient(135deg,#f59e0b,#fbbf24); border-color:#fde68a; color:#2b1400; box-shadow:0 4px 16px rgba(245,158,11,.5)}
 
   #searchBox{display:flex; gap:8px; padding:12px 16px}
+  /* Ô tìm + nút Tìm luôn nằm trên cùng khi vuốt xem bài phía dưới.
+     Điện thoại / máy tính bảng dọc: dính ngay dưới thanh trên (cao --stickTop, đo bằng JS); máy tính bảng ngang: dính đầu cột tìm bài. */
+  #paneSearch #searchBox{position:sticky; top:var(--stickTop, 0px); z-index:25; background:var(--bg)}
+  #paneSearch #searchBox.stuck{box-shadow:0 8px 16px -8px rgba(0,0,0,.7)}
   #searchBox input{flex:1; background:var(--panel); border:1px solid var(--line); color:var(--ink); border-radius:12px; padding:12px 14px; font-size:16px}
   #searchBox button{background:linear-gradient(135deg,#7c3aed,#a855f7); border:none; color:#fff; font-weight:700; border-radius:12px; padding:0 18px; font-size:20px}
   #detect{display:none; gap:8px; padding:0 16px 8px; flex-wrap:wrap}
@@ -123,8 +127,19 @@
   body.wide{height:100vh; overflow:hidden; display:grid; grid-template-columns:minmax(0,1fr) clamp(300px,35vw,460px); grid-template-rows:auto auto minmax(0,1fr)}
   body.wide #top{grid-column:1; grid-row:1; box-shadow:none}
   body.wide #now, body.wide #tabQueue, body.wide #paneQueue, body.wide #dock{display:none !important}
-  body.wide .tabs{padding:6px 12px 8px} body.wide .tabs button{flex-direction:row; justify-content:center; gap:8px; padding:9px 8px}
-  body.wide .tabs .ti{font-size:19px} body.wide .tabs button.on .ti{font-size:20px}
+  /* Máy tính bảng ngang: hai nút Tìm bài / Gọi lễ tân lên cùng hàng với logo và ô PHÒNG, dạng nút viên thuốc nhỏ gọn → rộng chỗ cho danh sách bài */
+  body.wide #top{display:flex; flex-wrap:wrap; align-items:center; gap:10px; padding:8px 14px; background:linear-gradient(135deg,#1a1530,#0a0a0f)}
+  body.wide header{display:contents}
+  body.wide .logoImg{order:1}
+  body.wide .tabs{order:2; flex:0 1 auto; min-width:0; padding:0; margin-left:6px; background:none; gap:8px}
+  body.wide .tabs button{flex:0 0 auto; flex-direction:row; justify-content:center; gap:7px; padding:7px 18px; border-radius:999px; opacity:1}
+  body.wide .tabs .ti, body.wide .tabs button.on .ti{font-size:17px}
+  body.wide .tabs .tl, body.wide .tabs button.on .tl{font-size:14.5px}
+  body.wide .tabs button.on{box-shadow:0 3px 12px rgba(139,92,246,.5)}
+  body.wide .tabs button.od.on{box-shadow:0 3px 12px rgba(245,158,11,.45)}
+  body.wide header .room{order:3}
+  body.wide #gear{order:4}
+  body.wide #roomBanner{order:10; flex:1 0 100%; margin:0 -14px -8px}
   body.wide #settings{grid-column:1; grid-row:2; max-height:45vh; overflow:auto}
   body.wide #paneSearch, body.wide #paneOrder{grid-column:1; grid-row:3; overflow:auto; min-height:0}
   body.wide .list{overflow:visible; padding-bottom:30px}
@@ -1206,6 +1221,21 @@ function applyWide(){
   if(w && curTab === 'queue') tab('search');
 }
 try{ WIDE_MQ.addEventListener('change', applyWide); }catch(e){ try{ WIDE_MQ.addListener(applyWide); }catch(e2){} }
+/* Ô tìm dính: dọc → ngay dưới thanh trên (#top, cao thay đổi theo tên bài đang hát / thông báo phòng); ngang → đầu cột (cột tự cuộn) */
+function stickTop(){
+  const t = document.body.classList.contains('wide') ? 0 : $('top').getBoundingClientRect().height;
+  document.documentElement.style.setProperty('--stickTop', Math.round(t) + 'px');
+}
+try{ new ResizeObserver(stickTop).observe($('top')); }catch(e){}
+new MutationObserver(stickTop).observe(document.body, { attributes:true, attributeFilter:['class'] });
+function markStuck(){
+  const sb = $('searchBox'), r = sb.getBoundingClientRect(), pane = $('paneSearch');
+  const wide = document.body.classList.contains('wide');
+  sb.classList.toggle('stuck', wide ? pane.scrollTop > 4 : (scrollY > 4 && r.top <= parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--stickTop') || 0) + 1));
+}
+addEventListener('scroll', markStuck, { passive:true });
+$('paneSearch').addEventListener('scroll', markStuck, { passive:true });
+stickTop();
 addEventListener('resize', () => setTimeout(applyWide, 150));
 document.addEventListener('focusout', () => setTimeout(applyWide, 400));
 $('playBtn').onclick = () => send('play'); $('nextBtn').onclick = () => send('next');
