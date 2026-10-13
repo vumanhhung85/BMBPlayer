@@ -70,3 +70,18 @@ Trên máy có Node (thư mục repo BMBPlayer, PowerShell):
 - `bmbplayer.vmh.io.vn` và `bmbplayer.boommusicbox.vn` chỉ là địa chỉ cũ chạy song song trong thời gian chuyển; sẽ bỏ sau khi tắt GitHub Pages.
 - Một Worker `bmbplayer` nhận mọi tên miền đã nằm trong Cloudflare (`bmb.id.vn`, `vmh.io.vn`) và luôn cùng một phiên bản. `boommusicbox.vn` không nằm trong Cloudflare nên chỉ chạy qua GitHub Pages.
 - Tất cả địa chỉ đang dùng phải có trong `ALLOWED_ORIGINS` của Worker `bmbplayer` (`wrangler.toml`) và của Worker `kho-karaoke` (Dash). Đăng nhập và dữ liệu lưu trên máy tách riêng theo địa chỉ, nên mỗi thiết bị dùng một địa chỉ cố định; mã QR trên TV theo địa chỉ TV đang mở.
+
+## Kho bài tiếng Anh (kho thứ hai, từ 10/2026)
+Hai kho dùng **chung một file** `kho-worker.js` (file này không nằm trong repo, anh dán tay vào Cloudflare): kho Việt `kho-karaoke` (như cũ) và kho Anh `kho-karaoke-en` (đặt `KHO_LANG=en`). Quản trị chung một trang `https://bmb.id.vn/kho.html` (nút **Kho Việt / Kho Anh** ở trên cùng). Trang khách tìm một ô ra cả hai kho, bài hot có hai mục **Nhạc Việt / Quốc tế**. Kho Anh chưa tạo hoặc lỗi thì trang khách chạy như chỉ có kho Việt.
+
+Tạo kho Anh (làm một lần):
+1. Cloudflare → **D1** → Create database `kho_karaoke_en` (để trống, Worker tự tạo bảng lần chạy đầu).
+2. **Workers** → Create → đặt tên `kho-karaoke-en` → Deploy → **Edit code**: dán toàn bộ `kho-worker.js` bản mới → Deploy. Địa chỉ phải là `https://kho-karaoke-en.vumanhhung85.workers.dev` (khác thì nhập ở nút ⚙ của kho.html; trang khách dùng địa chỉ này mặc định).
+3. Settings → **Bindings** → D1 database, tên biến `DB` → chọn `kho_karaoke_en`.
+4. Settings → **Variables**: `KHO_LANG` = `en`; `ALLOWED_ORIGINS` giống kho Việt (phải có `https://bmb.id.vn`). **Secrets**: `APP_PASS`, `YT_KEY` (cùng khoá kho Việt), `GUEST_SECRET` (giống Worker `bmbplayer` và kho Việt).
+5. Settings → **Triggers** → Cron `*/10 * * * *`.
+6. Dán cùng file `kho-worker.js` mới đó vào Worker `kho-karaoke` (kho Việt, KHÔNG đặt KHO_LANG): chạy y như trước.
+
+Kho Anh để **hạn chế** (đặt biến cùng tên để đổi): tối đa 30.000 bản (`MAX_VIDEOS`), không tự khám phá kênh/playlist (`EXPAND`), 1.500 đơn vị/ngày (`DAILY_UNIT_BUDGET`), 25 lượt tìm/ngày (`SEARCH_LIMIT`), bảng thịnh hành US 50 bài (`HOT_REGION`, `HOT_PAGES`), dọn kho mặc định giữ 4 bản/bài. Bài phải có chữ "karaoke" (tiếng Anh "beat" là chữ trong tên bài). Hai kho chung hạn mức một project Google: tổng đơn vị và lượt tìm của hai kho phải nằm trong hạn mức project.
+
+Nạp bài cho kho Anh: thêm 2–3 kênh karaoke tiếng Anh (bấm **Xem mẫu** — kênh tiếng Anh thường đặt "Ca sĩ – Tên bài" → chọn **Ca sĩ trước**), xem tỉ lệ phát được rồi giữ kênh tốt; dán danh sách bài kinh điển vào **danh sách tay** ở mục Bài hot (danh sách tay hết hạn sau 30 ngày, dán lại mỗi tháng). Bài khách tìm bằng tiếng Anh mà kho chưa có được ghi vào "bài tìm hụt" của kho Anh và tự tìm bù dần.

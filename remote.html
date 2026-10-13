@@ -46,6 +46,10 @@
   .list{flex:1; overflow:auto; padding:0 16px 210px}
   .secHead{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:14px 0 6px; font-size:14px}
   .secAct{display:flex; gap:6px; flex:0 0 auto}
+  .hotTabs{display:inline-flex; background:#0e0e16; border:1px solid var(--line); border-radius:12px; padding:3px; gap:3px}
+  .secAct .hotTabs button{background:transparent; color:var(--quiet, #9aa0b4); border:none; padding:6px 10px; border-radius:9px; font-weight:700}
+  .secAct .hotTabs button.on{background:var(--accent); color:#fff}
+  .tag.en{background:#0b2a33; color:#a5f3fc}
   .hint{color:var(--quiet); font-size:12px; padding:0 0 6px; line-height:1.5}
   .row{display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--line)}
   .row img{width:96px; height:54px; object-fit:cover; border-radius:8px; background:#20202e; flex:0 0 auto}
@@ -373,6 +377,10 @@ const lsSet = (k, v) => { try{ localStorage.setItem(k, v); }catch(e){} };
 try{ localStorage.removeItem('bmb_yt_api_key'); }catch(e){}   // bản cũ từng lưu khoá YouTube trong trình duyệt: không còn cần nữa
 const DEFAULT_API = 'https://nhac-playlist.vumanhhung85.workers.dev';
 const KHO_NAME = 'kho_api', DEFAULT_KHO = 'https://kho-karaoke.vumanhhung85.workers.dev';
+/* Kho bài tiếng Anh: Worker riêng (kho-karaoke-en), cùng vé khách/mật khẩu. Chưa tạo hoặc không dùng được → trang chạy y như chỉ có kho Việt. */
+const KHO_EN_NAME = 'kho_api_en', DEFAULT_KHO_EN = 'https://kho-karaoke-en.vumanhhung85.workers.dev';
+const khoEn = (lsGet(KHO_EN_NAME) || DEFAULT_KHO_EN).replace(/\/+$/, '');
+let enOk = false, enProbed = false;
 let cfg = { api: lsGet(API_NAME) || DEFAULT_API, pass: lsGet(PASS_NAME) || '', kho: lsGet(KHO_NAME) || DEFAULT_KHO };
 const hasCfg = () => !!(cfg.api && cfg.pass);
 if(GUEST || IS_TB_DEV){ $('gear').style.display = 'none'; }
@@ -380,7 +388,7 @@ $('gear').onclick = () => { const s = $('settings'); if(s.style.display !== 'blo
 $('saveKey').onclick = () => {
   cfg.api = $('apiInput').value.trim().replace(/\/+$/, ''); cfg.pass = $('passInput').value; cfg.kho = $('khoInput').value.trim().replace(/\/+$/, '');
   lsSet(API_NAME, cfg.api); lsSet(PASS_NAME, cfg.pass); lsSet(KHO_NAME, cfg.kho);
-  $('settings').style.display = 'none'; msg('Đã lưu kết nối. Nhập tên bài hoặc dán link để bắt đầu.'); hotCache = null; quota = null; showQuota(); renderKho(); loadIndex();
+  $('settings').style.display = 'none'; msg('Đã lưu kết nối. Nhập tên bài hoặc dán link để bắt đầu.'); hotCache = null; hotCacheEn = null; quota = null; showQuota(); renderKho(); loadIndex(); probeEn();
 };
 $('clearKey').onclick = () => { try{ localStorage.removeItem(API_NAME); localStorage.removeItem(PASS_NAME); localStorage.removeItem(KHO_NAME); }catch(e){} cfg = { api:DEFAULT_API, pass:'', kho:DEFAULT_KHO }; $('apiInput').value = DEFAULT_API; $('passInput').value = ''; $('khoInput').value = DEFAULT_KHO; msg('Đã xoá thông tin kết nối.'); };
 $('apiInput').value = cfg.api; $('khoInput').value = cfg.kho;     // địa chỉ Worker điền sẵn, chỉ cần nhập mật khẩu
@@ -595,7 +603,8 @@ async function search(force){
 let gateFor = '';
 async function searchViaKho(raw, term, force){
   if(!force && gateFor === raw) force = true;          // bấm Tìm lần nữa = vẫn muốn tìm YouTube
-  if(cache.has(term)) return renderYT(cache.get(term), term, true);
+  const en = useEnFor(raw), ck = (en ? 'en|' : '') + term;
+  if(cache.has(ck)) return renderYT(cache.get(ck), term, true, en);
   if(!force){
     const n = lastKho.q === raw ? lastKho.n : await renderKho();
     logQuery(raw, n);
@@ -604,15 +613,31 @@ async function searchViaKho(raw, term, force){
   gateFor = '';
   msg('Đang tìm “' + term + '” trên YouTube…');
   let d;
-  try{ d = await kapi('/api/kho/ytsearch?q=' + encodeURIComponent(term)); }
+  try{ d = await kapi('/api/kho/ytsearch?q=' + encodeURIComponent(term), null, en); }
   catch(e){
+    if(en && !enOk) return searchViaKho(raw, term, true);     // kho Anh vừa bị tắt (vé/địa chỉ) → tìm bằng kho Việt như trước
     if(e.status === 401 || e.reason === 'origin') return msg('Không dùng được kho: ' + khoWhy(e) + '. Kiểm tra ở nút ⚙.', true);
-    return renderFallback({ reason:'offline' }, raw, term);
+    return renderFallback({ reason:'offline' }, raw, term, en);
   }
-  setQuota(d.quota);
-  if(d.source === 'fallback') return renderFallback(d, raw, term);
-  cache.set(term, d); renderYT(d, term, d.source === 'cache');
+  if(!en) setQuota(d.quota);
+  if(d.source === 'fallback') return renderFallback(d, raw, term, en);
+  cache.set(ck, d); renderYT(d, term, d.source === 'cache', en);
 }
+/* Câu tìm là tiếng Anh? Có dấu tiếng Việt → không. Không dấu: đếm từ tiếng Anh thông dụng và từ tiếng Việt không dấu thông dụng. */
+const VN_MARK = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i;
+const EN_W = new Set(('i you love my your the a of to in on all is are be it this that what when where why how oh baby heart night day time go let dont do not never ever forever ' +
+  'want need feel know say tell take make give come back way one life world home girl boy man woman lady dream rain fire star sun moon sky heaven angel happy christmas new year ' +
+  'perfect someone somebody everything nothing hello goodbye yesterday tonight together alone again only still just like with without over sorry thank thanks because will can ' +
+  'cant wont im youre were was me we us our they them their he she his her who dance party song sing sad blue sweet beautiful wonderful crazy little big last first more').split(' '));
+const VN_W = new Set(('anh em yeu nguoi toi cua mot khong tinh ngay dem nha ve di den cho va trong nhu mua xuan thu dong nho buon vui chieu troi dat bien tim mat lai thoi ' +
+  'roi se dang nay kia sao bao nhieu qua khi mai xa gan vang trang hong xanh duong pho que huong bong hoa doi minh ta chung ai biet chua phai thuong nhung con').split(' '));
+function looksEnglish(raw){
+  if(VN_MARK.test(raw)) return false;
+  const w = asc(raw).split(' ').filter(x => x && !QN.has(x)); if(!w.length) return false;
+  let en = 0, vn = 0; w.forEach(x => { if(EN_W.has(x)) en++; if(VN_W.has(x)) vn++; });
+  return en > 0 && en >= vn;
+}
+const useEnFor = raw => enOk && (looksEnglish(raw) || (lastKho.q === raw && lastKho.en > 0 && lastKho.vi === 0));
 function quotaLeft(){ return quota ? Math.max(0, quota.limit - quota.used) : null; }
 function ytBtn(label){
   const left = quotaLeft();
@@ -632,16 +657,16 @@ function resultsHead(title){
   const act = el('span', 'secAct'); act.append(btn('Đóng', 'ghost', () => { $('results').replaceChildren(); gateFor = ''; })); head.append(act);
   return head;
 }
-function renderYT(d, term, fromCache){
+function renderYT(d, term, fromCache, en){
   const box = $('results'); box.replaceChildren();
   box.append(resultsHead('YouTube: “' + term + '”'));
   const items = d.items || [];
-  if(items.length) items.forEach(v => box.append(khoRow(v, {})));
+  if(items.length) items.forEach(v => box.append(khoRow(v, { en })));
   else box.append(el('div', 'hint', 'YouTube không có bản phát được cho từ khoá này.'));
   const g = d.groups || [];
   if(!items.length && g.length){
     box.append(el('div', 'secHead', 'Bài gần giống trong kho'));
-    g.forEach(x => box.append(khoRow(x.best, { versions:x.versions, key:x.key, tone:x.tone })));
+    g.forEach(x => box.append(khoRow(x.best, { versions:x.versions, key:x.key, tone:x.tone, en })));
   }
 }
 const FALLBACK_MSG = {
@@ -651,15 +676,15 @@ const FALLBACK_MSG = {
   nokey:   '🎤 Đây là những bài gần giống trong kho:',
   offline: '🎤 Mạng đang chập chờn. Đây là những bài gần giống bạn đã lưu trên máy này:'
 };
-function renderFallback(d, raw, term){
+function renderFallback(d, raw, term, en){
   const box = $('results'); box.replaceChildren();
   const nt = el('div', 'notice'); nt.append(el('div', null, FALLBACK_MSG[d.reason] || FALLBACK_MSG.error));
   if(d.reason === 'timeout' || d.reason === 'error' || d.reason === 'offline'){ const act = el('div', 'secAct'); act.append(btn('↻ Thử tìm lại', 'ghost', () => search(true))); nt.append(act); }
   box.append(nt);
   let n = 0;
-  (d.groups || []).forEach(x => { box.append(khoRow(x.best, { versions:x.versions, key:x.key, tone:x.tone })); n++; });
-  if(!n && (d.hot || []).length){ box.append(el('div', 'hint', 'Chưa có bài gần giống, bạn thử các bài đang hot:')); d.hot.forEach((h, i) => { box.append(khoRow(h.best, { rank:i + 1, versions:h.versions, key:h.key, tone:null })); n++; }); }
-  if(!n && (d.suggest || []).length){ box.append(el('div', 'hint', 'Gợi ý từ kho:')); d.suggest.forEach(v => { box.append(khoRow(v, {})); n++; }); }
+  (d.groups || []).forEach(x => { box.append(khoRow(x.best, { versions:x.versions, key:x.key, tone:x.tone, en })); n++; });
+  if(!n && (d.hot || []).length){ box.append(el('div', 'hint', 'Chưa có bài gần giống, bạn thử các bài đang hot:')); d.hot.forEach((h, i) => { box.append(khoRow(h.best, { rank:i + 1, versions:h.versions, key:h.key, tone:null, en })); n++; }); }
+  if(!n && (d.suggest || []).length){ box.append(el('div', 'hint', 'Gợi ý từ kho:')); d.suggest.forEach(v => { box.append(khoRow(v, { en })); n++; }); }
   if(!n){
     // không gọi được Worker: dùng bài hot đã tải
     if(hotCache && hotCache.length){ box.append(el('div', 'hint', 'Các bài đang hot:')); hotCache.slice(0, 20).forEach((h, i) => { box.append(khoRow(h.best, { rank:i + 1, versions:h.versions, key:h.key, tone:null })); n++; }); }
@@ -672,17 +697,32 @@ function khoWhy(e){ return e.status === 401 ? (e.reason === 'guest' ? 'vé khác
 const hasKho = () => !!(cfg.kho && (cfg.pass || guestTok));
 let passBad = false;                                 // mật khẩu lưu trên máy bị kho từ chối mà phòng có cấp vé → dùng vé khách
 const khoAuth = () => (cfg.pass && !(passBad && guestTok)) ? { 'x-pass':cfg.pass } : { 'x-guest':guestTok };   // nhân viên dùng mật khẩu; khách dùng vé do phòng cấp
-async function kapi(path, body){
+async function kapi(path, body, en){
   const opt = body ? { method:'POST', headers:Object.assign({ 'content-type':'application/json' }, khoAuth()), body:JSON.stringify(body) } : { headers:khoAuth() };
-  const res = await fetch(cfg.kho + path, opt);
-  if(res.status === 401 && opt.headers['x-pass'] && guestTok && !passBad){ passBad = true; return kapi(path, body); }   // mật khẩu cũ lệch → thử lại bằng vé khách
+  let res;
+  try{ res = await fetch((en ? khoEn : cfg.kho) + path, opt); }
+  catch(e){ if(en) enOff(); throw e; }
+  if(res.status === 401 && opt.headers['x-pass'] && guestTok && !passBad){ passBad = true; return kapi(path, body, en); }   // mật khẩu cũ lệch → thử lại bằng vé khách
   let data = {}; try{ data = await res.json(); }catch(e){}
-  if(!res.ok){ const e = new Error(data.error || ('Lỗi ' + res.status)); e.status = res.status; e.reason = data.reason || ''; throw e; }
+  if(!res.ok){
+    const e = new Error(data.error || ('Lỗi ' + res.status)); e.status = res.status; e.reason = data.reason || '';
+    if(en && (res.status === 401 || res.status === 403)) enOff();      // kho Anh từ chối vé/địa chỉ → thôi dùng, trang về như chỉ có kho Việt
+    throw e;
+  }
   return data;
 }
-function reportPick(id){ if(hasKho()) kapi('/api/kho/pick', { id }).catch(() => {}); }
-// Mỗi lần bấm Tìm (không phải từng phím gõ): kho ghi lại để đo tỉ lệ tìm hụt và tự đi tìm bài còn thiếu
-function logQuery(q, n){ if(hasKho() && q.length >= 3 && !parseYT(q).vid && !parseYT(q).list) kapi('/api/kho/qlog', { q, n }).catch(() => {}); }
+/* Kho Anh có thật và cho phép trang này không (hỏi 1 lần, không tốn gì) */
+async function probeEn(){
+  if(enProbed || !hasKho() || !khoEn) return;
+  enProbed = true;
+  try{ const r = await fetch(khoEn + '/'); const d = await r.json(); enOk = r.ok && d.lang === 'en'; }catch(e){ enOk = false; }
+  if(enOk && !$('q').value.trim()) renderKho();
+}
+function enOff(){ if(!enOk) return; enOk = false; hotLang = 'vi'; if(!$('q').value.trim()) renderKho(); }
+const EN_IDS = new Set();             // bài đang hiện thuộc kho Anh → chọn/kiểm bài gửi đúng kho
+function reportPick(id){ if(hasKho()) kapi('/api/kho/pick', { id }, EN_IDS.has(id)).catch(() => {}); }
+// Mỗi lần bấm Tìm (không phải từng phím gõ): kho ghi lại để đo tỉ lệ tìm hụt và tự đi tìm bài còn thiếu (câu tiếng Anh → kho Anh)
+function logQuery(q, n){ if(hasKho() && q.length >= 3 && !parseYT(q).vid && !parseYT(q).list) kapi('/api/kho/qlog', { q, n }, useEnFor(q)).catch(() => {}); }
 const TONE = { nam:'Tone Nam', nu:'Tone Nữ', 'song-ca':'Song ca', 'thieu-nam':'Thiếu giọng nam', 'thieu-nu':'Thiếu giọng nữ' };
 const fmtViews = n => n >= 1e6 ? (n / 1e6).toFixed(n >= 1e7 ? 0 : 1).replace('.', ',') + ' Tr' : n >= 1e3 ? Math.round(n / 1e3) + ' N' : String(n || 0);
 const kItem = v => ({ id:v.id, title:String(v.title || ''), channel:String(v.channel || ''), thumb:'https://i.ytimg.com/vi/' + v.id + '/mqdefault.jpg' });
@@ -692,7 +732,7 @@ let checkTimer = null;
 const CHK = 'kho_chk';                       // bài đã kiểm là còn sống: nhớ 7 ngày để khỏi kiểm lại
 function chkMap(){ try{ const m = JSON.parse(lsGet(CHK) || '{}'), t = Date.now(); for(const k in m) if(t - m[k] > 7 * 864e5) delete m[k]; return m; }catch(e){ return {}; } }
 function markDead(id){
-  deadIds.add(id); hotCache = null;
+  deadIds.add(id); hotCache = null; hotCacheEn = null;
   document.querySelectorAll('[data-vid="' + id + '"]').forEach(r => {
     if(r.classList.contains('dead')) return;
     r.classList.add('dead');
@@ -704,11 +744,14 @@ function suspectDead(id){
   suspect.add(id); clearTimeout(checkTimer);
   checkTimer = setTimeout(async () => {
     const ids = [...suspect].slice(0, 50); ids.forEach(i => suspect.delete(i));
-    try{
-      const d = await kapi('/api/kho/check', { ids, reason:'thumb' });
-      (d.removed || []).forEach(markDead);
-      const m = chkMap(), t = Date.now(); (d.ok || []).forEach(i => { m[i] = t; }); try{ localStorage.setItem(CHK, JSON.stringify(m)); }catch(e){}
-    }catch(e){}
+    for(const en of [false, true]){
+      const part = ids.filter(i => EN_IDS.has(i) === en); if(!part.length) continue;
+      try{
+        const d = await kapi('/api/kho/check', { ids:part, reason:'thumb' }, en);
+        (d.removed || []).forEach(markDead);
+        const m = chkMap(), t = Date.now(); (d.ok || []).forEach(i => { m[i] = t; }); try{ localStorage.setItem(CHK, JSON.stringify(m)); }catch(e){}
+      }catch(e){}
+    }
   }, 1500);
 }
 function closeVers(){ $('vm').style.display = 'none'; }
@@ -717,23 +760,25 @@ async function openVers(it, opts){
   const box = $('vmList'); box.replaceChildren(el('div', 'hint', 'Đang tải các bản khác…'));
   $('vm').style.display = 'flex';
   try{
-    const d = await kapi('/api/kho/versions?key=' + encodeURIComponent(opts.key) + (opts.tone != null ? '&tone=' + encodeURIComponent(opts.tone) : ''));
+    const d = await kapi('/api/kho/versions?key=' + encodeURIComponent(opts.key) + (opts.tone != null ? '&tone=' + encodeURIComponent(opts.tone) : ''), null, opts.en);
     box.replaceChildren();
     const all = d.items || [], qs = qualitySplit(all), items = qs.good;
     $('vmN').textContent = all.length + ' bản' + (qs.low.length ? ' · đang ẩn ' + qs.low.length + ' bản ít lượt xem' : '');
-    items.forEach(x => box.append(khoRow(x, {})));
-    lowBtn(box, qs.low, v => khoRow(v, {}));
+    items.forEach(x => box.append(khoRow(x, { en:opts.en })));
+    lowBtn(box, qs.low, v => khoRow(v, { en:opts.en }));
     if(!items.length) box.append(el('div', 'hint', 'Không có bản nào.'));
   }catch(e){ box.replaceChildren(el('div', 'hint err', 'Không tải được: ' + (e.message || ''))); }
 }
 function khoRow(v, opts){
-  const it = kItem(v), row = el('div', 'row tap');
+  const it = kItem(v), row = el('div', 'row tap'), en = !!(opts.en || v.en);
   row.dataset.vid = it.id;
+  if(en){ EN_IDS.add(it.id); opts = Object.assign({}, opts, { en:true }); }
   const img = document.createElement('img'); img.alt = ''; img.loading = 'lazy'; img.src = it.thumb;
   img.onload = () => { if(img.naturalWidth === 120 && img.naturalHeight === 90) suspectDead(it.id); };   // mqdefault thật là 320×180
   img.onerror = () => suspectDead(it.id);
   const meta = el('div', 'meta'), sub = el('div', 'sub');
   if(opts.rank) sub.append(el('span', 'tag hot', '🔥 ' + opts.rank));
+  if(en) sub.append(el('span', 'tag en', 'EN'));
   if(v.tone && TONE[v.tone]) sub.append(el('span', 'tag', TONE[v.tone]));
   sub.append(document.createTextNode(fmtViews(v.views) + ' lượt xem' + (v.picks ? ' · chọn ' + v.picks + ' lần' : '') + ' · ' + it.channel));
   meta.append(el('div', 'name', it.title), sub);
@@ -748,12 +793,13 @@ function khoRow(v, opts){
   return wrap;
 }
 let hotCache = null, sugCache = [], hotAll = false, khoTimer = null, khoSeq = 0, lastKho = { q:null, n:0 };
+let hotCacheEn = null, sugCacheEn = [], hotLang = lsGet('kho_hotlang') === 'en' ? 'en' : 'vi';
 /* Cuộn xuống tới đáy thì tự nạp thêm: bài hot → bài khách hay chọn / mới / nhiều lượt xem (lọc trùng) */
 let feed = null, feedIO = null;
 function feedReset(){ feed = null; if(feedIO){ feedIO.disconnect(); feedIO = null; } }
-function feedStart(box, seq){
+function feedStart(box, seq, en){
   feedReset();
-  feed = { hot:0, more:null, mi:0, seen:new Set(), loading:false, done:false, box, seq, sent:el('div', 'feedEnd', '') };
+  feed = { hot:0, more:null, mi:0, seen:new Set(), loading:false, done:false, box, seq, en:!!en, sent:el('div', 'feedEnd', '') };
   box.append(feed.sent);
   feedMore(true);
   if('IntersectionObserver' in window){
@@ -765,21 +811,21 @@ async function feedMore(first){
   const f = feed; if(!f || f.loading || f.done || f.seq !== khoSeq) return;
   f.loading = true;
   try{
-    const N = first ? 15 : 20;
-    if(f.hot < hotCache.length){
-      const part = hotCache.slice(f.hot, f.hot + N);
-      part.forEach((h, i) => { f.seen.add(h.best.id); f.box.insertBefore(khoRow(h.best, { rank:f.hot + i + 1, versions:h.versions, key:h.key, tone:null }), f.sent); });
+    const N = first ? 15 : 20, HC = (f.en ? hotCacheEn : hotCache) || [];
+    if(f.hot < HC.length){
+      const part = HC.slice(f.hot, f.hot + N);
+      part.forEach((h, i) => { f.seen.add(h.best.id); f.box.insertBefore(khoRow(h.best, { rank:f.hot + i + 1, versions:h.versions, key:h.key, tone:null, en:f.en }), f.sent); });
       f.hot += part.length;
     }else{
       if(!f.more){
         f.sent.textContent = 'Đang tải thêm…';
-        let d; try{ d = await kapi('/api/kho/new'); }catch(e){ d = { items:[] }; }
+        let d; try{ d = await kapi('/api/kho/new', null, f.en); }catch(e){ d = { items:[] }; }
         if(feed !== f) return;
         f.more = (d.items || []).filter(v => !f.seen.has(v.id));
         if(f.more.length) f.box.insertBefore(khoHead('⭐ Khách hay chọn · bài mới · nhiều lượt xem'), f.sent);
       }
       const part = f.more.slice(f.mi, f.mi + N);
-      part.forEach(v => { f.seen.add(v.id); f.box.insertBefore(khoRow(v, {}), f.sent); });
+      part.forEach(v => { f.seen.add(v.id); f.box.insertBefore(khoRow(v, { en:f.en }), f.sent); });
       f.mi += part.length;
       if(f.mi >= f.more.length){ f.done = true; f.sent.textContent = f.more.length ? 'Đã hết gợi ý. Gõ tên bài để tìm thêm.' : ''; }
       else f.sent.textContent = '';
@@ -804,22 +850,22 @@ function lowBtn(box, low, mk, before){
   if(before) box.insertBefore(b, before); else box.append(b);
 }
 const FLAT_MAX_GROUPS = 6, FLAT_CAP = 150, versCache = new Map();
-async function versionsOf(key, tone){
-  const k = key + '|' + tone; if(versCache.has(k)) return versCache.get(k);
-  const d = await kapi('/api/kho/versions?key=' + encodeURIComponent(key) + (tone != null ? '&tone=' + encodeURIComponent(tone) : ''));
-  const items = d.items || []; versCache.set(k, items); return items;
+async function versionsOf(key, tone, en){
+  const k = (en ? 'en|' : '') + key + '|' + tone; if(versCache.has(k)) return versCache.get(k);
+  const d = await kapi('/api/kho/versions?key=' + encodeURIComponent(key) + (tone != null ? '&tone=' + encodeURIComponent(tone) : ''), null, en);
+  const items = (d.items || []).map(v => en ? Object.assign(v, { en:true }) : v); versCache.set(k, items); return items;
 }
 async function showGroups(box, groups, seq, suffix){
   const n = groups.length, head = t => khoHead('Kho karaoke (' + t + suffix + ')');
   const grouped = () => {
     box.replaceChildren(head(n + (n >= 30 ? '+' : '') + ' bài'));
-    groups.forEach(x => box.append(khoRow(x.best, { versions:x.versions, key:x.key, tone:x.tone })));
+    groups.forEach(x => box.append(khoRow(x.best, { versions:x.versions, key:x.key, tone:x.tone, en:x.en })));
   };
   if(n > FLAT_MAX_GROUPS || !groups.some(x => x.versions > 1)){ grouped(); return; }
   box.replaceChildren(head(n + ' bài'), el('div', 'hint', 'Đang liệt kê đủ các bản phối…'));
   let rows;
   try{
-    const lists = await Promise.all(groups.map(x => x.versions > 1 ? versionsOf(x.key, x.tone != null ? x.tone : null) : Promise.resolve([x.best])));
+    const lists = await Promise.all(groups.map(x => x.versions > 1 ? versionsOf(x.key, x.tone != null ? x.tone : null, x.en) : Promise.resolve([x.en ? Object.assign({}, x.best, { en:true }) : x.best])));
     const seen = new Set(); rows = [];
     lists.forEach(l => l.forEach(v => { if(v && !seen.has(v.id)){ seen.add(v.id); rows.push(v); } }));
   }catch(e){ if(seq === khoSeq) grouped(); return; }
@@ -857,27 +903,40 @@ async function renderKho(){
   if(p.vid || p.list){ box.replaceChildren(); return 0; }
   try{
     if(!raw){
-      if(!hotCache){
-        box.replaceChildren(khoHead('🔥 Bài hot'), el('div', 'hint', 'Đang tải…'));
-        const d = await kapi('/api/kho/hot?limit=100'); feedReset(); hotCache = d.items || []; sugCache = d.suggest || []; setQuota(d.quota);
+      const en = enOk && hotLang === 'en';
+      if(!(en ? hotCacheEn : hotCache)){
+        box.replaceChildren(hotHead(en, null), el('div', 'hint', 'Đang tải…'));
+        let d;
+        try{ d = await kapi('/api/kho/hot?limit=100', null, en); }
+        catch(e){ if(en){ if(seq === khoSeq) renderKho(); return 0; } throw e; }        // kho Anh lỗi → enOff() đã tắt, vẽ lại bài hot Việt
+        feedReset();
+        if(en){ hotCacheEn = d.items || []; sugCacheEn = d.suggest || []; }
+        else { hotCache = d.items || []; sugCache = d.suggest || []; setQuota(d.quota); }
       }
       if(seq !== khoSeq) return 0;
-      box.replaceChildren(khoHead('🔥 Bài hot (' + hotCache.length + ')', btn('↻', 'ghost', () => { hotCache = null; renderKho(); })));
-      if(!hotCache.length && !sugCache.length) box.append(el('div', 'msg', 'Kho chưa có bài. Thêm kênh karaoke ở trang kho.html, kho sẽ tự đầy dần.'));
-      feedStart(box, seq);
+      const HC = en ? hotCacheEn : hotCache;
+      box.replaceChildren(hotHead(en, HC.length));
+      if(!HC.length && !(en ? sugCacheEn : sugCache).length) box.append(el('div', 'msg', en ? 'Kho tiếng Anh đang được nạp dần, bạn quay lại sau nhé.' : 'Kho chưa có bài. Thêm kênh karaoke ở trang kho.html, kho sẽ tự đầy dần.'));
+      feedStart(box, seq, en);
       return 0;
     }
     if(raw.length < 2){ box.replaceChildren(); lastKho = { q:raw, n:0 }; return 0; }
-    const loc = localKho(raw, 30);
-    if(loc && loc.length){
-      lastKho = { q:raw, n:loc.length };
-      await showGroups(box, loc.map(g => ({ best:{ id:g.id, title:g.title, channel:g.channel, tone:g.tone, views:g.views, picks:g.picks }, versions:g.versions, key:g.key, tone:g.tone })), seq, ' · trên máy');
+    if(enOk && !IDX_EN) loadIndex(true);                          // danh mục kho Anh chỉ tải khi khách bắt đầu tìm
+    const hv = localHits(IDX, raw, 30), he = enOk ? localHits(IDX_EN, raw, 30) : null;
+    if((hv && hv.length) || (he && he.length)){
+      const engFirst = looksEnglish(raw);
+      const loc = (hv || []).concat(he || []).sort((a, b) => b[0] - a[0] || (engFirst ? (b[1].en ? 1 : 0) - (a[1].en ? 1 : 0) : 0) ||
+        b[1].hot - a[1].hot || b[1].picks - a[1].picks || b[1].views - a[1].views).slice(0, 30).map(x => x[1]);
+      lastKho = { q:raw, n:loc.length, vi:(hv || []).length, en:(he || []).length };
+      await showGroups(box, loc.map(g => ({ best:{ id:g.id, title:g.title, channel:g.channel, tone:g.tone, views:g.views, picks:g.picks, en:!!g.en }, versions:g.versions, key:g.key, tone:g.tone, en:!!g.en })), seq, ' · trên máy');
       return loc.length;
     }
-    const d = await kapi('/api/kho/search?q=' + encodeURIComponent(raw) + '&limit=30');
+    const q = '/api/kho/search?q=' + encodeURIComponent(raw) + '&limit=30';
+    const [d, de] = await Promise.all([kapi(q), enOk ? kapi(q, null, true).catch(() => ({ groups:[] })) : Promise.resolve({ groups:[] })]);
     if(seq !== khoSeq) return 0;
-    const g = d.groups || [];
-    lastKho = { q:raw, n:g.length };
+    const gv = d.groups || [], ge = (de.groups || []).map(x => Object.assign({}, x, { en:true, best:Object.assign({}, x.best, { en:true }) }));
+    const g = (looksEnglish(raw) ? ge.concat(gv) : gv.concat(ge)).slice(0, 30);
+    lastKho = { q:raw, n:g.length, vi:gv.length, en:ge.length };
     if(!g.length){ box.replaceChildren(khoHead('Kho karaoke (0 bài)'), el('div', 'msg', quotaLeft() === 0 ? 'Kho chưa có bài khớp. Hôm nay đã hết lượt tìm YouTube, bấm Tìm để xem bài gần giống trong kho.' : 'Kho chưa có bài khớp. Bấm Tìm để tìm trên YouTube; bài tìm được sẽ tự vào kho.')); return 0; }
     await showGroups(box, g, seq, '');
     return g.length;
@@ -889,6 +948,21 @@ async function renderKho(){
     return 0;
   }
 }
+function hotHead(en, n){
+  const act = el('span', 'secAct');
+  if(enOk){
+    const t = el('span', 'hotTabs');
+    [['vi', 'Nhạc Việt'], ['en', 'Quốc tế']].forEach(([k, label]) => {
+      const b = el('button', (en ? 'en' : 'vi') === k ? 'on' : null, label);
+      b.onclick = () => { if(hotLang === k) return; hotLang = k; lsSet('kho_hotlang', k); if(k === 'en' && !IDX_EN) loadIndex(true); renderKho(); };
+      t.append(b);
+    });
+    act.append(t);
+  }
+  act.append(btn('↻', 'ghost', () => { if(en) hotCacheEn = null; else hotCache = null; renderKho(); }));
+  const head = el('div', 'secHead'); head.append(el('b', null, (en ? '🌍 Quốc tế hot' : '🔥 Bài hot') + (n != null ? ' (' + n + ')' : ''))); head.append(act);
+  return head;
+}
 function khoSoon(){ clearTimeout(khoTimer); if(IDX) renderKho(); else khoTimer = setTimeout(renderKho, 300); }   // có danh mục trên máy: tìm ngay, không chờ
 
 /* ---------- Danh mục kho trên máy (giống songs.dat của SmartK) ----------
@@ -896,7 +970,7 @@ function khoSoon(){ clearTimeout(khoTimer); if(IDX) renderKho(); else khoTimer =
    Gõ là tìm ngay trên máy, kể cả gõ tắt chữ cái đầu: "slca" → Sai lầm của anh, "tnp" → Tình nhạt phai.
    Trên máy không có thì mới hỏi Worker (FTS), rồi YouTube như trước. */
 const IDX_MAX_AGE = 7 * DAY;
-let IDX = null;
+let IDX = null, IDX_EN = null;
 const vnDay = t => new Date(t + 7 * 3600000).toISOString().slice(0, 10);
 const asc = s => nd(s).replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
 function idbOpen(){
@@ -912,11 +986,11 @@ async function idb(mode, fn){
   return new Promise(res => { const tx = db.transaction('kv', mode); const q = fn(tx.objectStore('kv')); tx.oncomplete = () => res(q && q.result); tx.onerror = tx.onabort = () => res(null); });
 }
 /* Dựng danh mục theo từng đợt nhỏ, nhường máy giữa các đợt: máy tính bảng yếu không bị đứng vài giây (lúc đó chạm ô tìm gõ không ăn) */
-async function prepIndex(d){
+async function prepIndex(d, en){
   const rows = d.rows || [], chans = d.chans || [], list = new Array(rows.length);
   for(let i = 0; i < rows.length; i++){
     const r = rows[i], key = String(r[0] || ''), tw = asc(r[3]);
-    list[i] = { key, tone: r[1] || '', id: r[2], title: r[3], channel: chans[r[4]] || '', versions: r[5] || 1, hot: r[6] || 0, views: r[7] || 0, picks: r[8] || 0,
+    list[i] = { key, tone: r[1] || '', id: r[2], title: r[3], channel: chans[r[4]] || '', versions: r[5] || 1, hot: r[6] || 0, views: r[7] || 0, picks: r[8] || 0, en: !!en,
              ab: key.split(' ').filter(Boolean).map(w => w[0]).join(''), hay: ' ' + key + ' ' + tw + ' ' };
     if(i % 1500 === 1499) await new Promise(res => setTimeout(res, 16));
   }
@@ -927,33 +1001,37 @@ function paintIdx(got){
   if(GUEST || bc.tablet){ l.style.display = 'none'; return; }
   l.style.display = ''; l.textContent = 'Danh mục trên máy: ' + IDX.list.length.toLocaleString('vi-VN') + ' bài · tải ' + new Date(got || IDX.at).toLocaleDateString('vi-VN') + ' · gõ tắt được, vd. “slca”.';
 }
-let idxLoading = false;
-async function loadIndex(){
-  if(!hasKho() || idxLoading) return;
-  idxLoading = true;
+const idxLoading = { vi:false, en:false };
+async function loadIndex(en){
+  en = en === true;
+  const L = en ? 'en' : 'vi', KEY = en ? 'index_en' : 'index', base = en ? khoEn : cfg.kho;
+  if(!hasKho() || idxLoading[L] || (en && !enOk)) return;
+  idxLoading[L] = true;
+  const setIx = ix => { if(en) IDX_EN = ix; else IDX = ix; };
   try{
-    let saved = null; try{ saved = await idb('readonly', st => st.get('index')); }catch(e){}
-    if(saved && (!saved.got || Date.now() - saved.got > IDX_MAX_AGE)){ try{ await idb('readwrite', st => st.delete('index')); }catch(e){} saved = null; }
-    if(saved && !IDX){ IDX = await prepIndex(saved.d); paintIdx(saved.got); if($('q').value.trim()) renderKho(); }
+    let saved = null; try{ saved = await idb('readonly', st => st.get(KEY)); }catch(e){}
+    if(saved && (!saved.got || Date.now() - saved.got > IDX_MAX_AGE)){ try{ await idb('readwrite', st => st.delete(KEY)); }catch(e){} saved = null; }
+    if(saved && !(en ? IDX_EN : IDX)){ setIx(await prepIndex(saved.d, en)); if(!en) paintIdx(saved.got); if($('q').value.trim()) renderKho(); }
     if(saved && saved.d.v === vnDay(Date.now())) return;                       // hôm nay đã tải
-    const res = await fetch(cfg.kho + '/api/kho/index', { headers: Object.assign({}, khoAuth(), saved && saved.etag ? { 'If-None-Match': saved.etag } : {}) });
-    if(res.status === 304 && saved){ saved.got = Date.now(); try{ await idb('readwrite', st => st.put(saved, 'index')); }catch(e){} paintIdx(saved.got); return; }
-    if(!res.ok){ if(res.status === 401 && cfg.pass && guestTok && !passBad){ passBad = true; setTimeout(loadIndex, 0); } return; }
+    const res = await fetch(base + '/api/kho/index', { headers: Object.assign({}, khoAuth(), saved && saved.etag ? { 'If-None-Match': saved.etag } : {}) });
+    if(res.status === 304 && saved){ saved.got = Date.now(); try{ await idb('readwrite', st => st.put(saved, KEY)); }catch(e){} if(!en) paintIdx(saved.got); return; }
+    if(!res.ok){ if(!en && res.status === 401 && cfg.pass && guestTok && !passBad){ passBad = true; setTimeout(loadIndex, 0); } return; }
     const d = await res.json(), rec = { d, etag: res.headers.get('ETag') || '', got: Date.now() };
-    try{ await idb('readwrite', st => st.put(rec, 'index')); }catch(e){}
-    IDX = await prepIndex(d); paintIdx(rec.got);
+    try{ await idb('readwrite', st => st.put(rec, KEY)); }catch(e){}
+    setIx(await prepIndex(d, en)); if(!en) paintIdx(rec.got);
     if($('q').value.trim()) renderKho();
   }catch(e){}
-  finally{ idxLoading = false; }
+  finally{ idxLoading[L] = false; }
 }
 // Xếp hạng: khớp đủ chữ cái đầu > tên bài bắt đầu bằng chữ gõ > khớp đầu chuỗi viết tắt > khớp từng từ; bằng nhau thì bài hot, được chọn nhiều, nhiều lượt xem
-function localKho(raw, lim){
-  if(!IDX) return null;
+function localKho(raw, lim){ const h = localHits(IDX, raw, lim); return h && h.map(x => x[1]); }
+function localHits(ix, raw, lim){
+  if(!ix) return null;
   const q = asc(raw); if(q.length < 2) return [];
   let toks = q.split(' ').filter(w => !QN.has(w)); if(!toks.length) toks = q.split(' ');
   const qs = toks.join(' '), one = toks.length === 1 ? toks[0] : null, abOk = one && /^[a-z]{2,10}$/.test(one);
   const hits = [];
-  for(const g of IDX.list){
+  for(const g of ix.list){
     let tier = 0;
     if(abOk && g.ab === one) tier = 4;
     else if(g.key.startsWith(qs)) tier = 3;
@@ -962,7 +1040,7 @@ function localKho(raw, lim){
     if(tier) hits.push([tier, g]);
   }
   hits.sort((a, b) => b[0] - a[0] || b[1].hot - a[1].hot || b[1].picks - a[1].picks || b[1].views - a[1].views);
-  return hits.slice(0, lim).map(x => x[1]);
+  return hits.slice(0, lim);
 }
 const QN = new Set(['karaoke', 'beat', 'tone', 'ton', 'nhac', 'song', 'bai', 'hat', 'lyric', 'lyrics', 'hd', 'mv']);
 
@@ -1223,7 +1301,7 @@ if(GUEST){
   bc.onroom = m => {
     if(m.name && m.name !== roomName){ roomName = m.name; paintTag(); }
     if(m.branch && m.branch !== OD.branch){ OD.branch = m.branch; $('tabOrder').style.display = ''; if(curTab === 'order') odLoadMenu(); }
-    if(m.gt){ const first = !guestTok; guestTok = m.gt; noTicket = false; if(first){ showQuota(); renderKho(); loadIndex(); } }
+    if(m.gt){ const first = !guestTok; guestTok = m.gt; noTicket = false; if(first){ showQuota(); renderKho(); loadIndex(); probeEn(); } }
     else if(m.open && !guestTok && !noTicket) setTimeout(() => { if(!guestTok && !noTicket){ noTicket = true; renderKho(); } }, 4000);   // chờ tin kèm vé tới (có thể tới sau tin phòng)
     if(m.open){ banner(''); send('hello'); } else banner(BANNER[m.reason === 'notopen' ? 'waiting' : 'closed']);
   };
@@ -1322,7 +1400,7 @@ $('roomTag').onclick = () => {
 };
 
 /* ---------- Khởi động ---------- */
-applyWide(); showQuota(); updateDetect(); renderKho(); loadIndex();
+applyWide(); showQuota(); updateDetect(); renderKho(); loadIndex(); probeEn();
 if(!bc.ws && IS_TB_DEV) showPair();          // máy tính bảng chưa gán: chỉ hiện màn gán, không hỏi mật khẩu
 send('hello');
 </script>

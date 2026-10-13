@@ -59,26 +59,39 @@
   details{margin-top:12px} summary{cursor:pointer; color:var(--quiet); font-size:13px}
   button.star{background:#20202e; border:1px solid var(--line); color:var(--quiet)} button.star.on{background:#3a2f12; border-color:#6b5520; color:var(--warn)}
   .chk{display:inline-flex; align-items:center; gap:5px; font-size:13px; color:var(--ink)}
+  .seg{display:inline-flex; background:#0e0e16; border:1px solid var(--line); border-radius:12px; padding:3px; gap:3px}
+  .seg button{background:transparent; color:var(--quiet); padding:6px 12px; border-radius:9px}
+  .seg button.on{background:var(--accent); color:#fff}
+  body.en .seg button.on{background:#0e7490}
+  body.en header{border-bottom:2px solid #0e7490}
+  .langNote{margin-top:8px; padding:8px 10px; border-radius:10px; background:#0b2a33; border:1px solid #0e7490; color:#a5f3fc; font-size:13px}
+  body.en .vi-only{display:none}
   @media (max-width:560px){ .row{flex-wrap:wrap} .row .acts{max-width:100%; justify-content:flex-start} .hide-sm{display:none} }
 </style>
 </head>
 <body>
 <header>
-  <div class="logo">K</div><b>Kho karaoke</b> <span style="color:var(--quiet);font-size:12px">quản trị</span>
+  <div class="logo">K</div><b>Kho karaoke</b> <span class="hide-sm" style="color:var(--quiet);font-size:12px">quản trị</span>
+  <span class="seg" id="khoSeg" title="Chọn kho đang quản trị — hai kho chạy riêng, cài đặt chung một trang"><button data-k="vi">Kho Việt</button><button data-k="en">Kho Anh</button></span>
   <button class="ghost sp" id="gear">⚙ Kết nối</button>
 </header>
 
 <main>
 <section id="settings" style="display:none">
   <h2>Kết nối Worker kho</h2>
+  <div class="hint">Kho Việt</div>
   <div class="line"><input type="url" id="khoInput" value="https://kho-karaoke.vumanhhung85.workers.dev" placeholder="https://kho-karaoke.vumanhhung85.workers.dev" autocomplete="off"></div>
-  <div class="line"><input type="password" id="passInput" placeholder="Mật khẩu (APP_PASS của Worker kho)" autocomplete="off"><button id="saveCfg">Lưu</button></div>
+  <div class="line"><input type="password" id="passInput" placeholder="Mật khẩu (APP_PASS của Worker kho)" autocomplete="off"></div>
+  <div class="hint" style="margin-top:8px">Kho Anh (Worker riêng, đặt KHO_LANG=en)</div>
+  <div class="line"><input type="url" id="khoEnInput" value="https://kho-karaoke-en.vumanhhung85.workers.dev" placeholder="https://kho-karaoke-en.vumanhhung85.workers.dev" autocomplete="off"></div>
+  <div class="line"><input type="password" id="passEnInput" placeholder="Mật khẩu kho Anh (để trống = dùng chung mật khẩu kho Việt)" autocomplete="off"><button id="saveCfg">Lưu</button></div>
   <div class="hint">Lưu trong trình duyệt này, dùng chung với remote.html nếu cùng địa chỉ trang.</div>
 </section>
 
 <section>
   <h2>Tình trạng kho <button class="ghost sp" id="reloadStats">↻</button></h2>
-  <div class="grid" id="stats"></div>
+  <div class="langNote" id="langNote" style="display:none"></div>
+  <div class="grid" id="stats" style="margin-top:8px"></div>
   <div class="line" style="margin-top:10px">
     <button id="fastScan">⚡ Quét nhanh đến khi xong</button>
     <button class="ghost" id="runAuto">▶ Chạy 1 lượt</button>
@@ -86,9 +99,9 @@
     <button class="ghost" data-job="refresh">Làm mới</button>
     <button class="ghost" data-job="hot">Cập nhật bài hot</button>
     <button class="ghost" data-job="hotsearch">Tìm bài hot còn thiếu</button>
-    <button class="ghost" data-job="discover">Khám phá kênh</button>
+    <button class="ghost vi-only" data-job="discover">Khám phá kênh</button>
     <button class="ghost" data-job="gap">Lấp bài tìm hụt</button>
-    <button class="ghost" data-job="plsearch">Tìm playlist ca sĩ</button>
+    <button class="ghost vi-only" data-job="plsearch">Tìm playlist ca sĩ</button>
   </div>
   <div class="hint">Kho tự chạy 10 phút/lần (Cron Trigger), mỗi lượt làm một việc nhỏ. <b>Quét nhanh</b> dùng khi mới thêm kênh: trang này gọi quét liên tục (giữ trang mở) cho tới khi quét hết các kênh, rồi tự ghép lại bài hot.</div>
   <div class="hint err" id="cronWarn" style="display:none"></div>
@@ -183,28 +196,54 @@ function el(tag, cls, text){ const e = document.createElement(tag); if(cls) e.cl
 function btn(label, cls, fn){ const b = el('button', cls, label); b.onclick = fn; return b; }
 const lsGet = k => { try{ return localStorage.getItem(k); }catch(e){ return null; } };
 const lsSet = (k, v) => { try{ localStorage.setItem(k, v); }catch(e){} };
-const DEFAULT_KHO = 'https://kho-karaoke.vumanhhung85.workers.dev';
-let cfg = { kho: lsGet('kho_api') || DEFAULT_KHO, pass: lsGet('np_pass') || '' };
+const DEFAULT_KHO = 'https://kho-karaoke.vumanhhung85.workers.dev', DEFAULT_KHO_EN = 'https://kho-karaoke-en.vumanhhung85.workers.dev';
+/* Hai kho (Việt / Anh) là hai Worker riêng, quản trị chung trang này: nút "Kho Việt / Kho Anh" chọn kho đang làm việc */
+const K = { vi: lsGet('kho_api') || DEFAULT_KHO, en: lsGet('kho_api_en') || DEFAULT_KHO_EN, pass: lsGet('np_pass') || '', passEn: lsGet('kho_pass_en') || '' };
+let CUR = lsGet('kho_cur') === 'en' ? 'en' : 'vi';
+const cfg = { get kho(){ return CUR === 'en' ? K.en : K.vi; }, get pass(){ return CUR === 'en' ? (K.passEn || K.pass) : K.pass; } };
+const CLEAN_DEF = { vi:{ keep:8, tone:2 }, en:{ keep:4, tone:1 } };
+function paintKho(){
+  document.querySelectorAll('#khoSeg button').forEach(b => b.classList.toggle('on', b.dataset.k === CUR));
+  document.body.classList.toggle('en', CUR === 'en');
+  document.title = (CUR === 'en' ? 'Kho Anh' : 'Kho Việt') + ' · Kho karaoke';
+  $('clKeep').value = CLEAN_DEF[CUR].keep; $('clTone').value = CLEAN_DEF[CUR].tone;
+  $('manual').placeholder = CUR === 'en' ? '1. My Love – Westlife\n2. Yesterday Once More – Carpenters' : '1. Tên bài – Ca sĩ\n2. Tên bài – Ca sĩ';
+}
+document.querySelectorAll('#khoSeg button').forEach(b => b.onclick = () => {
+  if(b.dataset.k === CUR) return;
+  CUR = b.dataset.k; lsSet('kho_cur', CUR); paintKho();
+  ['stats', 'channels', 'discover', 'hotTable', 'rawTable', 'growStats', 'missTable', 'artTable', 'candTable', 'nearBox', 'preview', 'suggest'].forEach(id => { const e = $(id); if(e) e.replaceChildren(); });
+  $('last').textContent = '—'; $('clOut').textContent = 'Chưa xem trước.'; $('clGo').disabled = true; $('langNote').style.display = 'none';
+  loadAll();
+});
 const fmt = n => (+n || 0).toLocaleString('vi-VN');
 const until = t => { const m = Math.round((t - Date.now()) / 60000); return m <= 0 ? 'đến hạn' : m < 60 ? 'sau ' + m + ' phút' : m < 1440 ? 'sau ' + Math.round(m / 60) + ' giờ' : 'sau ' + Math.round(m / 1440) + ' ngày'; };
 const ago = t => { if(!t) return 'chưa'; const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'vừa xong' : m < 60 ? m + ' phút trước' : m < 1440 ? Math.round(m / 60) + ' giờ trước' : Math.round(m / 1440) + ' ngày trước'; };
 
-$('gear').onclick = () => { const s = $('settings'); $('khoInput').value = cfg.kho; $('passInput').value = cfg.pass; s.style.display = s.style.display === 'none' ? '' : 'none'; };
-$('saveCfg').onclick = () => { cfg.kho = $('khoInput').value.trim().replace(/\/+$/, ''); cfg.pass = $('passInput').value; lsSet('kho_api', cfg.kho); lsSet('np_pass', cfg.pass); $('settings').style.display = 'none'; loadAll(); };
+function fillCfg(){ $('khoInput').value = K.vi; $('passInput').value = K.pass; $('khoEnInput').value = K.en; $('passEnInput').value = K.passEn; }
+$('gear').onclick = () => { const s = $('settings'); fillCfg(); s.style.display = s.style.display === 'none' ? '' : 'none'; };
+$('saveCfg').onclick = () => {
+  K.vi = $('khoInput').value.trim().replace(/\/+$/, '') || DEFAULT_KHO; K.pass = $('passInput').value;
+  K.en = $('khoEnInput').value.trim().replace(/\/+$/, '') || DEFAULT_KHO_EN; K.passEn = $('passEnInput').value;
+  lsSet('kho_api', K.vi); lsSet('np_pass', K.pass); lsSet('kho_api_en', K.en); lsSet('kho_pass_en', K.passEn);
+  $('settings').style.display = 'none'; loadAll();
+};
 
 async function api(path, body){
-  if(!cfg.kho || !cfg.pass){ $('khoInput').value = cfg.kho; $('settings').style.display = ''; throw new Error(cfg.kho ? 'Chưa nhập mật khẩu (ô Mật khẩu ở trên)' : 'Chưa nhập địa chỉ Worker kho và mật khẩu'); }
+  if(!cfg.kho || !cfg.pass){ fillCfg(); $('settings').style.display = ''; throw new Error(cfg.kho ? 'Chưa nhập mật khẩu (ô Mật khẩu ở trên)' : 'Chưa nhập địa chỉ Worker kho và mật khẩu'); }
   const opt = body ? { method:'POST', headers:{ 'x-pass':cfg.pass, 'content-type':'application/json' }, body:JSON.stringify(body) } : { headers:{ 'x-pass':cfg.pass } };
   let res;
-  try{ res = await fetch(cfg.kho + path, opt); }catch(e){ throw new Error('Không kết nối được tới Worker kho (sai địa chỉ, mạng, hoặc CORS)'); }
+  const at = CUR;
+  try{ res = await fetch(cfg.kho + path, opt); }catch(e){ throw new Error('Không kết nối được tới Worker ' + (CUR === 'en' ? 'kho Anh (đã tạo Worker kho-karaoke-en chưa? địa chỉ ở nút ⚙)' : 'kho') + ' (sai địa chỉ, mạng, hoặc CORS)'); }
   let d = {}; try{ d = await res.json(); }catch(e){}
+  if(at !== CUR) throw Object.assign(new Error('Đã chuyển kho'), { switched: true });     // trả lời của kho cũ về sau khi đã bấm sang kho kia → bỏ
   if(!res.ok){
     if(res.status === 401) $('settings').style.display = '';
     throw new Error(d.reason === 'origin' ? 'Worker kho chưa cho phép địa chỉ ' + location.origin + ' (biến ALLOWED_ORIGINS)' : (d.error || 'Lỗi ' + res.status));
   }
   return d;
 }
-function fail(boxId, e){ const b = $(boxId); b.replaceChildren(el('div', 'hint err', e.message || String(e))); }
+function fail(boxId, e){ if(e && e.switched) return; const b = $(boxId); b.replaceChildren(el('div', 'hint err', e.message || String(e))); }
 
 /* ---------- Tình trạng ---------- */
 const JOB = { scan:'Quét kênh', refresh:'Làm mới', hot:'Cập nhật bài hot', hotsearch:'Tìm bài hot còn thiếu', rehot:'Ghép lại bài hot', gap:'Lấp bài tìm hụt', discover:'Khám phá kênh', plsearch:'Tìm playlist ca sĩ', idle:'Nghỉ', busy:'Đang bận', error:'Lỗi' };
@@ -242,6 +281,16 @@ async function loadStats(){
   try{
     const s = await api('/api/kho/stats');
     const g = $('stats'); g.replaceChildren();
+    const ln = $('langNote'), sl = s.lang || 'vi';
+    if(sl !== CUR){
+      ln.textContent = '⚠ Địa chỉ đang dùng cho ' + (CUR === 'en' ? 'Kho Anh' : 'Kho Việt') + ' lại trỏ vào một kho ' + (sl === 'en' ? 'tiếng Anh' : 'tiếng Việt') +
+        '. Kiểm tra địa chỉ ở nút ⚙' + (CUR === 'en' ? ' và biến KHO_LANG=en của Worker kho Anh.' : '.');
+      ln.style.display = '';
+    } else if(sl === 'en'){
+      ln.textContent = 'Kho tiếng Anh · hạn chế: tối đa ' + (s.maxVideos ? fmt(s.maxVideos) + ' bản' : 'không giới hạn') + ' · ' + (s.expand ? 'có' : 'không') + ' tự khám phá kênh/playlist · bảng thịnh hành ' +
+        (s.hotRegion || 'tắt') + ' · bài thiếu được tìm dần từ danh sách tay và bài khách tìm hụt. Kênh karaoke tiếng Anh thường đặt “Ca sĩ – Tên bài”: khi thêm kênh nhớ chọn Ca sĩ trước.';
+      ln.style.display = '';
+    } else ln.style.display = 'none';
     [['Bản karaoke', fmt(s.videos)], ['Bài (đã gom)', fmt(s.songs)], ['Nguồn đang bật', s.channelsOn + '/' + s.channels + (s.playlists ? ' (' + s.playlists + ' PL)' : '')],
      ['Chờ quét toàn bộ', s.pendingFull || 0], ['Đến hạn kiểm', s.dueNow || 0], ['Bài hot', s.hotSongs],
      ['Hot chờ tìm', s.hotPending], ['Lượt chọn 30 ngày', fmt(s.picks30)], ['Đơn vị hôm nay', fmt(s.unitsToday) + '/' + fmt(s.budget)],
@@ -250,11 +299,12 @@ async function loadStats(){
      ['Chờ làm mới', fmt(s.refreshDue || 0) + (s.refreshOldest ? ' · cũ nhất ' + ago(s.refreshOldest) : '')], ['Đơn vị dành cho làm mới', fmt(s.refreshReserve || 0) + '/ngày'],
      ['Tìm hụt 7 ngày', s.q7 ? (s.miss7 || 0) + '/' + s.q7 + ' (' + Math.round((s.miss7 || 0) * 100 / s.q7) + '%)' : 'chưa có'],
      ['Dòng ghi D1 hôm nay', s.writeLimit ? fmt(s.writesToday) + '/' + fmt(s.writeLimit) : '—'], ['Khoá YouTube', keyLabel(s.keys)]]
+      .concat(s.maxVideos ? [['Trần số bản', fmt(s.videos) + '/' + fmt(s.maxVideos)]] : [])
       .forEach(([l, v]) => { const d = el('div', 'stat'); d.append(el('b', String(v).length > 12 ? 'sm' : null, String(v)), el('span', null, l)); g.append(d); });
     showReport(s.last);
     const w = $('cronWarn');
     if(s.last && Date.now() - s.last.at > 30 * 60000){
-      w.textContent = '⚠ Lượt chạy gần nhất cách đây ' + ago(s.last.at) + ' nên lịch tự chạy 10 phút/lần (Cron Trigger) đang KHÔNG hoạt động. Vào Cloudflare → Worker kho-karaoke → Settings → Triggers → thêm Cron Trigger */10 * * * * .';
+      w.textContent = '⚠ Lượt chạy gần nhất cách đây ' + ago(s.last.at) + ' nên lịch tự chạy 10 phút/lần (Cron Trigger) đang KHÔNG hoạt động. Vào Cloudflare → Worker ' + (CUR === 'en' ? 'kho-karaoke-en' : 'kho-karaoke') + ' → Settings → Triggers → thêm Cron Trigger */10 * * * * .';
       w.style.display = '';
     } else w.style.display = 'none';
     const kw = $('keyWarn'), bad = (s.keys || []).filter(k => k.set && k.bad);
@@ -656,7 +706,7 @@ $('clGo').onclick = async () => {
 };
 
 function loadAll(){ loadStats(); loadGrow(); loadChannels(); loadHot(); }
-$('khoInput').value = cfg.kho; $('passInput').value = cfg.pass;     // địa chỉ Worker điền sẵn, chỉ cần nhập mật khẩu
+fillCfg(); paintKho();     // địa chỉ Worker điền sẵn, chỉ cần nhập mật khẩu
 if(!cfg.pass) $('settings').style.display = '';
 loadAll();
 </script>
