@@ -87,11 +87,11 @@
   .msg{color:var(--quiet); text-align:center; padding:26px 0; line-height:1.6}
   .err{color:#fecdd3}
 
-  #dock{position:fixed; left:0; right:0; bottom:0; background:rgba(21,21,31,.97); border-top:1px solid var(--line); padding:10px 16px calc(10px + env(safe-area-inset-bottom)); display:flex; flex-direction:column; gap:10px}
+  #dock{position:fixed; left:0; right:0; bottom:0; background:#15151f; border-top:1px solid #3a3a52; box-shadow:0 -8px 20px rgba(0,0,0,.6); padding:10px 16px calc(10px + env(safe-area-inset-bottom)); display:flex; flex-direction:column; gap:10px}
   .ctrlRow .vn{min-width:26px; text-align:center; color:#FFD21A; font-size:14px; font-variant-numeric:tabular-nums}
   @media (max-width:420px){ .ctrlRow{gap:6px !important} .ctrlRow button{width:42px !important; height:42px !important} .ctrlRow button svg{width:22px !important; height:22px !important} .ctrlRow button.primary{width:54px !important; height:54px !important} .ctrlRow .vn{min-width:24px; font-size:13px} }
   .ctrlRow{display:flex; gap:14px; align-items:center; justify-content:center}
-  .ctrlRow button{width:54px; height:54px; flex:0 0 auto; background:#20202e; border:1px solid var(--line); color:var(--ink); border-radius:50%; display:flex; align-items:center; justify-content:center; padding:0}
+  .ctrlRow button{width:54px; height:54px; flex:0 0 auto; background:#2e2e44; border:1.5px solid #5a5a7a; color:#fff; border-radius:50%; display:flex; align-items:center; justify-content:center; padding:0}
   .ctrlRow button svg{width:26px; height:26px; fill:currentColor}
   .ctrlRow button.primary{width:68px; height:68px; background:linear-gradient(135deg,#7c3aed,#c084fc); border:none; box-shadow:0 6px 20px rgba(139,92,246,.6)} .ctrlRow button.primary svg{width:34px; height:34px}
   .ctrlRow button:active{transform:scale(.94)} .ctrlRow button.off{color:#f87171}
@@ -101,7 +101,7 @@
   .vol input::-webkit-slider-runnable-track{height:8px; border-radius:99px; background:linear-gradient(90deg,#7c3aed,#c084fc var(--p,100%),#2c2c3c var(--p,100%))}
   .vol input::-webkit-slider-thumb{-webkit-appearance:none; width:26px; height:26px; margin-top:-9px; border-radius:50%; background:#fff; border:3px solid #a855f7; box-shadow:0 2px 8px rgba(0,0,0,.5)}
   .vol .vi{color:var(--quiet); display:flex} .vol .vi svg{width:20px; height:20px; fill:currentColor} .vol input{flex:1; accent-color:#a855f7; height:28px}
-  .roomOff #dock{ opacity:.4; pointer-events:none }
+  .roomOff #dock{ pointer-events:none } .roomOff #dock .ctrlRow, .roomOff #dock .vol{ opacity:.6 }
   .row.tap{cursor:pointer} .row.tap:active{background:#1c1830}
   .row .num{flex:0 0 auto; width:26px; text-align:center; color:var(--quiet); font-weight:800; font-size:14px}
   .row img.qth{width:80px; height:45px}
