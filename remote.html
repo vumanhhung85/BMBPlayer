@@ -12,13 +12,13 @@
   *{box-sizing:border-box;margin:0;padding:0}
   body{background:var(--bg); color:var(--ink); font-family:-apple-system,"Segoe UI",Roboto,Arial,sans-serif; min-height:100vh; display:flex; flex-direction:column}
   #top{position:sticky; top:0; z-index:30; background:var(--bg); box-shadow:0 6px 18px rgba(0,0,0,.45)}
-  header{padding:8px 14px; background:linear-gradient(135deg,#1a1530,#0a0a0f); display:flex; align-items:center; gap:10px}
-  .logoImg{height:34px; width:auto; display:block}
-  header .room{margin-left:auto; background:linear-gradient(135deg,#FFD21A,#f5b800); color:#4a148c; font-size:14px; font-weight:900; padding:5px 14px; border-radius:999px; letter-spacing:.3px}
-  #gear{background:none; border:1px solid var(--line); color:var(--ink); border-radius:10px; padding:6px 10px; font-size:14px}
+  header{padding:5px 12px; background:linear-gradient(135deg,#1a1530,#0a0a0f); display:flex; align-items:center; gap:10px}
+  .logoImg{height:28px; width:auto; display:block}
+  header .room{margin-left:auto; background:linear-gradient(135deg,#FFD21A,#f5b800); color:#4a148c; font-size:13px; font-weight:900; padding:3px 12px; border-radius:999px; letter-spacing:.3px}
+  #gear{background:none; border:1px solid var(--line); color:var(--ink); border-radius:10px; padding:3px 9px; font-size:13px}
 
-  #now{padding:8px 14px; background:#16102a; border-top:1px solid var(--line); display:flex; align-items:center; gap:10px; font-size:14px}
-  #now .ic{flex:0 0 auto; width:26px; height:26px; border-radius:50%; background:linear-gradient(135deg,var(--accent),var(--accent2)); display:flex; align-items:center; justify-content:center; font-size:14px}
+  #now{padding:5px 12px; background:#16102a; border-top:1px solid var(--line); display:flex; align-items:center; gap:8px; font-size:13px}
+  #now .ic{flex:0 0 auto; width:22px; height:22px; border-radius:50%; background:linear-gradient(135deg,var(--accent),var(--accent2)); display:flex; align-items:center; justify-content:center; font-size:14px}
   #now .t{font-weight:700; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; min-width:0}
 
   #settings{display:none; padding:12px 16px; background:var(--panel); border-bottom:1px solid var(--line); font-size:13px; line-height:1.6}
@@ -26,41 +26,41 @@
   #settings button{background:var(--accent); border:none; color:#fff; font-weight:700; border-radius:10px; padding:8px 14px; margin-top:4px}
   #settings .hint{color:var(--quiet)}
 
-  .tabs{display:flex; gap:8px; padding:8px 10px 10px; background:var(--bg)}
-  .tabs button{flex:1; min-width:0; background:#14141c; border:1px solid var(--line); color:#7c7c92; padding:9px 4px 8px; border-radius:14px; font:inherit; font-weight:700; display:flex; flex-direction:column; align-items:center; gap:2px; opacity:.85}
-  .tabs .ti{font-size:21px; line-height:1; filter:grayscale(.7)} .tabs .tl{font-size:13px; white-space:nowrap}
-  .tabs .cnt{display:inline-block; min-width:20px; padding:0 6px; border-radius:99px; background:#2a2a3a; color:var(--ink); font-size:12px; line-height:19px}
-  .tabs button.on{background:linear-gradient(135deg,#7c3aed,#a855f7); border-color:#c4a1ff; color:#fff; opacity:1; box-shadow:0 4px 16px rgba(139,92,246,.55)}
-  .tabs button.on .ti{filter:none; font-size:23px} .tabs button.on .tl{font-size:14px} .tabs button.on .cnt{background:#fff; color:#6d28d9}
+  .tabs{display:flex; gap:6px; padding:6px 12px 6px; background:var(--bg)}
+  .tabs button{flex:1; min-width:0; background:#14141c; border:1px solid var(--line); color:#7c7c92; padding:5px 4px; border-radius:999px; font:inherit; font-weight:700; display:flex; flex-direction:row; justify-content:center; align-items:center; gap:6px; opacity:.85}
+  .tabs .ti{font-size:15px; line-height:1; filter:grayscale(.7)} .tabs .tl{font-size:13px; white-space:nowrap}
+  .tabs .cnt{display:inline-block; min-width:20px; padding:0 6px; border-radius:99px; background:#2a2a3a; color:var(--ink); font-size:12px; line-height:17px}
+  .tabs button.on{background:linear-gradient(135deg,#7c3aed,#a855f7); border-color:#c4a1ff; color:#fff; opacity:1; box-shadow:0 2px 10px rgba(139,92,246,.5)}
+  .tabs button.on .ti{filter:none; font-size:15px} .tabs button.on .tl{font-size:13px} .tabs button.on .cnt{background:#fff; color:#6d28d9}
   .tabs button.od{color:#a98a3a}
   .tabs button.od.on{background:linear-gradient(135deg,#f59e0b,#fbbf24); border-color:#fde68a; color:#2b1400; box-shadow:0 4px 16px rgba(245,158,11,.5)}
 
-  #searchBox{display:flex; gap:8px; padding:12px 16px}
+  #searchBox{display:flex; gap:8px; padding:4px 12px 6px}
   /* Ô tìm + nút Tìm luôn nằm trên cùng khi vuốt xem bài phía dưới.
      Điện thoại / máy tính bảng dọc: dính ngay dưới thanh trên (cao --stickTop, đo bằng JS); máy tính bảng ngang: dính đầu cột tìm bài. */
   #paneSearch #searchBox{position:sticky; top:var(--stickTop, 0px); z-index:25; background:var(--bg)}
   #paneSearch #searchBox.stuck{box-shadow:0 8px 16px -8px rgba(0,0,0,.7)}
-  #searchBox input{flex:1; background:var(--panel); border:1px solid var(--line); color:var(--ink); border-radius:12px; padding:12px 14px; font-size:16px}
-  #searchBox button{background:linear-gradient(135deg,#7c3aed,#a855f7); border:none; color:#fff; font-weight:700; border-radius:12px; padding:0 18px; font-size:20px}
+  #searchBox input{flex:1; background:var(--panel); border:1px solid var(--line); color:var(--ink); border-radius:999px; padding:9px 16px; font-size:16px}
+  #searchBox button{background:linear-gradient(135deg,#7c3aed,#a855f7); border:none; color:#fff; font-weight:700; border-radius:999px; padding:0 16px; font-size:18px}
   #detect{display:none; gap:8px; padding:0 16px 8px; flex-wrap:wrap}
   #detect button, .secAct button{background:var(--accent); border:none; color:#fff; font-weight:700; border-radius:10px; padding:8px 12px; font-size:13px}
   .secAct button.ghost{background:#20202e; border:1px solid var(--line)}
-  .opt{padding:0 16px 6px; color:var(--quiet); font-size:13px; display:flex; align-items:center; gap:8px; line-height:1.4}
+  .opt{padding:0 12px 3px; color:var(--quiet); font-size:13px; display:flex; align-items:center; gap:8px; line-height:1.4}
 
-  .list{flex:1; overflow:auto; padding:0 16px 210px}
-  .secHead{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:14px 0 6px; font-size:14px}
+  .list{flex:1; overflow:auto; padding:0 12px 190px}
+  .secHead{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 0 3px; font-size:14px}
   .secAct{display:flex; gap:6px; flex:0 0 auto}
   .hotTabs{display:inline-flex; background:#0e0e16; border:1px solid var(--line); border-radius:12px; padding:3px; gap:3px}
   .secAct .hotTabs button{background:transparent; color:var(--quiet, #9aa0b4); border:none; padding:6px 10px; border-radius:9px; font-weight:700}
   .secAct .hotTabs button.on{background:var(--accent); color:#fff}
   .tag.en{background:#0b2a33; color:#a5f3fc}
   .hint{color:var(--quiet); font-size:12px; padding:0 0 6px; line-height:1.5}
-  .row{display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--line)}
-  .row img{width:96px; height:54px; object-fit:cover; border-radius:8px; background:#20202e; flex:0 0 auto}
+  .row{display:flex; align-items:center; gap:10px; padding:6px 0; border-bottom:1px solid var(--line)}
+  .row img{width:80px; height:45px; object-fit:cover; border-radius:7px; background:#20202e; flex:0 0 auto}
   .row .meta{flex:1; min-width:0}
   .row .name{font-weight:600; font-size:14px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden}
   .row .sub{color:var(--quiet); font-size:12px; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
-  .row button{background:var(--accent); border:none; color:#fff; font-weight:700; border-radius:10px; padding:9px 12px; font-size:13px; flex:0 0 auto}
+  .row button{background:var(--accent); border:none; color:#fff; font-weight:700; border-radius:10px; padding:7px 11px; font-size:13px; flex:0 0 auto}
   .row button.ghost{background:#20202e; border:1px solid var(--line)}
   .row button.done{background:#059669}
   #snack{position:fixed; left:50%; top:12px; transform:translate(-50%,-140%); z-index:50; max-width:calc(100% - 24px); background:#14532d; border:1px solid #22c55e; color:#dcfce7;
@@ -294,7 +294,6 @@
   </div>
   <div id="detect"></div>
   <div class="opt" id="quotaLine"></div>
-  <div class="opt" id="idxLine" style="display:none"></div>
   <div class="list">
     <div id="results"></div>
     <div id="khoSec"></div>
@@ -1011,11 +1010,7 @@ async function prepIndex(d, en){
   }
   return { v: d.v, at: d.at, list };
 }
-function paintIdx(got){
-  const l = $('idxLine'); if(!IDX){ l.style.display = 'none'; return; }
-  if(GUEST || bc.tablet){ l.style.display = 'none'; return; }
-  l.style.display = ''; l.textContent = 'Danh mục trên máy: ' + IDX.list.length.toLocaleString('vi-VN') + ' bài · tải ' + new Date(got || IDX.at).toLocaleDateString('vi-VN') + ' · gõ tắt được, vd. “slca”.';
-}
+function paintIdx(got){ /* không hiện dòng thông tin danh mục cho khách */ }
 const idxLoading = { vi:false, en:false };
 async function loadIndex(en){
   en = en === true;
