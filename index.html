@@ -19,6 +19,15 @@
   /* ===== Màn hình phát: video tràn viền, không thanh tiêu đề ===== */
   #stage{position:fixed; inset:0; background:#000}
   #yt, #stage iframe{position:absolute; inset:0; width:100%; height:100%; border:0}
+  /* Màn chuyển bài: hết bài / đang nạp bài mới thì ẨN trình phát (không phủ lên video đang phát) để không lộ ô gợi ý video của YouTube */
+  #swap{position:absolute; inset:0; z-index:3; display:none; flex-direction:column; align-items:center; justify-content:center; gap:2.4vh; padding:4vw; text-align:center;
+    background:radial-gradient(1300px 700px at 50% 38%, #2a1f4a 0%, #120d22 45%, var(--bg) 78%)}
+  #swap .logo{height:clamp(70px,15vh,180px)}
+  #swap .s1{font-size:clamp(14px,2.2vw,30px); font-weight:800; letter-spacing:4px; color:var(--accent2)}
+  #swap .s2{font-size:clamp(22px,4.2vw,58px); font-weight:800; max-width:86vw; line-height:1.25; text-shadow:0 4px 30px rgba(139,92,246,.6)}
+  body.swap #swap{display:flex}
+  body.swap #yt, body.swap #stage iframe{visibility:hidden}
+  body.swap #cornerLogo{display:none}
 
   /* ===== Màn hình chờ (giống màn hình chờ của SK Player: logo, giờ, trạng thái sẵn sàng) ===== */
   #idle{position:absolute; inset:0; z-index:5; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; padding:24px; text-align:center;
@@ -154,6 +163,7 @@
 <script src="./qrcode.js"></script>
 <div id="stage">
   <div id="yt"></div>
+  <div id="swap"><img class="logo" src="Logo_BoomBox.png" alt=""><div class="s1">SẮP HÁT</div><div class="s2" id="swapT"></div></div>
   <img id="cornerLogo" src="Logo_BoomBox.png" alt="">
 
   <!-- Màn hình chờ: mở lên là sẵn sàng, không có nút phải bấm -->
@@ -414,9 +424,20 @@ function onReady(){
   if(cur >= 0) load();       // remote đã gửi bài trong lúc YouTube đang khởi động → phát luôn
   push();
 }
+/* Hết bài → YouTube hiện lưới video gợi ý. Không có tham số nào tắt được lưới này (rel=0 chỉ giới hạn cùng kênh),
+   nên lúc video KHÔNG phát (hết bài, đang nạp bài sau) trang ẩn hẳn trình phát và hiện màn "Sắp hát" của BMB;
+   video bắt đầu phát là hiện lại ngay. Không che gì khi video đang phát. */
+let swapTimer = null;
+function swapOn(){
+  $('swapT').textContent = cur >= 0 && queue[cur] ? queue[cur].title : '';
+  document.body.classList.add('swap');
+  clearTimeout(swapTimer); swapTimer = setTimeout(swapOff, 12000);     // phòng khi không nhận được trạng thái "đang phát"
+}
+function swapOff(){ clearTimeout(swapTimer); document.body.classList.remove('swap'); }
 function onStateChange(e){
   const S = YT.PlayerState;
-  if(e.data === S.ENDED) next();
+  if(e.data === S.ENDED){ swapOn(); next(); }
+  if(e.data === S.PLAYING) swapOff();
   if(e.data === S.PLAYING){
     if(lock === 'tap') setLock(null);
     else if(lock === 'muted') setLock('muted');
@@ -442,6 +463,7 @@ function reportDead(id, done){
     .then(r => r.ok ? r.json() : null).then(d => { if(d && (d.removed || []).includes(id) && done) done(); }).catch(() => {});
 }
 function onError(e){
+  swapOff();
   const it = queue[cur];
   if(it && [100, 101, 150].includes(e.data)) reportDead(it.id, () => { bc.postMessage({ type:'dead', id:it.id }); toast('Đã gỡ "' + it.title + '" khỏi kho karaoke (không còn phát được trên YouTube).'); });
   toast('Không phát được "' + (it ? it.title : '') + '"\n' + (ERRMSG[e.data] || ('Mã lỗi ' + e.data)) +
@@ -458,6 +480,7 @@ function setLock(kind){
   lock = kind;
   const el = $('lock');
   if(!kind){ hide('lock'); push(); return; }
+  if(kind === 'tap') swapOff();                       // cần một lần chạm để phát → để trình phát hiện ra
   el.textContent = kind === 'muted'
     ? '🔇 Đang phát không tiếng (trình duyệt chặn). Bấm OK trên điều khiển TV hoặc chạm màn hình một lần để bật tiếng.'
     : '▶ Bấm OK trên điều khiển TV hoặc chạm màn hình một lần để bắt đầu phát.';
@@ -491,10 +514,11 @@ function load(){
   if(!ready) return;
   clearTimeout(wd);
   if(cur < 0 || cur >= queue.length){
-    player.stopVideo(); $('idle').style.display='flex'; setLock(null);
+    swapOff(); player.stopVideo(); $('idle').style.display='flex'; setLock(null);
     hide('ovTitle'); hide('ovNext'); hide('ovCount'); render(); push(); return;
   }
   $('idle').style.display = 'none';
+  swapOn();
   player.loadVideoById(queue[cur].id);
   if(!userMuted && lock !== 'muted') player.unMute();
   showNowOverlay(); hide('ovNext');
