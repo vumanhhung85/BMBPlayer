@@ -45,7 +45,7 @@
               APP_PASS (mật khẩu nhac.html) · tuỳ chọn: LEGACY_SECRET, NHAC_PASS
      Biến   : ALLOWED_ORIGINS (mặc định https://bmb.id.vn), NET_CHECK (off|warn|on), TB_NET (on|off)
      Binding: D1 DB → bmb_data ; Durable Object ROOM → Room, REG → Registry, NHAC → NhacRoom
-   TELEGRAM: yêu cầu gọi lễ tân (mới / xác nhận / đã phục vụ / huỷ) báo cho quản lý + nhân viên quầy chi nhánh (xem tgLeTan). CHƯA CÓ: nhắc lại khi quá hạn (SLA); học IP chi nhánh
+   TELEGRAM: yêu cầu gọi lễ tân (mới / xác nhận / đã phục vụ / huỷ) báo cho quản lý + nhân viên quầy chi nhánh (xem tgDon: có nút Tiếp nhận / Đã xong / Huỷ / Đã nhập POS ngay trên Telegram). CHƯA CÓ: nhắc lại khi quá hạn (SLA); học IP chi nhánh
    ============================================================ */
 import { DurableObject } from 'cloudflare:workers';
 
@@ -372,7 +372,7 @@ async function handleApi(request, env, ctx) {
         case 'quay.goMtb':               res = await quayGoMtb(env, body); break;
         case 'quay.thuHoiMtb':           res = await quayThuHoiMtb(env, body); break;
         case 'quay.goTv':                res = await quayGoTv(env, body); break;
-        case 'quay.pos':                 res = await quayPos(env, body); break;
+        case 'quay.pos':                 res = await quayPos(env, body, ctx); break;
         case 'quay.chan':                res = await quayChan(env, body); break;
         case 'quay.lichSu':              res = await quayLichSu(env, body); break;
         case 'admin.menuList':           res = await adminMenuList(env, body); break;
@@ -498,7 +498,7 @@ async function donTao(env, body, ctx) {
     }
   }
   await baoLeTan(env, phong.id, { id, st: 'MOI', items, at: now });     // TV của phòng hiện "Đã gửi"
-  chayNen(ctx, tgLeTan(env, { id, cn: phong.chi_nhanh_id, phong: phong.ten_phong, items, note: ghiChu, st: 'MOI', nguon, nghiNgo: dongPhong }));   // Telegram quản lý + nhân viên quầy
+  chayNen(ctx, tgDon(env, id));       // Telegram quản lý + nhân viên quầy (kèm nút Tiếp nhận / Huỷ)
   return ok({ orderId: id });
 }
 
@@ -648,14 +648,11 @@ async function donCuaChiNhanh(env, ss, orderId, cot) {
   return [don, null];
 }
 
-async function quayDon(env, body, ctx) {
-  const [ss, loi] = await canPhien(env, body);
-  if (loi) return loi;
-  const orderId = s(body.orderId, 40);
-  const act = s(body.act, 10);
-  if (!orderId || !['nhan', 'huy', 'xong'].includes(act)) return fail('missing_or_bad_params');
-  const [don, loi2] = await donCuaChiNhanh(env, ss, orderId, 'chi_nhanh_id, trang_thai, dev_id, phong_id, ten_phong, items, ghi_chu, tao_luc');
-  if (loi2) return loi2;
+// Đổi trạng thái 1 đơn — dùng chung cho quầy (quay.don) và nút trên Telegram. cn = chi nhánh người thao tác. Trả {ok} hoặc {ok:false, error, msg, status}.
+async function doiTrangThai(env, ctx, orderId, act, cn, user) {
+  const don = await env.DB.prepare('SELECT chi_nhanh_id, trang_thai, dev_id, phong_id, ten_phong, items, ghi_chu, tao_luc FROM order_don WHERE id = ?').bind(orderId).first();
+  if (!don) return { ok: false, error: 'not_found', status: 400 };
+  if (don.chi_nhanh_id !== cn) return { ok: false, error: 'forbidden', status: 403 };
 
   const now = Date.now();
   let sql, params;
@@ -664,23 +661,34 @@ async function quayDon(env, body, ctx) {
       const chan = await env.DB.prepare(
         'SELECT 1 FROM order_chan_tb WHERE dev_id = ? AND chi_nhanh_id = ? AND den_luc > ?'
       ).bind(don.dev_id, don.chi_nhanh_id, now).first();
-      if (chan) return fail('device_blocked', 403, 'Thiết bị gửi đơn này đang bị chặn — hãy huỷ đơn.');
+      if (chan) return { ok: false, error: 'device_blocked', status: 403, msg: 'Thiết bị gửi đơn này đang bị chặn — hãy huỷ đơn.' };
     }
     sql = `UPDATE order_don SET trang_thai='NHAN', cap_nhat_luc=?, nhan_luc=?, nguoi_xu_ly=? WHERE id=? AND trang_thai='MOI'`;
-    params = [now, now, ss.u, orderId];
+    params = [now, now, user, orderId];
   } else if (act === 'xong') {
     sql = `UPDATE order_don SET trang_thai='XONG', cap_nhat_luc=?, xong_luc=? WHERE id=? AND trang_thai='NHAN'`;
     params = [now, now, orderId];
   } else {
     sql = `UPDATE order_don SET trang_thai='HUY', cap_nhat_luc=?, nguoi_xu_ly=? WHERE id=? AND trang_thai IN ('MOI','NHAN')`;
-    params = [now, ss.u, orderId];
+    params = [now, user, orderId];
   }
   const r = await env.DB.prepare(sql).bind(...params).run();
-  if (!r.meta.changes) return fail('khong_doi_duoc_trang_thai', 400, 'Đơn đã được người khác xử lý. Màn hình sẽ tự cập nhật.');
+  if (!r.meta.changes) return { ok: false, error: 'khong_doi_duoc_trang_thai', status: 400, msg: 'Đơn đã được người khác xử lý. Màn hình sẽ tự cập nhật.' };
   let items = []; try { items = JSON.parse(don.items); } catch (e) {}
   const stMoi = act === 'nhan' ? 'NHAN' : act === 'xong' ? 'XONG' : 'HUY';
   await baoLeTan(env, don.phong_id, { id: orderId, st: stMoi, items, at: don.tao_luc });   // TV hiện "Đã xác nhận / Đã phục vụ / Đã huỷ"
-  chayNen(ctx, tgLeTan(env, { id: orderId, cn: don.chi_nhanh_id, phong: don.ten_phong, items, note: don.ghi_chu, st: stMoi, nguoi: ss.u }));
+  return { ok: true, st: stMoi };
+}
+
+async function quayDon(env, body, ctx) {
+  const [ss, loi] = await canPhien(env, body);
+  if (loi) return loi;
+  const orderId = s(body.orderId, 40);
+  const act = s(body.act, 10);
+  if (!orderId || !['nhan', 'huy', 'xong'].includes(act)) return fail('missing_or_bad_params');
+  const r = await doiTrangThai(env, ctx, orderId, act, ss.b, ss.u);
+  if (!r.ok) return fail(r.error, r.status || 400, r.msg);
+  chayNen(ctx, tgDon(env, orderId, { nguoi: ss.u }));       // Telegram: sửa tin nhắn của đơn (cùng nội dung như khi bấm nút trên Telegram)
   return ok({});
 }
 
@@ -698,14 +706,18 @@ async function quayPhong(env, body) {
   return ok({});
 }
 
-async function quayPos(env, body) {
+async function danhDauPos(env, orderId) {
+  await env.DB.prepare('UPDATE order_don SET da_nhap_pos = 1 WHERE id = ?').bind(orderId).run();
+}
+async function quayPos(env, body, ctx) {
   const [ss, loi] = await canPhien(env, body);
   if (loi) return loi;
   const orderId = s(body.orderId, 40);
   if (!orderId) return fail('missing_orderId');
   const [, loi2] = await donCuaChiNhanh(env, ss, orderId, 'chi_nhanh_id');
   if (loi2) return loi2;
-  await env.DB.prepare('UPDATE order_don SET da_nhap_pos = 1 WHERE id = ?').bind(orderId).run();
+  await danhDauPos(env, orderId);
+  chayNen(ctx, tgDon(env, orderId));       // tin nhắn Telegram đổi thành "Đã nhập POS", mất nút
   return ok({});
 }
 
@@ -1107,43 +1119,127 @@ const hhmmVn = ms => { const d = new Date(ms + VN_MS); return String(d.getUTCHou
 // Chạy nền (không bắt khách chờ Telegram); không có ctx (thử nghiệm) thì cứ để chạy
 function chayNen(ctx, p) { if (ctx && ctx.waitUntil) ctx.waitUntil(p); }
 
-async function tgLeTan(env, d) {
+// ---- Nút bấm ngay trên Telegram (cùng một bộ xử lý với quầy: đổi ở đâu thì tin nhắn + quầy + TV cập nhật theo) ----
+//   Mỗi yêu cầu = 1 tin nhắn / người nhận; đổi trạng thái thì SỬA tin nhắn đó (không đẻ thêm tin), nút đổi theo trạng thái.
+//   Nút gửi callback_data "od:<việc>:<mã đơn>" (n tiếp nhận · x đã xong · h hỏi huỷ · H xác nhận huỷ · b quay lại · p đã nhập POS).
+//   Bot dùng chung với app quản lý BMB nên webhook của bot nằm ở bmb-quanly-worker: Worker đó chuyển callback "od:" sang /api/tg/relay (xem README).
+let tgBangXong = false;
+async function tgBangSan(env) {
+  if (tgBangXong) return;
+  await env.DB.prepare('CREATE TABLE IF NOT EXISTS order_tg_msg (don_id TEXT NOT NULL, chat_id TEXT NOT NULL, message_id INTEGER NOT NULL, PRIMARY KEY (don_id, chat_id))').run();
+  tgBangXong = true;
+}
+async function tgGoi(token, method, payload) {
+  const r = await fetch('https://api.telegram.org/bot' + token + '/' + method, {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload), signal: AbortSignal.timeout(5000)
+  });
+  return r.json().catch(() => ({}));      // chỉ đọc kết quả, không ghi log nội dung (tránh lộ chat/token)
+}
+const tgToken = async env => String(((await env.DB.prepare(`SELECT gia_tri FROM cai_dat WHERE khoa = 'tg_bot_token'`).first()) || {}).gia_tri || '').trim();
+const coNuoc = items => (items || []).some(i => i && i.type === 'DR');
+
+function tgBanPhim(don, items) {
+  const id = don.id, hang = [];
+  if (don.trang_thai === 'MOI') hang.push([{ text: '✅ Tiếp nhận', callback_data: 'od:n:' + id }, { text: '✖ Huỷ', callback_data: 'od:h:' + id }]);
+  else if (don.trang_thai === 'NHAN') hang.push([{ text: '🎉 Đã xong', callback_data: 'od:x:' + id }, { text: '✖ Huỷ', callback_data: 'od:h:' + id }]);
+  if ((don.trang_thai === 'NHAN' || don.trang_thai === 'XONG') && coNuoc(items) && !don.da_nhap_pos) hang.push([{ text: '🧾 Đã nhập POS', callback_data: 'od:p:' + id }]);
+  return { inline_keyboard: hang };
+}
+const tgBanPhimHoiHuy = id => ({ inline_keyboard: [[{ text: '⚠️ Xác nhận huỷ đơn', callback_data: 'od:H:' + id }, { text: 'Không', callback_data: 'od:b:' + id }]] });
+
+function tgNoiDung(don, items, nguoi, nguoiLam) {
+  const mon = items.map(i => '• ' + (i.icon ? escHtml(i.icon) + ' ' : '') + escHtml(i.label) + (i.type === 'DR' && i.qty > 1 ? ' ×' + (+i.qty | 0) : '')).join('\n');
+  const dong = [TG_TIEUDE[don.trang_thai] || TG_TIEUDE.MOI, 'Phòng: <b>' + escHtml(don.ten_phong) + '</b> · #' + escHtml(String(don.id).slice(-6).toUpperCase()), mon];
+  if (don.ghi_chu) dong.push('Ghi chú: “' + escHtml(String(don.ghi_chu).slice(0, 200)) + '”');
+  if (don.trang_thai === 'MOI') {
+    dong.push('Gửi từ: ' + (don.nguon === 'TABLET' ? 'máy tính bảng' : 'điện thoại khách'));
+    if (don.nghi_ngo) dong.push('⚠️ Phòng đang ở trạng thái đóng lúc khách gửi');
+  } else {
+    const ten = nguoiLam || nguoi;
+    if (ten) dong.push((don.trang_thai === 'NHAN' ? 'Xác nhận: ' : don.trang_thai === 'XONG' ? 'Phục vụ: ' : 'Huỷ: ') + escHtml(ten));
+  }
+  if (coNuoc(items) && (don.trang_thai === 'NHAN' || don.trang_thai === 'XONG')) dong.push(don.da_nhap_pos ? '🧾 Đã nhập POS' : '🧾 Chưa nhập POS');
+  dong.push('🕒 ' + hhmmVn(Date.now()));
+  return dong.join('\n');
+}
+
+// Gửi / sửa tin nhắn của 1 đơn cho quản lý + nhân viên quầy đúng chi nhánh. opt.nguoi = tài khoản vừa bấm (hiện "Xác nhận/Phục vụ/Huỷ: tên")
+async function tgDon(env, orderId, opt = {}) {
   try {
-    if (String(env.TG_LETAN || '1') === '0' || !d.cn || !env.DB) return;
+    if (String(env.TG_LETAN || '1') === '0' || !env.DB) return;
+    const don = await env.DB.prepare('SELECT id, chi_nhanh_id, ten_phong, items, ghi_chu, nguon, nghi_ngo, trang_thai, nguoi_xu_ly, da_nhap_pos FROM order_don WHERE id = ?').bind(orderId).first();
+    if (!don || !don.chi_nhanh_id) return;
+    await tgBangSan(env);
     const lenh = [
       env.DB.prepare(`SELECT gia_tri FROM cai_dat WHERE khoa = 'tg_bot_token'`),
       env.DB.prepare(
         `SELECT tg_chat_id FROM tai_khoan
          WHERE chi_nhanh_id = ? AND vai_tro IN ('manager', 'quay') AND hoat_dong = 1 AND tg_chat_id <> '' AND tg_tam_dung = 0`
-      ).bind(d.cn)
+      ).bind(don.chi_nhanh_id),
+      env.DB.prepare('SELECT chat_id, message_id FROM order_tg_msg WHERE don_id = ?').bind(orderId),
+      env.DB.prepare('SELECT username, ho_ten FROM tai_khoan WHERE username IN (?, ?)').bind(don.nguoi_xu_ly || '', opt.nguoi || '')
     ];
-    if (d.nguoi) lenh.push(env.DB.prepare('SELECT ho_ten FROM tai_khoan WHERE username = ?').bind(d.nguoi));
     const rs = await env.DB.batch(lenh);
     const token = String((rs[0].results[0] || {}).gia_tri || '').trim();
     const chats = [...new Set(rs[1].results.map(r => String(r.tg_chat_id).trim()).filter(Boolean))];
     if (!token || !chats.length) return;
+    const daGui = new Map(rs[2].results.map(r => [String(r.chat_id), r.message_id]));
+    const ten = u => u ? ((rs[3].results.find(r => r.username === u) || {}).ho_ten || u) : '';
+    let items = []; try { items = JSON.parse(don.items); } catch (e) {}
+    const text = tgNoiDung(don, items, ten(don.nguoi_xu_ly), ten(opt.nguoi));
+    const reply_markup = tgBanPhim(don, items);
 
-    const mon = (d.items || []).map(i => '• ' + (i.icon ? escHtml(i.icon) + ' ' : '') + escHtml(i.label) + (i.type === 'DR' && i.qty > 1 ? ' ×' + (+i.qty | 0) : '')).join('\n');
-    const nguoi = d.nguoi ? (((rs[2] && rs[2].results[0]) || {}).ho_ten || d.nguoi) : '';
-    const dong = [TG_TIEUDE[d.st] || TG_TIEUDE.MOI, 'Phòng: <b>' + escHtml(d.phong) + '</b> · #' + escHtml(String(d.id).slice(-6).toUpperCase()), mon];
-    if (d.note) dong.push('Ghi chú: “' + escHtml(String(d.note).slice(0, 200)) + '”');
-    if (d.st === 'MOI') {
-      dong.push('Gửi từ: ' + (d.nguon === 'TABLET' ? 'máy tính bảng' : 'điện thoại khách'));
-      if (d.nghiNgo) dong.push('⚠️ Phòng đang ở trạng thái đóng lúc khách gửi');
-    } else if (nguoi) {
-      dong.push((d.st === 'NHAN' ? 'Xác nhận: ' : d.st === 'XONG' ? 'Phục vụ: ' : 'Huỷ: ') + escHtml(nguoi));
+    await Promise.allSettled(chats.map(async chat => {
+      const cu = daGui.get(chat);
+      if (cu) {
+        const r = await tgGoi(token, 'editMessageText', { chat_id: chat, message_id: cu, text, parse_mode: 'HTML', disable_web_page_preview: true, reply_markup });
+        if (r.ok || /not modified/i.test(String(r.description || ''))) return;
+      }
+      const r = await tgGoi(token, 'sendMessage', { chat_id: chat, text, parse_mode: 'HTML', disable_web_page_preview: true, reply_markup });
+      if (r.ok && r.result && r.result.message_id)
+        await env.DB.prepare('INSERT OR REPLACE INTO order_tg_msg (don_id, chat_id, message_id) VALUES (?,?,?)').bind(orderId, chat, r.result.message_id).run();
+    }));
+    // dọn bản ghi cũ (đơn quá 3 ngày) để bảng không phình — chỉ làm khi có đơn mới
+    if (don.trang_thai === 'MOI') await env.DB.prepare('DELETE FROM order_tg_msg WHERE don_id IN (SELECT id FROM order_don WHERE tao_luc < ?)').bind(Date.now() - 3 * 24 * 3600 * 1000).run();
+  } catch (e) { console.error('tgDon:', e && e.name); }   // không ghi e.message: có thể chứa địa chỉ có token
+}
+
+// Bấm nút trên Telegram: cq = callback_query do Telegram gửi. Chỉ tài khoản quản lý/quầy ĐÚNG chi nhánh của đơn, bấm trong chat riêng với bot.
+async function tgCallback(env, ctx, cq) {
+  let token = '';
+  const tra = (text, hienHop) => tgGoi(token, 'answerCallbackQuery', { callback_query_id: cq.id, text, show_alert: !!hienHop });
+  try {
+    if (String(env.TG_LETAN || '1') === '0' || !env.DB || !cq || !cq.id) return;
+    token = await tgToken(env); if (!token) return;
+    const m = /^od:([nxhHbp]):([A-Za-z0-9]{4,12})$/.exec(String(cq.data || ''));
+    if (!m) return await tra('Nút không hợp lệ.');
+    const chat = cq.message && cq.message.chat, tu = cq.from;
+    if (!chat || !tu || chat.type !== 'private' || String(chat.id) !== String(tu.id)) return await tra('Chỉ bấm được trong tin nhắn riêng với bot.', true);
+    const tk = await env.DB.prepare(
+      `SELECT username, chi_nhanh_id FROM tai_khoan WHERE tg_chat_id = ? AND hoat_dong = 1 AND vai_tro IN ('manager', 'quay') LIMIT 1`
+    ).bind(String(chat.id)).first();
+    if (!tk) return await tra('Tài khoản Telegram này chưa được cấp quyền xử lý đơn.', true);
+    const [, viec, id] = m;
+    const don = await env.DB.prepare('SELECT id, chi_nhanh_id, trang_thai, items, da_nhap_pos FROM order_don WHERE id = ?').bind(id).first();
+    if (!don || don.chi_nhanh_id !== tk.chi_nhanh_id) return await tra('Không có đơn này ở chi nhánh của bạn.', true);
+    let items = []; try { items = JSON.parse(don.items); } catch (e) {}
+    const phim = markup => tgGoi(token, 'editMessageReplyMarkup', { chat_id: chat.id, message_id: cq.message.message_id, reply_markup: markup });
+
+    if (viec === 'h') { await phim(tgBanPhimHoiHuy(id)); return await tra('Bấm "Xác nhận huỷ đơn" để huỷ.'); }
+    if (viec === 'b') { await phim(tgBanPhim(don, items)); return await tra('Đã giữ nguyên đơn.'); }
+
+    let nguoiLam = '';       // chỉ ghi tên người bấm khi bấm đó thật sự đổi được trạng thái
+    if (viec === 'p') {
+      await danhDauPos(env, id);
+      await tra('Đã ghi nhận nhập POS ✓');
+    } else {
+      const act = viec === 'n' ? 'nhan' : viec === 'x' ? 'xong' : 'huy';
+      const r = await doiTrangThai(env, ctx, id, act, tk.chi_nhanh_id, tk.username);
+      if (r.ok) nguoiLam = tk.username;
+      await tra(r.ok ? (act === 'nhan' ? 'Đã tiếp nhận ✓' : act === 'xong' ? 'Đã xong ✓' : 'Đã huỷ đơn') : (r.msg || 'Không làm được.'), !r.ok);
     }
-    dong.push('🕒 ' + hhmmVn(Date.now()));
-    const text = dong.join('\n');
-
-    await Promise.allSettled(chats.map(chat =>
-      fetch('https://api.telegram.org/bot' + token + '/sendMessage', {
-        method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ chat_id: chat, text, parse_mode: 'HTML', disable_web_page_preview: true }),
-        signal: AbortSignal.timeout(5000)
-      }).then(r => r.text())      // đọc hết để giải phóng kết nối; không ghi nội dung (tránh lộ chat/token vào log)
-    ));
-  } catch (e) { console.error('tgLeTan:', e && e.name); }   // không ghi e.message: có thể chứa địa chỉ có token
+    await tgDon(env, id, { nguoi: nguoiLam });      // sửa tin nhắn (cho mọi người nhận) theo trạng thái mới — kể cả khi đơn đã bị người khác xử lý, để nút cũ biến mất
+  } catch (e) { console.error('tgCallback:', e && e.name); }
 }
 
 // ============================================================
@@ -1738,6 +1834,17 @@ export default {
   async fetch(req, env, ctx){
     const u = new URL(req.url);
     if(!env.SECRET) return jres({ error: 'Worker chưa đặt secret SECRET' }, 500);
+
+    /* Nút bấm Telegram: bmb-quanly-worker (nơi đặt webhook của bot) chuyển callback "od:" sang đây, kèm header x-relay-secret = secret TG_RELAY_SECRET */
+    if(u.pathname === '/api/tg/relay' && req.method === 'POST'){
+      const kho = String(env.TG_RELAY_SECRET || '');
+      if(!kho) return new Response('not found', { status: 404 });
+      const gui = req.headers.get('x-relay-secret') || '';
+      if(gui.length !== kho.length || !same(gui, kho)) return new Response('forbidden', { status: 403 });
+      const up = await req.json().catch(() => null);
+      if(up && up.callback_query) await tgCallback(env, ctx, up.callback_query);
+      return jres({ ok: true });
+    }
 
     /* API quầy + gọi lễ tân (giữ nguyên cách gọi của quay.html cũ: POST JSON {action,...}) */
     if(u.pathname === '/api' || u.pathname === '/api/') return handleApi(req, env, ctx);

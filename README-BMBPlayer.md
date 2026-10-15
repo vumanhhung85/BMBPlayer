@@ -85,3 +85,27 @@ Tạo kho Anh (làm một lần):
 Kho Anh để **hạn chế** (đặt biến cùng tên để đổi): tối đa 30.000 bản (`MAX_VIDEOS`), không tự khám phá kênh/playlist (`EXPAND`), 1.500 đơn vị/ngày (`DAILY_UNIT_BUDGET`), 25 lượt tìm/ngày (`SEARCH_LIMIT`), bảng thịnh hành US 50 bài (`HOT_REGION`, `HOT_PAGES`), dọn kho mặc định giữ 4 bản/bài. Bài phải có chữ "karaoke" (tiếng Anh "beat" là chữ trong tên bài). Hai kho chung hạn mức một project Google: tổng đơn vị và lượt tìm của hai kho phải nằm trong hạn mức project.
 
 Nạp bài cho kho Anh: thêm 2–3 kênh karaoke tiếng Anh (bấm **Xem mẫu** — kênh tiếng Anh thường đặt "Ca sĩ – Tên bài" → chọn **Ca sĩ trước**), xem tỉ lệ phát được rồi giữ kênh tốt; dán danh sách bài kinh điển vào **danh sách tay** ở mục Bài hot (danh sách tay hết hạn sau 30 ngày, dán lại mỗi tháng). Bài khách tìm bằng tiếng Anh mà kho chưa có được ghi vào "bài tìm hụt" của kho Anh và tự tìm bù dần.
+
+## Telegram: bấm nút ngay trên tin nhắn (từ 10/2026)
+
+Tin "Yêu cầu gọi lễ tân mới" gửi cho quản lý + nhân viên quầy có nút **✅ Tiếp nhận · ✖ Huỷ**; sau khi tiếp nhận: **🎉 Đã xong · ✖ Huỷ**; đơn có nước thì thêm **🧾 Đã nhập POS**. Bấm "Huỷ" phải bấm thêm một lần xác nhận. Bấm ở Telegram hay ở quầy đều chạy cùng một hàm (`doiTrangThai`), nên TV, quầy và Telegram luôn cập nhật theo nhau. Tin nhắn được **sửa tại chỗ** (không đẻ thêm tin mới) và nút đổi theo trạng thái; người bấm sau khi đơn đã bị người khác xử lý chỉ nhận thông báo "đã được người khác xử lý".
+
+Quyền: chỉ tài khoản `manager` / `quay` đang hoạt động, đúng chi nhánh của đơn, bấm trong chat riêng với bot (không bấm được trong nhóm).
+
+**Cài đặt (một lần):**
+1. Worker `bmbplayer` → Settings → Variables and Secrets → thêm **Secret** `TG_RELAY_SECRET` (chuỗi ngẫu nhiên dài). Không đặt thì tính năng nút tự tắt (chỉ còn tin nhắn như trước).
+2. Bot dùng chung với app quản lý BMB nên webhook của bot nằm ở Worker `bmb-quanly-worker` (Telegram chỉ cho 1 webhook mỗi bot). Worker đó cần chuyển các bấm nút có `callback_data` bắt đầu bằng `od:` sang `bmbplayer`. Thêm vào chỗ nhận webhook (trước khi xử lý các nút cũ), cùng secret đặt ở đó với tên `BMBPLAYER_RELAY_SECRET`:
+```js
+const cq = update.callback_query;
+if (cq && /^od:/.test(String(cq.data || ''))) {
+  ctx.waitUntil(fetch('https://bmb.id.vn/api/tg/relay', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-relay-secret': env.BMBPLAYER_RELAY_SECRET },
+    body: JSON.stringify(update)
+  }));
+  return new Response('ok');
+}
+```
+3. Bảng `order_tg_msg` (nhớ tin nhắn nào của đơn nào để sửa) tự tạo lần đầu có đơn, không cần chạy SQL.
+
+Tắt cả tin nhắn lẫn nút: biến `TG_LETAN = 0` (như cũ).
