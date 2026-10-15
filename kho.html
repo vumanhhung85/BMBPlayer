@@ -72,7 +72,7 @@
 <body>
 <header>
   <div class="logo">K</div><b>Kho karaoke</b> <span class="hide-sm" style="color:var(--quiet);font-size:12px">quản trị</span>
-  <span class="seg" id="khoSeg" title="Chọn kho đang quản trị — hai kho chạy riêng, cài đặt chung một trang"><button data-k="vi">Kho Việt</button><button data-k="en">Kho Anh</button></span>
+  <span class="seg" id="khoSeg" title="Chọn kho đang quản trị — hai kho chạy riêng, cài đặt chung một trang"><button data-k="vi">Kho Việt</button><button data-k="en">Kho quốc tế</button></span>
   <button class="ghost sp" id="gear">⚙ Kết nối</button>
 </header>
 
@@ -82,7 +82,7 @@
   <div class="hint">Kho Việt</div>
   <div class="line"><input type="url" id="khoInput" value="https://kho-karaoke.vumanhhung85.workers.dev" placeholder="https://kho-karaoke.vumanhhung85.workers.dev" autocomplete="off"></div>
   <div class="line"><input type="password" id="passInput" placeholder="Mật khẩu (APP_PASS của Worker kho)" autocomplete="off"></div>
-  <div class="hint" style="margin-top:8px">Kho Anh (Worker riêng, đặt KHO_LANG=en)</div>
+  <div class="hint" style="margin-top:8px">Kho quốc tế (Worker riêng kho-karaoke-en, đặt KHO_LANG=en): tiếng Anh + K-pop</div>
   <div class="line"><input type="url" id="khoEnInput" value="https://kho-karaoke-en.vumanhhung85.workers.dev" placeholder="https://kho-karaoke-en.vumanhhung85.workers.dev" autocomplete="off"></div>
   <div class="line"><input type="password" id="passEnInput" placeholder="Mật khẩu kho Anh (để trống = dùng chung mật khẩu kho Việt)" autocomplete="off"><button id="saveCfg">Lưu</button></div>
   <div class="hint">Lưu trong trình duyệt này, dùng chung với remote.html nếu cùng địa chỉ trang.</div>
@@ -205,7 +205,7 @@ const CLEAN_DEF = { vi:{ keep:8, tone:2 }, en:{ keep:4, tone:1 } };
 function paintKho(){
   document.querySelectorAll('#khoSeg button').forEach(b => b.classList.toggle('on', b.dataset.k === CUR));
   document.body.classList.toggle('en', CUR === 'en');
-  document.title = (CUR === 'en' ? 'Kho Anh' : 'Kho Việt') + ' · Kho karaoke';
+  document.title = (CUR === 'en' ? 'Kho quốc tế' : 'Kho Việt') + ' · Kho karaoke';
   $('clKeep').value = CLEAN_DEF[CUR].keep; $('clTone').value = CLEAN_DEF[CUR].tone;
   $('manual').placeholder = CUR === 'en' ? '1. My Love – Westlife\n2. Yesterday Once More – Carpenters' : '1. Tên bài – Ca sĩ\n2. Tên bài – Ca sĩ';
 }
@@ -283,11 +283,11 @@ async function loadStats(){
     const g = $('stats'); g.replaceChildren();
     const ln = $('langNote'), sl = s.lang || 'vi';
     if(sl !== CUR){
-      ln.textContent = '⚠ Địa chỉ đang dùng cho ' + (CUR === 'en' ? 'Kho Anh' : 'Kho Việt') + ' lại trỏ vào một kho ' + (sl === 'en' ? 'tiếng Anh' : 'tiếng Việt') +
+      ln.textContent = '⚠ Địa chỉ đang dùng cho ' + (CUR === 'en' ? 'Kho quốc tế' : 'Kho Việt') + ' lại trỏ vào một kho ' + (sl === 'en' ? 'tiếng Anh' : 'tiếng Việt') +
         '. Kiểm tra địa chỉ ở nút ⚙' + (CUR === 'en' ? ' và biến KHO_LANG=en của Worker kho Anh.' : '.');
       ln.style.display = '';
     } else if(sl === 'en'){
-      ln.textContent = 'Kho tiếng Anh · hạn chế: tối đa ' + (s.maxVideos ? fmt(s.maxVideos) + ' bản' : 'không giới hạn') + ' · ' + (s.expand ? 'có' : 'không') + ' tự khám phá kênh/playlist · bảng thịnh hành ' +
+      ln.textContent = 'Kho quốc tế (tiếng Anh + K-pop) · hạn chế: tối đa ' + (s.maxVideos ? fmt(s.maxVideos) + ' bản' : 'không giới hạn') + ' · ' + (s.expand ? 'có' : 'không') + ' tự khám phá kênh/playlist · bảng thịnh hành ' +
         (s.hotRegion || 'tắt') + ' · bài thiếu được tìm dần từ danh sách tay và bài khách tìm hụt. Kênh karaoke tiếng Anh thường đặt “Ca sĩ – Tên bài”: khi thêm kênh nhớ chọn Ca sĩ trước.';
       ln.style.display = '';
     } else ln.style.display = 'none';

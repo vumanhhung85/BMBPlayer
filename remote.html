@@ -54,6 +54,7 @@
   .secAct .hotTabs button{background:transparent; color:var(--quiet, #9aa0b4); border:none; padding:6px 10px; border-radius:9px; font-weight:700}
   .secAct .hotTabs button.on{background:var(--accent); color:#fff}
   .tag.en{background:#0b2a33; color:#a5f3fc}
+  .tag.kp{background:#3b0a2e; color:#f9a8d4}
   .hint{color:var(--quiet); font-size:12px; padding:0 0 6px; line-height:1.5}
   .row{display:flex; align-items:center; gap:10px; padding:6px 0; border-bottom:1px solid var(--line)}
   .row img{width:80px; height:45px; object-fit:cover; border-radius:7px; background:#20202e; flex:0 0 auto}
@@ -737,6 +738,8 @@ const EN_IDS = new Set();             // bài đang hiện thuộc kho Anh → c
 function reportPick(id){ if(hasKho()) kapi('/api/kho/pick', { id }, EN_IDS.has(id)).catch(() => {}); }
 // Mỗi lần bấm Tìm (không phải từng phím gõ): kho ghi lại để đo tỉ lệ tìm hụt và tự đi tìm bài còn thiếu (câu tiếng Anh → kho Anh)
 function logQuery(q, n){ if(hasKho() && q.length >= 3 && !parseYT(q).vid && !parseYT(q).list) kapi('/api/kho/qlog', { q, n }, useEnFor(q)).catch(() => {}); }
+/* Nhận bài K-pop trong kho quốc tế theo tên nhóm/ca sĩ trong tiêu đề (chỉ để gắn nhãn, không ảnh hưởng tìm kiếm) */
+const KPOP_RE = new RegExp('\\b(?:' + ['bts','jung kook','jungkook','jimin','blackpink','jennie','jisoo','g dragon','bigbang','2ne1','girls generation','snsd','wonder girls','t ara','exo','twice','red velvet','iu','newjeans','ive','aespa','le sserafim','g i dle','illit','fifty fifty','ikon','brave girls','stray kids','seventeen','huntr x','saja boys','kpop demon hunters','gummy','psy','super junior','shinee','itzy','nct','txt','enhypen','ateez','got7','monsta x','mamamoo','apink','stayc','kep1er','zerobaseone','nmixx','babymonster'].join('|') + ')\\b');
 const TONE = { nam:'Tone Nam', nu:'Tone Nữ', 'song-ca':'Song ca', 'thieu-nam':'Thiếu giọng nam', 'thieu-nu':'Thiếu giọng nữ' };
 const fmtViews = n => n >= 1e6 ? (n / 1e6).toFixed(n >= 1e7 ? 0 : 1).replace('.', ',') + ' Tr' : n >= 1e3 ? Math.round(n / 1e3) + ' N' : String(n || 0);
 const kItem = v => ({ id:v.id, title:String(v.title || ''), channel:String(v.channel || ''), thumb:'https://i.ytimg.com/vi/' + v.id + '/mqdefault.jpg' });
@@ -792,7 +795,7 @@ function khoRow(v, opts){
   img.onerror = () => suspectDead(it.id);
   const meta = el('div', 'meta'), sub = el('div', 'sub');
   if(opts.rank) sub.append(el('span', 'tag hot', '🔥 ' + opts.rank));
-  if(en) sub.append(el('span', 'tag en', 'EN'));
+  if(en){ const kp = KPOP_RE.test(asc(it.title)); sub.append(el('span', kp ? 'tag kp' : 'tag en', kp ? 'K-POP' : 'EN')); }
   if(v.tone && TONE[v.tone]) sub.append(el('span', 'tag', TONE[v.tone]));
   sub.append(document.createTextNode(fmtViews(v.views) + ' lượt xem' + (v.picks ? ' · chọn ' + v.picks + ' lần' : '') + ' · ' + it.channel));
   meta.append(el('div', 'name', it.title), sub);
