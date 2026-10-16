@@ -378,6 +378,12 @@ function renderChannels(){
     const l2 = el('div', 'sub', fmt(c.ytCount) + ' video trên ' + (c.kind === 'playlist' ? 'playlist' : 'kênh') +
       ' · bài mới nhất ' + (c.newestAt ? ago(c.newestAt) : '—') + ' · ' + (c.fullDone ? (c.enabled ? 'kiểm bài mới ' + until(c.nextScan) : 'đã tắt') : 'quét lần đầu ' + ago(c.lastScan)));
     meta.append(name, st, l1, l2);
+    if(c.rej && c.rej.seen){
+      const n = c.rej.seen, pc = k => Math.round((c.rej[k] || 0) * 100 / n) + '%';
+      const parts = [['noembed','không cho nhúng'],['region','chặn vùng'],['dur','sai thời lượng'],['kw','thiếu chữ karaoke'],['other','loại khác'],['gone','đã xoá/riêng tư']].filter(x => c.rej[x[0]]).map(x => x[1] + ' ' + pc(x[0]));
+      const okp = Math.round((c.rej.ok || 0) * 100 / n);
+      meta.append(el('div', 'sub' + (okp < 20 && n >= 50 ? ' warn' : ''), 'Đã xét ' + fmt(n) + ' video mới: nhận ' + okp + '%' + (parts.length ? ' · loại: ' + parts.join(', ') : '')));
+    }
     if(c.fullDone && c.videos > 0 && !c.uniq && !c.picks30) meta.append(el('div', 'sub warn', 'Không có bài riêng, chưa được chọn — nguồn này chỉ thêm bản trùng.'));
     if(c.note) meta.append(el('div', 'sub err', c.note));
     const acts = el('div', 'acts');
