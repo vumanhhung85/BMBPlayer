@@ -1202,6 +1202,28 @@ function volStep(d){
   $('vol').value = v; volNum(v); volHold = Date.now(); volSend(v, true);
 }
 $('sDown').onclick = $('dnBtn').onclick = () => volStep(-5); $('sUp').onclick = $('upBtn').onclick = () => volStep(5);
+/* Máy tính bảng trong APK (≥1.5): khách bấm nút âm lượng CỨNG hoặc kéo thanh âm lượng hệ thống của máy tính bảng → đổi âm lượng TV.
+   Máy tính bảng không phát tiếng nên âm lượng của chính nó chỉ làm "bộ đếm": mỗi lần đổi, tính chênh lệch → volStep trên TV (±5 mỗi nấc),
+   rồi đặt lại về giữa (~50%) để lúc nào cũng còn bấm tiếp được cả hai chiều (đang 100% thì bấm tăng hệ thống không báo gì nữa).
+   APK gọi window.bmbSysVol(v) (gộp 120 ms khi giữ nút); lần đặt lại cũng sinh một lần gọi → bỏ qua nhờ so với `base`. */
+(() => {
+  if(!/BMBPlayerApp\/\S+ \(tablet\)/.test(navigator.userAgent)) return;
+  let NV = null; try{ NV = window.BMBNative && typeof BMBNative.setVolume === 'function' && typeof BMBNative.getVolume === 'function' ? BMBNative : null; }catch(e){}
+  if(!NV) return;
+  let base = -1;
+  const center = () => { try{ NV.setVolume(50); base = +NV.getVolume(); }catch(e){} };
+  center();
+  window.bmbSysVol = v => {
+    v = Math.round(+v);
+    if(!(v >= 0) || v === base) return;                                   // tiếng vọng của lần đặt lại
+    const d = base >= 0 ? v - base : 0;
+    if(d && !document.body.classList.contains('roomOff')){
+      const n = Math.min(4, Math.max(1, Math.round(Math.abs(d) / 7)));     // 1 nấc máy tính bảng (~6–7%) = 1 nấc TV; giữ nút thì gộp nhiều nấc
+      volStep((d > 0 ? 5 : -5) * n);
+    }
+    center();
+  };
+})();
 /* Máy tính bảng xoay ngang (hoặc ?wide=1): bố cục hai cột như SK Player; điện thoại giữ dạng dọc */
 /* Bố cục rộng (máy tính bảng ngang). KHÔNG phụ thuộc chiều cao hiện tại: bàn phím ảo bật lên làm cao màn hình tụt < 500 →
    trước đây tự chuyển về bố cục dọc giữa lúc đang gõ, ô tìm mất tiêu điểm (bấm vào ô không gõ được). Nay nhớ chiều cao lớn nhất đã thấy
