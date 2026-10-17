@@ -49,7 +49,7 @@
      Binding: D1 DB → bmb_data ; Durable Object ROOM → Room, REG → Registry, NHAC → NhacRoom, QHUB → QuayHub
    THÔNG BÁO ĐẨY (Web Push, 10/2026): mỗi máy bật trong quay.html (nút 🔔) → đơn mới hiện thông báo có nút Tiếp nhận,
      đã xác nhận → nút Đã xong (sw-quay.js gọi action push.act, có chữ ký). Máy đang mở trang quầy thì không đẩy trùng.
-     Bảng order_push_sub + order_meta (khoá VAPID — đừng xoá) tự tạo. Biến PUSH_LETAN=0 tắt đẩy (chuông WebSocket vẫn chạy).
+     Bảng order_push_sub + order_meta (khoá VAPID — đừng xoá) tự tạo. Biến PUSH_LETAN=0 tắt đẩy (chuông WebSocket vẫn chạy). NHAC_PHUT (mặc định 3; 0 = tắt): đơn MỚI quá hạn chưa tiếp nhận thì đẩy thêm 1 thông báo nhắc.
    TELEGRAM: yêu cầu gọi lễ tân (mới / xác nhận / đã phục vụ / huỷ) báo cho quản lý + nhân viên quầy chi nhánh (xem tgDon: có nút Tiếp nhận / Đã xong / Huỷ / Đã nhập POS ngay trên Telegram). CHƯA CÓ: nhắc lại khi quá hạn (SLA); học IP chi nhánh
    ============================================================ */
 import { DurableObject } from 'cloudflare:workers';
@@ -1863,6 +1863,7 @@ const callR = (stub, path, body) => stub.fetch('https://do' + path, { method: 'P
 // ============================================================
 const QHUB_MAX_SOCK_USER = 4;            // mỗi tài khoản tối đa 4 màn quầy nối cùng lúc (đóng cái cũ nhất)
 const PUSH_MAX_MAY_USER = 6;             // mỗi tài khoản tối đa 6 máy nhận thông báo
+const NHAC_MS_MAC_DINH = 3 * 60 * 1000;      // đơn MỚI sau 3 phút chưa ai tiếp nhận → đẩy thêm 1 thông báo nhắc (đổi bằng biến NHAC_PHUT; 0 = tắt)
 const PUSH_NUT_HAN_MS = 12 * 3600 * 1000;    // nút trên thông báo dùng được trong 12 giờ
 const DV_Q_RE = /^[A-Za-z0-9_-]{8,40}$/;     // mã máy (quay.html tự sinh, nhớ trong trình duyệt; app tự sinh)
 const TRANG_THAI_TEN = { MOI: 'chờ xác nhận', NHAN: 'đã xác nhận', XONG: 'đã phục vụ', HUY: 'đã huỷ' };
@@ -1922,6 +1923,14 @@ export class QuayHub extends DurableObject {
       this.broadcast({ t: 'rev', why, at: Date.now() });
       return new Response('ok');
     }
+    if (url.pathname === '/nhac') {                     // hẹn nhắc 1 đơn mới (không đặt lại nếu đã hẹn)
+      let b = {}; try { b = await request.json(); } catch (e) {}
+      if (!/^[\w-]{4,40}$/.test(String(b.id || '')) || !(b.sau > 0)) return new Response('bad', { status: 400 });
+      const k = 'n:' + b.id;
+      if (!(await this.ctx.storage.get(k))) await this.ctx.storage.put(k, Date.now() + Math.min(+b.sau, 3600000));
+      await this.datBao();
+      return new Response('ok');
+    }
     if (url.pathname === '/visible') return new Response(JSON.stringify({ visible: this.visibleList() }), { headers: { 'content-type': 'application/json' } });
     if (url.pathname === '/ws') {
       const user = request.headers.get('X-User') || '';
@@ -1941,6 +1950,21 @@ export class QuayHub extends DurableObject {
     if (!m || m.t !== 'vis') return;
     const a = this.info(ws), v = m.v ? 1 : 0;
     if (a.u && v !== a.v) ws.serializeAttachment(Object.assign({}, a, { v }));
+  }
+  /** đặt báo thức vào giờ nhắc gần nhất */
+  async datBao() {
+    const m = await this.ctx.storage.list({ prefix: 'n:' });
+    let min = 0; for (const t of m.values()) if (!min || t < min) min = t;
+    if (min) await this.ctx.storage.setAlarm(Math.max(min, Date.now() + 1000));
+  }
+  async alarm() {
+    const m = await this.ctx.storage.list({ prefix: 'n:' }), now = Date.now();
+    for (const [k, t] of m) {
+      if (t > now + 500) continue;
+      await this.ctx.storage.delete(k);
+      try { await nhacDon(this.env, k.slice(2)); } catch (e) { console.error('nhacDon:', e && e.name, e && e.message); }
+    }
+    await this.datBao();
   }
   async webSocketClose(ws, code, reason) { try { ws.close(code === 1005 || code === 1006 ? 1000 : code, reason); } catch (e) {} }
   async webSocketError(ws) { try { ws.close(1011, 'error'); } catch (e) {} }
@@ -2051,8 +2075,26 @@ async function baoQuayDon(env, orderId, opt = {}) {
     if (!don || !don.chi_nhanh_id) return;
     await pokeQuay(env, don.chi_nhanh_id, 'don');
     if (opt.push === false || String(env.PUSH_LETAN || '1') === '0') return;
+    if (don.trang_thai === 'MOI') await henNhacDon(env, don);
     await pushDon(env, don, opt);
   } catch (e) { console.error('baoQuayDon:', e && e.name, e && e.message); }
+}
+/** Hẹn nhắc đơn MỚI (báo thức của QuayHub chi nhánh). NHAC_PHUT=0 → tắt */
+async function henNhacDon(env, don) {
+  const phut = env.NHAC_PHUT === undefined || env.NHAC_PHUT === '' ? NHAC_MS_MAC_DINH / 60000 : +env.NHAC_PHUT;
+  const st = quayHub(env, don.chi_nhanh_id);
+  if (!st || !(phut > 0)) return;
+  try { await st.fetch('https://hub/nhac', { method: 'POST', body: JSON.stringify({ id: don.id, sau: phut * 60000 }) }); }
+  catch (e) { console.error('henNhacDon:', e && e.name); }
+}
+/** Đến giờ nhắc: đơn còn MỚI → rung chuông lại + đẩy thông báo nhắc (đơn đã tiếp nhận/xong/huỷ thì thôi) */
+export async function nhacDon(env, orderId) {
+  if (!env.DB) return 0;
+  const don = await env.DB.prepare('SELECT id, chi_nhanh_id, ten_phong, items, ghi_chu, nghi_ngo, trang_thai, nguoi_xu_ly, tao_luc FROM order_don WHERE id = ?').bind(orderId).first();
+  if (!don || don.trang_thai !== 'MOI' || !don.chi_nhanh_id) return 0;
+  await pokeQuay(env, don.chi_nhanh_id, 'nhac');
+  if (String(env.PUSH_LETAN || '1') === '0') return 0;
+  return await pushDon(env, don, { nhac: true });
 }
 async function pushDon(env, don, opt) {
   await pushBangSan(env);
@@ -2074,6 +2116,10 @@ async function pushDon(env, don, opt) {
   };
   const nd = pushNoiDung(don, items, await tenNguoi(opt.nguoi || don.nguoi_xu_ly));
   const st = don.trang_thai, moi = st === 'MOI';
+  if (opt.nhac) {
+    const ph = Math.max(1, Math.round((Date.now() - don.tao_luc) / 60000));
+    nd.title = '⏰ ' + don.ten_phong + ' đợi ' + ph + ' phút chưa ai tiếp nhận';
+  }
   const exp = Date.now() + PUSH_NUT_HAN_MS;
   const actions = moi ? [{ action: 'nhan', title: '✅ Tiếp nhận' }] : st === 'NHAN' ? [{ action: 'xong', title: '🎉 Đã xong' }] : [];
   const ky = {};

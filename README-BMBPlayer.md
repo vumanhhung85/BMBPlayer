@@ -56,6 +56,7 @@ Trên máy có Node (thư mục repo BMBPlayer, PowerShell):
 - Deploy: thêm binding `QHUB` + migration `v2` trong wrangler.toml (đã có), push `main` là xong. Không cần secret mới. Bảng `order_push_sub`, `order_meta` tự tạo. **Đừng xoá dòng `vapid` trong `order_meta`** (xoá là mọi máy phải bật lại).
 - **App BMBPlayer 2.0 chế độ Quầy** (điện thoại Android): không dùng Web Push mà tự hiện thông báo bằng dịch vụ nền — đăng nhập trên app, trang xin khoá máy (`app.dangKy`, bảng `order_app_may` tự tạo), app nối `/quay/ws` bằng khoá đó và gọi `app.sync`. Chuông riêng, nhắc lại 30 giây tới khi có người Tiếp nhận. Đăng xuất bằng nút / khoá tài khoản / đổi chi nhánh → máy thôi nhận.
 - Tắt đẩy khẩn cấp: biến `PUSH_LETAN = 0` (chuông WebSocket vẫn chạy). Telegram vẫn chạy song song.
+- Nhắc lại: đơn MỚI sau 3 phút chưa ai tiếp nhận → QuayHub (báo thức Durable Object) rung chuông lại + đẩy thêm 1 thông báo «⏰ P5 đợi 3 phút chưa ai tiếp nhận» (có nút Tiếp nhận). Mỗi đơn nhắc đúng 1 lần; đơn đã tiếp nhận/xong/huỷ thì không nhắc. Đổi số phút bằng biến `NHAC_PHUT` (0 = tắt). Không cần migration mới.
 
 ## Chuyển CN03 sang (thay thẳng)
 1. Quầy CN03 mở `https://bmb.id.vn/quay.html`, đăng nhập tài khoản cũ.
