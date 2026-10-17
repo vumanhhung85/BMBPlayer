@@ -54,8 +54,8 @@ import okhttp3.WebSocketListener;
  * Khoá máy (dk) do quay.html xin bằng app.dangKy sau khi đăng nhập, rồi giao cho app qua BMBNative.quayBat.
  */
 public class QuayService extends Service {
-    static final String K_DK = "q_dk", K_API = "q_api", K_BRANCH = "q_branch", K_USER = "q_user", K_DV = "q_dv";
-    static final String CH_DON = "quay_don_v1", CH_CAPNHAT = "quay_capnhat_v1", CH_NEN = "quay_nen_v1";
+    static final String K_DK = "q_dk", K_API = "q_api", K_BRANCH = "q_branch", K_USER = "q_user", K_DV = "q_dv", K_TBSAU = "q_tbsau";
+    static final String CH_DON = "quay_don_v1", CH_CAPNHAT = "quay_capnhat_v1", CH_NEN = "quay_nen_v1", CH_VIEC = "quay_viec_v1";
     static final int ID_NEN = 77;
     static final String DEFAULT_API = "https://bmbplayer.vumanhhung85.workers.dev/api";
     static final String ORIGIN = "https://bmb.id.vn";
@@ -276,12 +276,13 @@ public class QuayService extends Service {
         try {
             io.execute(() -> {
                 try {
-                    JSONObject r = postJson(api, new JSONObject().put("action", "app.sync").put("dk", dk));
+                    JSONObject r = postJson(api, new JSONObject().put("action", "app.sync").put("dk", dk).put("tbSau", p.getLong(K_TBSAU, -1)));
                     h.post(() -> {
                         if (r.optInt("_status") == 403 || "may_het_han".equals(r.optString("error"))) { revoked(); return; }
                         if (!r.optBoolean("ok")) return;
                         lastSyncAt = System.currentTimeMillis();
                         apply(r.optJSONArray("orders"));
+                        applyQl(r.optJSONObject("ql"));
                     });
                 } catch (Exception ignored) { /* mất mạng: lượt sau thử lại */ }
             });
@@ -330,6 +331,42 @@ public class QuayService extends Service {
         if (!moi.isEmpty()) h.postDelayed(remind, REMIND_MS);
     }
 
+    /** 2.1 — quản lý chi nhánh: thông báo sự cố / đặt phòng (đúng các tin Telegram riêng gửi quản lý), kênh riêng.
+     *  im = trong giờ yên lặng (hiện nhưng không kêu; sự cố Khẩn cấp Worker đã để im=false). Bấm → mở admin.html đúng chỗ. */
+    private void applyQl(JSONObject ql) {
+        if (ql == null) return;
+        SharedPreferences p = prefs(this);
+        long moc = ql.optLong("moc", -1);
+        JSONArray tb = ql.optJSONArray("tb");
+        NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        if (tb != null) for (int i = 0; i < tb.length(); i++) {
+            JSONObject o = tb.optJSONObject(i);
+            if (o == null) continue;
+            String loai = o.optString("loai"), ma = o.optString("ma");
+            String key = "ql:" + loai + ":" + (ma.isEmpty() ? String.valueOf(o.optLong("id")) : ma);
+            boolean im = o.optBoolean("im");
+            Notification.Builder b = base(im ? CH_CAPNHAT : CH_VIEC, !im)
+                    .setContentTitle(o.optString("title"))
+                    .setContentText(o.optString("body"))
+                    .setStyle(new Notification.BigTextStyle().bigText(o.optString("body")))
+                    .setWhen(o.optLong("at", System.currentTimeMillis()))
+                    .setContentIntent(openAdmin(this, nid(key), "datphong".equals(loai) ? "datphong" : "suco", ma))
+                    .setCategory(Notification.CATEGORY_EVENT)
+                    .setVisibility(Notification.VISIBILITY_PUBLIC)
+                    .setAutoCancel(true);
+            if (Build.VERSION.SDK_INT < 26 && !im) b.setPriority(Notification.PRIORITY_HIGH).setDefaults(Notification.DEFAULT_ALL);
+            nm.notify(nid(key), b.build());
+        }
+        if (moc >= 0 && moc != p.getLong(K_TBSAU, -1)) p.edit().putLong(K_TBSAU, moc).apply();
+    }
+
+    static PendingIntent openAdmin(Context c, int req, String kind, String ma) {
+        Intent i = new Intent(c, MainActivity.class).setAction("vn.boommusicbox.bmbplayer.MO_ADMIN." + req)
+                .putExtra("mo", kind).putExtra("ma", ma == null ? "" : ma)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        return PendingIntent.getActivity(c, req, i, PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0));
+    }
+
     /** Còn đơn chờ tiếp nhận: 30 giây kêu lại một lần (đơn cũ nhất), tới khi có người Tiếp nhận */
     private final Runnable remind = new Runnable() {
         @Override public void run() {
@@ -375,6 +412,11 @@ public class QuayService extends Service {
         NotificationChannel cap = new NotificationChannel(CH_CAPNHAT, "Cập nhật đơn (im lặng)", NotificationManager.IMPORTANCE_LOW);
         cap.setDescription("Đơn đã xác nhận / kết quả bấm nút");
         cap.setShowBadge(false);
+        NotificationChannel viec = new NotificationChannel(CH_VIEC, "Sự cố & đặt phòng (quản lý)", NotificationManager.IMPORTANCE_HIGH);
+        viec.setDescription("Sự cố mới / đã tiếp nhận / kỹ thuật nhận việc / báo xong, đơn giữ phòng mới — cho quản lý chi nhánh");
+        viec.enableVibration(true);
+        viec.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
+        nm.createNotificationChannel(viec);
         NotificationChannel nen = new NotificationChannel(CH_NEN, "Dịch vụ nhận đơn (nền)", NotificationManager.IMPORTANCE_MIN);
         nen.setDescription("Dòng \"BMB Quầy đang nhận đơn\" — Android bắt buộc có khi app nhận đơn ở nền");
         nen.setShowBadge(false);

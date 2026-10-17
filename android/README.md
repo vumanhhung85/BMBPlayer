@@ -45,3 +45,9 @@ Tăng `versionCode` (và `versionName`) trong `android/app/build.gradle`, đẩy
 - Trang quầy đang mở trên máy thì không kêu (trang đã kêu). Thanh trạng thái luôn có dòng "BMB Quầy đang nhận đơn" (Android bắt buộc).
 - Lần đầu app hỏi quyền **Thông báo** (Android 13+) và **bỏ tối ưu pin** — nên cho phép. Bảng 🔔 trên trang quầy có nút mở lại 2 cài đặt này và "Gửi thử".
 - Đăng xuất bằng nút trên trang, hoặc đổi sang chế độ khác: máy thôi nhận đơn (`app.huy`). Tài khoản bị khoá / đổi chi nhánh: máy tự thôi nhận.
+
+## 2.1 — quản lý chi nhánh dùng chung app (Bảo trì / Đặt phòng + thông báo)
+- Bật trong admin.html → Cài đặt → "📱 App BMBPlayer cho quản lý chi nhánh" (2 công tắc). Chỉ tài khoản manager.
+- Trang quầy có thêm nút 🛠️ Bảo trì / 📋 Đặt phòng → app xin vé 1 lần (`app.veAdmin`) rồi mở `https://boommusicbox.vn/admin.html#ve=…` — không phải đăng nhập lại. Trên admin.html có nút "← Quầy"; nút Quay lại của máy cũng về trang quầy.
+- Thông báo sự cố / đặt phòng: kênh riêng "Sự cố & đặt phòng (quản lý)"; trong giờ yên lặng hiện không kêu (sự cố Khẩn cấp vẫn kêu). Bấm thông báo → mở đúng sự cố / tab Đặt phòng.
+- Đang xem Bảo trì / Đặt phòng trong app thì chuông đơn gọi lễ tân vẫn kêu (chỉ im khi trang quầy đang hiện).

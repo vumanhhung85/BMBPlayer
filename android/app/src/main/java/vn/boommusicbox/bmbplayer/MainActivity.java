@@ -168,6 +168,7 @@ public class MainActivity extends Activity {
         }
         applyScreenPolicy();
         start();
+        handleOpenIntent(getIntent());
     }
 
     @Override
@@ -175,6 +176,8 @@ public class MainActivity extends Activity {
         super.onNewIntent(intent);
         hideBars();
         if (web == null && !mode.isEmpty()) start();
+        setIntent(intent);
+        handleOpenIntent(intent);
     }
 
     @Override
@@ -184,7 +187,7 @@ public class MainActivity extends Activity {
         applyScreenPolicy();
         if (web != null) web.onResume();
         resumed = true;
-        QuayService.uiVisible = "quay".equals(mode);
+        updateUiVisible();
         if ("quay".equals(mode)) {
             QuayService.onChange = () -> ui.post(() -> { if (web != null) web.evaluateJavascript("window.bmbQuayTrangThai&&bmbQuayTrangThai()", null); });
             if (QuayService.self == null) QuayService.start(this);
@@ -443,6 +446,7 @@ public class MainActivity extends Activity {
         @Override
         public void onPageFinished(WebView view, String url) {
             if (!loadFailed) hideOffline();
+            updateUiVisible();
         }
 
         @Override
@@ -670,6 +674,43 @@ public class MainActivity extends Activity {
         openDialog.show();
     }
 
+    /** Chuông đơn trong app không kêu khi trang QUẦY đang hiện trên màn hình (trang đã tự kêu); đang xem Bảo trì / Đặt phòng thì vẫn kêu */
+    private void updateUiVisible() {
+        String u = web != null ? web.getUrl() : null;
+        QuayService.uiVisible = "quay".equals(mode) && resumed && (u == null || u.contains("/quay.html"));
+    }
+
+    /** 2.1 — quản lý chi nhánh: mở admin.html (Bảo trì / Đặt phòng) đã đăng nhập sẵn bằng vé 1 lần do Worker cấp.
+     *  kind: baotri | datphong | suco (ma = mã sự cố) */
+    private void moAdmin(final String kind, final String ma) {
+        if (!"quay".equals(mode)) return;
+        final String dk = prefs.getString(QuayService.K_DK, ""), api = prefs.getString(QuayService.K_API, QuayService.DEFAULT_API);
+        if (dk == null || dk.isEmpty()) { toast("Đăng nhập màn quầy trước đã."); return; }
+        new Thread(() -> {
+            String url = null, err = null;
+            try {
+                org.json.JSONObject r = QuayService.postJson(api, new org.json.JSONObject().put("action", "app.veAdmin").put("dk", dk));
+                if (r.optBoolean("ok") && r.optString("ve").length() > 10) {
+                    String q = "datphong".equals(kind) ? "?tab=dat-phong" : ("suco".equals(kind) && ma != null && !ma.isEmpty() ? "?ticket=" + Uri.encode(ma) : "");
+                    url = r.optString("url", "https://boommusicbox.vn/admin.html") + q + "#ve=" + r.optString("ve");
+                } else err = r.optString("msg", "Không mở được Bảo trì / Đặt phòng.");
+            } catch (Exception e) { err = "Không kết nối được máy chủ."; }
+            final String fu = url, fe = err;
+            ui.post(() -> {
+                if (fu != null) { if (web == null && createWeb()) applyUserAgent(); if (web != null) web.loadUrl(fu); }
+                else toast(fe);
+            });
+        }).start();
+    }
+
+    /** Bấm thông báo sự cố / đặt phòng → mở đúng chỗ */
+    private void handleOpenIntent(Intent i) {
+        if (i == null || !i.hasExtra("mo")) return;
+        String kind = i.getStringExtra("mo"), ma = i.getStringExtra("ma");
+        i.removeExtra("mo");
+        ui.postDelayed(() -> moAdmin(kind, ma), web == null ? 1200 : 0);
+    }
+
     private void showModeMenu() {
         final String[] keys = {"tv", "tablet", "quay"};
         final String[] names = {"📺  TV trong phòng (phát bài, hiện QR khách)", "📱  Máy tính bảng trong phòng (chọn bài + gọi phục vụ)", "🛎  Quầy (nhận đơn gọi lễ tân, có chuông báo)"};
@@ -685,7 +726,7 @@ public class MainActivity extends Activity {
         if ("quay".equals(mode) && !"quay".equals(m)) QuayService.logout(this);   // thôi làm quầy: gỡ máy khỏi danh sách nhận đơn
         mode = m;
         prefs.edit().putString(K_MODE, mode).apply();
-        QuayService.uiVisible = "quay".equals(mode) && resumed;
+        updateUiVisible();
         applyScreenPolicy(); applyUserAgent(); loadHome();
         toast("Đã chuyển sang chế độ " + modeName(mode));
     }
@@ -1077,6 +1118,10 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface
         public void quayCaiDat(String kind) { ui.post(() -> { if ("pin".equals(kind)) openBatterySettings(); else openNotifSettings(); }); }
+
+        /** Quản lý chi nhánh bấm 🛠️ Bảo trì / 📋 Đặt phòng trên trang quầy */
+        @JavascriptInterface
+        public void quayMoAdmin(String kind) { ui.post(() -> moAdmin("datphong".equals(kind) ? "datphong" : "baotri", "")); }
     }
 
     private void askNotifPermission() {
