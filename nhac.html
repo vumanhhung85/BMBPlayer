@@ -201,6 +201,16 @@
   body.remote #ctl .vol{display:none}
   body.remote #volRow{display:flex; align-items:center; gap:12px; padding:0 4px}
   #volRow{display:none}
+  /* Âm lượng bằng nút −/+ (không dùng thanh trượt, tránh kéo nhầm); #vol vẫn giữ làm nơi lưu giá trị nhưng ẩn */
+  #vol{display:none !important}
+  .vbtn{width:46px; height:46px; flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; border-radius:50%; background:#20202e; border:1px solid var(--line); color:var(--ink); padding:0; touch-action:manipulation; -webkit-user-select:none; user-select:none}
+  .vbtn svg{width:22px; height:22px; fill:currentColor} .vbtn:active{background:var(--accent)}
+  .vnum{min-width:38px; text-align:center; color:#FFD21A; font-weight:800; font-size:17px; font-variant-numeric:tabular-nums}
+  body.remote #volRow{justify-content:center; gap:14px; padding:2px 4px}
+  body.remote #volRow .vbtn{width:54px; height:54px} body.remote #volRow .vbtn svg{width:26px; height:26px}
+  body.remote #volRow .vi{width:54px; height:54px; align-items:center; justify-content:center; border-radius:50%; background:#20202e; border:1px solid var(--line); color:var(--ink)}
+  body.remote #volRow .vi svg{width:26px; height:26px}
+  body.remote #volRow .vn{min-width:48px; text-align:center; font-size:22px; font-weight:800}
   #volRow .vi{color:var(--quiet); display:flex} #volRow .vi svg{width:20px; height:20px; fill:currentColor} #volRow .vi.off{color:#f87171}
   #volRow input{flex:1; -webkit-appearance:none; appearance:none; background:transparent; height:28px; accent-color:#a855f7; touch-action:none}
   #volRow input::-webkit-slider-runnable-track{height:8px; border-radius:99px; background:linear-gradient(90deg,#7c3aed,#c084fc var(--p,100%),#2c2c3c var(--p,100%))}
@@ -251,7 +261,7 @@
       <button id="nextBtn" class="big" title="Bài kế (→)">⏭</button>
       <button id="shufBtn" class="big" title="Trộn bài (S)">🔀</button>
       <button id="repBtn" class="big" title="Lặp (R)">🔁</button>
-      <label class="vol"><span id="muteBtn" role="button" tabindex="0" title="Tắt / mở tiếng (M)" style="cursor:pointer;padding:0 4px">🔊</span> <input type="range" id="vol" min="0" max="100" value="50"></label>
+      <label class="vol"><span id="muteBtn" role="button" tabindex="0" title="Tắt / mở tiếng (M)" style="cursor:pointer;padding:0 4px">🔊</span> <input type="range" id="vol" min="0" max="100" value="50"><span id="volBtns"></span></label>
       <button id="fsBtn" class="big" title="Toàn màn hình (F)">⛶</button>
     </div>
     </div><div id="tvQr" title="Quét bằng điện thoại để chọn bài"><div class="box" id="tvQrImg"></div><b>VMHPlayer</b><span>Quét để chọn bài</span></div></div>
@@ -1081,13 +1091,14 @@ const ICON = {
   repeat:'<svg viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2z"/></svg>',
   repeat1:'<svg viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2zm-4-2V9h-1l-2 1v1h1.5v4z"/></svg>',
   mute:'<svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 4V5L7 9zm13.6 3 2.7-2.7-1.4-1.4-2.7 2.7-2.7-2.7-1.4 1.4 2.7 2.7-2.7 2.7 1.4 1.4 2.7-2.7 2.7 2.7 1.4-1.4z"/></svg>',
+  low:'<svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 4V5L7 9zm11.5 3A4.5 4.5 0 0 0 12 8v8a4.5 4.5 0 0 0 2.5-4z"/></svg>',
   vol:'<svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 4V5L7 9zM16.5 12A4.5 4.5 0 0 0 14 8v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z"/></svg>'
 };
 const ICON_FS = '<svg viewBox="0 0 24 24"><path d="M5 5h5v2H7v3H5zm9 0h5v5h-2V7h-3zM5 14h2v3h3v2H5zm12 0h2v5h-5v-2h3z"/></svg>', ICON_FS_OFF = '<svg viewBox="0 0 24 24"><path d="M8 5h2v5H5V8h3zm6 0h2v3h3v2h-5zM5 14h5v5H8v-3H5zm9 0h5v2h-3v3h-2z"/></svg>';
 let tvFsShown = false;
 function paintFs(on){ tvFsShown = on; const b = $('fsRemote'); if(b){ b.innerHTML = on ? ICON_FS_OFF : ICON_FS; b.classList.toggle('on', on); b.title = on ? 'Thu nhỏ màn hình TV' : 'Phóng to màn hình TV'; } }
 function setPlayIcon(playing){ if(REMOTE) $('playBtn').innerHTML = playing ? ICON.pause : ICON.play; else $('playBtn').textContent = playing ? '⏸' : '▶'; }
-function paintVol(){ const v = +$('vol').value || 0; $('vol').style.setProperty('--p', v + '%'); const n = $('volN'); if(n) n.textContent = v; }
+function paintVol(){ const v = +$('vol').value || 0; $('vol').style.setProperty('--p', v + '%'); const n = $('volN'); if(n) n.textContent = v; const n2 = $('volNum'); if(n2) n2.textContent = v; }
 function paintModes(){
   $('shufBtn').classList.toggle('on', shuffle);
   if(REMOTE) $('repBtn').innerHTML = repeat === 'one' ? ICON.repeat1 : ICON.repeat;
@@ -1106,6 +1117,21 @@ const act = {
 };
 $('playBtn').onclick = act.toggle; $('nextBtn').onclick = act.next; $('prevBtn').onclick = act.prev;
 $('shufBtn').onclick = act.shuffle; $('repBtn').onclick = act.repeat;
+/* Nút âm lượng −/+ (mỗi lần 5, giữ để lặp). Giá trị vẫn lưu ở #vol (ẩn) nên mọi chỗ khác dùng lại nguyên. */
+function volStep(d){
+  const v = Math.max(0, Math.min(100, (+$('vol').value || 0) + d));
+  $('vol').value = v; $('vol').dispatchEvent(new Event('input'));
+}
+function volButton(icon, d, title){
+  const b = el('button', 'vbtn'); b.type = 'button'; b.title = title; b.innerHTML = '<span style="font-size:30px;font-weight:600;line-height:1;margin-top:-3px">' + (d < 0 ? '−' : '+') + '</span>';
+  let t = null, r = null;
+  const stop = () => { clearTimeout(t); clearInterval(r); t = r = null; };
+  b.addEventListener('pointerdown', e => { e.preventDefault(); volStep(d); t = setTimeout(() => { r = setInterval(() => volStep(d), 120); }, 450); });
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => b.addEventListener(ev, stop));
+  b.addEventListener('contextmenu', e => e.preventDefault());
+  return b;
+}
+if(!REMOTE){ const vn = el('b', 'vnum'); vn.id = 'volNum'; vn.textContent = $('vol').value; $('volBtns').append(volButton('low', -5, 'Giảm âm lượng'), vn, volButton('vol', 5, 'Tăng âm lượng')); $('volBtns').style.cssText = 'display:inline-flex;align-items:center;gap:6px'; }
 let volTimer;
 $('vol').addEventListener('input', paintVol);
 $('vol').oninput = e => {
@@ -1271,7 +1297,7 @@ if(REMOTE){
   const dock = el('div'); dock.id = 'dock';
   const vr = el('div'); vr.id = 'volRow';
   const vi = el('span', 'vi'); vi.innerHTML = ICON.vol;
-  vr.append(vi, $('vol'), el('b', 'vn')); vr.lastChild.id = 'volN';
+  vr.append(vi, volButton('low', -5, 'Giảm âm lượng'), el('b', 'vn'), volButton('vol', 5, 'Tăng âm lượng'), $('vol')); vr.children[2].id = 'volN';
   vi.style.cursor = 'pointer'; vi.onclick = () => { sendCmd('mute'); remoteMute = !remoteMute; paintMute(); };
   dock.append($('ctl'), vr); document.body.append(dock);
   const fb = el('button'); fb.id = 'fsRemote'; dock.prepend(fb); paintFs(false);
