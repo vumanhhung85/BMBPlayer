@@ -167,6 +167,25 @@
   .eq.stop i{animation:none}
   @keyframes eq{50%{transform:scaleY(.35)}}
   #dock{display:none}
+  /* điện thoại: nút ⛶ phóng bảng điều khiển ra TOÀN MÀN HÌNH (nút to nhất, thao tác một tay), bấm lại để thu về như lúc mới mở */
+  #bigBtn, #bigNow, #volStep{display:none}
+  body.remote #bigBtn{display:flex; position:absolute; right:12px; top:-46px; width:40px; height:40px; align-items:center; justify-content:center; background:rgba(32,32,46,.95); border:1px solid var(--line); border-radius:50%; color:var(--ink); padding:0}
+  body.remote #bigBtn svg{width:20px; height:20px; fill:currentColor}
+  body.remote.big{overflow:hidden}
+  body.remote.big #dock{top:0; justify-content:center; align-items:stretch; gap:30px; padding:calc(20px + env(safe-area-inset-top)) 20px calc(24px + env(safe-area-inset-bottom)); z-index:90; border-top:none; background:#0f0f18}
+  body.remote.big #bigBtn{top:calc(14px + env(safe-area-inset-top)); right:14px; width:48px; height:48px}
+  body.remote.big #bigNow{display:block; text-align:center; padding:0 54px}
+  #bigNow .bt{font-size:21px; font-weight:800; line-height:1.3; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden}
+  #bigNow .bc{color:var(--quiet); font-size:15px; margin-top:6px}
+  body.remote.big #ctl{display:grid; grid-template-columns:repeat(4,1fr); gap:26px 10px; justify-items:center}
+  body.remote.big #ctl .big{width:76px; height:76px} body.remote.big #ctl .big svg{width:38px; height:38px}
+  body.remote.big #ctl .big.pri{width:160px; height:160px; grid-column:1 / -1; grid-row:1} body.remote.big #ctl .big.pri svg{width:80px; height:80px}
+  body.remote.big #volRow{gap:14px} body.remote.big #volRow input{height:48px} body.remote.big #volRow input::-webkit-slider-runnable-track{height:16px}
+  body.remote.big #volRow input::-webkit-slider-thumb{width:44px; height:44px; margin-top:-14px}
+  body.remote.big #volRow .vn{font-size:22px; min-width:44px} body.remote.big #volRow .vi svg{width:30px; height:30px}
+  body.remote.big #volStep{display:flex; gap:16px; justify-content:center}
+  #volStep button{flex:1; max-width:160px; height:64px; background:#20202e; border:1px solid var(--line); border-radius:16px; color:var(--ink); font-size:30px; font-weight:800}
+  #volStep button:active{transform:scale(.95)}
   body.remote #dock{display:flex; position:fixed; left:0; right:0; bottom:0; z-index:40; flex-direction:column; gap:10px; background:rgba(21,21,31,.97); border-top:1px solid var(--line); padding:10px 16px calc(10px + env(safe-area-inset-bottom))}
   body.remote #ctl{display:flex; gap:14px; align-items:center; justify-content:center; padding:0; flex-wrap:nowrap}
   body.remote #ctl .big{width:54px; height:54px; flex:0 0 auto; background:#20202e; border:1px solid var(--line); border-radius:50%; display:flex; align-items:center; justify-content:center; padding:0; font-size:0}
@@ -1110,6 +1129,27 @@ if(REMOTE){
   const vi = el('span', 'vi'); vi.innerHTML = ICON.vol;
   vr.append(vi, $('vol'), el('b', 'vn')); vr.lastChild.id = 'volN';
   dock.append($('ctl'), vr); document.body.append(dock);
+  // nút phóng to / thu nhỏ bảng điều khiển (toàn màn hình thật nếu trình duyệt cho; iPhone không có thì vẫn phóng to trong trang)
+  const bn = el('div'); bn.id = 'bigNow'; bn.innerHTML = '<div class="bt" id="bigT"></div><div class="bc" id="bigC"></div>';
+  const stp = el('div'); stp.id = 'volStep';
+  [['−', -5], ['＋', 5]].forEach(([t, d]) => { const b = el('button', null, t); b.onclick = () => { const v = Math.max(0, Math.min(100, (+$('vol').value || 0) + d)); $('vol').value = v; $('vol').oninput({ target: $('vol') }); paintVol(); }; stp.append(b); });
+  const bb = el('button'); bb.id = 'bigBtn'; bb.title = 'Phóng to / thu nhỏ bảng điều khiển';
+  const ICON_BIG = '<svg viewBox="0 0 24 24"><path d="M5 5h5v2H7v3H5zm9 0h5v5h-2V7h-3zM5 14h2v3h3v2H5zm12 0h2v5h-5v-2h3z"/></svg>';
+  const ICON_SMALL = '<svg viewBox="0 0 24 24"><path d="M8 5h2v5H5V8h3zm6 0h2v3h3v2h-5zM5 14h5v5H8v-3H5zm9 0h5v2h-3v3h-2z"/></svg>';
+  bb.innerHTML = ICON_BIG;
+  dock.prepend(bb, bn); dock.insertBefore(stp, vr.nextSibling);
+  const syncBig = () => { $('bigT').textContent = $('nowTitle').textContent; $('bigC').textContent = $('nowCh').textContent; };
+  new MutationObserver(syncBig).observe($('now'), { childList: true, subtree: true, characterData: true }); syncBig();
+  const setBig = on => {
+    document.body.classList.toggle('big', on); bb.innerHTML = on ? ICON_SMALL : ICON_BIG;
+    try{
+      if(on && document.documentElement.requestFullscreen && !document.fullscreenElement) document.documentElement.requestFullscreen({ navigationUI:'hide' }).catch(() => {});
+      if(!on && document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    }catch(e){}
+    if(on) window.scrollTo(0, 0);
+  };
+  bb.onclick = () => setBig(!document.body.classList.contains('big'));
+  document.addEventListener('fullscreenchange', () => { if(!document.fullscreenElement && document.body.classList.contains('big')) setBig(false); });   // vuốt/back thoát toàn màn hình → thu nhỏ theo
   $('fsBtn').remove();
   ['prevBtn', 'nextBtn', 'shufBtn'].forEach(id => { $(id).innerHTML = ICON[{ prevBtn:'prev', nextBtn:'next', shufBtn:'shuffle' }[id]]; });
   // thứ tự giống remote: trộn · lùi · phát · qua · lặp
