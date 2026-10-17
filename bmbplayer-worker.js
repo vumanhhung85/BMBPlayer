@@ -1754,7 +1754,7 @@ export class Room extends DurableObject {
    - Điện thoại {type:'cmd', action, payload} → mọi TV trong phòng.
    - TV {type:'state', state} và {type:'list', …} → mọi điện thoại; giữ bản mới nhất để gửi ngay cho máy vừa vào.
    ============================================================ */
-const NHAC_ACTIONS = new Set(['toggle', 'next', 'prev', 'vol', 'shuffle', 'repeat', 'playid', 'reload', 'playlist', 'hello']);
+const NHAC_ACTIONS = new Set(['toggle', 'next', 'prev', 'vol', 'shuffle', 'repeat', 'playid', 'reload', 'playlist', 'hello', 'fs']);   // fs = phóng to / thu nhỏ màn hình TV
 const NHAC_ROOM_RE = /^[\w-]{1,20}$/;
 const PAIR_MS = 5 * 60 * 1000, PAIR_TOKEN_MS = 24 * 3600 * 1000, MAX_LIST = 400000;
 const nhacPass = env => env.NHAC_PASS || env.APP_PASS;
@@ -1822,6 +1822,7 @@ export class NhacRoom extends DurableObject {
       if(m.action === 'vol') out.value = Math.max(0, Math.min(100, +p.value || 0));
       if(m.action === 'playid'){ if(!/^[\w-]{11}$/.test(p.id || '')) return; out.id = p.id; }
       if(m.action === 'playlist') out.name = String(p.name || '').slice(0, 60);
+      if(m.action === 'fs' && typeof p.on === 'boolean') out.on = p.on;
       this.sendAll(this.peers('tv'), JSON.stringify({ type: 'cmd', action: m.action, payload: out, at: now }));
       return;
     }
