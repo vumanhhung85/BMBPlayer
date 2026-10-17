@@ -410,7 +410,7 @@ function showDiag(kind){
 function makePlayer(){
   if(player || !apiReady) return;
   // controls=0 + rel=0 + iv_load_policy=3: giao diện sạch hơn, đều là tham số chính thức của trình phát nhúng
-  const vars = { autoplay:1, controls:0, rel:0, playsinline:1, enablejsapi:1, iv_load_policy:3, fs:0, disablekb:1 };
+  const vars = { autoplay:1, controls:0, rel:0, playsinline:1, enablejsapi:1, iv_load_policy:3, cc_load_policy:0, fs:0, disablekb:1 };
   if(location.protocol.startsWith('http')) vars.origin = location.origin;
   player = new YT.Player('yt', {
     width:'100%', height:'100%', playerVars: vars,
@@ -434,8 +434,10 @@ function swapOn(){
   clearTimeout(swapTimer); swapTimer = setTimeout(swapOff, 12000);     // phòng khi không nhận được trạng thái "đang phát"
 }
 function swapOff(){ clearTimeout(swapTimer); document.body.classList.remove('swap'); }
+function ccOff(){ try{ player.unloadModule('captions'); player.unloadModule('cc'); }catch(_){} }
 function onStateChange(e){
   const S = YT.PlayerState;
+  if(e.data === S.PLAYING) ccOff();
   if(e.data === S.ENDED){ swapOn(); next(); }
   if(e.data === S.PLAYING) swapOff();
   if(e.data === S.PLAYING){
