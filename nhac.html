@@ -125,6 +125,8 @@
   #link{font-size:12px; padding:4px 10px; border-radius:999px; background:#20202e; color:var(--quiet); white-space:nowrap}
   #link.on{background:#12361f; color:var(--good)}
   #pairBtn{display:none}
+  #scanBtn{display:none}
+  body.remote #scanBtn{display:inline-block}
   body:not(.remote) #pairBtn{display:inline-block}
   body.paired #plNew, body.paired #plDel, body.paired #tAdd, body.paired .acts{display:none}
   #pairModal{position:fixed; inset:0; z-index:61; display:none; align-items:center; justify-content:center; background:#000c; padding:16px}
@@ -222,6 +224,7 @@
   <button id="plDel" class="ico" title="Xoá playlist này">🗑</button>
   <span class="sp"></span>
   <span id="link" title="Kênh tức thì tới Worker bmbplayer">● Hỏi định kỳ</span>
+  <button id="scanBtn" class="ico" title="Quét mã QR trên TV để ghép / đổi TV">📷</button>
   <button id="pairBtn" class="ico" title="Ghép điện thoại bằng mã / QR">📱</button>
   <button id="gear" class="ico" title="Cài đặt kết nối">⚙</button>
 </header>
@@ -1234,20 +1237,26 @@ $('pairBtn').onclick = openPairTv;
 $('pairClose').onclick = closePair;
 $('pairPass').onclick = () => { closePair(); openSettings(); };
 $('pairGo').onclick = () => claim($('pairIn').value);
-$('pairScan').onclick = () => {
+function scanTv(){
   if(typeof openQrScanner !== 'function') return toast('Không mở được máy quét — hãy nhập mã 6 số.', 'err');
   openQrScanner({
-    title: 'Quét mã ghép trên TV', hint: 'Trên TV bấm nút 📱 rồi hướng camera vào mã QR hiện ra.',
+    title: 'Quét mã QR trên TV', hint: 'Hướng camera vào mã QR trên TV (mã cố định hoặc mã ghép bấm nút 📱).',
     manualPlaceholder: '000000', manualHint: 'Hoặc nhập mã 6 số trên TV.',
     onResult: async (raw) => {
-      let code = '';
-      try{ const u = new URL(raw); code = (u.searchParams.get('code') || '').replace(/\D/g, ''); }catch(e){ code = String(raw).replace(/\D/g, ''); }
-      if(code.length !== 6) return 'Đây không phải mã ghép. Trên TV bấm nút 📱 để hiện mã QR ghép.';
-      await claim(code);
-      return true;
+      let code = '', room = '';
+      try{ const u = new URL(raw); code = (u.searchParams.get('code') || '').replace(/\D/g, ''); room = (u.searchParams.get('room') || '').replace(/[^\w-]/g, '').slice(0, 20); }catch(e){ code = String(raw).replace(/\D/g, ''); }
+      if(code.length === 6){ await claim(code); return true; }
+      if(room){                                   // mã QR cố định của TV: chuyển sang đúng TV đó (điện thoại đã có mật khẩu điều khiển ngay; chưa có thì hiện màn nhập mã 6 số)
+        lsSet('nhac_last_room', room);
+        location.replace(location.pathname + '?mode=remote&room=' + encodeURIComponent(room));
+        return true;
+      }
+      return 'Đây không phải mã của TV. Hãy quét mã QR trên màn hình TV.';
     }
   });
-};
+}
+$('pairScan').onclick = scanTv;
+$('scanBtn').onclick = scanTv;
 $('pairIn').addEventListener('keydown', e => { if(e.key === 'Enter') claim($('pairIn').value); });
 document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') wsKick(); });
 
