@@ -76,6 +76,20 @@
   .addBtn.alt{background:#20202e; border:1px solid var(--line); color:var(--ink)}
   .addBtn:disabled{background:#20202e; color:var(--quiet); border:1px solid var(--line)}
   .verBox{margin:2px 0 6px 18px; border-left:2px solid var(--line); padding-left:8px}
+  /* TV: phóng video ra kín cả cửa sổ trình duyệt (điện thoại bấm ⛶ → lệnh 'fs'); thêm toàn màn hình thật nếu Chrome cho phép */
+  body.tvfull{overflow:hidden}
+  body.tvfull header, body.tvfull #side, body.tvfull #nowRow, body.tvfull #remoteCard{display:none}
+  body.tvfull #playerWrap{position:fixed; inset:0; width:100vw; height:100vh; aspect-ratio:auto; z-index:60}
+  #soundBanner{display:none; position:fixed; left:50%; top:14px; transform:translateX(-50%); z-index:90; background:#3a1f12; color:#fdba74; border:1px solid #f59e0b; border-radius:14px; padding:12px 18px; font-size:clamp(14px,1.6vw,20px); font-weight:700; text-align:center; max-width:90vw; box-shadow:0 8px 30px rgba(0,0,0,.6)}
+  #soundBanner small{display:block; font-weight:400; opacity:.85; margin-top:4px}
+  body.remote #fsRemote{display:flex}
+  #fsRemote{display:none; position:absolute; right:12px; top:-46px; width:40px; height:40px; align-items:center; justify-content:center; background:rgba(32,32,46,.95); border:1px solid var(--line); border-radius:50%; color:var(--ink); padding:0}
+  #fsRemote svg{width:20px; height:20px; fill:currentColor}
+  #fsRemote.on{border-color:#FFD21A; color:#FFD21A}
+  .row .tag{display:inline-block; font-size:11px; font-weight:700; padding:1px 7px; border-radius:999px; background:#2a2140; color:var(--accent2); margin-right:4px}
+  .row .tag.hot{background:#3a1f12; color:#fdba74}
+  .feedEnd{color:var(--quiet); text-align:center; padding:14px 6px; font-size:13px}
+  @media (min-width:900px){ body:not(.remote) .row img{width:88px; height:50px} body:not(.remote) #results .row{padding:6px 4px} body:not(.remote) .row .name{font-size:13px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden} }
   .msg{color:var(--quiet); text-align:center; padding:28px 8px; line-height:1.6}
   .secHead{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:12px 0 6px; font-size:14px}
   .secHead button{background:var(--accent); border:none; color:#fff; font-weight:700; border-radius:10px; padding:8px 12px; font-size:13px}
@@ -167,25 +181,6 @@
   .eq.stop i{animation:none}
   @keyframes eq{50%{transform:scaleY(.35)}}
   #dock{display:none}
-  /* điện thoại: nút ⛶ phóng bảng điều khiển ra TOÀN MÀN HÌNH (nút to nhất, thao tác một tay), bấm lại để thu về như lúc mới mở */
-  #bigBtn, #bigNow, #volStep{display:none}
-  body.remote #bigBtn{display:flex; position:absolute; right:12px; top:-46px; width:40px; height:40px; align-items:center; justify-content:center; background:rgba(32,32,46,.95); border:1px solid var(--line); border-radius:50%; color:var(--ink); padding:0}
-  body.remote #bigBtn svg{width:20px; height:20px; fill:currentColor}
-  body.remote.big{overflow:hidden}
-  body.remote.big #dock{top:0; justify-content:center; align-items:stretch; gap:30px; padding:calc(20px + env(safe-area-inset-top)) 20px calc(24px + env(safe-area-inset-bottom)); z-index:90; border-top:none; background:#0f0f18}
-  body.remote.big #bigBtn{top:calc(14px + env(safe-area-inset-top)); right:14px; width:48px; height:48px}
-  body.remote.big #bigNow{display:block; text-align:center; padding:0 54px}
-  #bigNow .bt{font-size:21px; font-weight:800; line-height:1.3; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden}
-  #bigNow .bc{color:var(--quiet); font-size:15px; margin-top:6px}
-  body.remote.big #ctl{display:grid; grid-template-columns:repeat(4,1fr); gap:26px 10px; justify-items:center}
-  body.remote.big #ctl .big{width:76px; height:76px} body.remote.big #ctl .big svg{width:38px; height:38px}
-  body.remote.big #ctl .big.pri{width:160px; height:160px; grid-column:1 / -1; grid-row:1} body.remote.big #ctl .big.pri svg{width:80px; height:80px}
-  body.remote.big #volRow{gap:14px} body.remote.big #volRow input{height:48px} body.remote.big #volRow input::-webkit-slider-runnable-track{height:16px}
-  body.remote.big #volRow input::-webkit-slider-thumb{width:44px; height:44px; margin-top:-14px}
-  body.remote.big #volRow .vn{font-size:22px; min-width:44px} body.remote.big #volRow .vi svg{width:30px; height:30px}
-  body.remote.big #volStep{display:flex; gap:16px; justify-content:center}
-  #volStep button{flex:1; max-width:160px; height:64px; background:#20202e; border:1px solid var(--line); border-radius:16px; color:var(--ink); font-size:30px; font-weight:800}
-  #volStep button:active{transform:scale(.95)}
   body.remote #dock{display:flex; position:fixed; left:0; right:0; bottom:0; z-index:40; flex-direction:column; gap:10px; background:rgba(21,21,31,.97); border-top:1px solid var(--line); padding:10px 16px calc(10px + env(safe-area-inset-bottom))}
   body.remote #ctl{display:flex; gap:14px; align-items:center; justify-content:center; padding:0; flex-wrap:nowrap}
   body.remote #ctl .big{width:54px; height:54px; flex:0 0 auto; background:#20202e; border:1px solid var(--line); border-radius:50%; display:flex; align-items:center; justify-content:center; padding:0; font-size:0}
@@ -269,6 +264,7 @@
 </main>
 
 <div id="toast"></div>
+<div id="soundBanner">🔇 Chrome đang chặn tiếng — chạm vào màn hình TV một lần (hoặc nhấn phím bất kỳ) để bật tiếng<small>Muốn khỏi bấm: Chrome → biểu tượng ổ khoá cạnh địa chỉ → Cài đặt trang web → Âm thanh: Cho phép</small></div>
 
 <div id="pairModal"><div class="card">
   <div id="pairTv">
@@ -485,7 +481,7 @@ function setNow(it){
 function playAt(p){
   if(!ready || p < 0 || p >= order.length) return;
   pos = p; const it = items[order[pos]]; curId = it.id;
-  player.loadVideoById(it.id); setNow(it); renderList();
+  player.loadVideoById(it.id); setNow(it); renderList(); if(!REMOTE) checkAutoplay();
   lsSet(LS.cur, JSON.stringify({ name: curName, id: curId }));
   publishState(false);
 }
@@ -507,6 +503,34 @@ function togglePlay(){
   player.getPlayerState() === YT.PlayerState.PLAYING ? player.pauseVideo() : player.playVideo();
 }
 function stopPlayback(){ if(ready) player.stopVideo(); curId = null; pos = -1; setNow(null); publishState(false); }
+let tvFs = false, soundBlocked = false, apTimer = null;
+function setTvFs(on){
+  tvFs = !!on; document.body.classList.toggle('tvfull', tvFs);
+  try{
+    if(tvFs && !document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});   // Chrome chỉ cho khi vừa có người bấm/nhấn phím trên TV → lúc đó mới thành toàn màn hình thật
+    else if(!tvFs && document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  }catch(e){}
+  publishState(true);
+}
+if(!REMOTE){
+  document.addEventListener('fullscreenchange', () => { if(!document.fullscreenElement && tvFs) setTvFs(false); });         // Esc → thu nhỏ theo
+  const gest = () => {                                         // có người chạm/nhấn trên TV: bật tiếng nếu Chrome đã chặn; xin toàn màn hình thật nếu điện thoại đã bấm phóng to
+    if(soundBlocked && ready){ try{ player.unMute(); player.setVolume(+$('vol').value); }catch(e){} soundBlocked = false; $('soundBanner').style.display = 'none'; publishState(true); }
+    if(tvFs && !document.fullscreenElement){ try{ document.documentElement.requestFullscreen().catch(() => {}); }catch(e){} }
+  };
+  ['pointerdown', 'keydown'].forEach(t => document.addEventListener(t, gest, true));
+}
+/* Chrome chặn phát có tiếng khi trang chưa từng được bấm: phát tạm KHÔNG tiếng (được phép), hiện nhắc trên TV; chạm một lần là có tiếng */
+function checkAutoplay(){
+  clearTimeout(apTimer);
+  apTimer = setTimeout(() => {
+    if(!ready || !player.getPlayerState) return;
+    const st = player.getPlayerState();
+    if(st !== 1 && st !== 3 && curId && !soundBlocked){
+      try{ player.mute(); player.playVideo(); soundBlocked = true; $('soundBanner').style.display = 'block'; publishState(true); }catch(e){}
+    }
+  }, 2500);
+}
 function unlock(){ unlocked = true; $('startOverlay').style.display = 'none'; setTimeout(() => publishState(true), 500); }
 function start(){
   unlock();
@@ -539,7 +563,7 @@ function snapshot(){
   const st = ready && player.getPlayerState ? player.getPlayerState() : -1;
   return { playing: st === 1, unlocked, id: curId, title: it ? it.title : '', channel: it ? it.channel : '', thumb: it ? it.thumb : '',
            vol: ready && player.getVolume ? Math.round(player.getVolume()) : +$('vol').value,
-           shuffle, repeat, playlist: curName, pos: pos + 1, total: order.length };
+           shuffle, repeat, playlist: curName, pos: pos + 1, total: order.length, fs: tvFs, muted: soundBlocked };
 }
 async function publishState(force){
   if(REMOTE) return;
@@ -554,11 +578,15 @@ async function publishState(force){
 }
 async function runCmd(c){
   const a = c.action, p = c.payload || {};
-  if(!unlocked && ['toggle','next','prev','playid'].includes(a)){ publishState(true); return; }   // chờ người bấm "Bắt đầu phát" trên TV một lần
+  if(!unlocked && ['toggle','next','prev','playid'].includes(a)){      // điện thoại toàn quyền: không bắt người bấm "Bắt đầu phát" trên TV
+    unlock();
+    if(!ready){ if(a === 'playid') startId = String(p.id || ''); pendingStart = true; makePlayer(); setTimeout(() => publishState(true), 300); return; }
+  }
   switch(a){
     case 'toggle': togglePlay(); break;
     case 'next': next(false); break;
-    case 'prev': prev(); break;
+    case 'prev': pos < 0 ? playAt(0) : prev(); break;
+    case 'fs': setTvFs(typeof p.on === 'boolean' ? p.on : !tvFs); break;
     case 'vol': { const v = Math.max(0, Math.min(100, +p.value || 0)); $('vol').value = v; if(ready) player.setVolume(v); break; }
     case 'shuffle': toggleShuffle(); break;
     case 'repeat': cycleRepeat(); break;
@@ -596,14 +624,15 @@ function applyRemoteState(d){
   let status;
   if(!st) status = 'Chưa thấy trang phát nào chạy trong phòng “' + ROOM + '”. Hãy mở trang chính trên TV.';
   else if(!online) status = 'Trang phát đang offline (không có tín hiệu hơn 90 giây).';
-  else if(!st.unlocked) status = 'Trên TV, bấm “Bắt đầu phát” một lần để cho phép phát nhạc.';
+  else if(st.muted) status = '🔇 TV đang phát nhưng Chrome chặn tiếng — chạm màn hình TV một lần để có tiếng.';
+  else if(!st.unlocked) status = 'TV sẵn sàng — chọn bài hoặc bấm ▶ để TV bắt đầu phát.';
   else status = (st.playing ? '▶ Đang phát' : '⏸ Đang dừng') + (st.total ? ' · bài ' + st.pos + '/' + st.total : '');
   $('rcStatus').textContent = status;
   if(!st) return;
   $('nowTitle').textContent = st.title ? decode(st.title) : '—';
   $('nowCh').textContent = st.channel ? decode(st.channel) : '';
   const th = safeThumb(st.thumb); if(th && $('rcImg').getAttribute('src') !== th) $('rcImg').src = th;
-  setPlayIcon(st.playing);
+  setPlayIcon(st.playing); paintFs(!!st.fs);
   shuffle = !!st.shuffle; repeat = st.repeat || 'all'; paintModes();
   if(document.activeElement !== $('vol') && typeof st.vol === 'number'){ $('vol').value = st.vol; paintVol(); }
   if((st.id || null) !== curId || !!st.playing !== lastPlaying){ curId = st.id || null; lastPlaying = !!st.playing; renderList(); }
@@ -706,7 +735,11 @@ function rowOf(raw, opt){
   const it = norm(raw); const have = () => items.some(x => x.id === it.id);
   const wrap = el('div', 'rowWrap'); const row = el('div', 'row'); row.style.cursor = 'default';
   const img = document.createElement('img'); img.alt = ''; img.loading = 'lazy'; img.src = it.thumb || ('https://i.ytimg.com/vi/' + it.id + '/mqdefault.jpg');
-  const meta = el('div', 'meta'); meta.append(el('div', 'name', (opt.rank ? opt.rank + '. ' : '') + it.title), el('div', 'sub', it.channel));
+  const meta = el('div', 'meta'), sub = el('div', 'sub');
+  if(opt.rank) sub.append(el('span', 'tag hot', '🔥 ' + opt.rank));
+  if(raw.tone && TONE[raw.tone]) sub.append(el('span', 'tag', TONE[raw.tone]));
+  sub.append(document.createTextNode((raw.views ? fmtViews(raw.views) + ' lượt xem' + (raw.picks ? ' · chọn ' + raw.picks + ' lần' : '') + ' · ' : '') + it.channel));
+  meta.append(el('div', 'name', it.title), sub);
   const b = el('button', 'addBtn', have() ? 'Đã có' : '＋ Thêm'); b.disabled = have();
   b.onclick = async () => { b.disabled = true; await addItem(it); b.textContent = 'Đã có'; };
   row.append(img, meta);
@@ -731,6 +764,48 @@ function rowOf(raw, opt){
     row.append(pn);
   }
   row.append(b); wrap.prepend(row); return wrap;
+}
+/* Kết quả tìm trong kho — như remote.html: ít bài (≤ 6 nhóm) → trải phẳng MỌI bản phối, nhiều lượt xem xếp trước (tối đa 150, cuộn tới đâu nạp tới đó);
+   nhiều bài → gom nhóm, bấm "N bản" mở các bản. Chỉ giữ bản có chữ karaoke/beat… và ≥ 100 lượt xem (khi còn ≥ 2 bản tốt), bản còn lại nằm sau nút "Hiện thêm". */
+const FLAT_MAX_GROUPS = 6, FLAT_CAP = 150, versCache = new Map(), KARA_RE = /karaoke|kara\b|beat|instrumental|nhac nen|nhạc nền|lyric|tone (nam|nu|nữ)|playback/i, MIN_VIEWS = 100;
+async function versionsOf(key, tone){
+  const k = key + '|' + tone; if(versCache.has(k)) return versCache.get(k);
+  const d = await kapi('/api/kho/versions?key=' + encodeURIComponent(key) + (tone != null ? '&tone=' + encodeURIComponent(tone) : ''));
+  const list = (d.items || []).filter(goodId).map(v => Object.assign({ embeddable:true }, v, { tone: v.tone != null ? v.tone : tone })); versCache.set(k, list); return list;
+}
+function qualitySplit(list){
+  const good = [], low = [];
+  list.forEach(v => (v.star || (KARA_RE.test((v.title || '') + ' ' + (v.channel || '')) && (v.views || 0) >= MIN_VIEWS) ? good : low).push(v));
+  return good.length >= 2 ? { good, low } : { good:list, low:[] };
+}
+async function showGroups(groups, title, extra, seq){
+  const box = $('results');
+  const grouped = () => showResults(groups, title, extra);
+  if(groups.length > FLAT_MAX_GROUPS || !groups.some(g => g.versions > 1)) return grouped();
+  box.replaceChildren(); const h0 = el('div', 'secHead'); h0.append(el('b', null, title)); box.append(h0, el('div', 'msg', 'Đang liệt kê đủ các bản phối…'));
+  let rows;
+  try{
+    const lists = await Promise.all(groups.map(g => g.versions > 1 && g.key ? versionsOf(g.key, g.tone) : Promise.resolve([g])));
+    const seen = new Set(); rows = [];
+    lists.forEach(l => l.forEach(v => { if(v && !seen.has(v.id)){ seen.add(v.id); rows.push(v); } }));
+  }catch(e){ if(seq === khoSeq) grouped(); return; }
+  if(seq !== khoSeq) return;
+  rows.sort((a, b) => (b.views || 0) - (a.views || 0));
+  const qs = qualitySplit(rows); rows = qs.good.slice(0, FLAT_CAP);
+  feedReset(); box.replaceChildren();
+  const head = el('div', 'secHead'); head.append(el('b', null, rows.length + ' bản phối · nhiều lượt xem xếp trước')); if(extra) head.append(extra); box.append(head);
+  const sent = el('div', 'feedEnd', ''); box.append(sent);
+  let i = 0, lowShown = false;
+  const more = () => {
+    if(seq !== khoSeq) return;
+    rows.slice(i, i + 30).forEach(v => box.insertBefore(rowOf(v, v), sent)); i += 30;
+    if(i >= rows.length){
+      if(feedIO){ feedIO.disconnect(); feedIO = null; }
+      if(!lowShown && qs.low.length){ lowShown = true; const lb = el('button', 'ghost', 'Hiện thêm ' + qs.low.length + ' bản ít lượt xem / không rõ là karaoke'); lb.style.cssText = 'width:100%;margin:8px 0'; lb.onclick = () => { qs.low.slice(0, 60).forEach(v => box.insertBefore(rowOf(v, v), lb)); lb.remove(); }; box.insertBefore(lb, sent); }
+    }else if(sent.getBoundingClientRect().top < innerHeight + 500) setTimeout(more, 50);
+  };
+  more();
+  if(i < rows.length && 'IntersectionObserver' in window){ feedIO = new IntersectionObserver(es => { if(es.some(e => e.isIntersecting)) more(); }, { rootMargin:'600px 0px' }); feedIO.observe(sent); }
 }
 function showResults(list, title, extra){
   feedReset();
@@ -852,9 +927,10 @@ function localHits(raw, lim){
   hits.sort((a, b) => b[0] - a[0] || b[1].hot - a[1].hot || b[1].picks - a[1].picks || b[1].views - a[1].views);
   return hits.slice(0, lim).map(x => x[1]);
 }
+const fmtViews = n => n >= 1e6 ? (n / 1e6).toFixed(n >= 1e7 ? 0 : 1).replace('.', ',') + ' Tr' : n >= 1e3 ? Math.round(n / 1e3) + ' N' : String(n || 0);
 const TONE = { nam:'Tone Nam', nu:'Tone Nữ', 'song-ca':'Song ca', 'thieu-nam':'Thiếu giọng nam', 'thieu-nu':'Thiếu giọng nữ' };
-const grpItem = g => ({ id:g.id || (g.best && g.best.id), title:g.title || (g.best && g.best.title), embeddable:true,
-  channel:[g.channel || (g.best && g.best.channel), TONE[g.tone] || ''].filter(Boolean).join(' · '), versions:g.versions, key:g.key, tone:g.tone != null ? g.tone : null });
+const grpItem = g => { const b = g.best || g; return { id:b.id, title:b.title, embeddable:true, channel:b.channel || '', views:b.views || 0, picks:b.picks || 0,
+  tone:g.tone != null ? g.tone : (b.tone != null ? b.tone : null), versions:g.versions, key:g.key }; };
 const goodId = it => /^[\w-]{11}$/.test(it.id || '');
 
 /* Bài hot + nạp tiếp khi cuộn xuống đáy */
@@ -919,7 +995,7 @@ async function renderKho(){
     }
     if(raw.length < 2){ feedReset(); box.replaceChildren(); khoShownFor = ''; return 0; }
     feedReset();
-    let list = localHits(raw, 30), where = ' · trên máy';
+    let list = localHits(raw, 40), where = ' · trên máy';
     if(!list || !list.length){
       where = '';
       const d = await kapi('/api/kho/search?q=' + encodeURIComponent(raw) + '&limit=30');
@@ -930,7 +1006,7 @@ async function renderKho(){
     khoShownFor = raw;
     const yb = el('button', 'ghost', '🔎 YouTube'); yb.title = 'Tìm bản có lời trên YouTube';
     yb.onclick = () => ytSearch(raw).catch(e => { msg(''); apiFail(e); });
-    showResults(list.map(grpItem), 'Kho BMB: ' + list.length + ' bài' + where + (list.length ? '' : ' — bấm Tìm để tìm trên YouTube'), yb);
+    await showGroups(list.map(grpItem), 'Kho BMB: ' + list.length + ' bài' + where + (list.length ? '' : ' — bấm Tìm để tìm trên YouTube'), yb, seq);
     return list.length;
   }catch(e){
     if(seq !== khoSeq) return 0;
@@ -964,6 +1040,9 @@ const ICON = {
   repeat1:'<svg viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2zm-4-2V9h-1l-2 1v1h1.5v4z"/></svg>',
   vol:'<svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 4V5L7 9zM16.5 12A4.5 4.5 0 0 0 14 8v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z"/></svg>'
 };
+const ICON_FS = '<svg viewBox="0 0 24 24"><path d="M5 5h5v2H7v3H5zm9 0h5v5h-2V7h-3zM5 14h2v3h3v2H5zm12 0h2v5h-5v-2h3z"/></svg>', ICON_FS_OFF = '<svg viewBox="0 0 24 24"><path d="M8 5h2v5H5V8h3zm6 0h2v3h3v2h-5zM5 14h5v5H8v-3H5zm9 0h5v2h-3v3h-2z"/></svg>';
+let tvFsShown = false;
+function paintFs(on){ tvFsShown = on; const b = $('fsRemote'); if(b){ b.innerHTML = on ? ICON_FS_OFF : ICON_FS; b.classList.toggle('on', on); b.title = on ? 'Thu nhỏ màn hình TV' : 'Phóng to màn hình TV'; } }
 function setPlayIcon(playing){ if(REMOTE) $('playBtn').innerHTML = playing ? ICON.pause : ICON.play; else $('playBtn').textContent = playing ? '⏸' : '▶'; }
 function paintVol(){ const v = +$('vol').value || 0; $('vol').style.setProperty('--p', v + '%'); const n = $('volN'); if(n) n.textContent = v; }
 function paintModes(){
@@ -991,7 +1070,7 @@ $('vol').oninput = e => {
   if(REMOTE){ clearTimeout(volTimer); volTimer = setTimeout(() => sendCmd('vol', { value: v }), 150); }
   else if(ready){ player.setVolume(v); publishState(false); }
 };
-$('fsBtn').onclick = () => { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); };
+$('fsBtn').onclick = () => setTvFs(!tvFs);
 window.addEventListener('keydown', e => {
   if(/^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName) || $('modal').style.display === 'flex') return;
   const k = e.key.toLowerCase();
@@ -1129,27 +1208,8 @@ if(REMOTE){
   const vi = el('span', 'vi'); vi.innerHTML = ICON.vol;
   vr.append(vi, $('vol'), el('b', 'vn')); vr.lastChild.id = 'volN';
   dock.append($('ctl'), vr); document.body.append(dock);
-  // nút phóng to / thu nhỏ bảng điều khiển (toàn màn hình thật nếu trình duyệt cho; iPhone không có thì vẫn phóng to trong trang)
-  const bn = el('div'); bn.id = 'bigNow'; bn.innerHTML = '<div class="bt" id="bigT"></div><div class="bc" id="bigC"></div>';
-  const stp = el('div'); stp.id = 'volStep';
-  [['−', -5], ['＋', 5]].forEach(([t, d]) => { const b = el('button', null, t); b.onclick = () => { const v = Math.max(0, Math.min(100, (+$('vol').value || 0) + d)); $('vol').value = v; $('vol').oninput({ target: $('vol') }); paintVol(); }; stp.append(b); });
-  const bb = el('button'); bb.id = 'bigBtn'; bb.title = 'Phóng to / thu nhỏ bảng điều khiển';
-  const ICON_BIG = '<svg viewBox="0 0 24 24"><path d="M5 5h5v2H7v3H5zm9 0h5v5h-2V7h-3zM5 14h2v3h3v2H5zm12 0h2v5h-5v-2h3z"/></svg>';
-  const ICON_SMALL = '<svg viewBox="0 0 24 24"><path d="M8 5h2v5H5V8h3zm6 0h2v3h3v2h-5zM5 14h5v5H8v-3H5zm9 0h5v2h-3v3h-2z"/></svg>';
-  bb.innerHTML = ICON_BIG;
-  dock.prepend(bb, bn); dock.insertBefore(stp, vr.nextSibling);
-  const syncBig = () => { $('bigT').textContent = $('nowTitle').textContent; $('bigC').textContent = $('nowCh').textContent; };
-  new MutationObserver(syncBig).observe($('now'), { childList: true, subtree: true, characterData: true }); syncBig();
-  const setBig = on => {
-    document.body.classList.toggle('big', on); bb.innerHTML = on ? ICON_SMALL : ICON_BIG;
-    try{
-      if(on && document.documentElement.requestFullscreen && !document.fullscreenElement) document.documentElement.requestFullscreen({ navigationUI:'hide' }).catch(() => {});
-      if(!on && document.fullscreenElement) document.exitFullscreen().catch(() => {});
-    }catch(e){}
-    if(on) window.scrollTo(0, 0);
-  };
-  bb.onclick = () => setBig(!document.body.classList.contains('big'));
-  document.addEventListener('fullscreenchange', () => { if(!document.fullscreenElement && document.body.classList.contains('big')) setBig(false); });   // vuốt/back thoát toàn màn hình → thu nhỏ theo
+  const fb = el('button'); fb.id = 'fsRemote'; dock.prepend(fb); paintFs(false);
+  fb.onclick = () => { sendCmd('fs', { on: !tvFsShown }); paintFs(!tvFsShown); };      // phóng to / thu nhỏ màn hình TV (không phải bảng điều khiển trên điện thoại)
   $('fsBtn').remove();
   ['prevBtn', 'nextBtn', 'shufBtn'].forEach(id => { $(id).innerHTML = ICON[{ prevBtn:'prev', nextBtn:'next', shufBtn:'shuffle' }[id]]; });
   // thứ tự giống remote: trộn · lùi · phát · qua · lặp
