@@ -272,6 +272,10 @@ td b{color:var(--txt)}
 .pu-note{font-size:12.5px;color:var(--txt-dim);margin-top:4px}
 .pu-note li{margin:3px 0 3px 18px}
 .modal-box .actions.wrap{flex-wrap:wrap}
+/* ── app BMBPlayer: quản lý chi nhánh mở Bảo trì / Đặt phòng (admin.html) ── */
+.qlnav{display:none;gap:8px;padding:8px 0 2px;flex-wrap:wrap}
+.qlnav.show{display:flex}
+.qlnav .btn{flex:1;min-width:140px}
 @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 </style>
 </head>
@@ -304,6 +308,10 @@ td b{color:var(--txt)}
         <div class="tab" data-p="p3" id="tabTv">📺 TV &amp; MTB</div>
         <div class="tab" data-p="p5" id="tabCaiDat" style="display:none">🍺 Menu</div>
         <div class="tab" data-p="p6" id="tabTaiKhoan" style="display:none">👥 Tài khoản quầy</div>
+      </div>
+      <div class="qlnav" id="qlNav">
+        <button class="btn btn-ghost btn-sm" id="btnQlBaoTri">🛠️ Bảo trì</button>
+        <button class="btn btn-ghost btn-sm" id="btnQlDatPhong">📋 Đặt phòng</button>
       </div>
     </div>
   </header>
@@ -693,6 +701,9 @@ function appKetNoi(){
     if(!r || !r.ok){ APPQ.loi = (r && r.msg) || 'Máy chủ chưa nhận.'; puVe(); return; }
     APPQ.loi = '';
     try{ BMBNative.quayBat(r.dk, CFG.API, r.branchName || S.bname || '', S.hoTen || S.user); }catch(e){ APPQ.loi = String(e); }
+    /* quản lý chi nhánh + admin đã bật trong Cài đặt của admin.html + app có hỗ trợ (2.1) → hiện nút Bảo trì / Đặt phòng */
+    var coNut = !!(r.ql && r.ql.tabs) && typeof BMBNative.quayMoAdmin === 'function';
+    $('qlNav').className = 'qlnav' + (coNut ? ' show' : '');
     puVe();
     if($('modalPush').classList.contains('show')) puCapNhat();
   }).catch(function(){ APPQ.busy = false; APPQ.loi = 'Không kết nối được máy chủ.'; puVe(); });
@@ -1721,6 +1732,8 @@ $('lgBtn').addEventListener('click', login);
 $('lgP').addEventListener('keydown', function(e){ if(e.key==='Enter') login(); });
 $('btnOut').addEventListener('click', function(){ logout(true); });
 $('btnPush').addEventListener('click', puMo);
+$('btnQlBaoTri').addEventListener('click', function(){ try{ BMBNative.quayMoAdmin('baotri'); }catch(e){} });
+$('btnQlDatPhong').addEventListener('click', function(){ try{ BMBNative.quayMoAdmin('datphong'); }catch(e){} });
 $('puDong').addEventListener('click', function(){ $('modalPush').classList.remove('show'); });
 $('puBat').addEventListener('click', puBat);
 $('puTat').addEventListener('click', puTat);

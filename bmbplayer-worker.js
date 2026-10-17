@@ -405,6 +405,7 @@ async function handleApi(request, env, ctx) {
         case 'app.dangKy':               res = await appDangKy(env, body, request); break;   // app BMBPlayer chế độ Quầy: xin khoá máy (cần phiên quầy)
         case 'app.sync':                 res = await appSync(env, body); break;              // dịch vụ nền của app: đơn đang mở + nút có chữ ký
         case 'app.huy':                  res = await appHuy(env, body); break;               // đăng xuất / tắt nhận trên app
+        case 'app.veAdmin':              res = await appVeAdmin(env, body); break;           // quản lý: mở admin.html (Bảo trì / Đặt phòng) không đăng nhập lại
         default:                         res = fail('unknown_action: ' + action, 400);
       }
     } catch (e) {
@@ -2117,7 +2118,7 @@ async function appMay(env, dk) {
     `SELECT a.tao_luc, t.vai_tro, t.chi_nhanh_id FROM order_app_may a JOIN tai_khoan t ON t.username = a.username AND t.hoat_dong = 1
       WHERE a.dv = ? AND a.username = ? AND a.chi_nhanh_id = ?`).bind(p.dv, p.u, p.cn).first();
   if (!r || r.tao_luc !== p.t || !VAI_TRO_ORDER.includes(r.vai_tro) || (r.vai_tro !== 'admin' && r.chi_nhanh_id !== p.cn)) return null;
-  return { u: p.u, cn: p.cn, dv: p.dv };
+  return { u: p.u, cn: p.cn, dv: p.dv, r: r.vai_tro };
 }
 async function appDangKy(env, body, request) {
   const [ss, loi] = await canPhien(env, body);
@@ -2136,7 +2137,7 @@ async function appDangKy(env, body, request) {
   ]);
   const p = b64uS(JSON.stringify({ u: ss.u, cn: ss.b, dv, t }));
   const cn = await env.DB.prepare(`SELECT COALESCE(NULLIF(ten_ngan,''), ten, id) AS ten FROM chi_nhanh WHERE id = ?`).bind(ss.b).first();
-  return ok({ dk: 'dk.' + p + '.' + await appKy(env, ss.u, ss.b, dv, t), branchName: (cn && cn.ten) || ss.b });
+  return ok({ dk: 'dk.' + p + '.' + await appKy(env, ss.u, ss.b, dv, t), branchName: (cn && cn.ten) || ss.b, ql: await qlCo(env, ss.r) });
 }
 async function appHuy(env, body) {
   const may = await appMay(env, s(body.dk, 600));
@@ -2166,7 +2167,71 @@ async function appSync(env, body) {
       act: coNut ? { u: may.u, cn: may.cn, exp, sig: await nutKy(env, d.id, may.u, may.cn, exp) } : null });
   }
   if (Math.random() < 0.05) await env.DB.prepare('UPDATE order_app_may SET lan_cuoi = ? WHERE dv = ?').bind(now, may.dv).run();
-  return ok({ now, u: may.u, cn: may.cn, orders });
+  return ok({ now, u: may.u, cn: may.cn, orders, ql: await qlThongBao(env, may, body.tbSau) });
+}
+
+
+/* ---------- App chế độ Quầy cho QUẢN LÝ CHI NHÁNH: Bảo trì / Đặt phòng (admin.html) + thông báo sự cố / đặt phòng ----------
+   Hai công tắc ở admin.html → Cài đặt (bảng cai_dat dùng chung): app_ql_baotri, app_ql_thongbao. Chỉ tài khoản manager.
+   - Thông báo: bmb-quanly-worker ghi bảng app_thong_bao (đúng các tin Telegram riêng gửi quản lý chi nhánh) rồi gọi
+     /api/app/relay để rung chuông; app gọi app.sync kèm tbSau (id cuối đã thấy) → nhận phần mới.
+   - Mở admin.html không đăng nhập lại: app.veAdmin ghi 1 vé dùng 1 lần (sso_ve, 60 giây) → admin.html#ve=… → sso_doi. */
+const QL_VAI_TRO = ['manager'];
+async function qlBangSan(env) {
+  await env.DB.batch([
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS app_thong_bao (id INTEGER PRIMARY KEY AUTOINCREMENT, chi_nhanh_id TEXT NOT NULL,
+      loai TEXT NOT NULL, ma TEXT NOT NULL DEFAULT '', tieu_de TEXT NOT NULL DEFAULT '', noi_dung TEXT NOT NULL DEFAULT '',
+      muc_do INTEGER, im_lang INTEGER NOT NULL DEFAULT 0, tru_user TEXT NOT NULL DEFAULT '', tao_luc INTEGER NOT NULL)`),
+    env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_app_thong_bao_cn ON app_thong_bao (chi_nhanh_id, id)'),
+    env.DB.prepare('CREATE TABLE IF NOT EXISTS sso_ve (ve TEXT PRIMARY KEY, username TEXT NOT NULL, tao_luc INTEGER NOT NULL, het_han INTEGER NOT NULL)')
+  ]);
+}
+let qlBangXong = false;
+async function qlCaiDat(env) {
+  const { results } = await env.DB.prepare(`SELECT khoa, gia_tri FROM cai_dat WHERE khoa IN ('app_ql_baotri', 'app_ql_thongbao')`).all();
+  const m = {}; (results || []).forEach(r => { m[r.khoa] = r.gia_tri; });
+  return { tabs: m.app_ql_baotri === 'Y', tb: m.app_ql_thongbao === 'Y' };
+}
+async function qlCo(env, vaiTro) {
+  if (!QL_VAI_TRO.includes(vaiTro)) return { tabs: false, tb: false };
+  return qlCaiDat(env);
+}
+/** Thông báo quản lý mới hơn tbSau. Lần đầu (app chưa có mốc: tbSau trống hoặc âm) chỉ trả mốc, không dồn tin cũ. */
+async function qlThongBao(env, may, tbSau) {
+  const dau = tbSau === undefined || tbSau === null || tbSau === '' || !(Number(tbSau) >= 0);
+  const co = await qlCo(env, may.r);
+  if (!co.tb) return { tabs: co.tabs, tb: [], moc: dau ? -1 : Math.floor(Number(tbSau)) };
+  if (!qlBangXong) { await qlBangSan(env); qlBangXong = true; }
+  const sau = dau ? 0 : Math.floor(Number(tbSau));
+  if (dau) {
+    const r = await env.DB.prepare('SELECT COALESCE(MAX(id), 0) AS m FROM app_thong_bao WHERE chi_nhanh_id = ?').bind(may.cn).first();
+    return { tabs: co.tabs, tb: [], moc: (r && r.m) || 0 };
+  }
+  const { results } = await env.DB.prepare(`SELECT id, loai, ma, tieu_de, noi_dung, muc_do, im_lang, tru_user, tao_luc FROM app_thong_bao
+      WHERE chi_nhanh_id = ?1 AND id > ?2 AND tao_luc > ?3 ORDER BY id ASC LIMIT 30`).bind(may.cn, sau, Date.now() - 24 * 3600000).all();
+  let moc = sau;
+  const tb = [];
+  for (const x of results || []) {
+    moc = Math.max(moc, x.id);
+    if (x.tru_user && x.tru_user === may.u) continue;            // chính người này vừa làm: khỏi báo lại
+    tb.push({ id: x.id, loai: x.loai, ma: x.ma, title: x.tieu_de, body: x.noi_dung, md: x.muc_do, im: !!x.im_lang, at: x.tao_luc });
+  }
+  return { tabs: co.tabs, tb, moc };
+}
+/** App xin vé mở admin.html (Bảo trì / Đặt phòng) đã đăng nhập sẵn */
+async function appVeAdmin(env, body) {
+  const may = await appMay(env, s(body.dk, 600));
+  if (!may) return fail('may_het_han', 403, 'Máy này đã bị gỡ khỏi quầy — mở app và đăng nhập lại.');
+  const co = await qlCo(env, may.r);
+  if (!co.tabs) return fail('forbidden', 403, 'Chức năng Bảo trì / Đặt phòng trong app chưa được bật cho tài khoản này.');
+  if (!qlBangXong) { await qlBangSan(env); qlBangXong = true; }
+  const ve = b64uB(crypto.getRandomValues(new Uint8Array(24)));
+  const now = Date.now();
+  await env.DB.batch([
+    env.DB.prepare('INSERT INTO sso_ve (ve, username, tao_luc, het_han) VALUES (?,?,?,?)').bind(ve, may.u, now, now + 60000),
+    env.DB.prepare('DELETE FROM sso_ve WHERE het_han < ?').bind(now - 3600000)
+  ]);
+  return ok({ ve, url: 'https://boommusicbox.vn/admin.html' });
 }
 
 /* ---------- API thông báo đẩy (action trong POST /api) ---------- */
@@ -2239,6 +2304,19 @@ export default {
       if(gui.length !== kho.length || !same(gui, kho)) return new Response('forbidden', { status: 403 });
       const up = await req.json().catch(() => null);
       if(up && up.callback_query) await tgCallback(env, ctx, up.callback_query);
+      return jres({ ok: true });
+    }
+
+    /* bmb-quanly-worker vừa ghi thông báo quản lý (sự cố / đặt phòng) → rung chuông chi nhánh để app quản lý lấy về ngay.
+       Cùng secret với nút Telegram: TG_RELAY_SECRET (ở đây) = BMBPLAYER_RELAY_SECRET (bên bmb-quanly-worker). */
+    if(u.pathname === '/api/app/relay' && req.method === 'POST'){
+      const kho = String(env.TG_RELAY_SECRET || '');
+      if(!kho) return new Response('not found', { status: 404 });
+      const gui = req.headers.get('x-relay-secret') || '';
+      if(gui.length !== kho.length || !same(gui, kho)) return new Response('forbidden', { status: 403 });
+      const b = await req.json().catch(() => ({}));
+      const cn = String(b.cn || '').slice(0, 40);
+      if(cn) ctx.waitUntil(pokeQuay(env, cn, 'ql'));
       return jres({ ok: true });
     }
 
