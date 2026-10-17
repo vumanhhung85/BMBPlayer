@@ -75,6 +75,7 @@
   .addBtn{background:var(--accent); border:none; color:#fff; font-weight:700; padding:8px 12px; font-size:13px}
   .addBtn.alt{background:#20202e; border:1px solid var(--line); color:var(--ink)}
   .addBtn:disabled{background:#20202e; color:var(--quiet); border:1px solid var(--line)}
+  .verBox{margin:2px 0 6px 18px; border-left:2px solid var(--line); padding-left:8px}
   .msg{color:var(--quiet); text-align:center; padding:28px 8px; line-height:1.6}
   .secHead{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:12px 0 6px; font-size:14px}
   .secHead button{background:var(--accent); border:none; color:#fff; font-weight:700; border-radius:10px; padding:8px 12px; font-size:13px}
@@ -680,26 +681,45 @@ async function addItem(it){
     toast('Đã thêm: ' + decode(it.title));
   }catch(e){ apiFail(e); }
 }
+/* Một dòng kết quả. opt: rank (số thứ tự bài hot), versions/key/tone (nhóm nhiều bản phối → nút "N bản" mở danh sách bản) */
+function rowOf(raw, opt){
+  opt = opt || {};
+  const it = norm(raw); const have = () => items.some(x => x.id === it.id);
+  const wrap = el('div', 'rowWrap'); const row = el('div', 'row'); row.style.cursor = 'default';
+  const img = document.createElement('img'); img.alt = ''; img.loading = 'lazy'; img.src = it.thumb || ('https://i.ytimg.com/vi/' + it.id + '/mqdefault.jpg');
+  const meta = el('div', 'meta'); meta.append(el('div', 'name', (opt.rank ? opt.rank + '. ' : '') + it.title), el('div', 'sub', it.channel));
+  const b = el('button', 'addBtn', have() ? 'Đã có' : '＋ Thêm'); b.disabled = have();
+  b.onclick = async () => { b.disabled = true; await addItem(it); b.textContent = 'Đã có'; };
+  row.append(img, meta);
+  if(opt.versions > 1 && opt.key){
+    const vb = el('button', 'addBtn alt', opt.versions + ' bản ▾'); let sub = null;
+    vb.onclick = async () => {
+      if(sub){ sub.remove(); sub = null; vb.textContent = opt.versions + ' bản ▾'; return; }
+      vb.disabled = true;
+      try{
+        const d = await kapi('/api/kho/versions?key=' + encodeURIComponent(opt.key) + (opt.tone != null ? '&tone=' + encodeURIComponent(opt.tone) : ''));
+        sub = el('div', 'verBox');
+        (d.items || []).filter(v => /^[\w-]{11}$/.test(v.id || '')).sort((a, c) => (c.views || 0) - (a.views || 0)).forEach(v => sub.append(rowOf(Object.assign({ embeddable: true }, v))));
+        wrap.append(sub); vb.textContent = 'Thu gọn ▴';
+      }catch(e){ toast('Không tải được các bản phối.', 'err'); }
+      vb.disabled = false;
+    };
+    row.append(vb);
+  }
+  if(REMOTE){           // trên điện thoại: thêm rồi phát ngay trên TV
+    const pn = el('button', 'addBtn alt', '▶ Phát');
+    pn.onclick = async () => { await addItem(it); b.textContent = 'Đã có'; b.disabled = true; sendCmd('playid', { id: it.id }); };
+    row.append(pn);
+  }
+  row.append(b); wrap.prepend(row); return wrap;
+}
 function showResults(list, title, extra){
+  feedReset();
   const box = $('results'); box.replaceChildren();
   const head = el('div', 'secHead'); head.append(el('b', null, title));
   if(extra) head.append(extra); box.append(head);
   if(!list.length){ box.append(el('div', 'msg', 'Không có kết quả phù hợp.')); return; }
-  list.forEach(raw => {
-    const it = norm(raw); const have = items.some(x => x.id === it.id);
-    const row = el('div', 'row'); row.style.cursor = 'default';
-    const img = document.createElement('img'); img.alt = ''; img.loading = 'lazy'; if(it.thumb) img.src = it.thumb;
-    const meta = el('div', 'meta'); meta.append(el('div', 'name', it.title), el('div', 'sub', it.channel));
-    const b = el('button', 'addBtn', have ? 'Đã có' : '＋ Thêm'); b.disabled = have;
-    b.onclick = async () => { b.disabled = true; await addItem(it); b.textContent = 'Đã có'; };
-    row.append(img, meta);
-    if(REMOTE){           // trên điện thoại: thêm rồi phát ngay trên TV
-      const pn = el('button', 'addBtn alt', '▶ Phát');
-      pn.onclick = async () => { await addItem(it); b.textContent = 'Đã có'; b.disabled = true; sendCmd('playid', { id: it.id }); };
-      row.append(pn);
-    }
-    row.append(b); box.append(row);
-  });
+  list.forEach(raw => box.append(rowOf(raw, raw)));
 }
 async function go(){
   const raw = $('q').value.trim(); if(!raw) return;
@@ -726,7 +746,7 @@ async function go(){
       return;
     }
     // Kho trước (không tốn lượt tìm YouTube); bấm Tìm lần nữa với cùng chữ → tìm YouTube
-    if(khoShownFor !== raw && await khoSearch(raw)) return;
+    if(khoShownFor !== raw && await renderKho()) return;
     await ytSearch(raw);
   }catch(e){ msg(''); apiFail(e); }
 }
@@ -737,40 +757,171 @@ async function ytSearch(raw){
   showResults(d.items, 'YouTube: “' + raw + '”');
 }
 
-/* ---------- Kho BMB (kho-karaoke): tìm bản karaoke/beat, không tốn lượt YouTube ----------
+/* ---------- Kho BMB (kho-karaoke): giống cơ chế tìm bài của remote.html ----------
+   • Mở tab Tìm bài là tự hiện bài hot (cuộn xuống tới đáy thì nạp tiếp: bài hot → bài khách hay chọn / mới).
+   • Danh mục kho tải về máy 1 lần/ngày (IndexedDB, dùng chung với remote.html) → gõ tới đâu hiện kết quả tới đó, kể cả gõ tắt chữ cái đầu ("tnp" → Tình nhạt phai).
+   • Trên máy không có mới hỏi Worker kho; vẫn không có thì bấm Tìm để tìm YouTube.
    Dùng chung địa chỉ kho + mật khẩu đã lưu trên trang (kho_api, np_pass). Không ghi lượt chọn/lượt tìm hụt vào kho
    (nghe nhạc cá nhân không làm lệch bảng bài hot và danh sách "tìm hụt" của quán). */
-let khoShownFor = '', khoTimer = null, khoSeq = 0;
+let khoShownFor = '', khoTimer = null, khoSeq = 0, IDX = null, idxLoading = false, hotCache = null;
+const DAY = 86400000, IDX_MAX_AGE = 7 * DAY;
 const khoBase = () => { try{ return (localStorage.getItem('kho_api') || KHO_DEFAULT).replace(/\/+$/, ''); }catch(e){ return KHO_DEFAULT; } };
-const TONE = { nam:'Tone Nam', nu:'Tone Nữ', 'song-ca':'Song ca', 'thieu-nam':'Thiếu giọng nam', 'thieu-nu':'Thiếu giọng nữ' };
-// trả về true nếu đã hiện kết quả kho (kể cả "không có bài"), false nếu không dùng được kho → để tìm YouTube luôn
-async function khoSearch(raw){
-  if(!cfg.pass) return false;
-  const seq = ++khoSeq;
-  let d;
-  try{
-    const res = await fetch(khoBase() + '/api/kho/search?q=' + encodeURIComponent(raw) + '&limit=30', { headers:{ 'x-pass': cfg.pass } });
-    d = await res.json().catch(() => ({}));
-    if(!res.ok){ if(seq === khoSeq) toast('Kho BMB: ' + (res.status === 401 ? 'sai mật khẩu (APP_PASS của kho-karaoke khác mật khẩu đã lưu)' : (d.error || 'lỗi ' + res.status)) + ' — tìm trên YouTube.', 'err'); return false; }
-  }catch(e){ return false; }
-  if(seq !== khoSeq || $('q').value.trim() !== raw) return true;    // đã gõ chữ khác
-  khoShownFor = raw;
-  const list = (d.groups || []).filter(g => g.best && /^[\w-]{11}$/.test(g.best.id)).map(g => ({
-    id: g.best.id, title: g.best.title, embeddable: true,
-    channel: [g.best.channel, TONE[g.tone] || '', g.versions > 1 ? g.versions + ' bản' : ''].filter(Boolean).join(' · '),
-    thumb: 'https://i.ytimg.com/vi/' + g.best.id + '/mqdefault.jpg' }));
-  const yt = el('button', 'ghost', '🔎 YouTube'); yt.title = 'Tìm bản có lời trên YouTube';
-  yt.onclick = () => ytSearch(raw).catch(e => { msg(''); apiFail(e); });
-  showResults(list, 'Kho BMB: ' + list.length + ' bài' + (list.length ? '' : ' — bấm Tìm lần nữa để tìm YouTube'), yt);
-  return true;
+async function kapi(path){
+  const res = await fetch(khoBase() + path, { headers:{ 'x-pass': cfg.pass } });
+  const d = await res.json().catch(() => ({}));
+  if(!res.ok){ const e = new Error(d.error || 'lỗi ' + res.status); e.status = res.status; throw e; }
+  return d;
 }
-// gõ là tìm trong kho (đợi ngưng gõ 350 ms); link YouTube thì để nút Thêm xử lý
-$('q').addEventListener('input', () => {
-  clearTimeout(khoTimer);
-  const raw = $('q').value.trim(), p = parseYT(raw);
-  if(raw.length < 2 || p.vid || p.list || !cfg.pass) return;
-  khoTimer = setTimeout(() => { khoSearch(raw).catch(() => {}); }, 350);
-});
+const nd = s => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase();
+const asc = s => nd(s).replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+const QN = new Set(['karaoke', 'beat', 'tone', 'ton', 'nhac', 'song', 'bai', 'hat', 'lyric', 'lyrics', 'hd', 'mv']);
+const vnDay = t => new Date(t + 7 * 3600000).toISOString().slice(0, 10);
+function idbOpen(){
+  return new Promise((res, rej) => {
+    if(!window.indexedDB) return rej(new Error('no idb'));
+    const r = indexedDB.open('bmb_kho', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('kv');
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  });
+}
+async function idb(mode, fn){
+  const db = await idbOpen();
+  return new Promise(res => { const tx = db.transaction('kv', mode); const q = fn(tx.objectStore('kv')); tx.oncomplete = () => res(q && q.result); tx.onerror = tx.onabort = () => res(null); });
+}
+async function prepIndex(d){      // dựng theo từng đợt nhỏ để máy yếu không đứng
+  const rows = d.rows || [], chans = d.chans || [], list = new Array(rows.length);
+  for(let i = 0; i < rows.length; i++){
+    const r = rows[i], key = String(r[0] || ''), tw = asc(r[3]);
+    list[i] = { key, tone: r[1] || '', id: r[2], title: r[3], channel: chans[r[4]] || '', versions: r[5] || 1, hot: r[6] || 0, views: r[7] || 0, picks: r[8] || 0,
+      ab: key.split(' ').filter(Boolean).map(w => w[0]).join(''), hay: ' ' + key + ' ' + tw + ' ' };
+    if(i % 1500 === 1499) await new Promise(res => setTimeout(res, 16));
+  }
+  return { v: d.v, at: d.at, list };
+}
+async function loadIndex(){
+  if(!cfg.pass || idxLoading) return;
+  idxLoading = true;
+  try{
+    let saved = null; try{ saved = await idb('readonly', st => st.get('index')); }catch(e){}
+    if(saved && (!saved.got || Date.now() - saved.got > IDX_MAX_AGE)){ try{ await idb('readwrite', st => st.delete('index')); }catch(e){} saved = null; }
+    if(saved && !IDX){ IDX = await prepIndex(saved.d); khoRefreshIfTyping(); }
+    if(saved && saved.d.v === vnDay(Date.now())) return;                       // hôm nay đã tải
+    const res = await fetch(khoBase() + '/api/kho/index', { headers: Object.assign({ 'x-pass': cfg.pass }, saved && saved.etag ? { 'If-None-Match': saved.etag } : {}) });
+    if(res.status === 304 && saved){ saved.got = Date.now(); try{ await idb('readwrite', st => st.put(saved, 'index')); }catch(e){} return; }
+    if(!res.ok) return;
+    const d = await res.json(), rec = { d, etag: res.headers.get('ETag') || '', got: Date.now() };
+    try{ await idb('readwrite', st => st.put(rec, 'index')); }catch(e){}
+    IDX = await prepIndex(d); khoRefreshIfTyping();
+  }catch(e){}
+  finally{ idxLoading = false; }
+}
+// Xếp hạng: khớp đủ chữ cái đầu > tên bài bắt đầu bằng chữ gõ > khớp đầu chuỗi viết tắt > khớp từng từ; bằng nhau thì bài hot, được chọn nhiều, nhiều lượt xem
+function localHits(raw, lim){
+  if(!IDX) return null;
+  const q = asc(raw); if(q.length < 2) return [];
+  let toks = q.split(' ').filter(w => !QN.has(w)); if(!toks.length) toks = q.split(' ');
+  const qs = toks.join(' '), one = toks.length === 1 ? toks[0] : null, abOk = one && /^[a-z]{2,10}$/.test(one);
+  const hits = [];
+  for(const g of IDX.list){
+    let tier = 0;
+    if(abOk && g.ab === one) tier = 4;
+    else if(g.key.startsWith(qs)) tier = 3;
+    else if(abOk && one.length >= 3 && g.ab.startsWith(one)) tier = 2;
+    else if(toks.every(t => g.hay.includes(' ' + t))) tier = 1;
+    if(tier) hits.push([tier, g]);
+  }
+  hits.sort((a, b) => b[0] - a[0] || b[1].hot - a[1].hot || b[1].picks - a[1].picks || b[1].views - a[1].views);
+  return hits.slice(0, lim).map(x => x[1]);
+}
+const TONE = { nam:'Tone Nam', nu:'Tone Nữ', 'song-ca':'Song ca', 'thieu-nam':'Thiếu giọng nam', 'thieu-nu':'Thiếu giọng nữ' };
+const grpItem = g => ({ id:g.id || (g.best && g.best.id), title:g.title || (g.best && g.best.title), embeddable:true,
+  channel:[g.channel || (g.best && g.best.channel), TONE[g.tone] || ''].filter(Boolean).join(' · '), versions:g.versions, key:g.key, tone:g.tone != null ? g.tone : null });
+const goodId = it => /^[\w-]{11}$/.test(it.id || '');
+
+/* Bài hot + nạp tiếp khi cuộn xuống đáy */
+let feed = null, feedIO = null;
+function feedReset(){ feed = null; if(feedIO){ feedIO.disconnect(); feedIO = null; } }
+function feedStart(box, seq, hot){
+  feedReset();
+  feed = { hot, hi:0, more:null, mi:0, seen:new Set(), loading:false, done:false, box, seq, sent:el('div', 'msg', '') };
+  box.append(feed.sent); feedMore(true);
+  if('IntersectionObserver' in window){
+    feedIO = new IntersectionObserver(es => { if(es.some(e => e.isIntersecting)) feedMore(); }, { rootMargin:'600px 0px' });
+    feedIO.observe(feed.sent);
+  }
+}
+async function feedMore(first){
+  const f = feed; if(!f || f.loading || f.done || f.seq !== khoSeq) return;
+  f.loading = true;
+  try{
+    const N = first ? 15 : 20;
+    if(f.hi < f.hot.length){
+      const part = f.hot.slice(f.hi, f.hi + N);
+      part.forEach((h, i) => { f.seen.add(h.best.id); f.box.insertBefore(rowOf(grpItem(h), { rank:f.hi + i + 1, versions:h.versions, key:h.key, tone:h.tone != null ? h.tone : null }), f.sent); });
+      f.hi += part.length;
+    }else{
+      if(!f.more){
+        f.sent.textContent = 'Đang tải thêm…';
+        let d; try{ d = await kapi('/api/kho/new'); }catch(e){ d = { items:[] }; }
+        if(feed !== f) return;
+        f.more = (d.items || []).filter(v => goodId(v) && !f.seen.has(v.id));
+        if(f.more.length){ const h = el('div', 'secHead'); h.append(el('b', null, '⭐ Khách hay chọn · bài mới · nhiều lượt xem')); f.box.insertBefore(h, f.sent); }
+      }
+      const part = f.more.slice(f.mi, f.mi + N);
+      part.forEach(v => { f.seen.add(v.id); f.box.insertBefore(rowOf(Object.assign({ embeddable:true }, v)), f.sent); });
+      f.mi += part.length;
+      if(f.mi >= f.more.length){ f.done = true; f.sent.textContent = f.more.length ? 'Đã hết gợi ý. Gõ tên bài để tìm thêm.' : ''; }
+      else f.sent.textContent = '';
+    }
+  }finally{ f.loading = false; }
+  if(feed === f && !f.done && f.sent.getBoundingClientRect().top < innerHeight + 500) setTimeout(() => feedMore(), 50);
+}
+/* Vẽ phần kho theo chữ đang gõ. Trả về số bài đã hiện (để nút Tìm biết có nên chuyển sang YouTube) */
+async function renderKho(){
+  if(!cfg.pass) return 0;
+  const raw = $('q').value.trim(), p = parseYT(raw), seq = ++khoSeq, box = $('results');
+  if(p.vid || p.list){ return 0; }
+  const head = t => { const h = el('div', 'secHead'); h.append(el('b', null, t)); return h; };
+  try{
+    if(!raw){
+      khoShownFor = '';
+      if(!hotCache){
+        box.replaceChildren(head('🔥 Bài hot'), el('div', 'msg', 'Đang tải…'));
+        const d = await kapi('/api/kho/hot?limit=100');
+        hotCache = (d.items || []).filter(h => h.best && goodId(h.best));
+      }
+      if(seq !== khoSeq) return 0;
+      feedReset(); box.replaceChildren();
+      const h = head('🔥 Bài hot (' + hotCache.length + ')'), rf = el('button', 'ghost', '↻'); rf.onclick = () => { hotCache = null; renderKho(); }; h.append(rf);
+      box.append(h);
+      if(!hotCache.length) box.append(el('div', 'msg', 'Kho chưa có bài. Thêm kênh karaoke ở trang kho.html, kho sẽ tự đầy dần.'));
+      feedStart(box, seq, hotCache);
+      return hotCache.length;
+    }
+    if(raw.length < 2){ feedReset(); box.replaceChildren(); khoShownFor = ''; return 0; }
+    feedReset();
+    let list = localHits(raw, 30), where = ' · trên máy';
+    if(!list || !list.length){
+      where = '';
+      const d = await kapi('/api/kho/search?q=' + encodeURIComponent(raw) + '&limit=30');
+      if(seq !== khoSeq) return 0;
+      list = (d.groups || []).filter(g => g.best && goodId(g.best)).map(g => Object.assign({}, g.best, { versions:g.versions, key:g.key, tone:g.tone }));
+    }
+    if(seq !== khoSeq) return 0;
+    khoShownFor = raw;
+    const yb = el('button', 'ghost', '🔎 YouTube'); yb.title = 'Tìm bản có lời trên YouTube';
+    yb.onclick = () => ytSearch(raw).catch(e => { msg(''); apiFail(e); });
+    showResults(list.map(grpItem), 'Kho BMB: ' + list.length + ' bài' + where + (list.length ? '' : ' — bấm Tìm để tìm trên YouTube'), yb);
+    return list.length;
+  }catch(e){
+    if(seq !== khoSeq) return 0;
+    box.replaceChildren(el('div', 'msg', e.status === 401 ? 'Kho BMB: sai mật khẩu (APP_PASS của kho-karaoke khác mật khẩu đã lưu) — gõ link hoặc bấm Tìm để tìm YouTube.' : 'Mạng đang chập chờn, kho sẽ hiện lại khi kết nối ổn.'));
+    return 0;
+  }
+}
+function khoRefreshIfTyping(){ if($('paneAdd').style.display !== 'none' && $('q').value.trim()) renderKho(); }
+const khoSoon = () => { clearTimeout(khoTimer); if(IDX) renderKho(); else khoTimer = setTimeout(renderKho, 350); };   // có danh mục trên máy: tìm ngay, không chờ
+$('q').addEventListener('input', khoSoon);
 $('goBtn').onclick = go;
 $('q').addEventListener('keydown', e => { if(e.key === 'Enter') go(); });
 $('q').addEventListener('input', () => { const p = parseYT($('q').value); $('goBtn').textContent = (p.vid || p.list) ? 'Thêm' : 'Tìm'; });
@@ -779,6 +930,7 @@ $('q').addEventListener('input', () => { const p = parseYT($('q').value); $('goB
 function tab(w){
   $('paneList').style.display = w === 'list' ? '' : 'none'; $('paneAdd').style.display = w === 'add' ? '' : 'none';
   $('tList').classList.toggle('on', w === 'list'); $('tAdd').classList.toggle('on', w === 'add');
+  if(w === 'add'){ loadIndex(); if(!$('q').value.trim() && (!$('results').firstChild || $('results').querySelector('.msg'))) renderKho(); }
 }
 $('tList').onclick = () => tab('list'); $('tAdd').onclick = () => tab('add');
 $('startBtn').onclick = start;
