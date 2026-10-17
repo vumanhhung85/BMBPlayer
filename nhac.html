@@ -201,6 +201,16 @@
   body.remote #ctl .vol{display:none}
   body.remote #volRow{display:flex; align-items:center; gap:12px; padding:0 4px}
   #volRow{display:none}
+  /* Âm lượng hiện trên TV khi đổi từ điện thoại / nút trên TV (giống BMBPlayer) */
+  #volOsd{position:fixed; right:2.2vw; top:50%; z-index:90; pointer-events:none; opacity:0; transform:translate(16px,-50%); transition:opacity .35s, transform .35s;
+    display:flex; flex-direction:column; align-items:center; gap:1.4vh; background:rgba(10,8,22,.84); border:2px solid rgba(192,132,252,.55); border-radius:22px; padding:2.2vh 1.4vw; min-width:clamp(64px,6vw,110px); box-shadow:0 10px 40px rgba(0,0,0,.6)}
+  #volOsd.show{opacity:1; transform:translate(0,-50%)}
+  #volOsd svg{width:clamp(26px,3vw,48px); height:clamp(26px,3vw,48px); fill:#fff}
+  #volOsd .vb{width:clamp(10px,.9vw,16px); height:26vh; background:rgba(255,255,255,.15); border-radius:99px; overflow:hidden; display:flex; align-items:flex-end}
+  #volOsd .vb i{display:block; width:100%; background:linear-gradient(0deg,#7c3aed,#FFD21A); border-radius:99px; transition:height .15s}
+  #volOsd b{font-size:clamp(20px,2.6vw,42px); font-weight:800; color:#FFD21A; font-variant-numeric:tabular-nums}
+  #volOsd.muted b{color:#f87171} #volOsd.muted .vb i{background:#555}
+  body.remote #volOsd{display:none}
   /* Âm lượng bằng nút −/+ (không dùng thanh trượt, tránh kéo nhầm); #vol vẫn giữ làm nơi lưu giá trị nhưng ẩn */
   #vol{display:none !important}
   .vbtn{width:46px; height:46px; flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; border-radius:50%; background:#20202e; border:1px solid var(--line); color:var(--ink); padding:0; touch-action:manipulation; -webkit-user-select:none; user-select:none}
@@ -287,6 +297,7 @@
 <div id="toast"></div>
 <div id="soundBanner">🔇 Chrome đang chặn tiếng — chạm vào màn hình TV một lần (hoặc nhấn phím bất kỳ) để bật tiếng<small>Muốn khỏi bấm: Chrome → biểu tượng ổ khoá cạnh địa chỉ → Cài đặt trang web → Âm thanh: Cho phép</small></div>
 
+<div id="volOsd"><span id="volIc"></span><div class="vb"><i id="volBar"></i></div><b id="volOsdNum">50</b></div>
 <div id="fsBadge"><div class="box" id="fsBadgeImg"></div><div class="nm">VMHPlayer</div><div class="sb">Quét mã để chọn bài</div></div>
 <div id="pairModal"><div class="card">
   <div id="pairTv">
@@ -542,10 +553,22 @@ function togglePlay(){
 }
 function stopPlayback(){ if(ready) player.stopVideo(); curId = null; pos = -1; setNow(null); publishState(false); }
 let tvFs = false, soundBlocked = false, apTimer = null;
+let volOsdT = null;
+function showVolOsd(){
+  if(REMOTE) return;
+  const v = Math.round(+$('vol').value || 0);
+  let m = v === 0; try{ if(ready && player.isMuted && player.isMuted()) m = true; }catch(e){}
+  $('volIc').innerHTML = m ? ICON.mute : ICON.vol;
+  $('volBar').style.height = (m ? 0 : v) + '%';
+  $('volOsdNum').textContent = m ? 'TẮT' : v;
+  $('volOsd').classList.toggle('muted', m);
+  $('volOsd').classList.add('show');
+  clearTimeout(volOsdT); volOsdT = setTimeout(() => $('volOsd').classList.remove('show'), 2200);
+}
 function toggleMute(){
   if(!ready) return;
   try{ if(player.isMuted()){ player.unMute(); player.setVolume(+$('vol').value); soundBlocked = false; $('soundBanner').style.display = 'none'; } else player.mute(); }catch(e){}
-  paintMute(); publishState(true);
+  paintMute(); publishState(true); showVolOsd();
 }
 function paintMute(){
   const m = REMOTE ? remoteMute : !!(ready && player.isMuted && player.isMuted());
@@ -639,7 +662,7 @@ async function runCmd(c){
     case 'prev': pos < 0 ? playAt(0) : prev(); break;
     case 'mute': toggleMute(); break;
     case 'fs': setTvFs(typeof p.on === 'boolean' ? p.on : !tvFs); break;
-    case 'vol': { const v = Math.max(0, Math.min(100, +p.value || 0)); $('vol').value = v; if(ready) player.setVolume(v); break; }
+    case 'vol': { const v = Math.max(0, Math.min(100, +p.value || 0)); $('vol').value = v; if(ready) player.setVolume(v); paintVol(); showVolOsd(); break; }
     case 'shuffle': toggleShuffle(); break;
     case 'repeat': cycleRepeat(); break;
     case 'playid': await playId(String(p.id || '')); break;
@@ -1134,6 +1157,7 @@ function volButton(icon, d, title){
 if(!REMOTE){ const vn = el('b', 'vnum'); vn.id = 'volNum'; vn.textContent = $('vol').value; $('volBtns').append(volButton('low', -5, 'Giảm âm lượng'), vn, volButton('vol', 5, 'Tăng âm lượng')); $('volBtns').style.cssText = 'display:inline-flex;align-items:center;gap:6px'; }
 let volTimer;
 $('vol').addEventListener('input', paintVol);
+$('vol').addEventListener('input', showVolOsd);
 $('vol').oninput = e => {
   const v = +e.target.value;
   if(REMOTE){ clearTimeout(volTimer); volTimer = setTimeout(() => sendCmd('vol', { value: v }), 150); }
