@@ -319,7 +319,19 @@ const DEFAULT_API = 'https://nhac-playlist.vumanhhung85.workers.dev';
 const $ = id => document.getElementById(id);
 const params = new URLSearchParams(location.search);
 const REMOTE = params.get('mode') === 'remote';
-const ROOM = (params.get('room') || 'tivi').replace(/[^\w-]/g, '').slice(0, 20) || 'tivi';
+/* Mỗi TV có PHÒNG RIÊNG (tự sinh, lưu trong máy): QR/mã ghép của TV nào chỉ điều khiển được đúng TV đó.
+   Điện thoại nhớ phòng của TV đã quét gần nhất; muốn đổi sang TV khác thì quét QR của TV đó. */
+const ROOM = (() => {
+  const clean = v => String(v || '').replace(/[^\w-]/g, '').slice(0, 20);
+  const get = k => { try{ return localStorage.getItem(k) || ''; }catch(e){ return ''; } };
+  const put = (k, v) => { try{ localStorage.setItem(k, v); }catch(e){} };
+  const given = clean(params.get('room'));
+  if(given){ if(REMOTE) put('nhac_last_room', given); return given; }
+  if(REMOTE) return clean(get('nhac_last_room')) || 'tivi';
+  let r = clean(get('nhac_room'));
+  if(!r){ r = 'tv-' + Array.from(crypto.getRandomValues(new Uint8Array(6)), b => (b % 36).toString(36)).join(''); put('nhac_room', r); }
+  return r;
+})();
 const LS = { api:'np_api', pass:'np_pass', cur:'np_cur', shuf:'np_shuf', rep:'np_rep' };
 const lsGet = k => { try{ return localStorage.getItem(k); }catch(e){ return null; } };
 const lsSet = (k, v) => { try{ localStorage.setItem(k, v); }catch(e){} };
