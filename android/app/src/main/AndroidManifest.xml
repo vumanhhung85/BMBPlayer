@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- BMBPlayer — vỏ WebView cho TV / Android box / máy tính bảng trong phòng.
+<!-- BMBPlayer — vỏ WebView cho TV / Android box / máy tính bảng trong phòng, và (2.0) điện thoại/máy của QUẦY nhận đơn.
      Nội dung là trang web https://bmb.id.vn: sửa trang trên GitHub là mọi máy tự cập nhật. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
@@ -10,6 +10,12 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <!-- Android 10+ chỉ cho tự mở app sau khi bật máy nếu được "hiển thị trên ứng dụng khác" -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <!-- 2.0 chế độ Quầy: dịch vụ nền nhận đơn + thông báo kêu chuông -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_REMOTE_MESSAGING" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <!-- Không bắt buộc phần cứng nào: cài được trên TV box (không cảm ứng, không camera) lẫn máy tính bảng -->
     <uses-feature android:name="android.hardware.camera" android:required="false" />
@@ -61,6 +67,16 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
+
+        <!-- Chế độ Quầy: giữ kết nối "cái chuông" với máy chủ, tự hiện thông báo đơn -->
+        <service
+            android:name=".QuayService"
+            android:exported="false"
+            android:foregroundServiceType="remoteMessaging" />
+
+        <receiver
+            android:name=".QuayActionReceiver"
+            android:exported="false" />
 
         <receiver
             android:name=".BootReceiver"

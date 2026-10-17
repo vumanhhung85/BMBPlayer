@@ -81,17 +81,21 @@ import java.util.regex.Pattern;
  *    trình hiển thị lúc 4:30–5:00 sáng khi rảnh, dọn bộ nhớ đệm khi quá lớn / máy báo thiếu RAM,
  *    TV tự mở lại khi app văng, máy tính bảng nạp lại trang khi bật lại sau ≥10 phút tắt màn.
  *  - Menu ẩn cho nhân viên: nút MENU trên điều khiển, bấm QUAY LẠI 3 lần, hoặc chạm 5 lần góc trên bên phải.
+ *  - 2.0 chế độ QUẦY (điện thoại tự nhận là quầy): mở quay.html; sau đăng nhập trang giao "khoá máy" cho QuayService —
+ *    dịch vụ nền giữ "cái chuông" với máy chủ, đơn mới kêu chuông riêng + nút Tiếp nhận / Đã xong ngay trên thông báo.
  */
 public class MainActivity extends Activity {
 
     static final String PREFS = "bmbplayer";
-    static final String K_MODE = "mode";                 // "tv" | "tablet" | "" (chưa chọn)
+    static final String K_MODE = "mode";                 // "tv" | "tablet" | "quay" | "" (chưa chọn)
     static final String K_AUTOSTART = "autostart";
     static final String K_ASK_OVERLAY = "askOverlay";    // số lần đã hỏi quyền tự mở
 
     private static final String HOST = "bmb.id.vn";
     private static final String URL_TV = "https://" + HOST + "/";
     private static final String URL_TABLET = "https://" + HOST + "/remote.html";
+    private static final String URL_QUAY = "https://" + HOST + "/quay.html";      // 2.0: điện thoại / máy của quầy nhận đơn
+    private static final int REQ_NOTIF = 8;
     private static final int MIN_WEBVIEW = 86;           // trang dùng tính năng có từ Chrome/WebView 86
     private static final int REQ_CAMERA = 7;
     private String versionName() {
@@ -159,7 +163,7 @@ public class MainActivity extends Activity {
 
         mode = prefs.getString(K_MODE, "");
         if (mode.isEmpty()) {   // lần đầu: tự nhận biết TV / máy tính bảng, không hỏi (đổi sau trong menu nhân viên)
-            mode = looksLikeTv() ? "tv" : "tablet";
+            mode = guessMode();
             prefs.edit().putString(K_MODE, mode).apply();
         }
         applyScreenPolicy();
@@ -180,6 +184,11 @@ public class MainActivity extends Activity {
         applyScreenPolicy();
         if (web != null) web.onResume();
         resumed = true;
+        QuayService.uiVisible = "quay".equals(mode);
+        if ("quay".equals(mode)) {
+            QuayService.onChange = () -> ui.post(() -> { if (web != null) web.evaluateJavascript("window.bmbQuayTrangThai&&bmbQuayTrangThai()", null); });
+            if (QuayService.self == null) QuayService.start(this);
+        }
         long now = SystemClock.elapsedRealtime();
         // Máy tính bảng tắt màn lâu rồi bật lại: nạp lại trang cho chắc dữ liệu mới, kết nối mới
         if ("tablet".equals(mode) && pausedAt > 0 && now - pausedAt >= TABLET_WAKE_RELOAD_MS && web != null && chooser == null) loadHome();
@@ -202,23 +211,25 @@ public class MainActivity extends Activity {
 
     private void applyScreenPolicy() {
         ui.removeCallbacks(tabletIdle);
-        boolean tab = "tablet".equals(mode);
+        boolean tab = "tablet".equals(mode), keepOn = "tv".equals(mode);
         Window w = getWindow();
         try {
             WindowManager.LayoutParams lp = w.getAttributes();
             lp.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE;
             w.setAttributes(lp);
         } catch (Throwable ignored) {}
-        if (tab) w.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        if (!keepOn) w.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         else w.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        if (root != null) root.setKeepScreenOn(!tab);
-        if (web != null) web.setKeepScreenOn(!tab);
+        if (root != null) root.setKeepScreenOn(keepOn);
+        if (web != null) web.setKeepScreenOn(keepOn);
+        applyWindowMode();
         if (tab) ui.postDelayed(tabletIdle, TABLET_IDLE_MS);
     }
 
     @Override
     protected void onPause() {
         resumed = false;
+        QuayService.uiVisible = false;
         pausedAt = SystemClock.elapsedRealtime();
         ui.removeCallbacks(watchdog);
         ui.removeCallbacks(tabletIdle);
@@ -255,6 +266,15 @@ public class MainActivity extends Activity {
     // ======================================================================
     // Màn hình chọn chế độ (lần đầu cài) — tự chọn sau 20 giây nếu không ai bấm
     // ======================================================================
+    /** Lần đầu cài: TV/box → TV; màn hình rộng (cạnh ngắn ≥ 600dp) → máy tính bảng; điện thoại → Quầy (khách không cài APK) */
+    private String guessMode() {
+        if (looksLikeTv()) return "tv";
+        int sw = getResources().getConfiguration().smallestScreenWidthDp;
+        return sw >= 600 ? "tablet" : "quay";
+    }
+
+    static String modeName(String m) { return "quay".equals(m) ? "Quầy" : "tablet".equals(m) ? "Máy tính bảng" : "TV"; }
+
     private boolean looksLikeTv() {
         try {
             UiModeManager um = (UiModeManager) getSystemService(UI_MODE_SERVICE);
@@ -324,7 +344,7 @@ public class MainActivity extends Activity {
         ui.postDelayed(() -> trimDiskCache(false), 60_000);
     }
 
-    private String home() { return "tablet".equals(mode) ? URL_TABLET : URL_TV; }
+    private String home() { return "quay".equals(mode) ? URL_QUAY : "tablet".equals(mode) ? URL_TABLET : URL_TV; }
 
     private void loadHome() {
         if (web == null) { if (!createWeb()) return; applyUserAgent(); }
@@ -346,7 +366,7 @@ public class MainActivity extends Activity {
         unrespSince = 0;
         if (Build.VERSION.SDK_INT >= 29) watchRenderer(web);
         web.setBackgroundColor(Color.BLACK);
-        web.setKeepScreenOn(!"tablet".equals(mode));
+        web.setKeepScreenOn("tv".equals(mode));
         web.setFocusable(true);
         web.setFocusableInTouchMode(true);
         WebSettings s = web.getSettings();
@@ -488,6 +508,7 @@ public class MainActivity extends Activity {
 
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        if (requestCode == REQ_NOTIF) { QuayService.fireChange(); return; }
         if (requestCode != REQ_CAMERA || pendingPermission == null) return;
         boolean ok = grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED;
         if (ok) pendingPermission.grant(new String[]{PermissionRequest.RESOURCE_VIDEO_CAPTURE});
@@ -595,7 +616,7 @@ public class MainActivity extends Activity {
         lastBack = now;
         backCount++;
         if (backCount >= 3) { backCount = 0; showMenu(); return; }
-        if (backCount == 1 && "tablet".equals(mode) && web != null && web.canGoBack() && chooser == null) { web.goBack(); return; }
+        if (backCount == 1 && !"tv".equals(mode) && web != null && web.canGoBack() && chooser == null) { web.goBack(); return; }
         if (backCount == 2) Toast.makeText(this, "Bấm Quay lại thêm 1 lần để mở menu BMBPlayer", Toast.LENGTH_SHORT).show();
     }
 
@@ -623,9 +644,7 @@ public class MainActivity extends Activity {
         final List<String> labels = new ArrayList<>();
         final List<Runnable> acts = new ArrayList<>();
         labels.add("⟳  Tải lại trang"); acts.add(this::loadHome);
-        labels.add("tablet".equals(mode) ? "📺  Chuyển sang chế độ TV" : "📱  Chuyển sang chế độ máy tính bảng");
-        acts.add(() -> confirm("Đổi chế độ?", "tablet".equals(mode) ? "Máy này sẽ thành TV phát bài." : "Máy này sẽ thành máy tính bảng chọn bài + gọi phục vụ.",
-                () -> { mode = "tablet".equals(mode) ? "tv" : "tablet"; prefs.edit().putString(K_MODE, mode).apply(); applyScreenPolicy(); applyUserAgent(); loadHome(); }));
+        labels.add("⇄  Đổi chế độ (đang: " + modeName(mode) + ")"); acts.add(this::showModeMenu);
         labels.add("▦  Mở ứng dụng khác…"); acts.add(this::showApps);
         labels.add("📶  Cài đặt Wi-Fi"); acts.add(() -> openSettings(Settings.ACTION_WIFI_SETTINGS));
         labels.add("⚙  Cài đặt Android"); acts.add(() -> openSettings(Settings.ACTION_SETTINGS));
@@ -643,12 +662,43 @@ public class MainActivity extends Activity {
         labels.add("✕  Thoát BMBPlayer"); acts.add(() -> { if (Build.VERSION.SDK_INT >= 21) finishAndRemoveTask(); else finish(); });
 
         AlertDialog.Builder b = new AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert);
-        b.setTitle("BMBPlayer " + versionName() + " · " + ("tablet".equals(mode) ? "Máy tính bảng" : "TV") + " · WebView " + webViewMajor());
+        b.setTitle("BMBPlayer " + versionName() + " · " + modeName(mode) + " · WebView " + webViewMajor());
         b.setItems(labels.toArray(new String[0]), (d, which) -> acts.get(which).run());
         b.setNegativeButton("Đóng", null);
         openDialog = b.create();
         openDialog.setOnDismissListener(d -> hideBars());
         openDialog.show();
+    }
+
+    private void showModeMenu() {
+        final String[] keys = {"tv", "tablet", "quay"};
+        final String[] names = {"📺  TV trong phòng (phát bài, hiện QR khách)", "📱  Máy tính bảng trong phòng (chọn bài + gọi phục vụ)", "🛎  Quầy (nhận đơn gọi lễ tân, có chuông báo)"};
+        new AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
+                .setTitle("Máy này dùng làm gì? (đang: " + modeName(mode) + ")")
+                .setItems(names, (d, w) -> { if (!keys[w].equals(mode)) setMode(keys[w]); })
+                .setNegativeButton("Đóng", null)
+                .setOnDismissListener(d -> hideBars())
+                .show();
+    }
+
+    private void setMode(String m) {
+        if ("quay".equals(mode) && !"quay".equals(m)) QuayService.logout(this);   // thôi làm quầy: gỡ máy khỏi danh sách nhận đơn
+        mode = m;
+        prefs.edit().putString(K_MODE, mode).apply();
+        QuayService.uiVisible = "quay".equals(mode) && resumed;
+        applyScreenPolicy(); applyUserAgent(); loadHome();
+        toast("Đã chuyển sang chế độ " + modeName(mode));
+    }
+
+    /** Quầy là điện thoại của nhân viên: hiện thanh trạng thái (xem thông báo), không mở khi máy đang khoá */
+    private void applyWindowMode() {
+        Window w = getWindow();
+        int f = WindowManager.LayoutParams.FLAG_FULLSCREEN | WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON;
+        if ("quay".equals(mode)) {
+            w.clearFlags(f);
+            View d = w.getDecorView();
+            if (d.getSystemUiVisibility() != 0) d.setSystemUiVisibility(0);
+        } else w.addFlags(f);
     }
 
     private void confirm(String title, String msg, final Runnable yes) {
@@ -729,7 +779,7 @@ public class MainActivity extends Activity {
 
     private void maybeAskAutostart() {
         if (Build.VERSION.SDK_INT < 29 || isFinishing()) return;
-        if ("tablet".equals(mode)) return;   // máy tính bảng không cần tự mở
+        if (!"tv".equals(mode)) return;      // máy tính bảng / quầy không cần tự mở màn hình (quầy: dịch vụ nền tự bật)
         if (!prefs.getBoolean(K_AUTOSTART, true) || Settings.canDrawOverlays(this) || isDefaultHome()) return;
         int asked = prefs.getInt(K_ASK_OVERLAY, 0);
         if (asked >= 3 || (openDialog != null && openDialog.isShowing())) return;
@@ -996,6 +1046,67 @@ public class MainActivity extends Activity {
             if (pct > 0 && idx == 0) idx = 1;                       // kéo lên một chút thì phải có tiếng
             try { am.setStreamVolume(AudioManager.STREAM_MUSIC, idx, 0); } catch (Exception ignored) {}
         }
+
+        // ---- 2.0 chế độ Quầy (chỉ dùng khi máy đang ở chế độ Quầy) ----
+        @JavascriptInterface
+        public String quayInfo() { return QuayService.info(MainActivity.this).toString(); }
+
+        /** Trang quầy vừa đăng nhập: nhận khoá máy (dk) do Worker cấp, bật dịch vụ nền nhận đơn */
+        @JavascriptInterface
+        public void quayBat(String dk, String api, String branch, String user) {
+            if (!"quay".equals(mode) || dk == null || !dk.startsWith("dk.") || dk.length() > 600) return;
+            String a = api != null && api.startsWith("https://") ? api : QuayService.DEFAULT_API;
+            boolean doi = !dk.equals(prefs.getString(QuayService.K_DK, ""));
+            prefs.edit().putString(QuayService.K_DK, dk).putString(QuayService.K_API, a)
+                    .putString(QuayService.K_BRANCH, branch == null ? "" : branch).putString(QuayService.K_USER, user == null ? "" : user).apply();
+            ui.post(() -> {
+                askNotifPermission();
+                QuayService s = QuayService.self;
+                if (s == null) QuayService.start(MainActivity.this);
+                else if (doi) s.reconnect();
+                askBatteryOnce();
+            });
+        }
+
+        /** Bấm Đăng xuất trên trang quầy: máy thôi nhận đơn */
+        @JavascriptInterface
+        public void quayTat() { ui.post(() -> QuayService.logout(MainActivity.this)); }
+
+        @JavascriptInterface
+        public void quayThu() { ui.post(() -> { askNotifPermission(); QuayService.test(MainActivity.this); }); }
+
+        @JavascriptInterface
+        public void quayCaiDat(String kind) { ui.post(() -> { if ("pin".equals(kind)) openBatterySettings(); else openNotifSettings(); }); }
+    }
+
+    private void askNotifPermission() {
+        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission("android.permission.POST_NOTIFICATIONS") != PackageManager.PERMISSION_GRANTED) {
+            try { requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, REQ_NOTIF); } catch (Exception ignored) {}
+        }
+    }
+
+    /** Hỏi bỏ tối ưu pin một lần (Android hay tắt dịch vụ nền của app bị tối ưu pin); lần sau bấm nút trong bảng 🔔 */
+    private void askBatteryOnce() {
+        if (Build.VERSION.SDK_INT < 23 || QuayService.batteryOk(this) || prefs.getBoolean("q_ask_pin", false)) return;
+        prefs.edit().putBoolean("q_ask_pin", true).apply();
+        ui.postDelayed(this::openBatterySettings, 1500);
+    }
+
+    @android.annotation.SuppressLint("BatteryLife")
+    private void openBatterySettings() {
+        if (Build.VERSION.SDK_INT < 23) return;
+        try {
+            startActivity(new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:" + getPackageName())).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        } catch (Exception e) { openSettings(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS); }
+    }
+
+    private void openNotifSettings() {
+        try {
+            Intent i = Build.VERSION.SDK_INT >= 26
+                    ? new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName())
+                    : new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getPackageName()));
+            startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        } catch (Exception e) { openSettings(Settings.ACTION_SETTINGS); }
     }
 
     private final Runnable volPush = () -> {
@@ -1027,6 +1138,7 @@ public class MainActivity extends Activity {
 
     @SuppressWarnings("deprecation")
     private void hideBars() {
+        if ("quay".equals(mode)) return;                     // quầy: giữ thanh trạng thái để thấy thông báo
         View d = getWindow().getDecorView();
         int want = View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
                 | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION

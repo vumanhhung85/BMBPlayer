@@ -12,6 +12,10 @@ public class BootReceiver extends BroadcastReceiver {
     public void onReceive(Context context, Intent intent) {
         if (intent == null || intent.getAction() == null) return;
         android.content.SharedPreferences sp = context.getSharedPreferences(MainActivity.PREFS, Context.MODE_PRIVATE);
+        if ("quay".equals(sp.getString(MainActivity.K_MODE, ""))) {    // chế độ Quầy: chỉ bật dịch vụ nhận đơn ở nền, không mở màn hình
+            QuayService.start(context);
+            return;
+        }
         if (!sp.getBoolean(MainActivity.K_AUTOSTART, true)) return;
         if ("tablet".equals(sp.getString(MainActivity.K_MODE, ""))) return;   // máy tính bảng: không tự mở, nhân viên mở khi cần
         Intent open = new Intent(context, MainActivity.class);

@@ -10,8 +10,8 @@ android {
         applicationId 'vn.boommusicbox.bmbplayer'
         minSdk 21          // Android 5.0 trở lên (cần WebView cập nhật được)
         targetSdk 34
-        versionCode 10
-        versionName '1.9'
+        versionCode 20
+        versionName '2.0'
     }
 
     buildTypes {
@@ -31,8 +31,17 @@ android {
         checkReleaseBuilds false
     }
 
+    packaging {
+        resources { excludes += ['META-INF/*.kotlin_module', 'META-INF/versions/**'] }
+    }
+
     dependenciesInfo {
         includeInApk false
         includeInBundle false
     }
+}
+
+dependencies {
+    // WebSocket cho dịch vụ nền chế độ Quầy (2.0). OkHttp 4.12 chạy được từ Android 5.0 (API 21).
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
 }

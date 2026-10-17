@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Biểu tượng nhỏ trên thanh thông báo (chế độ Quầy): chuông lễ tân, một màu trắng -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="#FFFFFFFF"
+        android:pathData="M12,4a1.5,1.5 0,0 0,-1.5 1.5v0.3C7.4,6.5 5,9.2 5,12.5V16H4v2h16v-2h-1v-3.5c0,-3.3 -2.4,-6 -5.5,-6.7V5.5A1.5,1.5 0,0 0,12 4zM9,19.5h6v1.5H9z"/>
+</vector>
