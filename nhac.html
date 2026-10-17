@@ -44,6 +44,13 @@
   #tvQr img{width:112px; height:112px; image-rendering:pixelated; display:block}
   #tvQr span{font-size:11px; color:var(--quiet); white-space:nowrap}
   body.remote #tvQr{display:none}
+  /* Toàn màn hình TV: mã QR + tên ứng dụng treo ở góc trên trái, đè lên video */
+  #fsBadge{display:none; position:fixed; top:14px; left:14px; z-index:70; align-items:center; gap:12px; padding:8px 18px 8px 8px; border-radius:16px; background:rgba(12,8,28,.62); backdrop-filter:blur(6px); border:1px solid rgba(255,255,255,.14); pointer-events:none}
+  body.tvfull #fsBadge{display:flex}
+  #fsBadge .box{background:#fff; border-radius:10px; padding:5px; line-height:0}
+  #fsBadge img{width:96px; height:96px; image-rendering:pixelated; display:block}
+  #fsBadge .nm{font-weight:800; font-size:26px; letter-spacing:.02em; line-height:1.1; background:linear-gradient(135deg,#ffd21a,#c084fc); -webkit-background-clip:text; background-clip:text; color:transparent}
+  #fsBadge .sb{font-size:12px; color:#d6d0ee; margin-top:3px}
   #now{padding:12px 18px 4px}
   #now .nt{font-weight:700; font-size:clamp(16px,2vw,22px); line-height:1.35}
   #now .nc{color:var(--quiet); font-size:13px; margin-top:2px; min-height:18px}
@@ -266,6 +273,7 @@
 <div id="toast"></div>
 <div id="soundBanner">🔇 Chrome đang chặn tiếng — chạm vào màn hình TV một lần (hoặc nhấn phím bất kỳ) để bật tiếng<small>Muốn khỏi bấm: Chrome → biểu tượng ổ khoá cạnh địa chỉ → Cài đặt trang web → Âm thanh: Cho phép</small></div>
 
+<div id="fsBadge"><div class="box" id="fsBadgeImg"></div><div><div class="nm">VMHPlayer</div><div class="sb">Quét mã để chọn bài</div></div></div>
 <div id="pairModal"><div class="card">
   <div id="pairTv">
     <h3>Ghép điện thoại</h3>
@@ -1257,7 +1265,7 @@ if(REMOTE){
 // máy chưa có mật khẩu sẽ được hỏi mật khẩu (không có mật khẩu thì không làm gì được).
 if(!REMOTE && window.qrcode){
   const url = location.origin + location.pathname + '?mode=remote&room=' + encodeURIComponent(ROOM) + '&qr=1';
-  try{ const q = qrcode(0, 'M'); q.addData(url); q.make(); const img = document.createElement('img'); img.alt = 'QR chọn bài'; img.src = q.createDataURL(5, 2); $('tvQrImg').append(img); }
+  try{ const q = qrcode(0, 'M'); q.addData(url); q.make(); const img = document.createElement('img'); img.alt = 'QR chọn bài'; img.src = q.createDataURL(5, 2); $('tvQrImg').append(img); const i2 = img.cloneNode(); $('fsBadgeImg').append(i2); }
   catch(e){ $('tvQr').style.display = 'none'; }
 }else $('tvQr').style.display = 'none';
 const fromQr = params.get('qr') === '1';
