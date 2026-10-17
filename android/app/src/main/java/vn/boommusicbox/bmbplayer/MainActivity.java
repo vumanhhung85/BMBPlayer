@@ -1072,6 +1072,21 @@ public class MainActivity extends Activity {
         return Math.round(am.getStreamVolume(AudioManager.STREAM_MUSIC) * 100f / max);
     }
 
+    /** Chỉ trang admin.html của hệ thống mình mới được dùng vân tay (cầu nối này lộ cho mọi trang trong WebView) */
+    private boolean adminPageNow() {
+        try {
+            String u = web != null ? web.getUrl() : null;
+            Uri uri = u == null ? null : Uri.parse(u);
+            return uri != null && allowed(uri) && uri.getPath() != null && uri.getPath().contains("/admin");
+        } catch (Exception e) { return false; }
+    }
+
+    private void bioReply(String id, boolean ok, String payload) {
+        if (web == null) return;
+        String js = "window.bmbBioDone&&window.bmbBioDone(" + org.json.JSONObject.quote(id == null ? "" : id) + "," + ok + "," + org.json.JSONObject.quote(payload == null ? "" : payload) + ")";
+        web.evaluateJavascript(js, null);
+    }
+
     /** Gọi từ trang web (window.BMBNative). Chỉ cho đọc/đặt âm lượng, không gì khác. */
     private class NativeBridge {
         @JavascriptInterface
@@ -1086,6 +1101,34 @@ public class MainActivity extends Activity {
             int idx = Math.round(Math.max(0, Math.min(100, pct)) * max / 100f);
             if (pct > 0 && idx == 0) idx = 1;                       // kéo lên một chút thì phải có tiếng
             try { am.setStreamVolume(AudioManager.STREAM_MUSIC, idx, 0); } catch (Exception ignored) {}
+        }
+
+        // ---- 2.2 vân tay cho trang admin.html (WebView không có WebAuthn) ----
+        @JavascriptInterface
+        public boolean bioAvailable() { return BioHelper.available(MainActivity.this); }
+
+        @JavascriptInterface
+        public boolean bioHas() { return BioHelper.has(prefs); }
+
+        @JavascriptInterface
+        public void bioClear() { BioHelper.clear(prefs); }
+
+        /** Lưu mật khẩu sau khi quét vân tay. Kết quả trả về window.bmbBioDone(id, ok, payload). */
+        @JavascriptInterface
+        public void bioSave(final String id, final String secret) {
+            ui.post(() -> {
+                if (!adminPageNow() || secret == null || secret.length() > 200) { bioReply(id, false, "denied"); return; }
+                BioHelper.save(MainActivity.this, prefs, secret, (ok, payload) -> ui.post(() -> bioReply(id, ok, payload)));
+            });
+        }
+
+        /** Quét vân tay rồi trả mật khẩu đã nhớ cho trang admin. */
+        @JavascriptInterface
+        public void bioUnlock(final String id) {
+            ui.post(() -> {
+                if (!adminPageNow()) { bioReply(id, false, "denied"); return; }
+                BioHelper.unlock(MainActivity.this, prefs, (ok, payload) -> ui.post(() -> bioReply(id, ok, payload)));
+            });
         }
 
         // ---- 2.0 chế độ Quầy (chỉ dùng khi máy đang ở chế độ Quầy) ----
