@@ -49,6 +49,13 @@ Trên máy có Node (thư mục repo BMBPlayer, PowerShell):
 - Không có giờ im lặng ban đêm (quán mở đến 6 giờ sáng, quầy luôn có người). Muốn tắt hẳn: thêm biến `TG_LETAN` = `0` ở Dash (Variable, không phải Secret).
 - Lỗi Telegram (mạng, bot bị chặn…) không làm hỏng việc gửi/xử lý yêu cầu; tin gửi nền sau khi đã trả lời khách.
 
+## Quầy nhận đơn tức thì + thông báo đẩy (từ 10/2026)
+- **Tức thì**: màn quầy (quay.html) nối WebSocket `/quay/ws` tới Durable Object `QuayHub` của chi nhánh. Có đơn mới, đổi trạng thái, nhập POS, mở/đóng phòng thì Worker "rung chuông" và quầy tải lại hàng đợi ngay (≈0,1–0,3 giây thay vì tới 8 giây). Chấm nhỏ cạnh tên tài khoản: xanh = đang nhận tức thì, xám = đang hỏi định kỳ 8 giây (WebSocket rớt vẫn không mất đơn).
+- **Thông báo đẩy**: mỗi máy (điện thoại Android, máy tính Chrome, iPhone/iPad đã cài ra Màn hình chính, iOS 16.4+) bấm 🔔 trên quay.html → Bật thông báo. Đơn mới hiện thông báo có nút **✅ Tiếp nhận**; đã xác nhận thì đổi thành **🎉 Đã xong**; xong/huỷ thì đổi theo. Máy đang mở trang quầy không bị báo trùng (trang đã kêu chuông). App APK không nhận thông báo đẩy: dùng Chrome.
+- Ai nhận: tài khoản quản lý + quầy của chi nhánh, đang hoạt động, đã bật trên máy đó (admin: nhận theo chi nhánh đang chọn lúc bật). Đăng xuất bằng nút thì gỡ máy khỏi danh sách; đăng nhập lại tự gắn lại.
+- Deploy: thêm binding `QHUB` + migration `v2` trong wrangler.toml (đã có), push `main` là xong. Không cần secret mới. Bảng `order_push_sub`, `order_meta` tự tạo. **Đừng xoá dòng `vapid` trong `order_meta`** (xoá là mọi máy phải bật lại).
+- Tắt đẩy khẩn cấp: biến `PUSH_LETAN = 0` (chuông WebSocket vẫn chạy). Telegram vẫn chạy song song.
+
 ## Chuyển CN03 sang (thay thẳng)
 1. Quầy CN03 mở `https://bmb.id.vn/quay.html`, đăng nhập tài khoản cũ.
 2. Mỗi TV: mở `https://bmb.id.vn/` → hiện mã 6 số. Quầy → tab **TV & phòng** → **Gán TV** ở đúng phòng → quét QR trên TV (hoặc quét QR trên TV bằng camera điện thoại → mở thẳng trang quầy).

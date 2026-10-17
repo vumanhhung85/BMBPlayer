@@ -13,6 +13,8 @@
    ĐƯỜNG DẪN CỦA WORKER:
      POST /api               — API quầy + gọi lễ tân (body JSON {action,...}), giữ đúng tên action cũ của Order.
      GET  /ws                — WebSocket kênh phòng (TV / máy tính bảng / điện thoại khách).
+     GET  /quay/ws           — WebSocket "cái chuông" của màn quầy (mỗi chi nhánh một QuayHub): có đơn / đổi trạng thái
+                               / mở-đóng phòng thì quầy tải lại ngay. Phiên quầy gửi qua Sec-WebSocket-Protocol 'tok.<phiên>'.
      POST /api/tv/pair/*     — TV (hoặc máy tính bảng, kind:'tb') chưa gán phòng xin mã 6 số, chờ quầy gán.
                                Máy tính bảng gán xong nhận thêm quyền thiết bị (dv) của chi nhánh.
      POST /api/tablet/claim  — máy tính bảng ĐÃ có quyền thiết bị quét QR trên TV để vào/đổi phòng (cùng chi nhánh).
@@ -44,7 +46,10 @@
               SECRET (chuỗi ngẫu nhiên dài, ký mã TV/QR), GUEST_SECRET (GIỐNG HỆT kho-karaoke),
               APP_PASS (mật khẩu nhac.html) · tuỳ chọn: LEGACY_SECRET, NHAC_PASS
      Biến   : ALLOWED_ORIGINS (mặc định https://bmb.id.vn), NET_CHECK (off|warn|on), TB_NET (on|off)
-     Binding: D1 DB → bmb_data ; Durable Object ROOM → Room, REG → Registry, NHAC → NhacRoom
+     Binding: D1 DB → bmb_data ; Durable Object ROOM → Room, REG → Registry, NHAC → NhacRoom, QHUB → QuayHub
+   THÔNG BÁO ĐẨY (Web Push, 10/2026): mỗi máy bật trong quay.html (nút 🔔) → đơn mới hiện thông báo có nút Tiếp nhận,
+     đã xác nhận → nút Đã xong (sw-quay.js gọi action push.act, có chữ ký). Máy đang mở trang quầy thì không đẩy trùng.
+     Bảng order_push_sub + order_meta (khoá VAPID — đừng xoá) tự tạo. Biến PUSH_LETAN=0 tắt đẩy (chuông WebSocket vẫn chạy).
    TELEGRAM: yêu cầu gọi lễ tân (mới / xác nhận / đã phục vụ / huỷ) báo cho quản lý + nhân viên quầy chi nhánh (xem tgDon: có nút Tiếp nhận / Đã xong / Huỷ / Đã nhập POS ngay trên Telegram). CHƯA CÓ: nhắc lại khi quá hạn (SLA); học IP chi nhánh
    ============================================================ */
 import { DurableObject } from 'cloudflare:workers';
@@ -364,7 +369,7 @@ async function handleApi(request, env, ctx) {
         case 'auth.login':               res = await authDangNhap(env, body, ip); break;
         case 'quay.feed':                res = await quayFeed(env, body); break;
         case 'quay.don':                 res = await quayDon(env, body, ctx); break;
-        case 'quay.phong':               res = await quayPhong(env, body); break;
+        case 'quay.phong':               res = await quayPhong(env, body, ctx); break;
         case 'quay.tv':                  res = await quayTv(env, body); break;
         case 'quay.ganTv':               res = await quayGanTv(env, body, ip); break;
         case 'quay.tvCheck':             res = await quayTvCheck(env, body, ip); break;
@@ -392,6 +397,11 @@ async function handleApi(request, env, ctx) {
         case 'admin.taiKhoan.khoa':      res = await tkKhoa(env, body); break;
         case 'admin.taiKhoan.datLaiMk':  res = await tkDatLaiMk(env, body); break;
         case 'admin.taiKhoan.quyenMenu': res = await tkQuyenMenu(env, body); break;
+        case 'push.key':                 res = await pushKey(env); break;                 // khoá công khai VAPID (không cần đăng nhập)
+        case 'push.subscribe':           res = await pushDangKy(env, body, request); break;
+        case 'push.unsubscribe':         res = await pushHuyDangKy(env, body); break;
+        case 'push.test':                res = await pushThu(env, body); break;
+        case 'push.act':                 res = await pushBam(env, body, ctx); break;     // nút Tiếp nhận / Đã xong ngay trên thông báo (service worker gọi, có chữ ký)
         default:                         res = fail('unknown_action: ' + action, 400);
       }
     } catch (e) {
@@ -499,6 +509,7 @@ async function donTao(env, body, ctx) {
   }
   await baoLeTan(env, phong.id, { id, st: 'MOI', items, at: now });     // TV của phòng hiện "Đã gửi"
   chayNen(ctx, tgDon(env, id));       // Telegram quản lý + nhân viên quầy (kèm nút Tiếp nhận / Huỷ)
+  chayNen(ctx, baoQuayDon(env, id));  // quầy cùng chi nhánh: chuông WebSocket (hàng đợi tự tải lại) + thông báo đẩy có nút Tiếp nhận
   return ok({ orderId: id });
 }
 
@@ -689,10 +700,11 @@ async function quayDon(env, body, ctx) {
   const r = await doiTrangThai(env, ctx, orderId, act, ss.b, ss.u);
   if (!r.ok) return fail(r.error, r.status || 400, r.msg);
   chayNen(ctx, tgDon(env, orderId, { nguoi: ss.u }));       // Telegram: sửa tin nhắn của đơn (cùng nội dung như khi bấm nút trên Telegram)
+  chayNen(ctx, baoQuayDon(env, orderId, { nguoi: ss.u }));   // quầy khác + thông báo đẩy đổi theo trạng thái mới
   return ok({});
 }
 
-async function quayPhong(env, body) {
+async function quayPhong(env, body, ctx) {
   const [ss, loi] = await canPhien(env, body);
   if (loi) return loi;
   const roomId = s(body.roomId, 60);
@@ -703,6 +715,7 @@ async function quayPhong(env, body) {
   ).bind(open ? 1 : 0, open ? Date.now() : null, roomId, ss.b).run();
   if (!r.meta.changes) return fail('not_found');
   await baoKenhPhong(env, roomId);
+  chayNen(ctx, pokeQuay(env, ss.b, 'phong'));       // màn quầy khác của chi nhánh cập nhật lưới phòng ngay
   return ok({});
 }
 
@@ -718,6 +731,7 @@ async function quayPos(env, body, ctx) {
   if (loi2) return loi2;
   await danhDauPos(env, orderId);
   chayNen(ctx, tgDon(env, orderId));       // tin nhắn Telegram đổi thành "Đã nhập POS", mất nút
+  chayNen(ctx, baoQuayDon(env, orderId, { push: false }));   // chỉ báo các màn quầy tải lại, không đẩy thông báo
   return ok({});
 }
 
@@ -1239,6 +1253,7 @@ async function tgCallback(env, ctx, cq) {
       await tra(r.ok ? (act === 'nhan' ? 'Đã tiếp nhận ✓' : act === 'xong' ? 'Đã xong ✓' : 'Đã huỷ đơn') : (r.msg || 'Không làm được.'), !r.ok);
     }
     await tgDon(env, id, { nguoi: nguoiLam });      // sửa tin nhắn (cho mọi người nhận) theo trạng thái mới — kể cả khi đơn đã bị người khác xử lý, để nút cũ biến mất
+    if (viec === 'p' || nguoiLam) await baoQuayDon(env, id, { nguoi: nguoiLam, push: !!nguoiLam });   // màn quầy tải lại; đổi trạng thái thì đẩy thông báo
   } catch (e) { console.error('tgCallback:', e && e.name); }
 }
 
@@ -1830,6 +1845,301 @@ const regStub = env => env.REG.get(env.REG.idFromName('registry'));
 const call = (stub, path, body) => stub.fetch('https://do' + path, body === undefined ? undefined : { method: 'POST', body: JSON.stringify(body) }).then(r => r.json());
 const callR = (stub, path, body) => stub.fetch('https://do' + path, { method: 'POST', body: JSON.stringify(body) }).then(async r => ({ status: r.status, data: await r.json() }));
 
+// ============================================================
+// QUẦY THỜI GIAN THỰC (WebSocket "cái chuông") + THÔNG BÁO ĐẨY (Web Push)
+// ------------------------------------------------------------
+// • Mỗi chi nhánh một Durable Object QuayHub. Màn quầy (quay.html) nối /quay/ws; có đơn mới / đổi trạng thái / mở-đóng phòng
+//   thì Worker "rung chuông" ({t:'rev'}) và quầy tự gọi lại quay.feed. Chuông KHÔNG chở dữ liệu: WebSocket rớt thì quầy vẫn
+//   tự hỏi định kỳ như cũ, không mất đơn nào.
+// • Thông báo đẩy: mỗi máy (điện thoại / PC) tự bật trong quay.html (nút 🔔). Đơn mới → máy của quản lý + quầy chi nhánh đó
+//   nhận thông báo có nút "Tiếp nhận"; đã xác nhận → thông báo đổi thành nút "Đã xong"; xong/huỷ → thông báo đổi theo.
+//   Máy đang mở màn quầy (tab đang hiện) thì KHÔNG đẩy, vì màn quầy đã kêu chuông.
+// • Khoá VAPID tự sinh lần đầu, lưu ở order_meta (D1). ĐỪNG xoá dòng 'vapid': xoá là mọi máy phải bật lại thông báo.
+// • Telegram vẫn chạy song song (kênh dự phòng).
+// ============================================================
+const QHUB_MAX_SOCK_USER = 4;            // mỗi tài khoản tối đa 4 màn quầy nối cùng lúc (đóng cái cũ nhất)
+const PUSH_MAX_MAY_USER = 6;             // mỗi tài khoản tối đa 6 máy nhận thông báo
+const PUSH_NUT_HAN_MS = 12 * 3600 * 1000;    // nút trên thông báo dùng được trong 12 giờ
+const DV_Q_RE = /^[A-Za-z0-9_-]{8,40}$/;     // mã máy (quay.html tự sinh, nhớ trong trình duyệt)
+const TRANG_THAI_TEN = { MOI: 'chờ xác nhận', NHAN: 'đã xác nhận', XONG: 'đã phục vụ', HUY: 'đã huỷ' };
+
+const quayHub = (env, cn) => (env.QHUB && cn) ? env.QHUB.get(env.QHUB.idFromName('cn:' + cn)) : null;
+async function pokeQuay(env, cn, why) {
+  const st = quayHub(env, cn);
+  if (!st) return;
+  try { await st.fetch('https://hub/poke', { method: 'POST', body: JSON.stringify({ why: why || '' }) }); }
+  catch (e) { console.error('pokeQuay:', e && e.name); }
+}
+/** Mã các máy đang mở màn quầy (tab đang hiện) của chi nhánh → khỏi đẩy thông báo cho máy đó */
+async function quayDangXem(env, cn) {
+  const st = quayHub(env, cn);
+  if (!st) return [];
+  try { const j = await (await st.fetch('https://hub/visible')).json(); return Array.isArray(j.visible) ? j.visible : []; }
+  catch (e) { return []; }
+}
+/** GET /quay/ws?b=<chi nhánh (admin)>&dv=<mã máy> — phiên quầy gửi qua Sec-WebSocket-Protocol: ['bmbq.v1', 'tok.<phiên>'] */
+async function quayWs(req, env) {
+  if ((req.headers.get('Upgrade') || '').toLowerCase() !== 'websocket') return new Response('Cần WebSocket', { status: 426 });
+  if (!env.QHUB) return new Response('Chưa bật thời gian thực', { status: 501 });
+  const u = new URL(req.url);
+  const protos = String(req.headers.get('Sec-WebSocket-Protocol') || '').split(',').map(x => x.trim());
+  const tok = protos.find(x => x.startsWith('tok.'));
+  const ss = await getSession(env, { session: tok ? tok.slice(4) : '', branchId: u.searchParams.get('b') || '' }).catch(() => null);
+  if (!ss || !ss.b) return new Response('phien', { status: 403 });
+  const dv = DV_Q_RE.test(u.searchParams.get('dv') || '') ? u.searchParams.get('dv') : '';
+  return quayHub(env, ss.b).fetch('https://hub/ws', { headers: { Upgrade: 'websocket', 'X-User': ss.u, 'X-Dv': dv } });
+}
+
+export class QuayHub extends DurableObject {
+  constructor(ctx, env) {
+    super(ctx, env);
+    try { this.ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair('ping', 'pong')); } catch (e) { /* môi trường thử */ }
+  }
+  socks() { return this.ctx.getWebSockets(); }
+  info(ws) { try { return ws.deserializeAttachment() || {}; } catch (e) { return {}; } }
+  visibleList() {
+    const set = new Set();
+    for (const ws of this.socks()) { const a = this.info(ws); if (a.dv && a.v) set.add(a.dv); }
+    return [...set];
+  }
+  broadcast(obj) {
+    const s = JSON.stringify(obj);
+    for (const ws of this.socks()) { try { ws.send(s); } catch (e) { /* socket đã đóng */ } }
+  }
+  async fetch(request) {
+    const url = new URL(request.url);
+    if (url.pathname === '/poke') {
+      let why = ''; try { why = String((await request.json()).why || '').slice(0, 20); } catch (e) {}
+      this.broadcast({ t: 'rev', why, at: Date.now() });
+      return new Response('ok');
+    }
+    if (url.pathname === '/visible') return new Response(JSON.stringify({ visible: this.visibleList() }), { headers: { 'content-type': 'application/json' } });
+    if (url.pathname === '/ws') {
+      const user = request.headers.get('X-User') || '';
+      if (!user) return new Response('no user', { status: 400 });
+      const mine = this.socks().filter(w => this.info(w).u === user);
+      while (mine.length >= QHUB_MAX_SOCK_USER) { try { mine.shift().close(1000, 'replaced'); } catch (e) {} }
+      const pair = new WebSocketPair(), client = pair[0], server = pair[1];
+      this.ctx.acceptWebSocket(server);
+      server.serializeAttachment({ u: user, dv: request.headers.get('X-Dv') || '', v: 1 });
+      try { server.send(JSON.stringify({ t: 'hello', at: Date.now() })); } catch (e) {}
+      return new Response(null, { status: 101, webSocket: client, headers: { 'Sec-WebSocket-Protocol': 'bmbq.v1' } });
+    }
+    return new Response('not found', { status: 404 });
+  }
+  async webSocketMessage(ws, data) {
+    let m; try { m = JSON.parse(String(data)); } catch (e) { return; }
+    if (!m || m.t !== 'vis') return;
+    const a = this.info(ws), v = m.v ? 1 : 0;
+    if (a.u && v !== a.v) ws.serializeAttachment(Object.assign({}, a, { v }));
+  }
+  async webSocketClose(ws, code, reason) { try { ws.close(code === 1005 || code === 1006 ? 1000 : code, reason); } catch (e) {} }
+  async webSocketError(ws) { try { ws.close(1011, 'error'); } catch (e) {} }
+}
+
+/* ---------- Bảng riêng của thông báo đẩy (tự tạo, không phải dán SQL) ---------- */
+let pushBangXong = false;
+async function pushBangSan(env) {
+  if (pushBangXong) return;
+  await env.DB.batch([
+    env.DB.prepare('CREATE TABLE IF NOT EXISTS order_meta (k TEXT PRIMARY KEY, v TEXT NOT NULL)'),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS order_push_sub (endpoint TEXT PRIMARY KEY, username TEXT NOT NULL, chi_nhanh_id TEXT NOT NULL,
+      dv TEXT NOT NULL DEFAULT '', p256dh TEXT NOT NULL, auth TEXT NOT NULL, ua TEXT NOT NULL DEFAULT '', tao_luc INTEGER NOT NULL)`),
+    env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_order_push_sub_cn ON order_push_sub (chi_nhanh_id)')
+  ]);
+  pushBangXong = true;
+}
+
+/* ---------- Web Push: VAPID + mã hoá aes128gcm (RFC 8291), tự làm bằng WebCrypto ---------- */
+const b64uBytes = buf => { const a = buf instanceof Uint8Array ? buf : new Uint8Array(buf); let s = ''; for (let i = 0; i < a.length; i++) s += String.fromCharCode(a[i]); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
+const unb64uBytes = str => { str = String(str).replace(/-/g, '+').replace(/_/g, '/'); while (str.length % 4) str += '='; const bin = atob(str), a = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i); return a; };
+const noiBytes = (...xs) => { let n = 0; for (const x of xs) n += x.length; const out = new Uint8Array(n); let o = 0; for (const x of xs) { out.set(x, o); o += x.length; } return out; };
+
+let _vapid = null;
+async function getVapid(env) {
+  if (_vapid) return _vapid;
+  await pushBangSan(env);
+  let r = await env.DB.prepare(`SELECT v FROM order_meta WHERE k = 'vapid'`).first();
+  if (!r) {
+    const kp = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
+    const jwk = await crypto.subtle.exportKey('jwk', kp.privateKey);
+    const pub = b64uBytes(await crypto.subtle.exportKey('raw', kp.publicKey));
+    await env.DB.prepare(`INSERT OR IGNORE INTO order_meta (k, v) VALUES ('vapid', ?)`).bind(JSON.stringify({ pub, jwk })).run();
+    r = await env.DB.prepare(`SELECT v FROM order_meta WHERE k = 'vapid'`).first();   // hai isolate cùng sinh: lấy bản đã lưu
+  }
+  const o = JSON.parse(r.v);
+  _vapid = { pub: o.pub, key: await crypto.subtle.importKey('jwk', o.jwk, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']) };
+  return _vapid;
+}
+async function vapidAuth(env, endpoint) {
+  const v = await getVapid(env);
+  const part = x => b64uBytes(enc.encode(JSON.stringify(x)));
+  const head = part({ typ: 'JWT', alg: 'ES256' });
+  const claims = part({ aud: new URL(endpoint).origin, exp: Math.floor(Date.now() / 1000) + 12 * 3600, sub: origins(env)[0] || 'https://bmb.id.vn' });
+  const sig = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, v.key, enc.encode(head + '.' + claims));
+  return 'vapid t=' + head + '.' + claims + '.' + b64uBytes(sig) + ', k=' + v.pub;
+}
+async function hkdf(salt, ikm, info, len) {
+  const k = await crypto.subtle.importKey('raw', ikm, 'HKDF', false, ['deriveBits']);
+  return new Uint8Array(await crypto.subtle.deriveBits({ name: 'HKDF', hash: 'SHA-256', salt, info }, k, len * 8));
+}
+/** RFC 8291 aes128gcm. sub = { p256dh, auth } dạng base64url */
+export async function encryptPush(sub, plain) {
+  const uaPub = unb64uBytes(sub.p256dh), authSecret = unb64uBytes(sub.auth);
+  const eph = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
+  const asPub = new Uint8Array(await crypto.subtle.exportKey('raw', eph.publicKey));
+  const uaKey = await crypto.subtle.importKey('raw', uaPub, { name: 'ECDH', namedCurve: 'P-256' }, false, []);
+  const shared = new Uint8Array(await crypto.subtle.deriveBits({ name: 'ECDH', public: uaKey }, eph.privateKey, 256));
+  const prk = await hkdf(authSecret, shared, noiBytes(enc.encode('WebPush: info\0'), uaPub, asPub), 32);
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const cek = await hkdf(salt, prk, enc.encode('Content-Encoding: aes128gcm\0'), 16);
+  const nonce = await hkdf(salt, prk, enc.encode('Content-Encoding: nonce\0'), 12);
+  const aes = await crypto.subtle.importKey('raw', cek, 'AES-GCM', false, ['encrypt']);
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, aes, noiBytes(plain, new Uint8Array([2]))));
+  return noiBytes(salt, new Uint8Array([0, 0, 0x10, 0]), new Uint8Array([asPub.length]), asPub, ct);
+}
+async function sendPush(env, sub, payload, opts) {
+  opts = opts || {};
+  let res;
+  try {
+    res = await fetch(sub.endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Encoding': 'aes128gcm', 'Content-Type': 'application/octet-stream',
+        'TTL': String(opts.ttl || 3600), 'Urgency': opts.urgency || 'normal',
+        'Authorization': await vapidAuth(env, sub.endpoint)
+      },
+      body: await encryptPush(sub, enc.encode(JSON.stringify(payload))),
+      signal: AbortSignal.timeout(8000)
+    });
+  } catch (e) { return 0; }
+  if (res.status === 404 || res.status === 410) await env.DB.prepare('DELETE FROM order_push_sub WHERE endpoint = ?').bind(sub.endpoint).run();   // máy đã gỡ / tắt thông báo
+  return res.status;
+}
+
+/* ---------- Chữ ký cho nút trên thông báo (service worker không giữ phiên quầy) ---------- */
+const nutKy = (env, orderId, u, cn, exp) => hmac(env.SECRET, 'pa|' + orderId + '|' + u + '|' + cn + '|' + exp);
+
+/* ---------- Gửi thông báo của 1 đơn ---------- */
+function pushNoiDung(don, items, nguoi) {
+  const mon = items.map(i => (i.icon ? i.icon + ' ' : '') + i.label + (i.type === 'DR' && i.qty > 1 ? ' ×' + (+i.qty | 0) : '')).join(', ');
+  const st = don.trang_thai;
+  const title = st === 'MOI' ? '🛎️ ' + don.ten_phong + ' gọi lễ tân'
+    : st === 'NHAN' ? '✅ ' + don.ten_phong + ' · đã xác nhận'
+    : st === 'XONG' ? '🎉 ' + don.ten_phong + ' · đã phục vụ'
+    : '⚠️ ' + don.ten_phong + ' · đã huỷ';
+  const dong = [mon || '(không có món)'];
+  if (don.ghi_chu) dong.push('“' + String(don.ghi_chu).slice(0, 120) + '”');
+  if (st === 'MOI' && don.nghi_ngo) dong.push('⚠️ Phòng đang đóng lúc khách gửi');
+  if (st !== 'MOI' && nguoi) dong.push((st === 'NHAN' ? 'Xác nhận: ' : st === 'XONG' ? 'Phục vụ: ' : 'Huỷ: ') + nguoi);
+  return { title, body: dong.join('\n') };
+}
+/** Báo quầy chi nhánh của đơn: rung chuông WebSocket + (mặc định) đẩy thông báo. opt.nguoi = tài khoản vừa thao tác; opt.push=false: chỉ rung chuông */
+async function baoQuayDon(env, orderId, opt = {}) {
+  try {
+    if (!env.DB) return;
+    const don = await env.DB.prepare('SELECT id, chi_nhanh_id, ten_phong, items, ghi_chu, nghi_ngo, trang_thai, nguoi_xu_ly, tao_luc FROM order_don WHERE id = ?').bind(orderId).first();
+    if (!don || !don.chi_nhanh_id) return;
+    await pokeQuay(env, don.chi_nhanh_id, 'don');
+    if (opt.push === false || String(env.PUSH_LETAN || '1') === '0') return;
+    await pushDon(env, don, opt);
+  } catch (e) { console.error('baoQuayDon:', e && e.name, e && e.message); }
+}
+async function pushDon(env, don, opt) {
+  await pushBangSan(env);
+  // máy của quản lý + quầy đúng chi nhánh (admin: máy admin đã bật khi đang chọn chi nhánh này), tài khoản còn hoạt động
+  const subs = (await env.DB.prepare(
+    `SELECT s.endpoint, s.username, s.chi_nhanh_id, s.dv, s.p256dh, s.auth, t.ho_ten FROM order_push_sub s
+       JOIN tai_khoan t ON t.username = s.username AND t.hoat_dong = 1 AND t.vai_tro IN ('admin', 'manager', 'quay')
+      WHERE s.chi_nhanh_id = ?1 AND (t.vai_tro = 'admin' OR t.chi_nhanh_id = ?1)`
+  ).bind(don.chi_nhanh_id).all()).results || [];
+  if (!subs.length) return 0;
+  const dangXem = new Set(await quayDangXem(env, don.chi_nhanh_id));
+  const nhan = subs.filter(s => !(s.dv && dangXem.has(s.dv)));
+  if (!nhan.length) return 0;
+  let items = []; try { items = JSON.parse(don.items); } catch (e) {}
+  const tenNguoi = async u => {
+    if (!u) return '';
+    const r = await env.DB.prepare('SELECT ho_ten FROM tai_khoan WHERE username = ?').bind(u).first();
+    return (r && r.ho_ten) || u;
+  };
+  const nd = pushNoiDung(don, items, await tenNguoi(opt.nguoi || don.nguoi_xu_ly));
+  const st = don.trang_thai, moi = st === 'MOI';
+  const exp = Date.now() + PUSH_NUT_HAN_MS;
+  const actions = moi ? [{ action: 'nhan', title: '✅ Tiếp nhận' }] : st === 'NHAN' ? [{ action: 'xong', title: '🎉 Đã xong' }] : [];
+  const ky = {};
+  let gui = 0;
+  await Promise.allSettled(nhan.map(async s => {
+    const khoa = s.username + '|' + s.chi_nhanh_id;
+    if (actions.length && !ky[khoa]) ky[khoa] = await nutKy(env, don.id, s.username, s.chi_nhanh_id, exp);
+    const payload = {
+      t: 'don', id: don.id, st, title: nd.title, body: nd.body, tag: 'don-' + don.id, at: don.tao_luc,
+      renotify: moi, silent: !moi, final: st === 'XONG' || st === 'HUY', actions,
+      act: actions.length ? { u: s.username, cn: s.chi_nhanh_id, exp, sig: ky[khoa] } : null
+    };
+    const code = await sendPush(env, s, payload, moi ? { urgency: 'high', ttl: 900 } : { urgency: 'normal', ttl: 3600 });
+    if (code >= 200 && code < 300) gui++;
+  }));
+  return gui;
+}
+
+/* ---------- API thông báo đẩy (action trong POST /api) ---------- */
+async function pushKey(env) { return ok({ key: (await getVapid(env)).pub }); }
+async function pushDangKy(env, body, request) {
+  const [ss, loi] = await canPhien(env, body);
+  if (loi) return loi;
+  const sub = body.sub || {}, k = sub.keys || {};
+  const ep = s(sub.endpoint, 800);
+  let u; try { u = new URL(ep); } catch (e) { u = null; }
+  if (!u || u.protocol !== 'https:') return fail('bad_endpoint', 400, 'Địa chỉ thông báo không hợp lệ.');
+  const p256dh = s(k.p256dh, 200), auth = s(k.auth, 100);
+  if (!p256dh || !auth) return fail('bad_keys', 400, 'Khoá thông báo không hợp lệ.');
+  const dv = DV_Q_RE.test(s(body.dv, 40)) ? s(body.dv, 40) : '';
+  await pushBangSan(env);
+  await env.DB.batch([
+    env.DB.prepare(`INSERT INTO order_push_sub (endpoint, username, chi_nhanh_id, dv, p256dh, auth, ua, tao_luc) VALUES (?,?,?,?,?,?,?,?)
+        ON CONFLICT(endpoint) DO UPDATE SET username = excluded.username, chi_nhanh_id = excluded.chi_nhanh_id, dv = excluded.dv,
+          p256dh = excluded.p256dh, auth = excluded.auth, ua = excluded.ua, tao_luc = excluded.tao_luc`)
+      .bind(ep, ss.u, ss.b, dv, p256dh, auth, s(request.headers.get('User-Agent') || '', 160), Date.now()),
+    env.DB.prepare(`DELETE FROM order_push_sub WHERE username = ?1 AND endpoint NOT IN
+        (SELECT endpoint FROM order_push_sub WHERE username = ?1 ORDER BY tao_luc DESC LIMIT ${PUSH_MAX_MAY_USER})`).bind(ss.u)
+  ]);
+  return ok({});
+}
+async function pushHuyDangKy(env, body) {
+  const ep = s((body.sub && body.sub.endpoint) || body.endpoint, 800);
+  if (!ep) return fail('missing_endpoint');
+  await pushBangSan(env);
+  await env.DB.prepare('DELETE FROM order_push_sub WHERE endpoint = ?').bind(ep).run();   // chỉ người giữ máy biết endpoint
+  return ok({});
+}
+async function pushThu(env, body) {
+  const [ss, loi] = await canPhien(env, body);
+  if (loi) return loi;
+  await pushBangSan(env);
+  const ep = s(body.endpoint, 800);
+  const sub = await env.DB.prepare('SELECT * FROM order_push_sub WHERE endpoint = ? AND username = ?').bind(ep, ss.u).first();
+  if (!sub) return fail('chua_bat', 404, 'Máy này chưa bật thông báo.');
+  const code = await sendPush(env, sub, { t: 'thu', title: '🔔 BMBPlayer · thử thông báo', body: 'Máy này sẽ nhận yêu cầu gọi lễ tân của chi nhánh đang chọn.', tag: 'thu', renotify: true }, { urgency: 'high', ttl: 120 });
+  if (code >= 200 && code < 300) return ok({});
+  return fail('gui_loi', 502, code === 404 || code === 410 ? 'Máy đã tắt thông báo — bấm Bật lại.' : 'Dịch vụ thông báo của trình duyệt chưa nhận (mã ' + code + '). Thử lại sau.');
+}
+/** Bấm nút trên thông báo: {orderId, act:'nhan'|'xong', u, cn, exp, sig} — chữ ký do Worker cấp lúc gửi thông báo cho đúng tài khoản đó */
+async function pushBam(env, body, ctx) {
+  const orderId = s(body.orderId, 40), act = s(body.act, 10), u = s(body.u, 40), cn = s(body.cn, 40), exp = Math.floor(Number(body.exp) || 0);
+  if (!orderId || !['nhan', 'xong'].includes(act) || !u || !cn || !exp) return fail('missing_or_bad_params');
+  if (Date.now() > exp) return fail('het_han', 403, 'Thông báo đã cũ — mở màn quầy để xử lý.');
+  if (!same(s(body.sig, 40), await nutKy(env, orderId, u, cn, exp))) return fail('forbidden', 403, 'Nút không hợp lệ.');
+  const tk = await env.DB.prepare('SELECT username, vai_tro, chi_nhanh_id FROM tai_khoan WHERE username = ? AND hoat_dong = 1').bind(u).first();
+  if (!tk || !VAI_TRO_ORDER.includes(tk.vai_tro) || (tk.vai_tro !== 'admin' && tk.chi_nhanh_id !== cn))
+    return fail('forbidden', 403, 'Tài khoản này không còn quyền xử lý đơn ở chi nhánh này.');
+  const r = await doiTrangThai(env, ctx, orderId, act, cn, u);
+  if (!r.ok) return fail(r.error, r.status || 400, r.msg);
+  chayNen(ctx, tgDon(env, orderId, { nguoi: u }));
+  chayNen(ctx, baoQuayDon(env, orderId, { nguoi: u }));
+  return ok({ st: r.st });
+}
+
 export default {
   async fetch(req, env, ctx){
     const u = new URL(req.url);
@@ -1862,6 +2172,12 @@ export default {
     if(u.pathname === '/api/ver' && req.method === 'GET'){
       const v = env.CF_VERSION_METADATA || {};
       return jres({ id: v.id || '', tag: v.tag || '', at: v.timestamp || '' }, 200, originOk ? { 'Access-Control-Allow-Origin': origin, 'Vary': 'Origin' } : {});
+    }
+
+    /* Màn quầy (quay.html): WebSocket "cái chuông" của chi nhánh — có đơn / đổi trạng thái thì quầy tự tải lại hàng đợi */
+    if(u.pathname === '/quay/ws'){
+      if(!originOk) return new Response('origin', { status: 403 });
+      return quayWs(req, env);
     }
 
     /* Kết nối WebSocket của TV / máy tính bảng / điện thoại */

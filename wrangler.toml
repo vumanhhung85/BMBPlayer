@@ -47,6 +47,16 @@ class_name = "Registry"
 name = "NHAC"
 class_name = "NhacRoom"
 
+# Chuông thời gian thực của màn quầy (mỗi chi nhánh một bản) — có đơn mới / đổi trạng thái thì quay.html tải lại ngay
+[[durable_objects.bindings]]
+name = "QHUB"
+class_name = "QuayHub"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Room", "Registry", "NhacRoom"]
+
+# 10/2026: thêm QuayHub. KHÔNG sửa/xoá các tag migration đã deploy (v1, v2) — muốn thêm lớp mới thì thêm tag v3.
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["QuayHub"]

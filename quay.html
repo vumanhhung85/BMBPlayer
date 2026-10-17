@@ -7,6 +7,11 @@
 <title>BMBPlayer — Quầy</title>
 <meta name="theme-color" content="#1B0E2E">
 <link rel="icon" href="Logo_BoomBox.png" id="favicon">
+<link rel="manifest" href="quay.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="BMB Quầy">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Be+Vietnam+Pro:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -252,6 +257,21 @@ td b{color:var(--txt)}
     box-shadow:0 0 0 .05em rgba(255,255,255,.9)}
 #qrKhach .qbox img{width:240px;height:240px;image-rendering:pixelated;display:block}
 
+/* ── chuông tức thì + thông báo trên máy này ── */
+.rt{width:9px;height:9px;border-radius:50%;background:var(--txt-mute);flex-shrink:0;box-shadow:0 0 0 3px rgba(255,255,255,.06)}
+.rt.on{background:var(--ok);box-shadow:0 0 0 3px rgba(61,220,151,.18)}
+#btnPush{min-width:42px;padding-left:12px;padding-right:12px}
+#btnPush.on{background:rgba(61,220,151,.16);border-color:rgba(61,220,151,.5);color:#BFF5DC}
+#btnPush.off{background:rgba(255,176,32,.14);border-color:rgba(255,176,32,.45)}
+.pu-st{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:12px;margin-bottom:12px;font-size:14px;line-height:1.5;
+  background:rgba(0,0,0,.25);border:1px solid var(--line-soft)}
+.pu-st.ok{border-color:rgba(61,220,151,.45);background:rgba(61,220,151,.1)}
+.pu-st.bad{border-color:rgba(255,92,122,.45);background:rgba(255,92,122,.1)}
+.pu-st.warn{border-color:rgba(255,176,32,.45);background:rgba(255,176,32,.1)}
+.pu-st b{display:block}
+.pu-note{font-size:12.5px;color:var(--txt-dim);margin-top:4px}
+.pu-note li{margin:3px 0 3px 18px}
+.modal-box .actions.wrap{flex-wrap:wrap}
 @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 </style>
 </head>
@@ -276,7 +296,7 @@ td b{color:var(--txt)}
       <div class="topbar">
         <img src="Logo_BoomBox.png" alt="Boom">
         <div class="tt"><b id="hTt">Quầy phục vụ</b><span>BMBPlayer · chọn bài &amp; gọi lễ tân</span></div>
-        <div class="who"><select class="selcn" id="selCN" style="display:none" aria-label="Chọn chi nhánh"></select><span class="badge" id="whoTx"></span><button class="btn btn-ghost btn-sm" id="btnOut">Đăng xuất</button></div>
+        <div class="who"><select class="selcn" id="selCN" style="display:none" aria-label="Chọn chi nhánh"></select><span class="rt" id="rtDot" title="Đang hỏi định kỳ"></span><span class="badge" id="whoTx"></span><button class="btn btn-ghost btn-sm" id="btnPush" title="Thông báo trên máy này" aria-label="Thông báo trên máy này">🔔</button><button class="btn btn-ghost btn-sm" id="btnOut">Đăng xuất</button></div>
       </div>
       <div class="tabs">
         <div class="tab on" data-p="p1">📋 Hàng đợi<span class="n zero" id="nMoi"></span></div>
@@ -375,6 +395,23 @@ td b{color:var(--txt)}
     <div class="actions">
       <button class="btn btn-ghost btn-sm" id="btnQrCopy">Chép liên kết</button>
       <button class="btn btn-y btn-sm" id="btnQrDong">Đóng</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal thông báo đẩy trên máy này -->
+<div class="modal-overlay" id="modalPush">
+  <div class="modal-box rong">
+    <h3>🔔 Thông báo trên máy này</h3>
+    <div class="pu-st" id="puSt"><span>…</span></div>
+    <div class="hint">Khách gọi lễ tân thì máy này hiện thông báo kèm nút <b>Tiếp nhận</b>, kể cả khi đã tắt màn hình hoặc đóng trang quầy.
+      Máy đang mở trang quầy sẽ không hiện thông báo trùng, vì trang đã kêu chuông. Mỗi máy (điện thoại, máy tính) bật riêng một lần.</div>
+    <ul class="pu-note" id="puNote"></ul>
+    <div class="actions wrap">
+      <button class="btn btn-y btn-sm" id="puBat">Bật thông báo</button>
+      <button class="btn btn-ghost btn-sm" id="puThu" style="display:none">Gửi thử</button>
+      <button class="btn btn-bad btn-sm" id="puTat" style="display:none">Tắt trên máy này</button>
+      <button class="btn btn-ghost btn-sm" id="puDong">Đóng</button>
     </div>
   </div>
 </div>
@@ -551,8 +588,224 @@ function favBadge(n){
   l.href = c.toDataURL();
 }
 function notify(n){
+  if(PU.on) return;                       /* máy đã bật thông báo đẩy: thông báo do service worker hiện, không hiện trùng */
   if(!(window.Notification) || Notification.permission!=='granted') return;
   try{ new Notification('Có '+n+' yêu cầu mới', {body:'Khách gọi lễ tân, chờ xác nhận', tag:'bmb'}); }catch(e){}
+}
+
+/* ============================================================
+   THỜI GIAN THỰC: WebSocket chỉ là "cái chuông" — Worker báo {t:'rev'} thì gọi lại quay.feed.
+   WebSocket rớt vẫn còn hỏi định kỳ (8 giây), không mất đơn. Đang nối thì giãn ra 45 giây.
+   ============================================================ */
+var DV = (function(){                     /* mã riêng của máy này (để Worker biết máy nào đang mở trang quầy) */
+  var v = '';
+  try{ v = localStorage.getItem('bmb_q_dv') || ''; }catch(e){}
+  if(!/^[A-Za-z0-9_-]{8,40}$/.test(v)){
+    var a = new Uint8Array(12); (window.crypto || window.msCrypto).getRandomValues(a);
+    v = Array.prototype.map.call(a, function(x){ return ('0'+x.toString(16)).slice(-2); }).join('');
+    try{ localStorage.setItem('bmb_q_dv', v); }catch(e){}
+  }
+  return v;
+})();
+var RT = { ws:null, open:false, retry:1500, tmRe:null, last:0, tmSoon:null };
+function datNhip(){
+  if(S.tm) clearTimeout(S.tm);
+  if(!S.tok) return;
+  var giay = RT.open ? 45 : CFG.POLL * (0.75 + Math.random()*0.5);
+  S.tm = setTimeout(function(){ tick(); datNhip(); }, giay*1000);
+}
+function rtVe(){
+  var d = $('rtDot'); if(!d) return;
+  d.className = 'rt' + (RT.open ? ' on' : '');
+  d.title = RT.open ? 'Nhận đơn tức thì (đang nối)' : 'Đang hỏi định kỳ ' + CFG.POLL + ' giây/lần';
+}
+function rtUrl(){
+  return CFG.API.replace(/^http/, 'ws').replace(/\/api\/?$/, '') + '/quay/ws?dv=' + DV
+    + (S.vaiTro === 'admin' && S.branch ? '&b=' + encodeURIComponent(S.branch) : '');
+}
+function rtVis(){
+  if(RT.ws && RT.open){ try{ RT.ws.send(JSON.stringify({ t:'vis', v: document.visibilityState === 'visible' ? 1 : 0 })); }catch(e){} }
+}
+function tickSoon(){ clearTimeout(RT.tmSoon); RT.tmSoon = setTimeout(tick, 120); }
+function rtNoi(){
+  if(!S.tok || !window.WebSocket || RT.ws) return;
+  clearTimeout(RT.tmRe);
+  var ws;
+  try{ ws = new WebSocket(rtUrl(), ['bmbq.v1', 'tok.' + S.tok]); }catch(e){ rtHen(); return; }
+  RT.ws = ws;
+  ws.onopen = function(){ if(RT.ws !== ws) return; RT.open = true; RT.retry = 1500; RT.last = Date.now(); rtVis(); rtVe(); datNhip(); tick(); };
+  ws.onmessage = function(e){
+    if(RT.ws !== ws) return;
+    RT.last = Date.now();
+    if(e.data === 'pong') return;
+    var m; try{ m = JSON.parse(e.data); }catch(x){ return; }
+    if(m && m.t === 'rev') tickSoon();
+  };
+  ws.onclose = function(){ if(RT.ws !== ws) return; RT.ws = null; RT.open = false; rtVe(); datNhip(); rtHen(); };
+  ws.onerror = function(){ try{ ws.close(); }catch(x){} };
+}
+function rtHen(){
+  clearTimeout(RT.tmRe);
+  if(!S.tok) return;
+  RT.tmRe = setTimeout(rtNoi, RT.retry);
+  RT.retry = Math.min(RT.retry * 2, 60000);
+}
+function rtDong(){
+  clearTimeout(RT.tmRe);
+  var ws = RT.ws; RT.ws = null; RT.open = false;
+  if(ws){ try{ ws.close(1000); }catch(e){} }
+  rtVe(); datNhip();
+}
+setInterval(function(){                   /* giữ kết nối: ping 25 giây; quá 70 giây không nghe gì thì nối lại */
+  if(!RT.ws || !RT.open) return;
+  if(Date.now() - RT.last > 70000){ try{ RT.ws.close(); }catch(e){} var w = RT.ws; RT.ws = null; RT.open = false; rtVe(); datNhip(); if(w) rtHen(); return; }
+  try{ RT.ws.send('ping'); }catch(e){}
+}, 25000);
+document.addEventListener('visibilitychange', function(){
+  rtVis();
+  if(document.visibilityState === 'visible' && S.tok){ if(!RT.ws){ RT.retry = 1500; rtNoi(); } tick(); }
+});
+window.addEventListener('online', function(){ if(S.tok && !RT.ws){ RT.retry = 1500; rtNoi(); } });
+if(navigator.serviceWorker){
+  navigator.serviceWorker.addEventListener('message', function(e){ if(e.data && e.data.t === 'rev' && S.tok) tickSoon(); });
+}
+
+/* ============================================================
+   THÔNG BÁO ĐẨY (Web Push) — mỗi máy tự bật; service worker sw-quay.js (phạm vi ./quay)
+   ============================================================ */
+var PU = { on:false, sub:null, reg:null, ban:false };
+function puHoTro(){ return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; }
+function laIOS(){ return /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); }
+function laApp(){ return /BMBPlayerApp\//.test(navigator.userAgent); }
+function laStandalone(){ return (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true; }
+function khoaTuChuoi(b64){
+  var s = String(b64).replace(/-/g, '+').replace(/_/g, '/'); while(s.length % 4) s += '=';
+  var bin = atob(s), a = new Uint8Array(bin.length);
+  for(var i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i);
+  return a;
+}
+function puSW(){
+  if(PU.reg) return Promise.resolve(PU.reg);
+  return navigator.serviceWorker.register('sw-quay.js?api=' + encodeURIComponent(CFG.API), { scope: './quay' })
+    .then(function(){ return navigator.serviceWorker.ready; })
+    .then(function(r){ PU.reg = r; return r; });
+}
+function puGuiLen(sub){
+  return api('push.subscribe', { sub: sub.toJSON(), dv: DV }).then(function(r){
+    if(!r || !r.ok) throw new Error((r && r.msg) || 'Máy chủ chưa nhận đăng ký.');
+    return r;
+  });
+}
+function puVe(){
+  var b = $('btnPush');
+  b.className = 'btn btn-ghost btn-sm' + (PU.on ? ' on' : (PU.ban ? '' : ' off'));
+  b.textContent = PU.on ? '🔔' : '🔕';
+  b.title = PU.on ? 'Máy này đang nhận thông báo' : 'Máy này chưa bật thông báo';
+}
+/* Lúc vào trang: máy đã bật từ trước thì gắn lại cho tài khoản + chi nhánh đang đăng nhập */
+function puKhoiDong(){
+  PU.on = false; PU.sub = null; PU.ban = !puHoTro() || (window.Notification && Notification.permission === 'denied');
+  puVe();
+  if(!puHoTro() || Notification.permission !== 'granted') return;
+  puSW().then(function(reg){ return reg.pushManager.getSubscription(); }).then(function(sub){
+    if(!sub) return;
+    PU.sub = sub;
+    return puGuiLen(sub).then(function(){ PU.on = true; puVe(); });
+  }).catch(function(e){ console.warn('Thông báo đẩy:', e); });
+}
+function puGanLai(){ if(PU.sub) puGuiLen(PU.sub).catch(function(){}); }
+function puNote(lines){ $('puNote').innerHTML = lines.map(function(x){ return '<li>' + x + '</li>'; }).join(''); }
+function puTrangThai(cls, tieuDe, chiTiet){
+  $('puSt').className = 'pu-st ' + (cls || '');
+  $('puSt').innerHTML = '<span>' + (cls === 'ok' ? '✅' : cls === 'bad' ? '⛔' : cls === 'warn' ? '⚠️' : 'ℹ️') + '</span><span><b>' + tieuDe + '</b>' + (chiTiet || '') + '</span>';
+}
+function puMo(){
+  $('modalPush').classList.add('show');
+  puCapNhat();
+}
+function puCapNhat(){
+  var bat = $('puBat'), tat = $('puTat'), thu = $('puThu');
+  bat.style.display = ''; tat.style.display = 'none'; thu.style.display = 'none'; bat.disabled = false; bat.textContent = 'Bật thông báo';
+  var note = [];
+  if(laApp()){
+    puTrangThai('bad', 'App BMBPlayer (APK) không nhận được thông báo đẩy.', 'Mở trang quầy bằng Chrome trên máy này để bật.');
+    bat.style.display = 'none'; puNote([]); return;
+  }
+  if(!puHoTro()){
+    if(laIOS() && !laStandalone()){
+      puTrangThai('warn', 'iPhone/iPad: cần cài trang quầy ra Màn hình chính trước.', '');
+      note = ['Mở trang này bằng <b>Safari</b> → bấm nút <b>Chia sẻ</b> (ô vuông có mũi tên) → <b>Thêm vào MH chính</b>.',
+              'Mở <b>BMB Quầy</b> từ biểu tượng vừa thêm, đăng nhập, rồi bấm 🔔 → Bật thông báo.',
+              'Cần iOS 16.4 trở lên.'];
+    }else{
+      puTrangThai('bad', 'Trình duyệt này không hỗ trợ thông báo đẩy.', 'Dùng Chrome (Android, máy tính) hoặc Safari trên iPhone/iPad iOS 16.4 trở lên.');
+    }
+    bat.style.display = 'none'; puNote(note); return;
+  }
+  if(Notification.permission === 'denied'){
+    puTrangThai('bad', 'Thông báo đang bị chặn cho trang này.', '');
+    note = ['Máy tính: bấm biểu tượng bên trái ô địa chỉ → <b>Thông báo</b> → <b>Cho phép</b>, rồi tải lại trang.',
+            'Điện thoại Android: Chrome → ⋮ → Cài đặt → Cài đặt trang web → Thông báo → cho phép trang này.'];
+    bat.style.display = 'none'; puNote(note); return;
+  }
+  if(PU.on){
+    puTrangThai('ok', 'Máy này đang nhận thông báo.', '<div class="pu-note">Tài khoản ' + esc(S.hoTen || S.user) + ' · ' + esc(S.bname || '') + '</div>');
+    bat.style.display = 'none'; tat.style.display = ''; thu.style.display = '';
+  }else{
+    puTrangThai('', 'Máy này chưa bật thông báo.', '');
+  }
+  note = ['Trên <b>máy tính</b>: Chrome phải đang chạy (đóng tab quầy vẫn nhận, tắt hẳn Chrome thì không).',
+          'Trên <b>điện thoại</b>: nhớ cho Chrome hiện thông báo và không bị chế độ tiết kiệm pin chặn.',
+          'Telegram vẫn báo song song như cũ.'];
+  puNote(note);
+}
+function puBat(){
+  var bat = $('puBat');
+  bat.disabled = true; bat.textContent = 'Đang bật…';
+  /* xin quyền NGAY trong thao tác bấm (iOS / Safari bắt buộc) */
+  var xin = Notification.permission === 'granted' ? Promise.resolve('granted') : new Promise(function(ok){
+    var p = Notification.requestPermission(ok); if(p && p.then) p.then(ok);
+  });
+  xin.then(function(q){
+    if(q !== 'granted'){ PU.ban = q === 'denied'; puVe(); throw new Error(q === 'denied' ? 'Bạn đã chặn thông báo.' : 'Chưa cho phép thông báo.'); }
+    return Promise.all([puSW(), api('push.key')]);
+  }).then(function(kq){
+    var reg = kq[0], k = kq[1];
+    if(!k || !k.ok || !k.key) throw new Error((k && k.msg) || 'Không lấy được khoá thông báo.');
+    var key = khoaTuChuoi(k.key);
+    return reg.pushManager.getSubscription().then(function(cu){
+      if(!cu) return null;
+      var cuKey = cu.options && cu.options.applicationServerKey ? new Uint8Array(cu.options.applicationServerKey) : null;
+      var trung = cuKey && cuKey.length === key.length && Array.prototype.every.call(key, function(x, i){ return x === cuKey[i]; });
+      return trung ? cu : cu.unsubscribe().then(function(){ return null; });
+    }).then(function(cu){ return cu || reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key }); });
+  }).then(function(sub){
+    PU.sub = sub;
+    return puGuiLen(sub);
+  }).then(function(){
+    PU.on = true; puVe(); puCapNhat();
+  }).catch(function(e){
+    puCapNhat();
+    if(Notification.permission !== 'denied') puTrangThai('bad', 'Chưa bật được.', '<div class="pu-note">' + esc(e && e.message || e) + '</div>');
+  });
+}
+function puTat(){
+  if(!confirm('Tắt thông báo trên máy này?')) return;
+  var sub = PU.sub;
+  PU.on = false; PU.sub = null; puVe();
+  var ep = sub ? sub.endpoint : '';
+  (sub ? sub.unsubscribe().catch(function(){}) : Promise.resolve()).then(function(){
+    return ep ? api('push.unsubscribe', { endpoint: ep }) : null;
+  }).then(puCapNhat, puCapNhat);
+}
+function puThu(){
+  if(!PU.sub) return;
+  var b = $('puThu'); b.disabled = true; b.textContent = 'Đang gửi…';
+  api('push.test', { endpoint: PU.sub.endpoint }).then(function(r){
+    b.disabled = false; b.textContent = 'Gửi thử';
+    if(r && r.ok) puTrangThai('ok', 'Đã gửi. Thông báo thử sẽ hiện trong vài giây.', '<div class="pu-note">Không thấy? Kiểm tra máy có đang tắt thông báo của Chrome/trang này không.</div>');
+    else puTrangThai('bad', 'Gửi thử chưa được.', '<div class="pu-note">' + esc((r && r.msg) || 'Lỗi máy chủ') + '</div>');
+  }).catch(function(){ b.disabled = false; b.textContent = 'Gửi thử'; });
 }
 
 /* ---------- đăng nhập ---------- */
@@ -618,6 +871,8 @@ function doiChiNhanh(){
   S.lastCount = 0; S.orders = []; S.rooms = [];
   datNgayLS(ngayHomNay());
   TV.rooms = []; tick();
+  rtDong(); RT.retry = 1500; rtNoi();      /* chuông của chi nhánh mới */
+  if(PU.on) puGanLai();                    /* thông báo đẩy theo chi nhánh đang chọn */
   if(tabTvDangMo()) loadTv();
   var on = document.querySelector('.tab.on');
   var p = on ? on.getAttribute('data-p') : '';
@@ -633,21 +888,26 @@ function start(){
   hienTheoQuyen();
   veChonChiNhanh();
   if(S.vaiTro==='admin' && !S.branch){ alert('Chưa có chi nhánh nào đang hoạt động.'); return; }
-  if(window.Notification && Notification.permission==='default') Notification.requestPermission();
   tick();
   if(GAN) moTabTv();
-  if(S.tm) clearInterval(S.tm);
-  S.tm = setInterval(tick, CFG.POLL*1000);
+  datNhip();                 /* hỏi định kỳ: 8 giây khi chưa có WebSocket, 45 giây khi WebSocket đang nối */
+  rtNoi();                   /* WebSocket "cái chuông": có đơn là tải lại ngay */
+  puKhoiDong();              /* máy đã bật thông báo đẩy thì gắn lại vào tài khoản + chi nhánh đang đăng nhập */
   /* Đơn Mới còn tồn (chưa ai bấm Tiếp nhận) thì nhắc lại bằng chuông mỗi NHAC_LAI giây,
      không chỉ kêu 1 lần lúc đơn vừa tới — tới khi tiếp nhận hết mới thôi. */
   if(S.nhacTm) clearInterval(S.nhacTm);
   S.nhacTm = setInterval(function(){ if(S.lastCount > 0) beep(); }, CFG.NHAC_LAI*1000);
 }
-function logout(){
+/* chuDong = bấm nút Đăng xuất. Phiên hết hạn (12 giờ) thì KHÔNG gỡ thông báo: điện thoại để trang quầy chạy nền vẫn nhận tiếp */
+function logout(chuDong){
   sessionStorage.removeItem('bmb_q');
-  if(S.tm) clearInterval(S.tm);
+  if(S.tm) clearTimeout(S.tm);
   if(S.nhacTm) clearInterval(S.nhacTm);
-  location.reload();
+  S.tok = ''; rtDong();
+  /* đăng xuất: gỡ máy này khỏi danh sách nhận thông báo (đăng nhập lại thì tự gắn lại cho tài khoản mới) */
+  var xong = function(){ location.reload(); };
+  if(chuDong === true && PU.sub){ setTimeout(xong, 1500); api('push.unsubscribe', {endpoint: PU.sub.endpoint}).then(xong, xong); }
+  else xong();
 }
 
 /* ---------- tab TV & phòng ---------- */
@@ -1390,7 +1650,12 @@ function printReview(){
 /* ---------- khởi động ---------- */
 $('lgBtn').addEventListener('click', login);
 $('lgP').addEventListener('keydown', function(e){ if(e.key==='Enter') login(); });
-$('btnOut').addEventListener('click', logout);
+$('btnOut').addEventListener('click', function(){ logout(true); });
+$('btnPush').addEventListener('click', puMo);
+$('puDong').addEventListener('click', function(){ $('modalPush').classList.remove('show'); });
+$('puBat').addEventListener('click', puBat);
+$('puTat').addEventListener('click', puTat);
+$('puThu').addEventListener('click', puThu);
 $('btnCsv').addEventListener('click', csv);
 $('lsNgay').addEventListener('change', function(){ if(this.value) datNgayLS(this.value); });
 $('lsTruoc').addEventListener('click', function(){ datNgayLS(congNgay(LS.ngay || ngayHomNay(), -1)); });
