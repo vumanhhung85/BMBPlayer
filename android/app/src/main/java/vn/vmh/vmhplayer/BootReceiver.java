@@ -5,7 +5,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 
-/** Tự mở VMHPlayer khi tivi khởi động (chỉ chế độ TV, và chỉ khi người dùng không tắt). */
+/** Tự mở VMH Nhạc khi tivi khởi động (chỉ chế độ TV, và chỉ khi người dùng không tắt). */
 public class BootReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context c, Intent i) {

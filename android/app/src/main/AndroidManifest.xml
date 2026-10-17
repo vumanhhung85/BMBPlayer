@@ -16,7 +16,7 @@
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:banner="@drawable/banner"
-        android:label="VMHPlayer"
+        android:label="VMH Nhạc"
         android:usesCleartextTraffic="false"
         android:hardwareAccelerated="true">
 

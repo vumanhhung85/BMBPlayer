@@ -41,14 +41,14 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 /**
- * VMHPlayer 1.1 — vỏ WebView cho trang nhac.html.
+ * VMH Nhạc 1.2 — vỏ WebView cho trang nhac.html.
  *  - Tivi (leanback / UiMode TV / không cảm ứng): mở màn hình phát nhạc nhac.html, tự bật tiếng (không cần chạm), tự mở khi bật tivi.
  *  - Máy tính bảng (>= 600dp) và điện thoại: mở chế độ điều khiển ?mode=remote.
  * Nhận diện thiết bị giống BMBPlayer; giữ chế độ tự nhận trừ khi người dùng đổi trong menu ẩn.
  */
 public class MainActivity extends Activity {
     static final String BASE = "https://bmb.id.vn/nhac.html";
-    static final String VER = "1.1";
+    static final String VER = "1.2";
 
     private WebView web;
     private FrameLayout root;
@@ -157,7 +157,7 @@ public class MainActivity extends Activity {
         l.setGravity(Gravity.CENTER);
         l.setBackgroundColor(Color.rgb(16, 10, 34));
         TextView t = new TextView(this);
-        t.setText("Không có kết nối mạng\nVMHPlayer sẽ tự thử lại…");
+        t.setText("Không có kết nối mạng\nVMH Nhạc sẽ tự thử lại…");
         t.setTextColor(Color.WHITE); t.setTextSize(20); t.setGravity(Gravity.CENTER);
         l.addView(t);
         Button bt = new Button(this);
@@ -241,7 +241,7 @@ public class MainActivity extends Activity {
     private void menu() {
         final String[] items = {"Tự nhận diện (" + guessMode(this) + ")", "Chế độ TV (phát nhạc)", "Chế độ Điều khiển (máy tính bảng / điện thoại)",
                 "Tải lại", sp.getBoolean("autostart", true) ? "Tắt tự mở khi bật tivi" : "Bật tự mở khi bật tivi", "Thoát"};
-        new AlertDialog.Builder(this).setTitle("VMHPlayer " + VER + " · " + mode).setItems(items, (d, w) -> {
+        new AlertDialog.Builder(this).setTitle("VMH Nhạc " + VER + " · " + mode).setItems(items, (d, w) -> {
             if (w == 0) sp.edit().remove("mode").apply();
             else if (w == 1) sp.edit().putString("mode", "tv").apply();
             else if (w == 2) sp.edit().putString("mode", "phone").apply();
