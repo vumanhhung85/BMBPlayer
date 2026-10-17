@@ -54,6 +54,7 @@ Trên máy có Node (thư mục repo BMBPlayer, PowerShell):
 - **Thông báo đẩy**: mỗi máy (điện thoại Android, máy tính Chrome, iPhone/iPad đã cài ra Màn hình chính, iOS 16.4+) bấm 🔔 trên quay.html → Bật thông báo. Đơn mới hiện thông báo có nút **✅ Tiếp nhận**; đã xác nhận thì đổi thành **🎉 Đã xong**; xong/huỷ thì đổi theo. Máy đang mở trang quầy không bị báo trùng (trang đã kêu chuông). App APK không nhận thông báo đẩy: dùng Chrome.
 - Ai nhận: tài khoản quản lý + quầy của chi nhánh, đang hoạt động, đã bật trên máy đó (admin: nhận theo chi nhánh đang chọn lúc bật). Đăng xuất bằng nút thì gỡ máy khỏi danh sách; đăng nhập lại tự gắn lại.
 - Deploy: thêm binding `QHUB` + migration `v2` trong wrangler.toml (đã có), push `main` là xong. Không cần secret mới. Bảng `order_push_sub`, `order_meta` tự tạo. **Đừng xoá dòng `vapid` trong `order_meta`** (xoá là mọi máy phải bật lại).
+- **App BMBPlayer 2.0 chế độ Quầy** (điện thoại Android): không dùng Web Push mà tự hiện thông báo bằng dịch vụ nền — đăng nhập trên app, trang xin khoá máy (`app.dangKy`, bảng `order_app_may` tự tạo), app nối `/quay/ws` bằng khoá đó và gọi `app.sync`. Chuông riêng, nhắc lại 30 giây tới khi có người Tiếp nhận. Đăng xuất bằng nút / khoá tài khoản / đổi chi nhánh → máy thôi nhận.
 - Tắt đẩy khẩn cấp: biến `PUSH_LETAN = 0` (chuông WebSocket vẫn chạy). Telegram vẫn chạy song song.
 
 ## Chuyển CN03 sang (thay thẳng)

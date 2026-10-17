@@ -401,7 +401,10 @@ async function handleApi(request, env, ctx) {
         case 'push.subscribe':           res = await pushDangKy(env, body, request); break;
         case 'push.unsubscribe':         res = await pushHuyDangKy(env, body); break;
         case 'push.test':                res = await pushThu(env, body); break;
-        case 'push.act':                 res = await pushBam(env, body, ctx); break;     // nút Tiếp nhận / Đã xong ngay trên thông báo (service worker gọi, có chữ ký)
+        case 'push.act':                 res = await pushBam(env, body, ctx); break;     // nút Tiếp nhận / Đã xong ngay trên thông báo (service worker / app gọi, có chữ ký)
+        case 'app.dangKy':               res = await appDangKy(env, body, request); break;   // app BMBPlayer chế độ Quầy: xin khoá máy (cần phiên quầy)
+        case 'app.sync':                 res = await appSync(env, body); break;              // dịch vụ nền của app: đơn đang mở + nút có chữ ký
+        case 'app.huy':                  res = await appHuy(env, body); break;               // đăng xuất / tắt nhận trên app
         default:                         res = fail('unknown_action: ' + action, 400);
       }
     } catch (e) {
@@ -1860,7 +1863,7 @@ const callR = (stub, path, body) => stub.fetch('https://do' + path, { method: 'P
 const QHUB_MAX_SOCK_USER = 4;            // mỗi tài khoản tối đa 4 màn quầy nối cùng lúc (đóng cái cũ nhất)
 const PUSH_MAX_MAY_USER = 6;             // mỗi tài khoản tối đa 6 máy nhận thông báo
 const PUSH_NUT_HAN_MS = 12 * 3600 * 1000;    // nút trên thông báo dùng được trong 12 giờ
-const DV_Q_RE = /^[A-Za-z0-9_-]{8,40}$/;     // mã máy (quay.html tự sinh, nhớ trong trình duyệt)
+const DV_Q_RE = /^[A-Za-z0-9_-]{8,40}$/;     // mã máy (quay.html tự sinh, nhớ trong trình duyệt; app tự sinh)
 const TRANG_THAI_TEN = { MOI: 'chờ xác nhận', NHAN: 'đã xác nhận', XONG: 'đã phục vụ', HUY: 'đã huỷ' };
 
 const quayHub = (env, cn) => (env.QHUB && cn) ? env.QHUB.get(env.QHUB.idFromName('cn:' + cn)) : null;
@@ -1883,7 +1886,12 @@ async function quayWs(req, env) {
   if (!env.QHUB) return new Response('Chưa bật thời gian thực', { status: 501 });
   const u = new URL(req.url);
   const protos = String(req.headers.get('Sec-WebSocket-Protocol') || '').split(',').map(x => x.trim());
-  const tok = protos.find(x => x.startsWith('tok.'));
+  const tok = protos.find(x => x.startsWith('tok.')), dk = protos.find(x => x.startsWith('dk.'));
+  if (dk) {                                  // app BMBPlayer chế độ Quầy (dịch vụ nền): khoá máy dài hạn, không tính là "đang xem"
+    const may = await appMay(env, dk).catch(() => null);
+    if (!may) return new Response('may', { status: 403 });
+    return quayHub(env, may.cn).fetch('https://hub/ws', { headers: { Upgrade: 'websocket', 'X-User': may.u, 'X-Dv': 'app-' + may.dv, 'X-Vis': '0' } });
+  }
   const ss = await getSession(env, { session: tok ? tok.slice(4) : '', branchId: u.searchParams.get('b') || '' }).catch(() => null);
   if (!ss || !ss.b) return new Response('phien', { status: 403 });
   const dv = DV_Q_RE.test(u.searchParams.get('dv') || '') ? u.searchParams.get('dv') : '';
@@ -1921,7 +1929,7 @@ export class QuayHub extends DurableObject {
       while (mine.length >= QHUB_MAX_SOCK_USER) { try { mine.shift().close(1000, 'replaced'); } catch (e) {} }
       const pair = new WebSocketPair(), client = pair[0], server = pair[1];
       this.ctx.acceptWebSocket(server);
-      server.serializeAttachment({ u: user, dv: request.headers.get('X-Dv') || '', v: 1 });
+      server.serializeAttachment({ u: user, dv: request.headers.get('X-Dv') || '', v: request.headers.get('X-Vis') === '0' ? 0 : 1 });
       try { server.send(JSON.stringify({ t: 'hello', at: Date.now() })); } catch (e) {}
       return new Response(null, { status: 101, webSocket: client, headers: { 'Sec-WebSocket-Protocol': 'bmbq.v1' } });
     }
@@ -2081,6 +2089,84 @@ async function pushDon(env, don, opt) {
     if (code >= 200 && code < 300) gui++;
   }));
   return gui;
+}
+
+
+/* ---------- App BMBPlayer chế độ QUẦY (APK 2.0): dịch vụ nền giữ WebSocket + tự hiện thông báo, không qua Web Push ----------
+   Đăng nhập quầy trong app → app.dangKy cấp "khoá máy" (dk) gắn tài khoản + chi nhánh + mã máy. Dịch vụ nền dùng dk để nối /quay/ws
+   (nghe chuông) và gọi app.sync (lấy đơn đang mở kèm chữ ký nút Tiếp nhận / Đã xong). Khoá không hết hạn theo phiên 12 giờ,
+   nhưng mất hiệu lực ngay khi: đăng xuất bằng nút (app.huy), tài khoản bị khoá / đổi vai trò / đổi chi nhánh, hoặc máy bị gỡ. */
+const APP_MAX_MAY_USER = 6;
+let appBangXong = false;
+async function appBangSan(env) {
+  if (appBangXong) return;
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS order_app_may (dv TEXT PRIMARY KEY, username TEXT NOT NULL, chi_nhanh_id TEXT NOT NULL,
+      ten TEXT NOT NULL DEFAULT '', ua TEXT NOT NULL DEFAULT '', tao_luc INTEGER NOT NULL, lan_cuoi INTEGER NOT NULL DEFAULT 0)`).run();
+  appBangXong = true;
+}
+const appKy = (env, u, cn, dv, t) => hmac(env.SESSION_SECRET, 'dk|' + u + '|' + cn + '|' + dv + '|' + t);
+/** dk.<base64url {u,cn,dv,t}>.<chữ ký> → {u, cn, dv} nếu còn hiệu lực */
+async function appMay(env, dk) {
+  const m = /^dk\.([A-Za-z0-9_-]{10,400})\.([\w-]{22})$/.exec(String(dk || ''));
+  if (!m || !env.SESSION_SECRET) return null;
+  let p; try { p = JSON.parse(unb64uS(m[1])); } catch (e) { return null; }
+  if (!p || typeof p.u !== 'string' || typeof p.cn !== 'string' || !DV_Q_RE.test(p.dv || '') || !p.t) return null;
+  if (!same(m[2], await appKy(env, p.u, p.cn, p.dv, p.t))) return null;
+  await appBangSan(env);
+  const r = await env.DB.prepare(
+    `SELECT a.tao_luc, t.vai_tro, t.chi_nhanh_id FROM order_app_may a JOIN tai_khoan t ON t.username = a.username AND t.hoat_dong = 1
+      WHERE a.dv = ? AND a.username = ? AND a.chi_nhanh_id = ?`).bind(p.dv, p.u, p.cn).first();
+  if (!r || r.tao_luc !== p.t || !VAI_TRO_ORDER.includes(r.vai_tro) || (r.vai_tro !== 'admin' && r.chi_nhanh_id !== p.cn)) return null;
+  return { u: p.u, cn: p.cn, dv: p.dv };
+}
+async function appDangKy(env, body, request) {
+  const [ss, loi] = await canPhien(env, body);
+  if (loi) return loi;
+  const dv = s(body.dv, 40);
+  if (!DV_Q_RE.test(dv)) return fail('bad_dv', 400, 'Mã máy không hợp lệ.');
+  await appBangSan(env);
+  const t = Date.now();
+  await env.DB.batch([
+    env.DB.prepare(`INSERT INTO order_app_may (dv, username, chi_nhanh_id, ten, ua, tao_luc, lan_cuoi) VALUES (?,?,?,?,?,?,?)
+        ON CONFLICT(dv) DO UPDATE SET username = excluded.username, chi_nhanh_id = excluded.chi_nhanh_id, ten = excluded.ten,
+          ua = excluded.ua, tao_luc = excluded.tao_luc, lan_cuoi = excluded.lan_cuoi`)
+      .bind(dv, ss.u, ss.b, s(body.ten, 60), s(request.headers.get('User-Agent') || '', 160), t, t),
+    env.DB.prepare(`DELETE FROM order_app_may WHERE username = ?1 AND dv NOT IN
+        (SELECT dv FROM order_app_may WHERE username = ?1 ORDER BY tao_luc DESC LIMIT ${APP_MAX_MAY_USER})`).bind(ss.u)
+  ]);
+  const p = b64uS(JSON.stringify({ u: ss.u, cn: ss.b, dv, t }));
+  const cn = await env.DB.prepare(`SELECT COALESCE(NULLIF(ten_ngan,''), ten, id) AS ten FROM chi_nhanh WHERE id = ?`).bind(ss.b).first();
+  return ok({ dk: 'dk.' + p + '.' + await appKy(env, ss.u, ss.b, dv, t), branchName: (cn && cn.ten) || ss.b });
+}
+async function appHuy(env, body) {
+  const may = await appMay(env, s(body.dk, 600));
+  if (!may) return ok({});                                   // đã hết hiệu lực từ trước
+  await env.DB.prepare('DELETE FROM order_app_may WHERE dv = ?').bind(may.dv).run();
+  return ok({});
+}
+/** Đơn đang chờ / đang xử lý của chi nhánh (ngày kinh doanh hiện tại) + đơn vừa xong/huỷ 15 phút gần đây (để app gỡ thông báo) */
+async function appSync(env, body) {
+  const may = await appMay(env, s(body.dk, 600));
+  if (!may) return fail('may_het_han', 403, 'Máy này đã bị gỡ khỏi quầy — mở app và đăng nhập lại.');
+  const now = Date.now();
+  const [rs, tk] = await env.DB.batch([
+    env.DB.prepare(`SELECT id, ten_phong, items, ghi_chu, nghi_ngo, trang_thai, nguoi_xu_ly, tao_luc, cap_nhat_luc FROM order_don
+      WHERE chi_nhanh_id = ?1 AND tao_luc >= ?2 AND (trang_thai IN ('MOI', 'NHAN') OR cap_nhat_luc >= ?3) ORDER BY tao_luc ASC LIMIT 60`)
+      .bind(may.cn, mocNgay(ngayKinhDoanh()), now - 15 * 60000),
+    env.DB.prepare('SELECT username, ho_ten FROM tai_khoan WHERE username IN (SELECT nguoi_xu_ly FROM order_don WHERE chi_nhanh_id = ? AND tao_luc >= ?)').bind(may.cn, mocNgay(ngayKinhDoanh()))
+  ]);
+  const ten = new Map(tk.results.map(r => [r.username, r.ho_ten || r.username]));
+  const exp = now + PUSH_NUT_HAN_MS;
+  const orders = [];
+  for (const d of rs.results) {
+    let items = []; try { items = JSON.parse(d.items); } catch (e) {}
+    const nd = pushNoiDung(d, items, ten.get(d.nguoi_xu_ly) || d.nguoi_xu_ly || '');
+    const coNut = d.trang_thai === 'MOI' || d.trang_thai === 'NHAN';
+    orders.push({ id: d.id, st: d.trang_thai, room: d.ten_phong, title: nd.title, body: nd.body, at: d.tao_luc, upd: d.cap_nhat_luc || d.tao_luc,
+      act: coNut ? { u: may.u, cn: may.cn, exp, sig: await nutKy(env, d.id, may.u, may.cn, exp) } : null });
+  }
+  if (Math.random() < 0.05) await env.DB.prepare('UPDATE order_app_may SET lan_cuoi = ? WHERE dv = ?').bind(now, may.dv).run();
+  return ok({ now, u: may.u, cn: may.cn, orders });
 }
 
 /* ---------- API thông báo đẩy (action trong POST /api) ---------- */

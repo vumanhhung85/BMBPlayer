@@ -666,6 +666,7 @@ document.addEventListener('visibilitychange', function(){
   if(document.visibilityState === 'visible' && S.tok){ if(!RT.ws){ RT.retry = 1500; rtNoi(); } tick(); }
 });
 window.addEventListener('online', function(){ if(S.tok && !RT.ws){ RT.retry = 1500; rtNoi(); } });
+window.bmbQuayTrangThai = function(){ puVe(); if($('modalPush').classList.contains('show')) puCapNhat(); };
 if(navigator.serviceWorker){
   navigator.serviceWorker.addEventListener('message', function(e){ if(e.data && e.data.t === 'rev' && S.tok) tickSoon(); });
 }
@@ -677,6 +678,25 @@ var PU = { on:false, sub:null, reg:null, ban:false };
 function puHoTro(){ return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; }
 function laIOS(){ return /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); }
 function laApp(){ return /BMBPlayerApp\//.test(navigator.userAgent); }
+/* App BMBPlayer 2.0 chế độ Quầy: thông báo do app tự hiện (dịch vụ nền), không qua Web Push */
+function appQ(){ try{ return !!(window.BMBNative && typeof BMBNative.quayBat === 'function'); }catch(e){ return false; } }
+function appInfo(){ try{ return JSON.parse(BMBNative.quayInfo()) || {}; }catch(e){ return {}; } }
+var APPQ = { busy:false, loi:'' };
+/* Sau đăng nhập / đổi chi nhánh: xin khoá máy cho tài khoản + chi nhánh đang dùng rồi giao cho app nghe đơn */
+function appKetNoi(){
+  if(!appQ() || !S.tok || APPQ.busy) return;
+  var info = appInfo();
+  if(!info.dv) return;
+  APPQ.busy = true;
+  api('app.dangKy', { dv: info.dv, ten: S.hoTen || S.user }).then(function(r){
+    APPQ.busy = false;
+    if(!r || !r.ok){ APPQ.loi = (r && r.msg) || 'Máy chủ chưa nhận.'; puVe(); return; }
+    APPQ.loi = '';
+    try{ BMBNative.quayBat(r.dk, CFG.API, r.branchName || S.bname || '', S.hoTen || S.user); }catch(e){ APPQ.loi = String(e); }
+    puVe();
+    if($('modalPush').classList.contains('show')) puCapNhat();
+  }).catch(function(){ APPQ.busy = false; APPQ.loi = 'Không kết nối được máy chủ.'; puVe(); });
+}
 function laStandalone(){ return (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true; }
 function khoaTuChuoi(b64){
   var s = String(b64).replace(/-/g, '+').replace(/_/g, '/'); while(s.length % 4) s += '=';
@@ -698,6 +718,13 @@ function puGuiLen(sub){
 }
 function puVe(){
   var b = $('btnPush');
+  if(appQ()){
+    var i = appInfo(), tot = i.on && i.notif !== 'denied';
+    b.className = 'btn btn-ghost btn-sm' + (tot ? ' on' : ' off');
+    b.textContent = tot ? '🔔' : '🔕';
+    b.title = tot ? 'App đang nhận đơn trên máy này' : 'App chưa nhận đơn trên máy này';
+    return;
+  }
   b.className = 'btn btn-ghost btn-sm' + (PU.on ? ' on' : (PU.ban ? '' : ' off'));
   b.textContent = PU.on ? '🔔' : '🔕';
   b.title = PU.on ? 'Máy này đang nhận thông báo' : 'Máy này chưa bật thông báo';
@@ -721,12 +748,35 @@ function puTrangThai(cls, tieuDe, chiTiet){
 }
 function puMo(){
   $('modalPush').classList.add('show');
+  if(!appQ()){ var b0 = $('puApp'); if(b0) b0.style.display = 'none'; }
   puCapNhat();
 }
 function puCapNhat(){
   var bat = $('puBat'), tat = $('puTat'), thu = $('puThu');
   bat.style.display = ''; tat.style.display = 'none'; thu.style.display = 'none'; bat.disabled = false; bat.textContent = 'Bật thông báo';
   var note = [];
+  if(appQ()){
+    var i = appInfo();
+    tat.style.display = 'none'; bat.style.display = 'none';
+    var nut = [];
+    if(!i.on){
+      puTrangThai('warn', 'App chưa nhận đơn trên máy này.', APPQ.loi ? '<div class="pu-note">' + esc(APPQ.loi) + '</div>' : '');
+      bat.style.display = ''; bat.textContent = 'Bật nhận đơn';
+    }else if(i.notif === 'denied'){
+      puTrangThai('bad', 'App chưa được phép hiện thông báo.', '<div class="pu-note">Bấm "Mở cài đặt thông báo" → bật Thông báo cho BMBPlayer.</div>');
+    }else{
+      puTrangThai(i.connected ? 'ok' : 'warn', i.connected ? 'App đang nhận đơn — kêu chuông kể cả khi tắt màn hình.' : 'App đang nối lại máy chủ…',
+        '<div class="pu-note">' + esc(i.user || S.hoTen || S.user) + ' · ' + esc(i.branch || S.bname || '') + '</div>');
+      thu.style.display = '';
+    }
+    note = ['Thông báo đơn mới kêu chuông riêng và <b>nhắc lại mỗi 30 giây</b> tới khi có người Tiếp nhận.',
+            'Trên thanh thông báo luôn có dòng "BMB Quầy đang nhận đơn" — đó là dịch vụ nền, đừng tắt.'];
+    if(i.battery === false) note.push('<b>Nên bỏ tối ưu pin</b> cho BMBPlayer để Android không tắt dịch vụ nền: bấm "Bỏ tối ưu pin".');
+    note.push('Đăng xuất bằng nút <b>Đăng xuất</b> thì máy này thôi nhận đơn.');
+    puNote(note);
+    puNutApp(i);
+    return;
+  }
   if(laApp()){
     puTrangThai('bad', 'App BMBPlayer (APK) không nhận được thông báo đẩy.', 'Mở trang quầy bằng Chrome trên máy này để bật.');
     bat.style.display = 'none'; puNote([]); return;
@@ -759,7 +809,22 @@ function puCapNhat(){
           'Telegram vẫn báo song song như cũ.'];
   puNote(note);
 }
+function puNutApp(i){
+  var box = $('puApp');
+  if(!box){
+    box = document.createElement('div'); box.id = 'puApp'; box.className = 'actions wrap';
+    $('puNote').parentNode.insertBefore(box, $('puNote').nextSibling);
+  }
+  box.innerHTML = '';
+  if(!appQ()){ box.style.display = 'none'; return; }
+  box.style.display = '';
+  var them = function(txt, kind){ var b = document.createElement('button'); b.className = 'btn btn-ghost btn-sm'; b.textContent = txt;
+    b.onclick = function(){ try{ BMBNative.quayCaiDat(kind); }catch(e){} setTimeout(puCapNhat, 1500); }; box.appendChild(b); };
+  them('Mở cài đặt thông báo', 'thongbao');
+  if(i.battery === false) them('Bỏ tối ưu pin', 'pin');
+}
 function puBat(){
+  if(appQ()){ APPQ.loi = ''; appKetNoi(); setTimeout(puCapNhat, 1500); return; }
   var bat = $('puBat');
   bat.disabled = true; bat.textContent = 'Đang bật…';
   /* xin quyền NGAY trong thao tác bấm (iOS / Safari bắt buộc) */
@@ -799,6 +864,7 @@ function puTat(){
   }).then(puCapNhat, puCapNhat);
 }
 function puThu(){
+  if(appQ()){ try{ BMBNative.quayThu(); }catch(e){} puTrangThai('ok', 'Đã gửi thông báo thử trên máy này.', ''); return; }
   if(!PU.sub) return;
   var b = $('puThu'); b.disabled = true; b.textContent = 'Đang gửi…';
   api('push.test', { endpoint: PU.sub.endpoint }).then(function(r){
@@ -873,6 +939,7 @@ function doiChiNhanh(){
   TV.rooms = []; tick();
   rtDong(); RT.retry = 1500; rtNoi();      /* chuông của chi nhánh mới */
   if(PU.on) puGanLai();                    /* thông báo đẩy theo chi nhánh đang chọn */
+  appKetNoi();
   if(tabTvDangMo()) loadTv();
   var on = document.querySelector('.tab.on');
   var p = on ? on.getAttribute('data-p') : '';
@@ -893,6 +960,7 @@ function start(){
   datNhip();                 /* hỏi định kỳ: 8 giây khi chưa có WebSocket, 45 giây khi WebSocket đang nối */
   rtNoi();                   /* WebSocket "cái chuông": có đơn là tải lại ngay */
   puKhoiDong();              /* máy đã bật thông báo đẩy thì gắn lại vào tài khoản + chi nhánh đang đăng nhập */
+  appKetNoi();               /* app BMBPlayer chế độ Quầy: giao cho dịch vụ nền nghe đơn */
   /* Đơn Mới còn tồn (chưa ai bấm Tiếp nhận) thì nhắc lại bằng chuông mỗi NHAC_LAI giây,
      không chỉ kêu 1 lần lúc đơn vừa tới — tới khi tiếp nhận hết mới thôi. */
   if(S.nhacTm) clearInterval(S.nhacTm);
@@ -904,6 +972,7 @@ function logout(chuDong){
   if(S.tm) clearTimeout(S.tm);
   if(S.nhacTm) clearInterval(S.nhacTm);
   S.tok = ''; rtDong();
+  if(chuDong === true && appQ()){ try{ BMBNative.quayTat(); }catch(e){} }
   /* đăng xuất: gỡ máy này khỏi danh sách nhận thông báo (đăng nhập lại thì tự gắn lại cho tài khoản mới) */
   var xong = function(){ location.reload(); };
   if(chuDong === true && PU.sub){ setTimeout(xong, 1500); api('push.unsubscribe', {endpoint: PU.sub.endpoint}).then(xong, xong); }
