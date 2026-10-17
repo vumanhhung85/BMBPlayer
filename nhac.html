@@ -277,6 +277,7 @@
   <div id="pairRemote">
     <h3>Ghép với TV</h3>
     <p class="hint">Trên TV bấm nút 📱 để hiện mã 6 số, rồi nhập vào đây (hoặc quét mã QR trên TV).</p>
+    <button id="pairScan" class="pri" style="width:100%;margin:6px 0 2px;padding:14px;border:none;border-radius:12px;font-size:16px;font-weight:700;color:#fff;background:var(--accent)">📷 Quét mã QR trên TV</button>
     <input id="pairIn" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="000000">
   </div>
   <div class="btns"><button id="pairClose">Đóng</button><button id="pairPass">Dùng mật khẩu</button><button id="pairGo" class="pri">Ghép</button></div>
@@ -296,6 +297,7 @@
 </div>
 
 <script src="./qrcode.js"></script>
+<script src="./quet-qr.js"></script>
 <script>
 /* ============================================================
    Playlist nhạc yêu thích — phát bằng trình phát nhúng chính thức của YouTube.
@@ -1212,6 +1214,20 @@ $('pairBtn').onclick = openPairTv;
 $('pairClose').onclick = closePair;
 $('pairPass').onclick = () => { closePair(); openSettings(); };
 $('pairGo').onclick = () => claim($('pairIn').value);
+$('pairScan').onclick = () => {
+  if(typeof openQrScanner !== 'function') return toast('Không mở được máy quét — hãy nhập mã 6 số.', 'err');
+  openQrScanner({
+    title: 'Quét mã ghép trên TV', hint: 'Trên TV bấm nút 📱 rồi hướng camera vào mã QR hiện ra.',
+    manualPlaceholder: '000000', manualHint: 'Hoặc nhập mã 6 số trên TV.',
+    onResult: async (raw) => {
+      let code = '';
+      try{ const u = new URL(raw); code = (u.searchParams.get('code') || '').replace(/\D/g, ''); }catch(e){ code = String(raw).replace(/\D/g, ''); }
+      if(code.length !== 6) return 'Đây không phải mã ghép. Trên TV bấm nút 📱 để hiện mã QR ghép.';
+      await claim(code);
+      return true;
+    }
+  });
+};
 $('pairIn').addEventListener('keydown', e => { if(e.key === 'Enter') claim($('pairIn').value); });
 document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') wsKick(); });
 
