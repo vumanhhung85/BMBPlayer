@@ -228,6 +228,95 @@
   #volRow .vn{min-width:30px; text-align:right; color:#FFD21A; font-size:15px; font-variant-numeric:tabular-nums}
   @media (max-width:420px){ body.remote #ctl{gap:8px} body.remote #ctl .big{width:46px; height:46px} body.remote #ctl .big svg{width:22px; height:22px} body.remote #ctl .big.pri{width:58px; height:58px} }
   @media (max-width:480px){ header{gap:6px; padding:8px 10px} header .ttl{display:none} header select{max-width:150px} #link{font-size:11px; padding:3px 8px} }
+
+  /* ===== VMH nhạc — điện thoại / máy tính bảng: bố cục, khoảng cách, vị trí icon học theo MHPlayer (remote.html) ===== */
+  .brand{display:none}
+  #menuBtn{display:none}
+  body.remote header{padding:5px 12px; gap:8px; background:linear-gradient(135deg,#1a1530,#0a0a0f)}
+  body.remote header .logo, body.remote header .sp, body.remote header > .ico{display:none !important}
+  body.remote .brand{display:flex; align-items:center; gap:7px; flex:0 0 auto; min-width:0}
+  body.remote .brand i{font-style:normal; width:28px; height:28px; border-radius:50%; background:linear-gradient(135deg,var(--accent),var(--accent2)); display:flex; align-items:center; justify-content:center; font-size:15px}
+  body.remote .brand b{font-size:19px; font-weight:900; letter-spacing:.2px; white-space:nowrap; background:linear-gradient(135deg,#fff,#c4b5fd 55%,#FFD21A); -webkit-background-clip:text; background-clip:text; color:transparent}
+  body.remote header select{margin-left:auto; padding:3px 12px; font-size:13px; font-weight:900; max-width:38vw; text-overflow:ellipsis}
+  body.remote #link{margin:0 2px}
+  body.remote #menuBtn{display:inline-flex; align-items:center; justify-content:center; background:none; border:1px solid var(--line); color:var(--ink); border-radius:10px; width:32px; height:28px; font-size:16px; line-height:1; padding:0}
+  body.remote #now{padding:5px 12px; gap:8px; font-size:13px}
+  body.remote #now::before{width:22px; height:22px; font-size:14px}
+  body.remote #now .nt{font-size:13px; font-weight:700}
+  body.remote #remoteCard{padding:0 12px 4px}
+  body.remote #rcStatus{font-size:11.5px}
+  body.remote .tabs{gap:6px; padding:6px 12px}
+  body.remote .tabs button{flex-direction:row; justify-content:center; gap:6px; padding:5px 4px; border-radius:999px; opacity:.85}
+  body.remote .tabs button.on{opacity:1; box-shadow:0 2px 10px rgba(139,92,246,.5)}
+  body.remote .tabs .ti{font-size:15px} body.remote .tabs button.on .ti{font-size:15px}
+  body.remote .tabs .tl, body.remote .tabs button.on .tl{font-size:13px}
+  body.remote .tabs .cnt{min-width:20px; padding:0 6px; line-height:17px; font-size:12px}
+  body.remote #paneAdd > .hint{display:none}
+  body.remote #addBox{position:sticky; top:var(--stickTop,0px); z-index:25; background:var(--bg); gap:8px; padding:4px 12px 6px; margin:0 -12px}
+  body.remote #addBox input{border-radius:999px; padding:9px 16px}
+  body.remote #addBox button{border-radius:999px; padding:0 16px; font-size:18px}
+  body.remote .pane{padding:0 12px 190px}
+  body.remote .row{gap:10px; padding:6px 0}
+  body.remote .row img{width:80px; height:45px; border-radius:7px}
+  body.remote .row .name{font-size:14px; font-weight:600}
+  body.remote .row.cur{padding:10px; margin:8px 0}
+  body.remote #results .row .addBtn:not(.more){display:none}
+  body.remote #results .row{cursor:pointer} body.remote #results .row:active{background:#1c1830}
+  body.remote .row .more{background:none; border:none; color:var(--accent2); font-size:12px; font-weight:700; padding:4px 0 0; display:block; text-align:left}
+  body.remote .verBox{margin:0 0 4px 12px}
+  /* hộp chọn khi bấm một bài trong kết quả (như MHPlayer) */
+  #pkOv{position:fixed; inset:0; z-index:80; background:rgba(0,0,0,.72); display:none; align-items:center; justify-content:center; padding:18px}
+  #pkOv.show{display:flex}
+  #pkCard{background:var(--panel); border:1px solid var(--line); border-radius:18px; width:min(440px,100%); overflow:hidden; padding:0 0 16px}
+  #pkCard img{display:block; width:100%; aspect-ratio:16/9; object-fit:cover; background:#20202e}
+  #pkCard .pkT{padding:12px 16px 4px; font-weight:700; font-size:15px; line-height:1.4}
+  #pkCard .pkS{padding:0 16px; color:var(--quiet); font-size:12.5px}
+  #pkCard .pkB{display:flex; flex-direction:column; gap:10px; padding:12px 16px 0}
+  #pkCard .pkB button{border:none; border-radius:12px; padding:14px 10px; font:inherit; font-weight:800; font-size:16px; color:#fff; background:linear-gradient(135deg,#7c3aed,#a855f7); letter-spacing:.3px}
+  #pkCard .pkB button.y{background:linear-gradient(135deg,#f59e0b,#fbbf24); color:#2b1400}
+  #pkCard .pkB button.g{background:#20202e; color:var(--ink); border:1px solid var(--line)}
+  #pkCard .pkB button:disabled{opacity:.55}
+  /* menu ⋮ */
+  #vmMenu{position:fixed; inset:0; z-index:65; background:rgba(0,0,0,.6); display:none; align-items:flex-start; justify-content:flex-end; padding:46px 10px 10px}
+  #vmMenu.show{display:flex}
+  #vmMenu .box{background:#17142a; border:1px solid #3b2f63; border-radius:14px; min-width:250px; max-width:92vw; overflow:hidden; box-shadow:0 12px 40px rgba(0,0,0,.6)}
+  #vmMenu button{display:block; width:100%; text-align:left; background:none; border:none; border-bottom:1px solid #2a2440; color:var(--ink); padding:13px 16px; font:inherit; font-size:15px}
+  #vmMenu .inf{padding:10px 16px; color:var(--quiet); font-size:12.5px; border-bottom:1px solid #2a2440; line-height:1.5}
+  #vmMenu .box > :last-child{border-bottom:none}
+  /* thanh điều khiển dưới: số đo như MHPlayer */
+  body.remote #dock{background:#15151f; border-top:1px solid #3a3a52; box-shadow:0 -8px 20px rgba(0,0,0,.6); gap:10px}
+  body.remote #ctl .big{background:#2e2e44; border:1.5px solid #5a5a7a; color:#fff}
+  body.remote #ctl .big.pri{border:none}
+  body.remote #ctl .big.on{background:#2a1856; border-color:#FFD21A}
+  body.remote #volRow{gap:14px} body.remote #volRow .vi, body.remote #volRow .vbtn{background:#2e2e44; border:1.5px solid #5a5a7a; color:#fff}
+  body.remote #volRow .vn{min-width:26px; font-size:16px}
+  body.remote #fsRemote{position:static; display:flex; flex:0 0 auto; width:54px; height:54px; background:#2e2e44; border:1.5px solid #5a5a7a; color:#fff}
+  body.remote #fsRemote.on{border-color:#FFD21A; color:#FFD21A}
+  body.remote #fsRemote svg{width:26px; height:26px}
+  @media (max-width:420px){ body.remote #volRow{gap:8px} body.remote #volRow .vi, body.remote #volRow .vbtn, body.remote #fsRemote{width:46px; height:46px} body.remote #volRow .vn{min-width:24px; font-size:15px} }
+  /* máy tính bảng nằm ngang: trái = tìm bài (lưới thẻ), phải = bài đang hát + nút + danh sách */
+  body.remote.wide{display:grid; height:100vh; overflow:hidden; grid-template-columns:minmax(0,1fr) clamp(300px,35vw,460px); grid-template-rows:auto minmax(0,1fr)}
+  body.wide #rTop{grid-column:1; grid-row:1; position:static; box-shadow:none}
+  body.wide #rTop #now, body.wide #rTop #remoteCard, body.wide #rTop .tabs{display:none}
+  body.wide main{grid-column:1; grid-row:2; display:block; overflow:auto; min-height:0}
+  body.wide #side{display:block; border:none}
+  body.wide #paneAdd{display:block !important}
+  body.wide #paneAdd .pane, body.wide .pane{padding-bottom:30px}
+  body.wide #addBox{top:0}
+  body.wide #wideSide{grid-column:2; grid-row:1 / span 2; display:flex; flex-direction:column; min-height:0; background:#100e1c; border-left:1px solid var(--line)}
+  body.wide #wideSide #now{display:flex !important; padding:8px 12px; background:#1a1430}
+  body.wide #wideSide #remoteCard{display:block; padding:0}
+  body.wide #wideSide #rcImg{display:block; width:100%; max-height:30vh; aspect-ratio:16/9; object-fit:cover; border-radius:0}
+  body.wide #wideSide #rcStatus{padding:4px 12px; background:#16102a}
+  body.wide #wideSide #dock{position:static; box-shadow:none; background:transparent; border-top:none; border-bottom:1px solid var(--line); padding:10px 8px}
+  body.wide #wideSide .wHead{padding:10px 12px 4px; font-size:12.5px; font-weight:800; color:#FFD21A; letter-spacing:.6px}
+  body.wide #wideSide #paneList{display:block !important; flex:1; overflow:auto; min-height:0; padding:0 10px 16px}
+  body.wide #results{display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:12px; align-items:start}
+  body.wide #results > *{grid-column:1 / -1}
+  body.wide #results > .rowWrap{grid-column:auto}
+  body.wide #results > .rowWrap > .row{flex-direction:column; align-items:stretch; gap:6px; border:none; background:#16161f; border-radius:12px; padding:0 0 10px; overflow:hidden}
+  body.wide #results > .rowWrap > .row img{width:100%; height:auto; aspect-ratio:16/9; border-radius:0}
+  body.wide #results > .rowWrap > .row .meta{padding:0 10px}
   @media (min-width:900px){
     main{display:grid; grid-template-columns:1fr 430px; overflow:hidden}
     #stage{min-height:0; overflow:auto}
@@ -819,26 +908,44 @@ function rowOf(raw, opt){
   b.onclick = async () => { b.disabled = true; await addItem(it); b.textContent = 'Đã có'; };
   row.append(img, meta);
   if(opt.versions > 1 && opt.key){
-    const vb = el('button', 'addBtn alt', opt.versions + ' bản ▾'); let sub = null;
+    const vtxt = opt.versions + ' bản ▾', vb = el('button', 'addBtn alt' + (REMOTE ? ' more' : ''), REMOTE ? '▾ ' + opt.versions + ' bản khác' : vtxt); let sub = null;
     vb.onclick = async () => {
-      if(sub){ sub.remove(); sub = null; vb.textContent = opt.versions + ' bản ▾'; return; }
+      if(sub){ sub.remove(); sub = null; vb.textContent = REMOTE ? '▾ ' + opt.versions + ' bản khác' : vtxt; return; }
       vb.disabled = true;
       try{
         const d = await kapi('/api/kho/versions?key=' + encodeURIComponent(opt.key) + (opt.tone != null ? '&tone=' + encodeURIComponent(opt.tone) : ''));
         sub = el('div', 'verBox');
         (d.items || []).filter(v => /^[\w-]{11}$/.test(v.id || '')).sort((a, c) => (c.views || 0) - (a.views || 0)).forEach(v => sub.append(rowOf(Object.assign({ embeddable: true }, v))));
-        wrap.append(sub); vb.textContent = 'Thu gọn ▴';
+        wrap.append(sub); vb.textContent = REMOTE ? '▴ Thu gọn' : 'Thu gọn ▴';
       }catch(e){ toast('Không tải được các bản phối.', 'err'); }
       vb.disabled = false;
     };
-    row.append(vb);
+    vb.onclick = (f => ev => { ev.stopPropagation(); return f(ev); })(vb.onclick);
+    meta.append(vb);
+    if(!REMOTE) row.append(vb);
   }
-  if(REMOTE){           // trên điện thoại: thêm rồi phát ngay trên TV
+  if(REMOTE){           // điện thoại: bấm vào bài → hộp chọn (Phát ngay / Thêm) như MHPlayer
+    row.style.cursor = 'pointer'; row.onclick = () => openPicker(it, b);
+  }
+  if(false){
     const pn = el('button', 'addBtn alt', '▶ Phát');
     pn.onclick = async () => { await addItem(it); b.textContent = 'Đã có'; b.disabled = true; sendCmd('playid', { id: it.id }); };
     row.append(pn);
   }
   row.append(b); wrap.prepend(row); return wrap;
+}
+function openPicker(it, addB){
+  let ov = $('pkOv');
+  if(!ov){ ov = el('div'); ov.id = 'pkOv'; ov.innerHTML = '<div id="pkCard"><img alt=""><div class="pkT"></div><div class="pkS"></div><div class="pkB"></div></div>'; ov.onclick = e => { if(e.target === ov) ov.classList.remove('show'); }; document.body.append(ov); }
+  const c = ov.querySelector('#pkCard'); c.querySelector('img').src = it.thumb || ('https://i.ytimg.com/vi/' + it.id + '/mqdefault.jpg');
+  c.querySelector('.pkT').textContent = decode(it.title); c.querySelector('.pkS').textContent = it.channel || '';
+  const bx = c.querySelector('.pkB'); bx.replaceChildren();
+  const have = () => items.some(x => x.id === it.id), mkb = (t, cls, fn) => { const b = el('button', cls, t); b.onclick = fn; bx.append(b); return b; };
+  mkb('▶  Phát ngay', '', async () => { ov.classList.remove('show'); await addItem(it); if(addB){ addB.textContent = 'Đã có'; addB.disabled = true; } sendCmd('playid', { id: it.id }); });
+  const ad = mkb(have() ? '✓  Đã có trong danh sách' : '＋  Thêm vào danh sách', 'y', async () => { ov.classList.remove('show'); await addItem(it); if(addB){ addB.textContent = 'Đã có'; addB.disabled = true; } });
+  ad.disabled = have();
+  mkb('Đóng', 'g', () => ov.classList.remove('show'));
+  ov.classList.add('show');
 }
 /* Kết quả tìm trong kho — như remote.html: ít bài (≤ 6 nhóm) → trải phẳng MỌI bản phối, nhiều lượt xem xếp trước (tối đa 150, cuộn tới đâu nạp tới đó);
    nhiều bài → gom nhóm, bấm "N bản" mở các bản. Chỉ giữ bản có chữ karaoke/beat… và ≥ 100 lượt xem (khi còn ≥ 2 bản tốt), bản còn lại nằm sau nút "Hiện thêm". */
@@ -1318,13 +1425,23 @@ if(REMOTE){
   const top = el('div'); top.id = 'rTop';
   top.append(document.querySelector('header'), $('now'), $('remoteCard'), document.querySelector('.tabs'));
   document.body.prepend(top);
+  const hd = document.querySelector('header');
+  const brand = el('div', 'brand'); brand.innerHTML = '<i>♪</i><b>VMHPlayer</b>'; hd.prepend(brand);
+  const menuBtn = el('button'); menuBtn.id = 'menuBtn'; menuBtn.textContent = '⋮'; menuBtn.title = 'Menu'; hd.append(menuBtn);
+  const vmm = el('div'); vmm.id = 'vmMenu'; document.body.append(vmm);
+  const mItem = (t, id) => { const b = el('button', null, t); b.onclick = () => { vmm.classList.remove('show'); $(id).click(); }; return b; };
+  menuBtn.onclick = () => { vmm.replaceChildren(); const bx = el('div', 'box'); const inf = el('div', 'inf'); inf.textContent = 'Phòng: ' + ROOM + ' · ' + ($('link').textContent || '').replace('●', '').trim(); bx.append(inf);
+    bx.append(mItem('📷  Quét QR trên TV (ghép / đổi TV)', 'scanBtn'));
+    if(!document.body.classList.contains('paired')){ bx.append(mItem('＋  Tạo playlist mới', 'plNew'), mItem('🗑  Xoá playlist này', 'plDel')); }
+    bx.append(mItem('⚙  Cài đặt kết nối', 'gear')); vmm.append(bx); vmm.classList.add('show'); };
+  vmm.onclick = e => { if(e.target === vmm) vmm.classList.remove('show'); };
   const dock = el('div'); dock.id = 'dock';
   const vr = el('div'); vr.id = 'volRow';
   const vi = el('span', 'vi'); vi.innerHTML = ICON.vol;
   vr.append(vi, volButton('low', -5, 'Giảm âm lượng'), el('b', 'vn'), volButton('vol', 5, 'Tăng âm lượng'), $('vol')); vr.children[2].id = 'volN';
   vi.style.cursor = 'pointer'; vi.onclick = () => { sendCmd('mute'); remoteMute = !remoteMute; paintMute(); };
   dock.append($('ctl'), vr); document.body.append(dock);
-  const fb = el('button'); fb.id = 'fsRemote'; dock.prepend(fb); paintFs(false);
+  const fb = el('button'); fb.id = 'fsRemote'; vr.append(fb); paintFs(false);
   fb.onclick = () => { sendCmd('fs', { on: !tvFsShown }); paintFs(!tvFsShown); };      // phóng to / thu nhỏ màn hình TV (không phải bảng điều khiển trên điện thoại)
   $('fsBtn').remove();
   ['prevBtn', 'nextBtn', 'shufBtn'].forEach(id => { $(id).innerHTML = ICON[{ prevBtn:'prev', nextBtn:'next', shufBtn:'shuffle' }[id]]; });
@@ -1332,6 +1449,16 @@ if(REMOTE){
   $('ctl').prepend($('shufBtn')); $('ctl').append($('repBtn'));
   setPlayIcon(false); paintVol();
   tab('add');                                    // điện thoại mở là vào Tìm bài (như remote.html)
+  // máy tính bảng nằm ngang: trái = tìm bài, phải = bài đang hát + nút điều khiển + danh sách
+  const side = el('div'); side.id = 'wideSide'; const wh = el('div', 'wHead', 'DANH SÁCH PHÁT'); let wide = false;
+  const home = { now: $('now').nextSibling, list: $('paneList').nextSibling };
+  const layout = () => {
+    const w = innerWidth >= 900 && innerWidth > innerHeight; if(w !== wide){ wide = w; document.body.classList.toggle('wide', w);
+      if(w){ side.append($('now'), $('remoteCard'), dock, wh, $('paneList')); document.body.append(side); tab('add'); }
+      else{ top.insertBefore($('now'), top.querySelector('.tabs')); top.insertBefore($('remoteCard'), top.querySelector('.tabs')); $('side').insertBefore($('paneList'), $('paneAdd')); document.body.append(dock); side.remove(); tab('add'); } }
+    document.documentElement.style.setProperty('--stickTop', (w ? 0 : top.offsetHeight) + 'px');
+  };
+  addEventListener('resize', layout); layout(); setTimeout(layout, 400);
 }
 // TV: mã QR cố định dẫn tới trang điều khiển của phòng này. Điện thoại đã lưu mật khẩu thì tìm/thêm bài được ngay;
 // máy chưa có mật khẩu sẽ được hỏi mật khẩu (không có mật khẩu thì không làm gì được).
