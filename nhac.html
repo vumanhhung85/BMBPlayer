@@ -1449,6 +1449,19 @@ if(REMOTE){
   $('ctl').prepend($('shufBtn')); $('ctl').append($('repBtn'));
   setPlayIcon(false); paintVol();
   tab('add');                                    // điện thoại mở là vào Tìm bài (như remote.html)
+  // Trong APK VMHPlayer (điện thoại / máy tính bảng): phím âm lượng cứng → âm lượng TV. Máy chỉ làm "bộ đếm": mỗi lần bấm tính chênh lệch rồi đặt lại về giữa.
+  (() => {
+    if(!/VMHPlayerApp\/\S+ \((phone|tablet)\)/.test(navigator.userAgent)) return;
+    let NV = null; try{ NV = window.VMHNative && typeof VMHNative.setVolume === 'function' ? VMHNative : (window.BMBNative && typeof BMBNative.setVolume === 'function' ? BMBNative : null); }catch(e){}
+    if(!NV) return;
+    let base = -1; const center = () => { try{ NV.setVolume(50); base = +NV.getVolume(); }catch(e){} }; center();
+    window.bmbSysVol = v => {
+      v = Math.round(+v); if(!(v >= 0) || v === base) return;
+      const d = base >= 0 ? v - base : 0;
+      if(d){ const n = Math.min(4, Math.max(1, Math.round(Math.abs(d) / 7))); volStep((d > 0 ? 5 : -5) * n); }
+      center();
+    };
+  })();
   // máy tính bảng nằm ngang: trái = tìm bài, phải = bài đang hát + nút điều khiển + danh sách
   const side = el('div'); side.id = 'wideSide'; const wh = el('div', 'wHead', 'DANH SÁCH PHÁT'); let wide = false;
   const home = { now: $('now').nextSibling, list: $('paneList').nextSibling };
