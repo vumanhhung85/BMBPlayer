@@ -120,6 +120,14 @@ public class MainActivity extends Activity {
     private int chooserLeft = 0;
     private AlertDialog openDialog;
 
+    // ---- 2.4 Tự cập nhật: hỏi /api/app/ver (Worker bmbplayer), tải /app.apk (R2) rồi giao cho trình cài đặt Android ----
+    private static final String VER_URL = "https://" + HOST + "/api/app/ver";
+    private static final String APK_URL = "https://" + HOST + "/app.apk";
+    private static final long UPD_FIRST_MS = 90_000L;
+    private static final long UPD_EVERY_MS = 6 * 3600_000L;
+    private boolean updBusy = false;
+    private int updWaitVc = 0;                                  // đang chờ người dùng bật "cài ứng dụng không rõ nguồn"
+
     // ---- Chạy lâu dài ----
     private static final long WD_PING_MS = 30_000L;            // hỏi trang mỗi 30 giây
     private static final long WD_STALL_MS = 3 * 60_000L;       // 3 phút không trả lời = treo
@@ -169,6 +177,7 @@ public class MainActivity extends Activity {
         applyScreenPolicy();
         start();
         handleOpenIntent(getIntent());
+        ui.postDelayed(updCheck, UPD_FIRST_MS);
     }
 
     @Override
@@ -199,6 +208,8 @@ public class MainActivity extends Activity {
         lastPong = now;
         ui.removeCallbacks(watchdog);
         ui.postDelayed(watchdog, WD_PING_MS);
+        // Vừa bật "cho phép cài ứng dụng" trong cài đặt rồi quay lại: tải bản mới luôn
+        if (updWaitVc > 0 && canInstall()) { int vc = updWaitVc; updWaitVc = 0; downloadAndInstall(vc); }
     }
 
     // Màn hình: TV luôn sáng; máy tính bảng KHÔNG giữ sáng — không chạm quá 3 phút thì tắt (tiết kiệm pin khi khách đã trả phòng)
@@ -648,6 +659,7 @@ public class MainActivity extends Activity {
         final List<String> labels = new ArrayList<>();
         final List<Runnable> acts = new ArrayList<>();
         labels.add("⟳  Tải lại trang"); acts.add(this::loadHome);
+        labels.add("⬆  Kiểm tra bản cập nhật"); acts.add(() -> checkUpdate(true));
         labels.add("⇄  Đổi chế độ (đang: " + modeName(mode) + ")"); acts.add(this::showModeMenu);
         labels.add("▦  Mở ứng dụng khác…"); acts.add(this::showApps);
         labels.add("📶  Cài đặt Wi-Fi"); acts.add(() -> openSettings(Settings.ACTION_WIFI_SETTINGS));
@@ -1077,7 +1089,7 @@ public class MainActivity extends Activity {
         try {
             String u = web != null ? web.getUrl() : null;
             Uri uri = u == null ? null : Uri.parse(u);
-            return uri != null && allowed(uri) && uri.getPath() != null && uri.getPath().contains("/admin");
+            return uri != null && allowed(uri) && uri.getPath() != null && (uri.getPath().contains("/admin") || uri.getPath().endsWith("/quay.html"));
         } catch (Exception e) { return false; }
     }
 
@@ -1273,6 +1285,173 @@ public class MainActivity extends Activity {
         lp.topMargin = dp(10);
         b.setLayoutParams(lp);
         return b;
+    }
+
+
+    // ======================================================================
+    // 2.4 Tự cập nhật: hỏi /api/app/ver → có bản mới → hỏi trên màn hình → tải → trình cài đặt Android
+    // (Android vẫn bắt người dùng bấm "Cài đặt"; lần đầu cần bật "cho phép từ nguồn này")
+    // ======================================================================
+    private final Runnable updCheck = new Runnable() {
+        @Override public void run() {
+            ui.removeCallbacks(this);
+            ui.postDelayed(this, UPD_EVERY_MS);
+            checkUpdate(false);
+        }
+    };
+
+    private int versionCode() {
+        try { return getPackageManager().getPackageInfo(getPackageName(), 0).versionCode; }
+        catch (Exception e) { return 0; }
+    }
+
+    private boolean canInstall() {
+        return Build.VERSION.SDK_INT < 26 || getPackageManager().canRequestPackageInstalls();
+    }
+
+    private static String readAll(java.io.InputStream in) throws java.io.IOException {
+        java.io.ByteArrayOutputStream o = new java.io.ByteArrayOutputStream();
+        byte[] b = new byte[8192];
+        int n;
+        while ((n = in.read(b)) > 0) o.write(b, 0, n);
+        return o.toString("UTF-8");
+    }
+
+    private void checkUpdate(final boolean manual) {
+        if (updBusy) { if (manual) toast("Đang kiểm tra / tải bản mới…"); return; }
+        updBusy = true;
+        if (manual) toast("Đang kiểm tra bản mới…");
+        new Thread(() -> {
+            int vc = 0;
+            String vn = "";
+            try {
+                java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(VER_URL + "?_=" + System.currentTimeMillis()).openConnection();
+                c.setConnectTimeout(15000);
+                c.setReadTimeout(15000);
+                c.setUseCaches(false);
+                if (c.getResponseCode() == 200) {
+                    org.json.JSONObject j = new org.json.JSONObject(readAll(c.getInputStream()));
+                    vc = j.optInt("vc", 0);
+                    vn = j.optString("vn", "");
+                }
+                c.disconnect();
+            } catch (Exception ignored) {}
+            final int fvc = vc;
+            final String fvn = vn;
+            ui.post(() -> {
+                updBusy = false;
+                if (fvc <= versionCode()) {
+                    if (manual) toast(fvc == 0 ? "Chưa có bản mới được phát hành (hoặc mạng lỗi)" : "Đang dùng bản mới nhất (" + versionName() + ")");
+                    return;
+                }
+                if (!manual && prefs.getInt("upd_skip_vc", 0) == fvc && prefs.getLong("upd_skip_until", 0) > System.currentTimeMillis()) return;
+                askUpdate(fvc, fvn, manual);
+            });
+        }).start();
+    }
+
+    /** Trang TV / máy tính bảng ghi window.__bmbOpen = true/false (phòng đang mở hay đóng). Chưa có thì '?'. */
+    private static final String PROBE_OPEN = "(function(){try{return typeof window.__bmbOpen==='boolean'?String(window.__bmbOpen):'?'}catch(e){return '?'}})()";
+
+    /** TV / máy tính bảng trong phòng: chỉ hỏi khi PHÒNG ĐANG ĐÓNG (không để khách thấy hộp cài đặt của Android).
+     *  Trang chưa báo được tình trạng phòng thì chỉ hỏi trong 4:00–10:00 sáng. Điện thoại / máy quầy hỏi ngay. */
+    private void askUpdate(final int vc, final String vn, final boolean manual) {
+        if (!manual && ("tv".equals(mode) || "tablet".equals(mode))) {
+            if (web == null) { ui.postDelayed(() -> askUpdate(vc, vn, false), 10 * 60_000L); return; }
+            web.evaluateJavascript(PROBE_OPEN, v -> {
+                String s = v == null ? "" : v;
+                int h = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY);
+                boolean closed = s.contains("false");
+                boolean unknownQuiet = s.contains("?") && h >= 4 && h < 10;
+                if (closed || unknownQuiet) showUpdateDialog(vc, vn, false);
+                else ui.postDelayed(() -> askUpdate(vc, vn, false), 10 * 60_000L);
+            });
+            return;
+        }
+        showUpdateDialog(vc, vn, manual);
+    }
+
+    private void showUpdateDialog(final int vc, final String vn, final boolean manual) {
+        if (openDialog != null && openDialog.isShowing()) { if (!manual) ui.postDelayed(() -> askUpdate(vc, vn, false), 5 * 60_000L); return; }
+        openDialog = new AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
+                .setTitle("Có bản BMBPlayer mới " + vn)
+                .setMessage("Đang dùng bản " + versionName() + ". Cập nhật mất khoảng 1 phút, sau đó BMBPlayer tự mở lại.\n\nBấm \"Cập nhật ngay\", rồi bấm \"Cài đặt\" trên hộp của Android.")
+                .setPositiveButton("Cập nhật ngay", (d, w) -> startUpdate(vc))
+                .setNegativeButton("Để sau", (d, w) -> skipUpdate(vc))
+                .setOnDismissListener(d -> hideBars())
+                .create();
+        openDialog.show();
+        final AlertDialog shown = openDialog;
+        ui.postDelayed(() -> { if (shown.isShowing()) { shown.dismiss(); skipUpdate(vc); } }, 60_000);   // không ai bấm: hỏi lại sau
+    }
+
+    private void skipUpdate(int vc) {
+        long wait = "quay".equals(mode) ? 12 * 3600_000L : 2 * 3600_000L;   // TV / máy tính bảng không ai bấm thì 2 giờ sau hỏi lại
+        prefs.edit().putInt("upd_skip_vc", vc).putLong("upd_skip_until", System.currentTimeMillis() + wait).apply();
+    }
+
+    private void startUpdate(int vc) {
+        if (!canInstall()) {
+            updWaitVc = vc;
+            toast("Bật \"Cho phép từ nguồn này\" cho BMBPlayer rồi bấm Quay lại — máy sẽ tự tải bản mới.");
+            try {
+                startActivity(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getPackageName())).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            } catch (Exception e) {
+                openSettings(Settings.ACTION_SECURITY_SETTINGS);
+            }
+            return;
+        }
+        downloadAndInstall(vc);
+    }
+
+    private void downloadAndInstall(final int vc) {
+        if (updBusy) return;
+        updBusy = true;
+        toast("Đang tải BMBPlayer bản mới…");
+        new Thread(() -> {
+            String err = null;
+            android.content.pm.PackageInstaller.Session s = null;
+            java.net.HttpURLConnection c = null;
+            try {
+                c = (java.net.HttpURLConnection) new java.net.URL(APK_URL + "?v=" + vc).openConnection();
+                c.setConnectTimeout(20000);
+                c.setReadTimeout(60000);
+                c.setUseCaches(false);
+                if (c.getResponseCode() != 200) throw new Exception("máy chủ trả " + c.getResponseCode());
+                long len = c.getContentLength();
+                android.content.pm.PackageInstaller pi = getPackageManager().getPackageInstaller();
+                android.content.pm.PackageInstaller.SessionParams p = new android.content.pm.PackageInstaller.SessionParams(android.content.pm.PackageInstaller.SessionParams.MODE_FULL_INSTALL);
+                p.setAppPackageName(getPackageName());
+                if (len > 0) p.setSize(len);
+                int id = pi.createSession(p);
+                s = pi.openSession(id);
+                java.io.InputStream in = c.getInputStream();
+                java.io.OutputStream out = s.openWrite("bmbplayer.apk", 0, len > 0 ? len : -1);
+                try {
+                    byte[] buf = new byte[65536];
+                    int n;
+                    while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+                    s.fsync(out);
+                } finally {
+                    try { out.close(); } catch (Exception ignored) {}
+                    try { in.close(); } catch (Exception ignored) {}
+                }
+                Intent cb = new Intent(this, InstallReceiver.class);
+                int fl = PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= 31 ? 0x02000000 /* FLAG_MUTABLE: hệ thống gắn kết quả vào */ : 0);
+                PendingIntent pend = PendingIntent.getBroadcast(this, id, cb, fl);
+                s.commit(pend.getIntentSender());
+                s.close();
+                s = null;
+                prefs.edit().putString("upd_msg", "Đã tải bản " + vc + ", chờ bấm Cài đặt").apply();
+            } catch (Exception e) {
+                err = e.getMessage();
+                if (s != null) { try { s.abandon(); } catch (Exception ignored) {} }
+            } finally {
+                if (c != null) { try { c.disconnect(); } catch (Exception ignored) {} }
+            }
+            final String fe = err;
+            ui.post(() -> { updBusy = false; if (fe != null) { toast("Tải bản mới lỗi: " + fe); prefs.edit().putString("upd_msg", "Tải bản mới lỗi: " + fe).apply(); } });
+        }).start();
     }
 
     private void toast(String s) {
