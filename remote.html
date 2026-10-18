@@ -6,7 +6,7 @@
 <title>BMBPlayer — Chọn bài & gọi lễ tân</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<meta name="theme-color" content="#0a0a0f">
+<meta name="theme-color" content="#4B1272">
 <style>
   :root{ --bg:#0a0a0f; --panel:#15151f; --line:#2a2a3a; --ink:#f2f2f7; --quiet:#9a9ab0; --accent:#8b5cf6; --accent2:#c084fc; --good:#34d399; --warn:#fbbf24; }
   *{box-sizing:border-box;margin:0;padding:0}
@@ -229,6 +229,118 @@
   #pair .pBack{border:1px solid var(--line); border-radius:14px; padding:12px 20px; font:inherit; font-weight:700; font-size:15px; color:var(--ink); background:#20202e; display:none}
   #pair .pBack.show{display:inline-block}
   #pair .pNote{color:var(--quiet); font-size:12.5px; max-width:560px; line-height:1.5}
+  /* ===== Giao diện SÁNG — cùng tone với quầy (tím chuỗi Boom + vàng, nền tím nhạt) ===== */
+  :root{ --bg:#F4EEFA; --panel:#FFFFFF; --line:#E2D6F0; --ink:#24123A; --quiet:#7B6A91; --accent:#6B21A8; --accent2:#8B2FBE; --good:#17935F; --warn:#B8700A; --grape:#4B1272; --tint:#EFE4F8; --sh:0 1px 2px rgba(75,18,114,.06),0 6px 16px -8px rgba(75,18,114,.2); }
+  body{ background:var(--bg); color:var(--ink); font-family:"Be Vietnam Pro","Segoe UI",Roboto,-apple-system,Arial,sans-serif }
+  #top{ background:linear-gradient(110deg,#3E0F60,#4B1272 55%,#6B21A8); box-shadow:0 6px 20px -10px rgba(40,8,70,.65) }
+  header{ background:none }
+  .logoImg{ background:#fff; border-radius:8px; padding:2px 3px }
+  header .room{ background:#FFD21A; color:#3A0F5A }
+  #gear{ background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.28); color:#fff }
+  #now{ background:rgba(255,255,255,.12); border-top:1px solid rgba(255,255,255,.14); color:#fff }
+  #now .ic{ background:#FFD21A; color:#3A0F5A }
+  #roomBanner{ background:#FFF1D6 !important; color:#7A4A00 !important }
+  #settings{ background:#fff; color:var(--ink) }
+  #settings input{ background:#FAF7FD; border:1px solid var(--line); color:var(--ink) }
+  #settings button{ background:var(--grape) }
+  #settings button#clearKey{ background:#fff !important; color:var(--ink) }
+  .tabs{ background:none }
+  .tabs button{ background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.18); color:#EBDDF7 }
+  .tabs .ti{ filter:none }
+  .tabs .cnt{ background:rgba(255,255,255,.22); color:#fff }
+  .tabs button.on{ background:#FFD21A; border-color:#FFD21A; color:#3A0F5A; box-shadow:0 3px 12px rgba(255,210,26,.5) }
+  .tabs button.on .cnt{ background:#4B1272; color:#fff }
+  .tabs button.od, .tabs button.od .tl{ color:#FFE9A8 }
+  .tabs button.od.on{ background:linear-gradient(135deg,#FF8A00,#F26A1B); border-color:#FFB366; color:#fff; box-shadow:0 3px 12px rgba(242,106,27,.55) }
+  .tabs button.od.on .tl{ color:#fff }
+  body.wide #top{ background:linear-gradient(110deg,#3E0F60,#4B1272 55%,#6B21A8) }
+  body.wide .tabs button.on{ box-shadow:0 3px 12px rgba(255,210,26,.5) }
+  body.wide .tabs button.od.on{ box-shadow:0 3px 12px rgba(242,106,27,.5) }
+
+  #paneSearch #searchBox{ background:var(--bg) }
+  #paneSearch #searchBox.stuck{ box-shadow:0 8px 16px -8px rgba(75,18,114,.35) }
+  #searchBox input{ background:#fff; border:1px solid #CDB8E3; color:var(--ink) }
+  #searchBox input:focus{ outline:none; border-color:var(--accent2); box-shadow:0 0 0 3px rgba(139,47,190,.15) }
+  #searchBox button{ background:var(--grape) }
+  #detect button, .secAct button{ background:var(--grape) }
+  .secAct button.ghost{ background:#fff; color:var(--ink); border:1px solid var(--line) }
+  .hotTabs{ background:#fff; border:1px solid var(--line) }
+  .secAct .hotTabs button{ color:var(--quiet) }
+  .secAct .hotTabs button.on{ background:var(--grape); color:#fff }
+  .tag.en{ background:#E1F1FA; color:#0B5A7A } .tag.kp{ background:#FCE4F1; color:#A31A6A }
+  .row{ border-bottom:1px solid var(--line) }
+  .row img{ background:#E9DDF5 }
+  .row button{ background:var(--grape) }
+  .row button.ghost{ background:#fff; color:var(--ink); border:1px solid var(--line) }
+  .row button.done{ background:var(--good) }
+  .row.cur{ background:linear-gradient(135deg,#FFF8D6,#F6ECFD); border:2px solid #F5B400; box-shadow:0 0 0 3px rgba(255,210,26,.25),0 8px 22px -10px rgba(75,18,114,.45) }
+  .row.cur .name{ color:var(--grape) } .row.cur .sub{ color:#9A6200 }
+  .eq i{ background:#F26A1B }
+  .row .tag{ background:var(--tint); color:var(--accent2) } .row .tag.hot{ background:#FFE9D2; color:#B35400 }
+  .row .gone{ color:#C0243E } .row .more{ color:var(--accent2) }
+  .row.tap:active{ background:var(--tint) }
+  .notice{ background:#fff; border:1px solid var(--line); border-left:4px solid var(--accent2) }
+  .err{ color:#C0243E }
+  #snack{ background:#E3F6EC; border:1px solid #6CCB9B; color:#0B5E3B; box-shadow:0 10px 30px -10px rgba(75,18,114,.5) }
+  #snack.warn{ background:#FFF1D6; border-color:#F2B94A; color:#7A4A00 }
+
+  #dock{ background:#fff; border-top:1px solid var(--line); box-shadow:0 -10px 24px -12px rgba(75,18,114,.35) }
+  .ctrlRow .vn, .vol .vn{ color:var(--grape); font-weight:700 }
+  .ctrlRow button{ background:#fff; border:1.5px solid #CDB8E3; color:var(--grape) }
+  .ctrlRow button.primary{ background:linear-gradient(135deg,#6B21A8,#8B2FBE); color:#fff; border:none; box-shadow:0 8px 20px -6px rgba(107,33,168,.65) }
+  .ctrlRow button.off{ color:#D6314F }
+  .vol input::-webkit-slider-runnable-track{ background:linear-gradient(90deg,#6B21A8,#8B2FBE var(--p,100%),#E2D6F0 var(--p,100%)) }
+  .vol input::-webkit-slider-thumb{ background:#fff; border:3px solid #6B21A8 }
+  .vol input{ accent-color:#6B21A8 }
+
+  body.wide .card > .row, body.wide .row.card{ background:#fff; box-shadow:var(--sh); border:1px solid var(--line) }
+  body.wide #side{ background:#fff; border-left:1px solid var(--line); box-shadow:-10px 0 30px -20px rgba(75,18,114,.4) }
+  .sNow .th{ background:linear-gradient(135deg,#4B1272,#8B2FBE) }
+  .sNow .idle{ color:#FFE27A }
+  .sNow .tt{ background:var(--tint); color:var(--grape) }
+  .sCtl{ border-bottom:1px solid var(--line) }
+  .sCtl button{ color:var(--ink) }
+  .sCtl .i{ background:#fff; border:1.5px solid #CDB8E3; color:var(--grape) }
+  .sCtl button.primary .i{ background:linear-gradient(135deg,#6B21A8,#8B2FBE); color:#fff; box-shadow:0 8px 18px -6px rgba(107,33,168,.65) }
+  .sCtl button.off .i{ color:#D6314F }
+  .sCtl .l{ color:var(--accent) }
+  .sVol{ border-bottom:1px solid var(--line) } .sVol b{ color:var(--grape) }
+  .sHead{ color:var(--accent2) }
+
+  .tabs button.od{ }
+  .odH{ color:var(--accent2) }
+  .svbtn{ background:#fff; box-shadow:var(--sh) }
+  .svbtn.on{ border-color:#F26A1B; background:#FFF3E6 } .svbtn.on .tx{ color:#B35400 }
+  .drow{ background:#fff; box-shadow:var(--sh) } .drow.on{ border-color:#F26A1B; background:#FFFAF4 }
+  .qty button{ background:var(--tint); color:var(--grape); border:1px solid #D9C6EC }
+  .qty .qn{ color:var(--quiet) } .drow.on .qn{ color:#B35400 }
+  #odNote{ background:#fff; color:var(--ink); border:1px solid #CDB8E3 }
+  .lsbtn{ background:#fff; border:1px dashed #CDB8E3; color:var(--accent) }
+  #odBar{ background:#fff; box-shadow:0 -10px 24px -12px rgba(75,18,114,.35) }
+  #odBar button{ background:var(--tint); color:var(--grape) }
+  #odBar #odSendBtn{ background:linear-gradient(135deg,#FF8A00,#F26A1B); color:#fff }
+  .odOv{ background:rgba(36,18,58,.55) }
+  .odCard{ background:#fff; color:var(--ink); box-shadow:0 30px 60px -20px rgba(36,18,58,.6) }
+  .odCard .row2 button{ background:var(--tint); color:var(--grape) }
+  .odCard .row2 .y{ background:linear-gradient(135deg,#FF8A00,#F26A1B); color:#fff }
+  .odDot{ background:#F26A1B } .odDot.go{ background:var(--good) }
+  .lsit{ background:#FAF7FD }
+  .pill.moi{ background:#FFE9D2; color:#B35400 } .pill.nhan{ background:#E3F6EC; color:#0F7A4D } .pill.xong{ background:var(--tint); color:var(--quiet) }
+  .vmH button{ background:var(--tint); color:var(--grape) }
+  .pkBtns button{ background:linear-gradient(135deg,#6B21A8,#8B2FBE) }
+  .pkBtns button.y{ background:linear-gradient(135deg,#FF8A00,#F26A1B); color:#fff }
+  .pkBtns button.r{ background:#FFF1F3; color:#C0243E; border:1px solid #F5B5C0 }
+  .pkBtns button.g{ background:#fff; color:var(--ink); border:1px solid var(--line) }
+  .pkCard img{ background:#E9DDF5 }
+
+  #pair{ background:radial-gradient(circle at 30% 20%,#7A2FB5,#4B1272 75%); }
+  #pair h2{ color:#fff }
+  #pair .pBox{ background:#fff; border:1px solid var(--line); box-shadow:0 30px 60px -20px rgba(36,18,58,.6) }
+  #pair .pQr{ border:1px solid var(--line) }
+  #pair .pCode{ color:var(--grape) } #pair ol{ color:var(--ink) }
+  #pair .pScan{ background:#FFD21A; color:#3A0F5A; box-shadow:0 8px 20px -6px rgba(255,210,26,.6) }
+  #pair .pBack{ background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.35); color:#fff }
+  #pair .pNote{ color:#E5D3F5 } #pair .pErr{ color:#FFD0D8 }
 </style>
 </head>
 <body>
