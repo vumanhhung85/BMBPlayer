@@ -1354,7 +1354,7 @@ public class MainActivity extends Activity {
     private static final String PROBE_OPEN = "(function(){try{return typeof window.__bmbOpen==='boolean'?String(window.__bmbOpen):'?'}catch(e){return '?'}})()";
 
     /** TV / máy tính bảng trong phòng: chỉ hỏi khi PHÒNG ĐANG ĐÓNG (không để khách thấy hộp cài đặt của Android).
-     *  Trang chưa báo được tình trạng phòng thì chỉ hỏi trong 4:00–10:00 sáng. Điện thoại / máy quầy hỏi ngay. */
+     *  Trang chưa báo được tình trạng phòng thì chỉ hỏi trong 9:00–12:00 (giờ nhân viên vào mở quán). Điện thoại / máy quầy hỏi ngay. */
     private void askUpdate(final int vc, final String vn, final boolean manual) {
         if (!manual && ("tv".equals(mode) || "tablet".equals(mode))) {
             if (web == null) { ui.postDelayed(() -> askUpdate(vc, vn, false), 10 * 60_000L); return; }
@@ -1362,7 +1362,7 @@ public class MainActivity extends Activity {
                 String s = v == null ? "" : v;
                 int h = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY);
                 boolean closed = s.contains("false");
-                boolean unknownQuiet = s.contains("?") && h >= 4 && h < 10;
+                boolean unknownQuiet = s.contains("?") && h >= 9 && h < 12;
                 if (closed || unknownQuiet) showUpdateDialog(vc, vn, false);
                 else ui.postDelayed(() -> askUpdate(vc, vn, false), 10 * 60_000L);
             });
@@ -1382,7 +1382,7 @@ public class MainActivity extends Activity {
                 .create();
         openDialog.show();
         final AlertDialog shown = openDialog;
-        ui.postDelayed(() -> { if (shown.isShowing()) { shown.dismiss(); skipUpdate(vc); } }, 60_000);   // không ai bấm: hỏi lại sau
+        ui.postDelayed(() -> { if (shown.isShowing()) { shown.dismiss(); skipUpdate(vc); } }, 180_000);   // 3 phút cho nhân viên kịp bấm; không ai bấm: hỏi lại sau
     }
 
     private void skipUpdate(int vc) {

@@ -10,8 +10,8 @@ android {
         applicationId 'vn.boommusicbox.bmbplayer'
         minSdk 21          // Android 5.0 trở lên (cần WebView cập nhật được)
         targetSdk 34
-        versionCode 25
-        versionName '2.5'
+        versionCode 26
+        versionName '2.6'
     }
 
     buildTypes {
