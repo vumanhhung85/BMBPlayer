@@ -1353,6 +1353,7 @@ if(GUEST){
     if(m.branch && m.branch !== OD.branch){ OD.branch = m.branch; $('tabOrder').style.display = ''; if(curTab === 'order') odLoadMenu(); }
     if(m.gt){ const first = !guestTok; guestTok = m.gt; noTicket = false; if(first){ showQuota(); renderKho(); loadIndex(); probeEn(); } }
     else if(m.open && !guestTok && !noTicket) setTimeout(() => { if(!guestTok && !noTicket){ noTicket = true; renderKho(); } }, 4000);   // chờ tin kèm vé tới (có thể tới sau tin phòng)
+    window.__bmbOpen = !!m.open;   /* APK 2.4: chỉ hỏi cập nhật khi phòng đóng */
     if(m.open){ banner(''); send('hello'); } else banner(BANNER[m.reason === 'notopen' ? 'waiting' : 'closed']);
   };
   bc.onstatus = s => { if(bc.tablet && s === 'rotated') return showPair('Máy tính bảng đã được gỡ khỏi phòng (hoặc phòng đã gán máy khác).');

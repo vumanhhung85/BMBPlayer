@@ -291,6 +291,7 @@ td b{color:var(--txt)}
     <div class="fld"><span>Tên đăng nhập</span><input id="lgU" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="vd: quay_tayhoa"></div>
     <div class="fld"><span>Mật khẩu</span><input id="lgP" type="password" autocomplete="current-password" placeholder="••••••••"></div>
     <button class="btn btn-y" id="lgBtn">Đăng nhập</button>
+    <button class="btn btn-ghost" id="lgVt" style="display:none;margin-top:10px;width:100%">🖐 Đăng nhập bằng vân tay</button>
   </div>
 </div>
 
@@ -308,6 +309,7 @@ td b{color:var(--txt)}
         <div class="tab" data-p="p3" id="tabTv">📺 TV &amp; MTB</div>
         <div class="tab" data-p="p5" id="tabCaiDat" style="display:none">🍺 Menu</div>
         <div class="tab" data-p="p6" id="tabTaiKhoan" style="display:none">👥 Tài khoản quầy</div>
+        <div class="tab" data-p="p7" id="tabCaiDatApp" style="display:none">⚙️ Cài đặt</div>
       </div>
       <div class="qlnav" id="qlNav">
         <button class="btn btn-ghost btn-sm" id="btnQlBaoTri">🛠️ Bảo trì</button>
@@ -391,6 +393,25 @@ td b{color:var(--txt)}
     </div>
     <button class="btn btn-y btn-sm" id="btnAccAdd" style="margin-bottom:14px">+ Tạo tài khoản mới</button>
     <div class="tblwrap"><table><thead><tr><th>Tài khoản</th><th>Họ tên</th><th>Trạng thái</th><th>Sửa menu</th><th>Đăng nhập cuối</th><th>Hành động</th></tr></thead><tbody id="tbAcc"></tbody></table></div>
+  </div>
+
+  <!-- ⚙️ Cài đặt (quản lý chi nhánh + admin): vân tay trên máy này; phát hành APK chỉ dành cho admin cao nhất -->
+  <div class="pg" id="p7">
+    <div class="sect-lbl">🖐 Đăng nhập bằng vân tay trên máy này</div>
+    <div class="hint" id="vtNote"></div>
+    <div class="actions wrap" id="vtBtns" style="margin-bottom:22px">
+      <button class="btn btn-y btn-sm" id="vtBat">Bật vân tay</button>
+      <button class="btn btn-ghost btn-sm" id="vtTat" style="display:none">Tắt vân tay</button>
+    </div>
+
+    <div id="apkSec" style="display:none">
+      <div class="sect-lbl">📦 Phát hành APK BMBPlayer</div>
+      <div class="hint" id="apkInfo">Đang tải…</div>
+      <div class="fld"><span>File APK ĐÃ KÝ (BMBPlayer.apk)</span><input type="file" id="apkFile" accept=".apk,application/vnd.android.package-archive"></div>
+      <div class="hint" id="apkRead" style="display:none"></div>
+      <button class="btn btn-y btn-sm" id="apkUp" disabled>Tải lên &amp; phát hành</button>
+      <div class="hint" style="margin-top:14px">Số phiên bản được đọc thẳng từ file nên không gõ nhầm. Bản chưa ký hoặc không phải BMBPlayer sẽ bị chặn. Sau khi phát hành, TV / máy tính bảng / máy quầy đang chạy bản 2.4 trở lên sẽ tự báo có bản mới (TV và máy tính bảng chỉ hỏi khi phòng đang đóng).</div>
+    </div>
   </div>
 </div>
 
@@ -521,7 +542,7 @@ var CFG = {
 };
 
 var $ = function(id){ return document.getElementById(id); };
-var S = { tok:'', user:'', hoTen:'', branch:'', bname:'', vaiTro:'', quanLy:false, suaMenu:false, branches:[],
+var S = { tok:'', user:'', hoTen:'', branch:'', bname:'', vaiTro:'', quanLy:false, suaMenu:false, sieuAdmin:false, branches:[],
           rooms:[], orders:[], qr:[], ips:[], accounts:[], lastCount:0, audio:null, tm:null, chanOrdId:null, mkUser:'' };
 var VT_TEN = {admin:'Admin', manager:'Quản lý', quay:'Quầy'};
 
@@ -893,7 +914,7 @@ function showLoginMsg(txt, kind){
 }
 function luuPhien(){
   sessionStorage.setItem('bmb_q', JSON.stringify({tok:S.tok, user:S.user, hoTen:S.hoTen, b:S.branch, n:S.bname,
-    vt:S.vaiTro, ql:S.quanLy, sm:S.suaMenu, bs:S.branches}));
+    vt:S.vaiTro, ql:S.quanLy, sm:S.suaMenu, sa:S.sieuAdmin, bs:S.branches}));
 }
 function login(){
   var u = $('lgU').value.trim().toLowerCase(), p = $('lgP').value;
@@ -904,7 +925,7 @@ function login(){
     $('lgBtn').disabled = false;
     if(!r || !r.ok){ showLoginMsg((r && r.msg) || 'Sai tài khoản hoặc mật khẩu.'); return; }
     S.tok = r.session; S.user = r.username; S.hoTen = r.hoTen || '';
-    S.vaiTro = r.vaiTro; S.quanLy = !!r.quanLy; S.suaMenu = !!r.suaMenu; S.branches = r.branches || [];
+    S.vaiTro = r.vaiTro; S.quanLy = !!r.quanLy; S.suaMenu = !!r.suaMenu; S.sieuAdmin = !!r.sieuAdmin; S.branches = r.branches || [];
     S.branch = r.branchId || ''; S.bname = r.branchName || '';
     if(S.vaiTro === 'admin'){
       var cu = localStorage.getItem('bmb_q_cn');
@@ -927,6 +948,8 @@ function hienTheoQuyen(){
   $('menuTools').style.display   = S.suaMenu ? '' : 'none';
   $('mauAdmin').style.display    = S.vaiTro==='admin' ? '' : 'none';
   $('tabTaiKhoan').style.display = S.quanLy  ? '' : 'none';
+  $('tabCaiDatApp').style.display = S.quanLy ? '' : 'none';   /* Cài đặt: quản lý + admin (vân tay); mục Phát hành APK chỉ admin cao nhất */
+  $('apkSec').style.display = S.sieuAdmin ? '' : 'none';
   $('phongAdmin').style.display  = S.vaiTro==='admin' ? '' : 'none';   /* phòng cố định — chỉ admin thêm/xoá */
   $('btnThuHoiMtb').style.display = S.quanLy ? '' : 'none';
   $('selCN').style.display       = S.vaiTro==='admin' ? '' : 'none';
@@ -1767,6 +1790,170 @@ window.addEventListener('hashchange', function(){ var c = maGan(location.hash); 
 if(GAN) $('lgGan').style.display = 'flex';
 $('selCN').addEventListener('change', doiChiNhanh);
 
+
+/* ============================================================
+   ⚙️ Cài đặt: vân tay (chỉ trong app Android BMBPlayer 2.4+) + phát hành APK (chỉ admin cao nhất)
+   ============================================================ */
+var VT_KEY = 'bmb_q_vt_user';                       /* tên đăng nhập đã bật vân tay trên máy này (mật khẩu nằm trong Keystore của app, không ở trang) */
+var BIO = { cb:{}, n:0 };
+window.bmbBioDone = function(id, ok, payload){ var f = BIO.cb[id]; if(f){ delete BIO.cb[id]; f(ok, payload); } };
+function bioApp(){ try{ return !!(window.BMBNative && typeof BMBNative.bioAvailable === 'function' && typeof BMBNative.bioUnlock === 'function'); }catch(e){ return false; } }
+function bioLoi(m){
+  m = String(m||'');
+  if(m === 'denied') return 'App chưa cho phép trang này dùng vân tay. Cập nhật app BMBPlayer lên bản 2.4 trở lên.';
+  if(/cancel|hủy|huỷ|user/i.test(m)) return 'Đã huỷ quét vân tay.';
+  return m.replace(/^err:/, '') || 'Không dùng được vân tay.';
+}
+function bioGoi(fn, arg){                           /* → Promise(payload) */
+  return new Promise(function(res, rej){
+    var id = 'b' + (++BIO.n) + Date.now();
+    var to = setTimeout(function(){ delete BIO.cb[id]; rej(new Error('Hết thời gian chờ vân tay.')); }, 90000);
+    BIO.cb[id] = function(ok, payload){ clearTimeout(to); ok ? res(payload) : rej(new Error(bioLoi(payload))); };
+    try{ arg === undefined ? BMBNative[fn](id) : BMBNative[fn](id, arg); }catch(e){ clearTimeout(to); delete BIO.cb[id]; rej(e); }
+  });
+}
+function vtDaBat(){ try{ return bioApp() && BMBNative.bioHas() && !!localStorage.getItem(VT_KEY); }catch(e){ return false; } }
+function vtNutDangNhap(){ var b = $('lgVt'); if(b) b.style.display = vtDaBat() ? '' : 'none'; }
+function vtDangNhap(){
+  var u = ''; try{ u = localStorage.getItem(VT_KEY) || ''; }catch(e){}
+  if(!u) return;
+  showLoginMsg('Đặt ngón tay lên cảm biến…', 'warn');
+  bioGoi('bioUnlock').then(function(pw){ $('lgU').value = u; $('lgP').value = pw; login(); })
+    .catch(function(e){ showLoginMsg(e.message || 'Không quét được vân tay.'); });
+}
+function vtVe(){
+  var ok = bioApp(), av = false, co = false;
+  try{ av = ok && BMBNative.bioAvailable(); }catch(e){}
+  co = vtDaBat();
+  var note = $('vtNote');
+  if(!ok) note.innerHTML = 'Chỉ dùng được trong <b>app BMBPlayer (Android) bản 2.4 trở lên</b>. Mở trang quầy bằng Chrome / iPhone thì chưa có vân tay.';
+  else if(!av) note.innerHTML = 'Máy chưa đặt <b>khoá màn hình + vân tay</b> (cần Android 9 trở lên). Vào Cài đặt máy để thêm vân tay rồi quay lại.';
+  else if(co) note.innerHTML = 'Vân tay <b>đang bật</b> cho tài khoản <b>' + esc(localStorage.getItem(VT_KEY)) + '</b> trên máy này. Đổi mật khẩu hoặc thêm vân tay mới trong máy thì phải bật lại. Máy dùng chung vân tay với trang admin.html trong app.';
+  else note.innerHTML = 'Bật xong, lần sau chỉ cần chạm vân tay ở màn đăng nhập. Mật khẩu được mã hoá trong chip bảo mật của máy, không lưu ở trang web.';
+  $('vtBat').style.display = (ok && av && !co) ? '' : 'none';
+  $('vtTat').style.display = (ok && co) ? '' : 'none';
+}
+function vtBat(){
+  var pw = prompt('Nhập MẬT KHẨU của tài khoản "' + S.user + '" để lưu vào chip bảo mật (rồi quét vân tay):');
+  if(!pw) return;
+  api('auth.login', {user:S.user, pass:pw}).then(function(r){
+    if(!r || !r.ok){ toast('Mật khẩu chưa đúng.'); return null; }          /* kiểm tra trước khi cất, tránh lưu mật khẩu sai */
+    return bioGoi('bioSave', pw).then(function(){ try{ localStorage.setItem(VT_KEY, S.user); }catch(e){} toast('Đã bật vân tay.'); });
+  }).catch(function(e){ toast(e.message || 'Không bật được vân tay.'); }).then(function(){ vtVe(); vtNutDangNhap(); });
+}
+function vtTat(){
+  if(!confirm('Tắt đăng nhập bằng vân tay trên máy này?')) return;
+  try{ BMBNative.bioClear(); }catch(e){} try{ localStorage.removeItem(VT_KEY); }catch(e){}
+  vtVe(); vtNutDangNhap();
+}
+
+/* --- Phát hành APK: đọc versionCode / versionName / package / chữ ký ngay trong file, không cần gõ tay --- */
+var APK = { file:null, info:null };
+function apkBase(){ return CFG.API.replace(/\/api\/?$/, ''); }
+async function apkInflate(raw){
+  var s = new Blob([raw]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+  return new Uint8Array(await new Response(s).arrayBuffer());
+}
+function axmlStrings(d, dv, off){                                    /* chunk string pool tại off → mảng chuỗi */
+  var n = dv.getUint32(off+8, true), flags = dv.getUint32(off+16, true), st = dv.getUint32(off+20, true), utf8 = (flags & 0x100) !== 0, out = [];
+  for(var i = 0; i < n; i++){
+    var p = off + st + dv.getUint32(off + 28 + i*4, true), len;
+    if(utf8){
+      len = d[p++]; if(len & 0x80) p++;                              /* độ dài ký tự (bỏ qua) */
+      var bl = d[p++]; if(bl & 0x80){ bl = ((bl & 0x7F) << 8) | d[p++]; }
+      out.push(new TextDecoder('utf-8').decode(d.subarray(p, p + bl)));
+    }else{
+      len = dv.getUint16(p, true); p += 2; if(len & 0x8000){ len = ((len & 0x7FFF) << 16) | dv.getUint16(p, true); p += 2; }
+      out.push(new TextDecoder('utf-16le').decode(d.subarray(p, p + len*2)));
+    }
+  }
+  return out;
+}
+function axmlManifest(d){
+  var dv = new DataView(d.buffer, d.byteOffset, d.byteLength), pos = 8, str = [], r = {};
+  while(pos + 8 <= d.length){
+    var ty = dv.getUint16(pos, true), sz = dv.getUint32(pos+4, true);
+    if(sz < 8) break;
+    if(ty === 0x0001) str = axmlStrings(d, dv, pos);
+    else if(ty === 0x0102){
+      var name = str[dv.getUint32(pos+20, true)];
+      if(name === 'manifest'){
+        var as = pos + 16 + dv.getUint16(pos+24, true), ac = dv.getUint16(pos+28, true);
+        for(var i = 0; i < ac; i++){
+          var a = as + i*20, an = str[dv.getUint32(a+4, true)], raw = dv.getUint32(a+8, true), dt = d[a+15], data = dv.getUint32(a+16, true);
+          if(an === 'versionCode') r.vc = data;
+          else if(an === 'versionName') r.vn = dt === 3 ? str[raw !== 0xFFFFFFFF ? raw : data] : String(data);
+          else if(an === 'package') r.pk = str[raw !== 0xFFFFFFFF ? raw : data];
+        }
+        return r;
+      }
+    }
+    pos += sz;
+  }
+  return r;
+}
+async function apkDoc(file){
+  var buf = await file.arrayBuffer(), d = new Uint8Array(buf), dv = new DataView(buf), e = -1, i;
+  for(i = d.length - 22; i >= Math.max(0, d.length - 65557); i--){ if(dv.getUint32(i, true) === 0x06054b50){ e = i; break; } }
+  if(e < 0) throw new Error('Đây không phải file APK (không đọc được dạng zip).');
+  var n = dv.getUint16(e+10, true), cd = dv.getUint32(e+16, true), p = cd, ent = {};
+  for(i = 0; i < n; i++){
+    if(dv.getUint32(p, true) !== 0x02014b50) break;
+    var nl = dv.getUint16(p+28, true), el = dv.getUint16(p+30, true), cl = dv.getUint16(p+32, true);
+    ent[new TextDecoder().decode(d.subarray(p+46, p+46+nl))] = { m:dv.getUint16(p+10, true), cs:dv.getUint32(p+20, true), lho:dv.getUint32(p+42, true) };
+    p += 46 + nl + el + cl;
+  }
+  var mf = ent['AndroidManifest.xml']; if(!mf) throw new Error('APK thiếu AndroidManifest.xml.');
+  var ds = mf.lho + 30 + dv.getUint16(mf.lho+26, true) + dv.getUint16(mf.lho+28, true), raw = d.subarray(ds, ds + mf.cs);
+  var xml = mf.m === 8 ? await apkInflate(raw) : raw, info = axmlManifest(xml);
+  var v2 = cd >= 16 && new TextDecoder().decode(d.subarray(cd-16, cd)) === 'APK Sig Block 42';
+  var v1 = Object.keys(ent).some(function(k){ return /^META-INF\/[^\/]+\.(RSA|DSA|EC)$/i.test(k); });
+  info.signed = v1 || v2; info.size = file.size;
+  if(!info.vc || !info.vn) throw new Error('Không đọc được versionCode / versionName trong APK.');
+  return info;
+}
+function apkVe(){
+  api0('GET').then(function(r){
+    if(!r || !r.ok){ $('apkInfo').textContent = (r && r.msg) || 'Không hỏi được bản đang phát hành.'; return; }
+    $('apkInfo').innerHTML = (r.vc ? 'Đang phát hành: <b>BMBPlayer ' + esc(r.vn) + '</b> (versionCode ' + r.vc + ', ' + Math.round(r.kb/1024) + ' KB' + (r.luc ? ', ' + new Date(r.luc).toLocaleString('vi-VN') : '') + ')' : 'Chưa phát hành bản APK nào.')
+      + (r.r2 ? '' : '<br><span style="color:var(--warn)">⚠ Worker chưa gắn R2 (bucket bmbplayer-files) — chưa tải lên được.</span>');
+  }).catch(function(){ $('apkInfo').textContent = 'Không kết nối được máy chủ.'; });
+}
+function api0(method, qs, body){
+  return fetch(apkBase() + '/api/admin/apk' + (qs || ''), { method:method, headers:{'x-session':S.tok, 'content-type':'application/vnd.android.package-archive'}, body:body })
+    .then(function(r){ return r.json(); });
+}
+function apkChon(){
+  var f = $('apkFile').files[0], box = $('apkRead'); APK.file = null; APK.info = null; $('apkUp').disabled = true;
+  if(!f){ box.style.display = 'none'; return; }
+  box.style.display = ''; box.textContent = 'Đang đọc file…';
+  apkDoc(f).then(function(i){
+    var loi = '';
+    if(i.pk !== 'vn.boommusicbox.bmbplayer') loi = 'Đây là APK của gói "' + i.pk + '", không phải BMBPlayer.';
+    else if(!i.signed) loi = 'APK CHƯA KÝ — máy sẽ không cài đè được. Hãy ký bằng sign_apk.py trước.';
+    box.innerHTML = 'Gói <b>' + esc(i.pk) + '</b> · phiên bản <b>' + esc(i.vn) + '</b> (versionCode ' + i.vc + ') · ' + (i.size/1048576).toFixed(1) + ' MB · ' + (i.signed ? 'đã ký ✓' : 'chưa ký ✗')
+      + (loi ? '<br><b style="color:var(--bad)">' + esc(loi) + '</b>' : '');
+    if(!loi){ APK.file = f; APK.info = i; $('apkUp').disabled = false; }
+  }).catch(function(e){ box.innerHTML = '<b style="color:var(--bad)">' + esc(e.message || 'Không đọc được file.') + '</b>'; });
+}
+function apkLen(){
+  if(!APK.file || !APK.info) return;
+  var i = APK.info;
+  if(!confirm('Phát hành BMBPlayer ' + i.vn + ' (versionCode ' + i.vc + ') cho TOÀN BỘ chi nhánh?\n\nMáy đang chạy bản 2.4 trở lên sẽ tự báo có bản mới.')) return;
+  $('apkUp').disabled = true; toast('Đang tải lên ' + (i.size/1048576).toFixed(1) + ' MB…');
+  api0('PUT', '?vc=' + i.vc + '&vn=' + encodeURIComponent(i.vn) + '&pk=' + encodeURIComponent(i.pk), APK.file).then(function(r){
+    if(!r || !r.ok){ toast((r && r.msg) || 'Phát hành lỗi.'); $('apkUp').disabled = false; return; }
+    toast('Đã phát hành BMBPlayer ' + i.vn + '.'); $('apkFile').value = ''; APK.file = null; $('apkRead').style.display = 'none'; apkVe();
+  }).catch(function(){ toast('Mất kết nối khi tải lên — thử lại.'); $('apkUp').disabled = false; });
+}
+function cdMo(){ vtVe(); if(S.sieuAdmin) apkVe(); }
+$('lgVt').addEventListener('click', vtDangNhap);
+$('vtBat').addEventListener('click', vtBat);
+$('vtTat').addEventListener('click', vtTat);
+$('apkFile').addEventListener('change', apkChon);
+$('apkUp').addEventListener('click', apkLen);
+vtNutDangNhap();
+
 Array.prototype.forEach.call(document.querySelectorAll('.tab'), function(t){
   t.addEventListener('click', function(){
     Array.prototype.forEach.call(document.querySelectorAll('.tab'), function(x){ x.className='tab'; });
@@ -1776,6 +1963,7 @@ Array.prototype.forEach.call(document.querySelectorAll('.tab'), function(t){
     $(p).className = 'pg on';
     if(p==='p5') loadMenuAdmin();
     if(p==='p6') loadAccounts();
+    if(p==='p7') cdMo();
     if(p==='p2') datNgayLS(LS.ngay || ngayHomNay());   /* lần đầu: ngày hiện tại; sau đó giữ ngày đang xem */
     if(TV.tm){ clearInterval(TV.tm); TV.tm = null; }
     if(p==='p3'){ loadTv(); TV.tm = setInterval(function(){ if(document.visibilityState==='visible' && !document.getElementById('qsOv')) loadTv(); }, 10000); }
@@ -1789,7 +1977,7 @@ Array.prototype.forEach.call(document.querySelectorAll('.tab'), function(t){
     var o = JSON.parse(s);
     if(!o.user){ sessionStorage.removeItem('bmb_q'); return; }   /* phiên của bản cũ (trước hợp nhất) — bắt đăng nhập lại */
     S.tok=o.tok; S.user=o.user; S.hoTen=o.hoTen||''; S.branch=o.b||''; S.bname=o.n||'';
-    S.vaiTro=o.vt; S.quanLy=!!o.ql; S.suaMenu=!!o.sm; S.branches=o.bs||[];
+    S.vaiTro=o.vt; S.quanLy=!!o.ql; S.suaMenu=!!o.sm; S.sieuAdmin=!!o.sa; S.branches=o.bs||[];
     start();
   }catch(e){ sessionStorage.removeItem('bmb_q'); }
 })();

@@ -35,6 +35,12 @@ binding = "DB"
 database_name = "bmb_data"
 database_id = "fecac75f-35ab-47df-85c4-caca0e3ca409"
 
+# R2 riêng cho BMBPlayer (tách khỏi MHPlayer): chứa file APK phát hành từ quay.html → Cài đặt.
+# Bật R2 trong Dash → R2 → tạo bucket "bmbplayer-files" TRƯỚC khi deploy, nếu không deploy sẽ lỗi.
+[[r2_buckets]]
+binding = "FILES"
+bucket_name = "bmbplayer-files"
+
 [[durable_objects.bindings]]
 name = "ROOM"
 class_name = "Room"

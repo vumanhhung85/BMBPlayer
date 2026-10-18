@@ -741,7 +741,7 @@ if(bc.ws){
   bc.onroom = m => {
     if(m.replaced){ roomNote('Màn hình khác đã nhận phòng này'); return; }
     if(lastSession !== null && m.session !== lastSession) resetSession();     // phòng đóng/mở lại = phiên hát mới, xoá hàng chờ cũ
-    lastSession = m.session; roomOpen = !!m.open;
+    lastSession = m.session; roomOpen = !!m.open; window.__bmbOpen = roomOpen;   /* APK 2.4: chỉ hỏi cập nhật khi phòng đóng */
     if(m.name) roomName = m.name;
     paintGuestQr(m.open ? m.qr : '', m.name);
     if(!m.open){ resetSession(); roomNote('Phòng chưa mở — chờ nhân viên mở phòng'); paintRoomTag(); connTxt = ''; $('hint').textContent = HINT0; }

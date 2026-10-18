@@ -98,7 +98,7 @@ async function devOk(env, t){                         // trả mã chi nhánh n�
 const origins = env => String(env.ALLOWED_ORIGINS || 'https://bmb.id.vn').split(',').map(s => s.trim()).filter(Boolean);
 function cors(req, env){
   const o = req.headers.get('Origin');
-  const h = { 'Vary': 'Origin', 'Access-Control-Allow-Headers': 'content-type, x-pass', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS' };
+  const h = { 'Vary': 'Origin', 'Access-Control-Allow-Headers': 'content-type, x-pass, x-session', 'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS' };
   if(o && origins(env).includes(o)) h['Access-Control-Allow-Origin'] = o;
   return h;
 }
@@ -615,6 +615,7 @@ async function authDangNhap(env, body, ip) {
     session: token, tok: token,
     username, hoTen: tk.ho_ten || '', vaiTro: tk.vai_tro,
     quanLy, suaMenu: quanLy || tk.order_sua_menu === 1,
+    sieuAdmin: tk.vai_tro === 'admin' && Number(tk.sieu_admin) === 1,   // chỉ admin cao nhất mới thấy mục Phát hành APK
     branchId: tk.chi_nhanh_id || '', branchName: tk.ten_cn || '',
     branches, expiresAt: exp * 1000
   });
@@ -2338,6 +2339,59 @@ async function pushBam(env, body, ctx) {
   return ok({ st: r.st });
 }
 
+
+/* ============================================================
+   Phát hành APK (từ 10/2026) — thay cho việc chép dist/BMBPlayer.apk lên GitHub.
+   Chỉ admin CAO NHẤT (tai_khoan.sieu_admin = 1) tải lên được, từ quay.html → Cài đặt.
+   File nằm trong R2 (binding FILES, bucket bmbplayer-files) tại apk/BMBPlayer.apk; số phiên bản nằm ở bảng riêng order_app_phat_hanh
+   (không đụng cai_dat dùng chung với app quản lý BMB).
+     PUT /api/admin/apk?vc=&vn=&pk=   (header x-session)   tải lên + phát hành
+     GET /api/app/ver                  {vc, vn, url}       công khai — APK hỏi để tự cập nhật
+     GET /app.apk                      file APK mới nhất   công khai
+   ============================================================ */
+const APK_KEY = 'apk/BMBPlayer.apk';
+const APK_MAX = 60 * 1024 * 1024;
+const APK_PKG = 'vn.boommusicbox.bmbplayer';
+async function apkBang(env) {
+  await env.DB.prepare('CREATE TABLE IF NOT EXISTS order_app_phat_hanh (khoa TEXT PRIMARY KEY, gia_tri TEXT NOT NULL DEFAULT \'\')').run();
+}
+async function apkPhienBan(env) {
+  try {
+    await apkBang(env);
+    const { results } = await env.DB.prepare(`SELECT khoa, gia_tri FROM order_app_phat_hanh WHERE khoa IN ('vc','vn','luc','kb')`).all();
+    const m = {}; for (const r of results) m[r.khoa] = r.gia_tri;
+    return { vc: Number(m.vc) || 0, vn: m.vn || '', luc: Number(m.luc) || 0, kb: Number(m.kb) || 0 };
+  } catch (e) { return { vc: 0, vn: '', luc: 0, kb: 0 }; }
+}
+async function apkPhatHanh(req, env, u, ch) {
+  const ss = await getSession(env, { session: req.headers.get('x-session') || '' }).catch(() => null);
+  if (!ss) return jres({ ok: false, error: 'unauthorized', msg: 'Phiên đã hết, đăng nhập lại.' }, 401, ch);
+  const tk = await env.DB.prepare('SELECT sieu_admin FROM tai_khoan WHERE username = ?').bind(ss.u).first();
+  if (ss.r !== 'admin' || !tk || Number(tk.sieu_admin) !== 1)
+    return jres({ ok: false, error: 'forbidden', msg: 'Chỉ admin cao nhất mới phát hành được APK.' }, 403, ch);
+  if (!env.FILES) return jres({ ok: false, error: 'no_r2', msg: 'Worker chưa gắn R2 (binding FILES). Xem wrangler.toml.' }, 501, ch);
+  const vc = Math.floor(Number(u.searchParams.get('vc')));
+  const vn = s(u.searchParams.get('vn') || '', 20), pk = s(u.searchParams.get('pk') || '', 80);
+  if (!(vc >= 1 && vc < 1e9) || !vn || !/^[0-9A-Za-z._-]+$/.test(vn)) return jres({ ok: false, error: 'ver', msg: 'Thiếu hoặc sai versionCode / versionName.' }, 400, ch);
+  if (pk !== APK_PKG) return jres({ ok: false, error: 'pkg', msg: 'Đây không phải APK BMBPlayer (' + APK_PKG + ').' }, 400, ch);
+  const cu = await apkPhienBan(env);
+  if (vc <= cu.vc) return jres({ ok: false, error: 'vc_thap', msg: 'versionCode ' + vc + ' không lớn hơn bản đang phát hành (' + cu.vc + '). Máy sẽ không cập nhật được.' }, 409, ch);
+  const len = Number(req.headers.get('content-length') || 0);
+  if (!len || len > APK_MAX) return jres({ ok: false, error: 'size', msg: 'File rỗng hoặc quá lớn (tối đa 60 MB).' }, 413, ch);
+  const buf = await req.arrayBuffer();
+  const mag = new Uint8Array(buf.slice(0, 4));
+  if (buf.byteLength !== len || mag[0] !== 0x50 || mag[1] !== 0x4B) return jres({ ok: false, error: 'khong_phai_apk', msg: 'File không phải APK (zip).' }, 400, ch);
+  await env.FILES.put(APK_KEY, buf, { httpMetadata: { contentType: 'application/vnd.android.package-archive', contentDisposition: 'attachment; filename="BMBPlayer.apk"' } });
+  await apkBang(env);
+  const now = Date.now();
+  await env.DB.batch([
+    ...[['vc', String(vc)], ['vn', vn], ['luc', String(now)], ['kb', String(len)]].map(([k, v]) =>
+      env.DB.prepare('INSERT INTO order_app_phat_hanh (khoa, gia_tri) VALUES (?,?) ON CONFLICT(khoa) DO UPDATE SET gia_tri = excluded.gia_tri').bind(k, v)),
+    ghiNhatKy(env, 'APK_RELEASE', ss.u + ' phát hành BMBPlayer ' + vn + ' (' + vc + '), ' + Math.round(len / 1024) + ' KB')
+  ]);
+  return jres({ ok: true, vc, vn }, 200, ch);
+}
+
 export default {
   async fetch(req, env, ctx){
     const u = new URL(req.url);
@@ -2365,6 +2419,29 @@ export default {
       const cn = String(b.cn || '').slice(0, 40);
       if(cn) ctx.waitUntil(pokeQuay(env, cn, 'ql'));
       return jres({ ok: true });
+    }
+
+    /* Phát hành / tự cập nhật APK (xem khối "Phát hành APK" phía trên) */
+    if(u.pathname === '/api/app/ver' && req.method === 'GET'){
+      const v = await apkPhienBan(env);
+      return jres({ vc: v.vc, vn: v.vn, url: u.origin + '/app.apk' }, 200, { 'Access-Control-Allow-Origin': '*' });
+    }
+    if(u.pathname === '/app.apk' && req.method === 'GET'){
+      const o = env.FILES ? await env.FILES.get(APK_KEY) : null;
+      if(!o) return new Response('Chưa phát hành bản APK nào.', { status: 404, headers: { 'content-type': 'text/plain; charset=utf-8' } });
+      return new Response(o.body, { headers: { 'content-type': 'application/vnd.android.package-archive', 'content-disposition': 'attachment; filename="BMBPlayer.apk"', 'content-length': String(o.size), 'cache-control': 'no-store' } });
+    }
+    if(u.pathname === '/api/admin/apk'){
+      const ch0 = cors(req, env), org = req.headers.get('Origin');
+      if(org && !origins(env).includes(org)) return jres({ ok: false, error: 'origin' }, 403, ch0);
+      if(req.method === 'OPTIONS') return new Response(null, { status: 204, headers: ch0 });
+      if(req.method === 'GET'){                                   // quay.html hỏi bản đang phát hành (cần phiên quầy)
+        const ss = await getSession(env, { session: req.headers.get('x-session') || '' }).catch(() => null);
+        if(!ss) return jres({ ok: false, error: 'unauthorized' }, 401, ch0);
+        return jres(Object.assign({ ok: true, r2: !!env.FILES }, await apkPhienBan(env)), 200, ch0);
+      }
+      if(req.method === 'PUT') return apkPhatHanh(req, env, u, ch0);
+      return jres({ ok: false, error: 'method' }, 405, ch0);
     }
 
     /* API quầy + gọi lễ tân (giữ nguyên cách gọi của quay.html cũ: POST JSON {action,...}) */
