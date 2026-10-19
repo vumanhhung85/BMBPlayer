@@ -118,3 +118,9 @@ if (cq && /^od:/.test(String(cq.data || ''))) {
 3. Bảng `order_tg_msg` (nhớ tin nhắn nào của đơn nào để sửa) tự tạo lần đầu có đơn, không cần chạy SQL.
 
 Tắt cả tin nhắn lẫn nút: biến `TG_LETAN = 0` (như cũ).
+
+## nhac.html — tài khoản từng người
+
+- `nhac-playlist-worker.js`: mã nguồn Worker `nhac-playlist` (dán thủ công vào Cloudflare). Quản trị = secret `APP_PASS` (không giới hạn tìm); mỗi người trong nhà có 1 mã riêng, chỉ thấy playlist của mình, tìm YouTube tối đa `USER_SEARCH_PER_WEEK` (mặc định 5) lượt/tuần, tự đổi mã được.
+- Cần secret `GUEST_SECRET` (cùng giá trị với kho-karaoke/bmbplayer) để người dùng dùng được Kho; biến tuỳ chọn `USER_SEARCH_PER_WEEK`, `MAX_USERS`.
+- Bảng D1 tự tạo ở lần gọi đầu; bảng playlist cũ giữ nguyên (playlist cũ thuộc về quản trị).

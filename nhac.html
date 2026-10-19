@@ -121,6 +121,23 @@
   #modal .btns button{flex:1; background:#0c4f58; border:1px solid var(--line); border-radius:10px; padding:11px; font-weight:600}
   #modal .btns button.pri{background:var(--accent); border:none; color:#fff}
   #modal .hint{margin-top:12px}
+  /* Tài khoản từng người */
+  #acct{margin-top:12px; padding:10px 12px; border-radius:12px; background:rgba(255,255,255,.08); display:none}
+  #acct .hint{margin:0}
+  #modal #acct .btns{margin-top:8px}
+  #usrModal{position:fixed; inset:0; z-index:62; display:none; align-items:center; justify-content:center; background:#000b; padding:16px}
+  #usrModal .card{background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:20px; width:min(480px,100%); max-height:92vh; overflow:auto}
+  #usrModal h3{margin-bottom:6px}
+  .urow{display:flex; align-items:center; gap:8px; padding:9px 0; border-bottom:1px solid var(--line)}
+  .urow .unm{flex:1; min-width:0; display:flex; flex-direction:column; gap:2px}
+  .urow small{color:var(--quiet); font-size:12px}
+  .urow button{background:#0c4f58; border:1px solid var(--line); border-radius:8px; padding:7px 10px; font-size:13px}
+  .urow button.del{color:#fca5a5}
+  #usrAddRow{display:flex; gap:8px; margin-top:12px}
+  #usrAddRow input{flex:1; background:#05252c; border:1px solid var(--line); color:var(--ink); border-radius:10px; padding:11px; font-size:15px; min-width:0}
+  #usrAddRow button{background:var(--accent); border:none; color:#fff; font-weight:700; border-radius:10px; padding:0 14px; font-size:14px}
+  #usrModal .btns{display:flex; gap:8px; margin-top:14px}
+  #usrModal .btns button{flex:1; background:#0c4f58; border:1px solid var(--line); border-radius:10px; padding:11px; font-weight:600}
 
   /* Kênh tức thì + ghép mã */
   #link{font-size:12px; padding:4px 10px; border-radius:999px; background:#0c4f58; color:var(--quiet); white-space:nowrap}
@@ -378,7 +395,7 @@
         <input id="q" type="search" placeholder="Tên bài, ca sĩ hoặc dán link YouTube…" autocomplete="off" enterkeyhint="go">
         <button id="goBtn">Tìm</button>
       </div>
-      <div class="hint">Gõ tên bài là tìm ngay trong kho BMB (bản karaoke/beat, không tốn lượt). Bấm <b>Tìm</b> lần nữa để tìm trên YouTube (bản có lời, khoảng 100 lượt/ngày). Dán link bài hoặc playlist để thêm thẳng.</div>
+      <div class="hint">Gõ tên bài là tìm ngay trong kho BMB (bản karaoke/beat, không tốn lượt). Bấm <b>Tìm</b> lần nữa để tìm trên YouTube (bản có lời, mỗi lần tốn 1 lượt<span id="srchLeft"></span>). Dán link bài hoặc playlist để thêm thẳng, không tốn lượt.</div>
       <div id="results"></div>
     </div>
   </aside>
@@ -406,13 +423,25 @@
   <div class="btns"><button id="pairClose">Đóng</button><button id="pairPass">Dùng mật khẩu</button><button id="pairGo" class="pri">Ghép</button></div>
 </div></div>
 
+<div id="usrModal"><div class="card">
+  <h3>Người dùng</h3>
+  <div class="hint">Mỗi người một mã riêng, chỉ thấy playlist của mình, được tìm YouTube theo số lượt mỗi tuần. Mã chỉ hiện một lần lúc tạo hoặc đặt lại.</div>
+  <div id="usrList"></div>
+  <div id="usrAddRow"><input id="usrName" type="text" maxlength="40" placeholder="Tên người mới" autocomplete="off"><button id="usrAdd">＋ Tạo mã</button></div>
+  <div class="btns"><button id="usrClose">Đóng</button></div>
+</div></div>
+
 <div id="modal">
   <div class="card">
     <h3>Kết nối tới Worker</h3>
     <label for="apiUrl">Địa chỉ Worker</label>
     <input id="apiUrl" type="url" value="https://nhac-playlist.vumanhhung85.workers.dev" placeholder="https://nhac-playlist.vumanhhung85.workers.dev" autocomplete="off">
-    <label for="pass">Mật khẩu truy cập</label>
-    <input id="pass" type="password" placeholder="Mật khẩu đã đặt trong APP_PASS" autocomplete="off">
+    <label for="pass">Mã của bạn</label>
+    <input id="pass" type="password" placeholder="Mã riêng của bạn (người quản lý gửi cho bạn)" autocomplete="off">
+    <div id="acct">
+      <div class="hint" id="acctInfo"></div>
+      <div class="btns"><button id="acctPass">Đổi mã của tôi</button><button id="acctUsers">Quản lý người dùng</button></div>
+    </div>
     <div class="btns"><button id="mClose">Đóng</button><button id="mSave" class="pri">Lưu</button></div>
     <div class="hint">Hai thông tin này chỉ lưu trong trình duyệt của thiết bị này. Khoá YouTube API nằm trong Worker, không nằm trong trang.<br>
       Trang này có hai chế độ: mở bình thường để <b>phát nhạc</b> (trên TV), thêm <b>?mode=remote</b> vào địa chỉ (hoặc mở remoteTV.html) để <b>điều khiển</b> từ điện thoại.</div>
@@ -484,12 +513,14 @@ async function api(path, body){
     headers: Object.assign({ 'x-pass': cfg.pass }, body ? { 'Content-Type':'application/json' } : {}),
     body: body ? JSON.stringify(body) : undefined });
   let data = {}; try{ data = await res.json(); }catch(e){}
-  if(!res.ok){ const e = new Error(data.error || ('Lỗi ' + res.status)); e.status = res.status; e.reason = data.reason || ''; throw e; }
+  if(!res.ok){ const e = new Error(data.error || ('Lỗi ' + res.status)); e.status = res.status; e.reason = data.reason || ''; if(data.search) e.search = data.search; throw e; }
   return data;
 }
 function apiFail(e){
   if(e.reason === 'noconfig') return;
-  if(e.status === 401){ openSettings(); return toast('Sai mật khẩu hoặc địa chỉ Worker.', 'err'); }
+  if(e.reason === 'locked') return toast(e.message || 'Nhập sai quá nhiều lần, thử lại sau ít phút.', 'err', 7000);
+  if(e.reason === 'userQuota'){ if(e.search){ me = Object.assign(me || {}, { search: e.search }); paintMe(); } return toast(e.message || 'Hết lượt tìm YouTube tuần này.', 'err', 7000); }
+  if(e.status === 401){ me = null; openSettings(); return toast('Sai mã hoặc địa chỉ Worker.', 'err'); }
   if(e.reason === 'origin') return toast('Worker từ chối địa chỉ trang này. Kiểm tra biến ALLOWED_ORIGINS.', 'err', 7000);
   if(e.reason === 'quotaExceeded') return toast('Hết lượt tìm hôm nay (100 lượt/ngày). Dán link vẫn dùng được.', 'err', 6000);
   if(e instanceof TypeError) return toast('Không kết nối được tới Worker. Kiểm tra địa chỉ và mạng.', 'err', 6000);
@@ -497,13 +528,96 @@ function apiFail(e){
 }
 
 /* ---------- Cài đặt ---------- */
-function openSettings(){ $('apiUrl').value = cfg.api; $('pass').value = cfg.pass; $('modal').style.display = 'flex'; }
+function openSettings(){ $('apiUrl').value = cfg.api; $('pass').value = cfg.pass; $('modal').style.display = 'flex'; paintMe(); if(cfg.pass && !me) refreshMe(); }
+
+/* ---------- Tài khoản từng người ---------- */
+let me = null, meP = null;
+async function refreshMe(){
+  if(!cfg.api || !cfg.pass) { me = null; paintMe(); return null; }
+  try{ me = await api('/api/me'); try{ if(me.kho) localStorage.setItem('np_kho', JSON.stringify(me.kho)); else localStorage.removeItem('np_kho'); }catch(e){} }
+  catch(e){ if(e.status === 404) me = { legacy:true }; else if(e.status === 401) me = null; }   // Worker cũ chưa có tài khoản → chạy như trước
+  paintMe(); return me;
+}
+function ensureMe(){ return me ? Promise.resolve(me) : (meP || (meP = refreshMe().finally(() => { meP = null; }))); }
+function khoTicketNow(){
+  try{ const t = JSON.parse(localStorage.getItem('np_kho') || 'null'); if(t && t.ticket && t.exp - Date.now() > 300000) return t.ticket; }catch(e){}
+  return '';
+}
+async function khoHeaders(){          // người thường dùng vé 6 giờ, quản trị dùng thẳng mã
+  if(!cfg.pass) return {};
+  await ensureMe();
+  if(me && !me.admin && !me.legacy){
+    let t = khoTicketNow();
+    if(!t){ await refreshMe(); t = khoTicketNow(); }
+    if(t) return { 'x-guest': t };
+  }
+  return { 'x-pass': cfg.pass };
+}
+function paintMe(){
+  const box = $('acct'), left = $('srchLeft');
+  const ok = me && !me.legacy && me.id;
+  box.style.display = ok ? 'block' : 'none';
+  if(!ok){ if(left) left.textContent = ''; return; }
+  const q = me.search || {};
+  let line = 'Xin chào ' + me.name + (me.admin ? ' (quản trị)' : '') + '. ';
+  if(q.unlimited) line += 'Tìm YouTube không giới hạn.';
+  else line += 'Còn ' + q.left + '/' + q.limit + ' lượt tìm YouTube tuần này (làm mới sáng thứ Hai).';
+  $('acctInfo').textContent = line;
+  $('acctPass').style.display = me.admin ? 'none' : '';
+  $('acctUsers').style.display = me.admin ? '' : 'none';
+  if(left) left.textContent = q.unlimited ? ', bạn không bị giới hạn' : ', còn ' + q.left + '/' + q.limit + ' lượt tuần này';
+}
+$('acctPass').onclick = async () => {
+  const a = prompt('Mã mới (6–40 ký tự, chữ không dấu / số / ký hiệu, không có khoảng trắng):');
+  if(a === null) return;
+  if(!/^[\x21-\x7E]{6,40}$/.test(a)) return toast('Mã gồm 6–40 ký tự không dấu, không có khoảng trắng.', 'err', 6000);
+  const b = prompt('Nhập lại mã mới để chắc chắn:');
+  if(b === null) return;
+  if(a !== b) return toast('Hai lần nhập chưa giống nhau.', 'err');
+  try{
+    await api('/api/me/pass', { pass:a });
+    cfg.pass = a; lsSet(LS.pass, a); $('pass').value = a;
+    toast('Đã đổi mã. Từ nay dùng mã mới để vào.', '', 5000);
+    wsStop = false; wsTries = 0; try{ if(ws) ws.close(); }catch(e){} wsConnect();
+    await refreshMe();
+  }catch(e){ apiFail(e); }
+};
+/* Quản lý người dùng (chỉ quản trị) */
+async function usrLoad(){
+  const L = $('usrList'); L.textContent = 'Đang tải…';
+  try{
+    const d = await api('/api/admin/users'); L.replaceChildren();
+    if(!d.users.length) L.append(el('div', 'hint', 'Chưa có người dùng nào. Nhập tên rồi bấm “Tạo mã”.'));
+    d.users.forEach(u => {
+      const r = el('div', 'urow'), n = el('div', 'unm');
+      n.append(el('span', null, u.name), el('small', null, 'Đã tìm ' + u.used + '/' + d.limit + ' lượt tuần này'));
+      const rs = el('button', null, 'Đặt lại mã'), dl = el('button', 'del', 'Xoá');
+      rs.onclick = async () => {
+        if(!confirm('Đặt lại mã của ' + u.name + '? Mã cũ sẽ không dùng được nữa.')) return;
+        try{ const x = await api('/api/admin/users/reset', { id:u.id }); showCode(x); }catch(e){ apiFail(e); }
+      };
+      dl.onclick = async () => {
+        if(!confirm('Xoá ' + u.name + ' cùng toàn bộ playlist của người này?')) return;
+        try{ await api('/api/admin/users/delete', { id:u.id }); usrLoad(); }catch(e){ apiFail(e); }
+      };
+      r.append(n, rs, dl); L.append(r);
+    });
+  }catch(e){ L.textContent = ''; apiFail(e); }
+}
+function showCode(x){ prompt('Mã của ' + x.name + ' (chỉ hiện một lần, hãy sao chép gửi cho người đó):', x.code); }
+$('acctUsers').onclick = () => { $('usrModal').style.display = 'flex'; usrLoad(); };
+$('usrClose').onclick = () => { $('usrModal').style.display = 'none'; };
+$('usrAdd').onclick = async () => {
+  const name = $('usrName').value.trim(); if(!name) return toast('Nhập tên người dùng trước.', 'err');
+  try{ const x = await api('/api/admin/users/create', { name }); $('usrName').value = ''; showCode(x); usrLoad(); }catch(e){ apiFail(e); }
+};
 $('gear').onclick = openSettings;
 $('mClose').onclick = () => { $('modal').style.display = 'none'; };
 $('mSave').onclick = () => {
   cfg.api = $('apiUrl').value.trim(); cfg.pass = $('pass').value;
   lsSet(LS.api, cfg.api); lsSet(LS.pass, cfg.pass);
-  $('modal').style.display = 'none'; paintLink(); loadPlaylists();
+  me = null; try{ localStorage.removeItem('np_kho'); }catch(e){}
+  $('modal').style.display = 'none'; paintLink(); loadPlaylists(); refreshMe();
   wsStop = false; wsTries = 0; try{ if(ws) ws.close(); }catch(e){} wsConnect();          // nối lại kênh tức thì bằng mật khẩu mới
 };
 
@@ -591,9 +705,14 @@ const ERR = { 2:'mã video không hợp lệ', 5:'lỗi trình phát HTML5', 100
 const KHO_DEFAULT = 'https://kho-karaoke.vumanhhung85.workers.dev';
 function reportDead(id, done){
   let kho = '', pass = '';
-  try{ kho = localStorage.getItem('kho_api') || KHO_DEFAULT; pass = localStorage.getItem('np_pass') || ''; }catch(e){}
-  if(!kho || !pass || !/^[\w-]{11}$/.test(id || '')) return;
-  fetch(kho + '/api/kho/check', { method:'POST', headers:{ 'x-pass':pass, 'content-type':'application/json' }, body:JSON.stringify({ ids:[id], reason:'player' }) })
+  let hdr = null;
+  try{
+    kho = localStorage.getItem('kho_api') || KHO_DEFAULT; pass = localStorage.getItem('np_pass') || '';
+    const t = JSON.parse(localStorage.getItem('np_kho') || 'null');
+    hdr = t && t.ticket && t.exp > Date.now() ? { 'x-guest': t.ticket } : { 'x-pass': pass };
+  }catch(e){}
+  if(!kho || !pass || !hdr || !/^[\w-]{11}$/.test(id || '')) return;
+  fetch(kho + '/api/kho/check', { method:'POST', headers:Object.assign({ 'content-type':'application/json' }, hdr), body:JSON.stringify({ ids:[id], reason:'player' }) })
     .then(r => r.ok ? r.json() : null).then(d => { if(d && (d.removed || []).includes(id) && done) done(); }).catch(() => {});
 }
 function onError(e){
@@ -1031,6 +1150,7 @@ async function ytSearch(raw){
   khoShownFor = '';
   msg('Đang tìm trên YouTube…');
   const d = await api('/api/search?q=' + encodeURIComponent(raw));
+  if(d.search && me){ me.search = d.search; paintMe(); }
   showResults(d.items, 'YouTube: “' + raw + '”');
 }
 
@@ -1044,7 +1164,7 @@ let khoShownFor = '', khoTimer = null, khoSeq = 0, IDX = null, idxLoading = fals
 const DAY = 86400000, IDX_MAX_AGE = 7 * DAY;
 const khoBase = () => { try{ return (localStorage.getItem('kho_api') || KHO_DEFAULT).replace(/\/+$/, ''); }catch(e){ return KHO_DEFAULT; } };
 async function kapi(path){
-  const res = await fetch(khoBase() + path, { headers:{ 'x-pass': cfg.pass } });
+  const res = await fetch(khoBase() + path, { headers: await khoHeaders() });
   const d = await res.json().catch(() => ({}));
   if(!res.ok){ const e = new Error(d.error || 'lỗi ' + res.status); e.status = res.status; throw e; }
   return d;
@@ -1083,7 +1203,7 @@ async function loadIndex(){
     if(saved && (!saved.got || Date.now() - saved.got > IDX_MAX_AGE)){ try{ await idb('readwrite', st => st.delete('index')); }catch(e){} saved = null; }
     if(saved && !IDX){ IDX = await prepIndex(saved.d); khoRefreshIfTyping(); }
     if(saved && saved.d.v === vnDay(Date.now())) return;                       // hôm nay đã tải
-    const res = await fetch(khoBase() + '/api/kho/index', { headers: Object.assign({ 'x-pass': cfg.pass }, saved && saved.etag ? { 'If-None-Match': saved.etag } : {}) });
+    const res = await fetch(khoBase() + '/api/kho/index', { headers: Object.assign(await khoHeaders(), saved && saved.etag ? { 'If-None-Match': saved.etag } : {}) });
     if(res.status === 304 && saved){ saved.got = Date.now(); try{ await idb('readwrite', st => st.put(saved, 'index')); }catch(e){} return; }
     if(!res.ok) return;
     const d = await res.json(), rec = { d, etag: res.headers.get('ETag') || '', got: Date.now() };
@@ -1434,7 +1554,8 @@ if(REMOTE){
   menuBtn.onclick = () => { vmm.replaceChildren(); const bx = el('div', 'box'); const inf = el('div', 'inf'); inf.textContent = 'Phòng: ' + ROOM + ' · ' + ($('link').textContent || '').replace('●', '').trim(); bx.append(inf);
     bx.append(mItem('📷  Quét QR trên TV (ghép / đổi TV)', 'scanBtn'));
     if(!document.body.classList.contains('paired')){ bx.append(mItem('＋  Tạo playlist mới', 'plNew'), mItem('🗑  Xoá playlist này', 'plDel')); }
-    bx.append(mItem('⚙  Cài đặt kết nối', 'gear')); vmm.append(bx); vmm.classList.add('show'); };
+    if(me && me.id && !me.legacy){ const w = el('div', 'inf'); w.textContent = '👤 ' + me.name + (me.admin ? ' · không giới hạn tìm' : ' · còn ' + (me.search ? me.search.left + '/' + me.search.limit : '?') + ' lượt tìm tuần này'); bx.append(w); }
+    bx.append(mItem('⚙  Tài khoản & kết nối', 'gear')); vmm.append(bx); vmm.classList.add('show'); };
   vmm.onclick = e => { if(e.target === vmm) vmm.classList.remove('show'); };
   const dock = el('div'); dock.id = 'dock';
   const vr = el('div'); vr.id = 'volRow';
@@ -1493,7 +1614,7 @@ if(REMOTE && !cfg.pass){
   else if(fromQr) openSettings();                // quét QR: nhập mật khẩu một lần, các lần sau quét là dùng được ngay
   else openPair();
 }else if(!cfg.api || !cfg.pass){ $('startInfo').textContent = cfg.api ? 'Nhập mật khẩu truy cập ở cửa sổ vừa mở.' : 'Bấm ⚙ để nhập địa chỉ Worker và mật khẩu.'; openSettings(); }
-else{ loadPlaylists(); wsConnect(); }
+else{ loadPlaylists(); wsConnect(); refreshMe(); }
 if(REMOTE){ pollState(); ping(); setInterval(ping, 20000); }
 else{
   pollCmds(); setInterval(() => publishState(false), 5000);
