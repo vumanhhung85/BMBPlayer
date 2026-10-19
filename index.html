@@ -265,8 +265,11 @@ let userMuted = false;
 /* Âm lượng giữ ở trang (không đọc lại từ YouTube vì getVolume()/isMuted() trả giá trị cũ ngay sau khi đặt → remote bị bật về chỗ cũ).
    Chạy trong app BMBPlayer (Android) thì điều khiển luôn âm lượng hệ thống của TV/box: remote, quầy, nút trên điều khiển TV dùng chung một mức. */
 const NATIVE = (() => { try{ return window.BMBNative && typeof BMBNative.getVolume === 'function' ? BMBNative : null; }catch(e){ return null; } })();
-let vol = (() => { try{ const v = parseInt(localStorage.getItem('bmb_vol'), 10); return v >= 0 && v <= 100 ? v : 100; }catch(e){ return 100; } })();
-if(NATIVE){ try{ const v = NATIVE.getVolume(); if(v >= 0) vol = v; }catch(e){} }          // người dùng chủ động tắt tiếng (khác với bị trình duyệt chặn)
+/* Âm lượng khi mở trang: lần đầu 70%, từ lần sau nhớ mức chỉnh gần nhất (mức 0 không nhớ để khỏi mở lên im lặng).
+   Trong app Android thì đặt luôn âm lượng hệ thống của TV/box về mức đó. Điện thoại / máy tính bảng không giữ mức riêng mà lấy theo TV. */
+const VOL_DEFAULT = 70;
+let vol = (() => { try{ const v = parseInt(localStorage.getItem('bmb_vol'), 10); return v >= 1 && v <= 100 ? v : VOL_DEFAULT; }catch(e){ return VOL_DEFAULT; } })();
+if(NATIVE){ try{ NATIVE.setVolume(vol); }catch(e){} }          // người dùng chủ động tắt tiếng (khác với bị trình duyệt chặn)
 let lock = null;                // null | 'muted' (đang phát im lặng vì bị chặn) | 'tap' (chưa phát được, cần một lần chạm)
 let unlocked = false;           // đã có thao tác của người dùng trên trang này
 let roomOpen = !bc.ws, lastSession = null, connTxt = '';
@@ -590,7 +593,7 @@ function setVol(v){
   vol = v; $('vol').value = v;
   if(NATIVE){ try{ NATIVE.setVolume(v); }catch(e){} if(ready) player.setVolume(100); }
   else if(ready) player.setVolume(v);
-  try{ localStorage.setItem('bmb_vol', String(v)); }catch(e){}
+  if(v > 0){ try{ localStorage.setItem('bmb_vol', String(v)); }catch(e){} }
   if(userMuted && v > 0){ userMuted = false; if(ready && lock !== 'muted') player.unMute(); applyMute(); }   // kéo âm lượng lên = bật tiếng lại
   volOsd(); push();
 }
@@ -598,7 +601,7 @@ function setVol(v){
 window.bmbSysVol = v => {
   v = Math.max(0, Math.min(100, Math.round(+v || 0)));
   if(v === vol) return;
-  vol = v; $('vol').value = v; volOsd(); push();
+  vol = v; $('vol').value = v; if(v > 0){ try{ localStorage.setItem('bmb_vol', String(v)); }catch(e){} } volOsd(); push();
 };
 function prio(i){ // đưa bài i lên ngay sau bài đang hát
   if(i <= cur || i >= queue.length) return;
