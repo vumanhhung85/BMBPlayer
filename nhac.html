@@ -1502,7 +1502,7 @@ async function wsConnect(){
     const was = wsReady; wsReady = false; clearInterval(wsPing); paintLink();
     if(!REMOTE && was){ clearTimeout(pollTimer); pollTimer = setTimeout(pollCmds, 300); }      // TV: quay về hỏi định kỳ ngay
     if(ev.code === 4001){                                                                     // sai mật khẩu / vé hết hạn: không thử lại vô ích
-      if(cfg.pass && me && me.id && !me.admin && wsTries < 3){ try{ localStorage.removeItem('np_kho'); }catch(e){} refreshMe().then(wsRetry); return; }   // vé người dùng hết hạn: xin vé mới rồi nối lại
+      if(cfg.pass && me && me.id && !me.admin && wsTries < 6){ try{ localStorage.removeItem('np_kho'); }catch(e){} refreshMe().then(wsRetry); return; }   // vé người dùng hết hạn: xin vé mới rồi nối lại
       if(!cfg.pass && pairTok){ pairTok = ''; try{ localStorage.removeItem(TOK_KEY); }catch(e){} paintLink(); if(REMOTE) openPair(); }
       return;
     }
@@ -1552,6 +1552,7 @@ async function openPairTv(){
     const d = await res.json().catch(() => ({}));
     if(!res.ok) throw new Error(d.error || ('Lỗi ' + res.status));
     const url = location.origin + location.pathname + '?mode=remote&room=' + encodeURIComponent(ROOM) + '&code=' + d.code;
+    if(!wsReady){ wsStop = false; wsTries = 0; try{ if(ws) ws.close(); }catch(e){} wsConnect(); }     // TV chưa có kênh tức thì (vd. mở trang trước khi Worker cập nhật): nối lại ngay để điện thoại vừa ghép điều khiển được
     $('pairCode').textContent = d.code;
     if(window.qrcode){ const q = qrcode(0, 'M'); q.addData(url); q.make(); const img = document.createElement('img'); img.alt = 'QR'; img.src = q.createDataURL(6, 2); $('pairQr').append(img); }
     clearInterval(pairTimer);

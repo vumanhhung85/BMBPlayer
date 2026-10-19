@@ -7,6 +7,7 @@ node_modules
 .gitignore
 wrangler.toml
 bmbplayer-worker.js
+nhac-playlist-worker.js
 kho-worker.js
 *.sql
 *.md
