@@ -487,11 +487,14 @@ const ROOM = (() => {
   if(!r){ r = 'tv-' + Array.from(crypto.getRandomValues(new Uint8Array(6)), b => (b % 36).toString(36)).join(''); put('nhac_room', r); }
   return r;
 })();
-const LS = { api:'np_api', pass:'np_pass', cur:'np_cur', shuf:'np_shuf', rep:'np_rep' };
+const LS = { api:'np_api', pass:'np_pass', cur:'np_cur', shuf:'np_shuf', rep:'np_rep', vol:'np_vol' };
 const lsGet = k => { try{ return localStorage.getItem(k); }catch(e){ return null; } };
 const lsSet = (k, v) => { try{ localStorage.setItem(k, v); }catch(e){} };
 
 let cfg = { api: lsGet(LS.api) || DEFAULT_API, pass: lsGet(LS.pass) || '' };
+// Âm lượng trên TV: nhớ mức chỉnh gần nhất (lần đầu mới dùng mặc định 50%). Mức 0 coi như tắt tiếng, không lưu.
+const saveVol = v => { if(!REMOTE && v > 0) lsSet(LS.vol, String(Math.round(v))); };
+(() => { if(REMOTE) return; const v = parseInt(lsGet(LS.vol), 10); if(v > 0 && v <= 100) $('vol').value = v; })();
 let playlists = [], curName = null;
 let items = [], order = [], pos = -1, curId = null, startId = null;
 let shuffle = lsGet(LS.shuf) === '1';
@@ -892,7 +895,7 @@ async function runCmd(c){
       player.seekTo(t, true); break;
     }
     case 'fs': setTvFs(typeof p.on === 'boolean' ? p.on : !tvFs); break;
-    case 'vol': { const v = Math.max(0, Math.min(100, +p.value || 0)); $('vol').value = v; if(ready) player.setVolume(v); paintVol(); showVolOsd(); break; }
+    case 'vol': { const v = Math.max(0, Math.min(100, +p.value || 0)); $('vol').value = v; saveVol(v); if(ready) player.setVolume(v); paintVol(); showVolOsd(); break; }
     case 'shuffle': toggleShuffle(); break;
     case 'repeat': cycleRepeat(); break;
     case 'playid': await playId(String(p.id || '')); break;
@@ -1438,7 +1441,7 @@ $('vol').addEventListener('input', showVolOsd);
 $('vol').oninput = e => {
   const v = +e.target.value;
   if(REMOTE){ clearTimeout(volTimer); volTimer = setTimeout(() => sendCmd('vol', { value: v }), 150); }
-  else if(ready){ player.setVolume(v); publishState(false); }
+  else{ saveVol(v); if(ready){ player.setVolume(v); publishState(false); } }
 };
 $('fsBtn').onclick = () => setTvFs(!tvFs);
 $('muteBtn').onclick = e => { e.preventDefault(); REMOTE ? (sendCmd('mute'), remoteMute = !remoteMute, paintMute()) : toggleMute(); };
