@@ -300,6 +300,8 @@ tbody tr:hover td{background:#FBF8FE}
 .qlnav.show{display:flex}
 .qlnav .btn{flex:1;min-width:140px;background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.28);color:#fff}
 .qlnav .btn:hover{background:rgba(255,255,255,.22)}
+.qlnav .qlhint{flex-basis:100%;font-size:12px;color:rgba(255,255,255,.75)}
+.qlnav .btn .go{display:block;font-size:11px;font-weight:600;opacity:.8;margin-top:2px}
 @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 </style>
 </head>
@@ -336,8 +338,9 @@ tbody tr:hover td{background:#FBF8FE}
         <div class="tab" data-p="p7" id="tabCaiDatApp" style="display:none">⚙️ Cài đặt</div>
       </div>
       <div class="qlnav" id="qlNav">
-        <button class="btn btn-ghost btn-sm" id="btnQlBaoTri">🛠️ Bảo trì</button>
-        <button class="btn btn-ghost btn-sm" id="btnQlDatPhong">📋 Đặt phòng</button>
+        <div class="qlhint">Chuyển sang trang quản trị khác (rời màn Quầy):</div>
+        <button class="btn btn-ghost btn-sm" id="btnQlBaoTri">🛠️ Bảo trì <span class="go">↗ mở trang khác</span></button>
+        <button class="btn btn-ghost btn-sm" id="btnQlDatPhong">📋 Đặt phòng <span class="go">↗ mở trang khác</span></button>
       </div>
     </div>
   </header>
@@ -1779,8 +1782,12 @@ $('lgBtn').addEventListener('click', login);
 $('lgP').addEventListener('keydown', function(e){ if(e.key==='Enter') login(); });
 $('btnOut').addEventListener('click', function(){ logout(true); });
 $('btnPush').addEventListener('click', puMo);
-$('btnQlBaoTri').addEventListener('click', function(){ try{ BMBNative.quayMoAdmin('baotri'); }catch(e){} });
-$('btnQlDatPhong').addEventListener('click', function(){ try{ BMBNative.quayMoAdmin('datphong'); }catch(e){} });
+function moTrangQl(loai, ten){
+  if(!confirm('Chuyển sang trang ' + ten + ' (app quản trị)?\n\nBạn sẽ rời màn Quầy. Muốn quay lại Quầy thì thoát trang ' + ten + ' ra.')) return;
+  try{ BMBNative.quayMoAdmin(loai); }catch(e){}
+}
+$('btnQlBaoTri').addEventListener('click', function(){ moTrangQl('baotri', 'Bảo trì'); });
+$('btnQlDatPhong').addEventListener('click', function(){ moTrangQl('datphong', 'Đặt phòng'); });
 $('puDong').addEventListener('click', function(){ $('modalPush').classList.remove('show'); });
 $('puBat').addEventListener('click', puBat);
 $('puTat').addEventListener('click', puTat);
