@@ -54,6 +54,7 @@ import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -170,12 +171,21 @@ public class MainActivity extends Activity {
         listenVolume();
 
         mode = prefs.getString(K_MODE, "");
-        if (mode.isEmpty()) {   // lần đầu: tự nhận biết TV / máy tính bảng, không hỏi (đổi sau trong menu nhân viên)
-            mode = guessMode();
-            prefs.edit().putString(K_MODE, mode).apply();
+        boolean ask = false;
+        if (mode.isEmpty()) {
+            if (looksLikeTv()) {   // lần đầu: TV / box không cảm ứng → tự chọn TV (không ai cầm máy để hỏi)
+                mode = "tv";
+                prefs.edit().putString(K_MODE, mode).apply();
+            } else {               // 2.7: máy cảm ứng (điện thoại, máy tính bảng 7–10 inch…) → hỏi một lần, không tự đoán sai
+                ask = true;
+            }
         }
-        applyScreenPolicy();
-        start();
+        if (ask) {
+            showChooser();         // chọn xong chooseMode() sẽ chạy start()
+        } else {
+            applyScreenPolicy();
+            start();
+        }
         handleOpenIntent(getIntent());
         ui.postDelayed(updCheck, UPD_FIRST_MS);
     }
@@ -284,10 +294,10 @@ public class MainActivity extends Activity {
     private String guessMode() {
         if (looksLikeTv()) return "tv";
         int sw = getResources().getConfiguration().smallestScreenWidthDp;
-        return sw >= 600 ? "tablet" : "quay";
+        return sw >= 480 ? "tablet" : "quay";      // chỉ để GỢI Ý nút nào sáng sẵn trên màn chọn (máy 7 inch ~533–600dp trước đây bị đoán nhầm là quầy)
     }
 
-    static String modeName(String m) { return "quay".equals(m) ? "Quầy" : "tablet".equals(m) ? "Máy tính bảng" : "TV"; }
+    static String modeName(String m) { return "quay".equals(m) ? "Nhân viên quầy" : "tablet".equals(m) ? "Máy chọn bài" : "TV"; }
 
     private boolean looksLikeTv() {
         try {
@@ -301,41 +311,35 @@ public class MainActivity extends Activity {
 
     private void showChooser() {
         final boolean tv = looksLikeTv();
+        final String suggest = guessMode();                    // nút được gợi ý (sáng sẵn): không tự chọn thay người dùng
+        ScrollView sv = new ScrollView(this);
+        sv.setFillViewport(true);
+        sv.setBackgroundColor(Color.rgb(16, 10, 34));
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
         box.setGravity(Gravity.CENTER);
         box.setPadding(dp(24), dp(24), dp(24), dp(24));
-        box.setBackgroundColor(Color.rgb(16, 10, 34));
+        sv.addView(box, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         TextView t = text("BMBPlayer", 30, Color.rgb(255, 210, 26), true);
-        TextView s = text("Máy này dùng để làm gì?", 18, Color.WHITE, false);
+        TextView s = text("Máy này dùng để làm gì?", 20, Color.WHITE, false);
         s.setPadding(0, dp(6), 0, dp(18));
         Button bTv = bigButton("📺  TV trong phòng\n(phát bài, hiện mã QR cho khách)");
-        Button bTab = bigButton("📱  Máy tính bảng trong phòng\n(chọn bài + gọi phục vụ)");
-        final TextView count = text("", 14, Color.rgb(170, 160, 200), false);
-        count.setPadding(0, dp(16), 0, 0);
-        TextView note = text("Đổi lại sau: bấm MENU trên điều khiển, hoặc bấm QUAY LẠI 3 lần.", 13, Color.rgb(140, 130, 170), false);
-        note.setPadding(0, dp(6), 0, 0);
+        Button bTab = bigButton("🎤  Máy chọn bài (đặt trong phòng)\n(khách chọn bài + gọi phục vụ)");
+        Button bQuay = bigButton("👤  Nhân viên quầy\n(nhận đơn gọi lễ tân, có chuông báo)");
+        TextView note = text("Chọn một lần. Đổi lại sau: bấm QUAY LẠI 3 lần liên tiếp (hoặc chạm 5 lần góc trên bên phải), chọn \"Đổi chế độ\".", 13, Color.rgb(140, 130, 170), false);
+        note.setPadding(0, dp(18), 0, 0);
 
-        box.addView(t); box.addView(s); box.addView(bTv); box.addView(bTab); box.addView(count); box.addView(note);
+        box.addView(t); box.addView(s);
+        if (tv) box.addView(bTv);
+        box.addView(bTab); box.addView(bQuay); box.addView(note);
         bTv.setOnClickListener(v -> chooseMode("tv"));
         bTab.setOnClickListener(v -> chooseMode("tablet"));
-        chooser = box;
-        root.addView(box, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        (tv ? bTv : bTab).requestFocus();
-
-        chooserLeft = 20;
-        final String auto = tv ? "tv" : "tablet";
-        ui.post(new Runnable() {
-            @Override public void run() {
-                if (chooser == null) return;
-                if (chooserLeft < 0) { count.setText(""); return; }           // đã có người bấm: thôi đếm
-                if (chooserLeft == 0) { chooseMode(auto); return; }
-                count.setText("Tự chọn \"" + (tv ? "TV trong phòng" : "Máy tính bảng") + "\" sau " + chooserLeft + " giây");
-                chooserLeft--;
-                ui.postDelayed(this, 1000);
-            }
-        });
+        bQuay.setOnClickListener(v -> chooseMode("quay"));
+        chooser = sv;
+        root.addView(sv, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        (tv ? bTv : "quay".equals(suggest) ? bQuay : bTab).requestFocus();
+        chooserLeft = -1;                                      // không đếm ngược, không tự chọn
     }
 
     private void chooseMode(String m) {
@@ -725,7 +729,7 @@ public class MainActivity extends Activity {
 
     private void showModeMenu() {
         final String[] keys = {"tv", "tablet", "quay"};
-        final String[] names = {"📺  TV trong phòng (phát bài, hiện QR khách)", "📱  Máy tính bảng trong phòng (chọn bài + gọi phục vụ)", "🛎  Quầy (nhận đơn gọi lễ tân, có chuông báo)"};
+        final String[] names = {"📺  TV trong phòng (phát bài, hiện QR khách)", "🎤  Máy chọn bài (đặt trong phòng: chọn bài + gọi phục vụ)", "👤  Nhân viên quầy (nhận đơn gọi lễ tân, có chuông báo)"};
         new AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
                 .setTitle("Máy này dùng làm gì? (đang: " + modeName(mode) + ")")
                 .setItems(names, (d, w) -> { if (!keys[w].equals(mode)) setMode(keys[w]); })
