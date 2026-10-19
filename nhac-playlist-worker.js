@@ -26,7 +26,7 @@ const ID_RE = /^[\w-]{11}$/;
 const LIST_RE = /^[\w-]{10,64}$/;
 const ROOM_RE = /^[\w-]{1,20}$/;
 const UID_RE = /^u[a-z0-9]{5}$/;
-const ACTIONS = ['hello', 'toggle', 'next', 'prev', 'vol', 'shuffle', 'repeat', 'playid', 'reload', 'playlist'];
+const ACTIONS = ['hello', 'toggle', 'next', 'prev', 'vol', 'shuffle', 'repeat', 'playid', 'reload', 'playlist', 'seek'];
 const SEP = '~';
 const CODE_MIN = 6, CODE_MAX = 40;
 

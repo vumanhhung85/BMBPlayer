@@ -184,7 +184,7 @@
   body.remote .tabs button.on .ti{filter:none; font-size:23px} body.remote .tabs button.on .tl{font-size:14px} body.remote .tabs button.on .cnt{background:#fff; color:#c2410c}
   body.remote #tAdd{order:-1}
   body.remote #side{border:none}
-  body.remote .pane{padding:0 16px 190px; overflow:visible; min-height:0}
+  body.remote .pane{padding:0 16px 250px; overflow:visible; min-height:0}
   body.remote #addBox{padding:12px 0 4px}
   body.remote #addBox button{background:linear-gradient(180deg,#ff8a2b,#ea5a0c)}
   body.remote .row{gap:12px; padding:10px 0; border-radius:0}
@@ -218,6 +218,18 @@
   body.remote #ctl .vol{display:none}
   body.remote #volRow{display:flex; align-items:center; gap:12px; padding:0 4px}
   #volRow{display:none}
+  /* Thanh tua bài (điều khiển từ xa) */
+  #seekRow{display:none}
+  body.remote #seekRow{display:flex; align-items:center; gap:8px; padding:0 2px}
+  #seekRow .sk{flex:none; min-width:44px; height:40px; padding:0 8px; border-radius:20px; background:#0c4f58; border:1px solid var(--line); color:var(--ink); font-size:13px; font-weight:700}
+  #seekRow .tm{flex:none; width:44px; font-size:12.5px; color:var(--quiet); text-align:center; font-variant-numeric:tabular-nums}
+  #seekRow input{flex:1; min-width:0; height:40px; margin:0; background:transparent; -webkit-appearance:none; appearance:none; --p:0%; touch-action:none}
+  #seekRow input::-webkit-slider-runnable-track{height:6px; border-radius:3px; background:linear-gradient(90deg,var(--accent2) var(--p),rgba(255,255,255,.22) var(--p))}
+  #seekRow input::-moz-range-track{height:6px; border-radius:3px; background:rgba(255,255,255,.22)}
+  #seekRow input::-moz-range-progress{height:6px; border-radius:3px; background:var(--accent2)}
+  #seekRow input::-webkit-slider-thumb{-webkit-appearance:none; width:22px; height:22px; margin-top:-8px; border-radius:50%; background:#ffc83d; border:2px solid #fff}
+  #seekRow input::-moz-range-thumb{width:18px; height:18px; border-radius:50%; background:#ffc83d; border:2px solid #fff}
+  #seekRow.off{opacity:.45; pointer-events:none}
   /* Âm lượng hiện trên TV khi đổi từ điện thoại / nút trên TV (giống BMBPlayer) */
   #volOsd{position:fixed; right:2.2vw; top:50%; z-index:90; pointer-events:none; opacity:0; transform:translate(16px,-50%); transition:opacity .35s, transform .35s;
     display:flex; flex-direction:column; align-items:center; gap:1.4vh; background:rgba(4,48,56,.86); border:2px solid rgba(95,224,214,.55); border-radius:22px; padding:2.2vh 1.4vw; min-width:clamp(64px,6vw,110px); box-shadow:0 10px 40px rgba(0,0,0,.6)}
@@ -273,7 +285,7 @@
   body.remote #addBox{position:sticky; top:var(--stickTop,0px); z-index:25; background:#0c646e; gap:8px; padding:4px 12px 6px; margin:0 -12px}
   body.remote #addBox input{border-radius:999px; padding:9px 16px}
   body.remote #addBox button{border-radius:999px; padding:0 16px; font-size:18px}
-  body.remote .pane{padding:0 12px 190px}
+  body.remote .pane{padding:0 12px 250px}
   body.remote .row{gap:10px; padding:6px 0}
   body.remote .row img{width:80px; height:45px; border-radius:7px}
   body.remote .row .name{font-size:14px; font-weight:600}
@@ -623,7 +635,7 @@ $('mSave').onclick = () => {
 
 /* ---------- Gửi lệnh tới trang phát (chế độ điều khiển) ---------- */
 async function sendCmd(action, payload){
-  if(wsSend({ type:'cmd', action, payload: payload || {} })) return;                 // kênh tức thì: TV nhận dưới 0,5 giây
+  if(wsSend({ type:'cmd', action, payload: payload || {} })) return;   // kênh tức thì: TV nhận dưới 0,5 giây
   if(!cfg.pass){ toast('Đang nối lại tới TV, thử lại sau vài giây…', 'err'); wsKick(); return; }
   try{ await api('/api/cmd', { room: ROOM, action, payload: payload || null }); }catch(e){ apiFail(e); }   // dự phòng: qua D1
 }
@@ -845,12 +857,13 @@ function snapshot(){
   const st = ready && player.getPlayerState ? player.getPlayerState() : -1;
   return { playing: st === 1, unlocked, id: curId, title: it ? it.title : '', channel: it ? it.channel : '', thumb: it ? it.thumb : '',
            vol: ready && player.getVolume ? Math.round(player.getVolume()) : +$('vol').value,
+           t: ready && player.getCurrentTime ? Math.round((player.getCurrentTime() || 0) * 10) / 10 : 0, dur: ready && player.getDuration ? Math.round(player.getDuration() || 0) : 0,
            shuffle, repeat, playlist: curName, pos: pos + 1, total: order.length, fs: tvFs, muted: soundBlocked, mute: !!(ready && player.isMuted && player.isMuted()) };
 }
 async function publishState(force){
   if(REMOTE) return;
   paintMute();
-  const snap = snapshot(), str = JSON.stringify(snap), changed = str !== lastPub, now = Date.now();
+  const snap = snapshot(), str = JSON.stringify(Object.assign({}, snap, { t: 0 })), changed = str !== lastPub, now = Date.now();      // t (giây đang phát) đổi liên tục nên không tính là 'có thay đổi'
   if(wsReady && (changed || force)) wsSend({ type:'state', state: snap });             // kênh tức thì: gửi ngay khi đổi
   lastPub = str;
   if(!cfg.api || !cfg.pass) return;
@@ -870,6 +883,13 @@ async function runCmd(c){
     case 'next': next(false); break;
     case 'prev': pos < 0 ? playAt(0) : prev(); break;
     case 'mute': toggleMute(); break;
+    case 'seek': {                       // tua: by = ±giây so với hiện tại, t = giây tuyệt đối
+      if(!ready) break;
+      const dur = player.getDuration ? player.getDuration() : 0;
+      let t = typeof p.t === 'number' ? p.t : (player.getCurrentTime() || 0) + (+p.by || 0);
+      t = Math.max(0, dur > 1 ? Math.min(t, dur - 1) : t);
+      player.seekTo(t, true); break;
+    }
     case 'fs': setTvFs(typeof p.on === 'boolean' ? p.on : !tvFs); break;
     case 'vol': { const v = Math.max(0, Math.min(100, +p.value || 0)); $('vol').value = v; if(ready) player.setVolume(v); paintVol(); showVolOsd(); break; }
     case 'shuffle': toggleShuffle(); break;
@@ -897,11 +917,38 @@ async function pollCmds(){
       }
     }
   }catch(e){}
-  pollTimer = setTimeout(pollCmds, wsReady ? 30000 : (Date.now() < fastUntil ? 1500 : 5000));   // có kênh tức thì: chỉ hỏi D1 30 giây/lần làm dự phòng
+  pollTimer = setTimeout(pollCmds, wsReady ? 30000 : (Date.now() < fastUntil ? 1500 : 5000));   // có kênh tức thì: chỉ hỏi D1 30 giây/lần làm dự phòng   // có kênh tức thì: chỉ hỏi D1 30 giây/lần làm dự phòng
 }
 
 /* ---------- Trang điều khiển: đọc trạng thái của trang phát ---------- */
 let lastStatePlaylist = null;
+/* ---------- Thanh tua trên điều khiển từ xa: kéo thanh hoặc bấm ±10 giây ---------- */
+const fmtT = s => { s = Math.max(0, Math.floor(s || 0)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60; return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(x).padStart(2, '0'); };
+let sk = { t:0, dur:0, at:0, playing:false, drag:false, hold:0 };
+function seekBuild(){
+  const row = el('div'); row.id = 'seekRow'; row.classList.add('off');
+  const back = el('button', 'sk', '⏪ 10'), fwd = el('button', 'sk', '10 ⏩'), tc = el('span', 'tm', '0:00'), td = el('span', 'tm', '0:00');
+  const rg = document.createElement('input'); rg.type = 'range'; rg.min = 0; rg.max = 1000; rg.value = 0; rg.id = 'seekBar'; rg.setAttribute('aria-label', 'Tua bài');
+  back.type = fwd.type = 'button'; back.title = 'Lùi 10 giây'; fwd.title = 'Tới 10 giây';
+  const jump = by => { sendCmd('seek', { by }); sk.t = Math.max(0, Math.min(sk.dur || 1e9, sk.t + by)); sk.at = Date.now(); sk.hold = Date.now() + 1500; seekPaint(); };
+  back.onclick = () => jump(-10); fwd.onclick = () => jump(10);
+  rg.addEventListener('input', () => { sk.drag = true; tc.textContent = fmtT(rg.value / 1000 * sk.dur); rg.style.setProperty('--p', rg.value / 10 + '%'); });
+  rg.addEventListener('change', () => { const t = Math.round(rg.value / 1000 * sk.dur); sk.drag = false; sendCmd('seek', { t }); sk.t = t; sk.at = Date.now(); sk.hold = Date.now() + 1500; seekPaint(); });
+  row.append(back, tc, rg, td, fwd); row._tc = tc; row._td = td; row._rg = rg;
+  setInterval(seekPaint, 500);
+  return row;
+}
+function seekSync(st){       // nhận giây đang phát từ TV; giữa hai lần báo thì tự chạy theo đồng hồ
+  if(Date.now() < sk.hold) { sk.dur = st.dur || sk.dur; sk.playing = !!st.playing; return; }          // vừa tua xong: bỏ qua trạng thái cũ còn trên đường về
+  sk.t = +st.t || 0; sk.dur = +st.dur || 0; sk.playing = !!st.playing; sk.at = Date.now(); seekPaint();
+}
+function seekPaint(){
+  const row = $('seekRow'); if(!row || sk.drag) return;
+  const live = sk.dur > 0, t = Math.min(sk.dur || 1e9, sk.t + (sk.playing ? (Date.now() - sk.at) / 1000 : 0));
+  row.classList.toggle('off', !live);
+  row._tc.textContent = fmtT(live ? t : 0); row._td.textContent = live ? fmtT(sk.dur) : '--:--';
+  const v = live ? Math.round(t / sk.dur * 1000) : 0; row._rg.value = v; row._rg.style.setProperty('--p', v / 10 + '%');
+}
 let lastPlaying = null;
 function applyRemoteState(d){
   const st = d.state, online = !!st && d.age != null && d.age < 90000;
@@ -916,6 +963,7 @@ function applyRemoteState(d){
   $('nowTitle').textContent = st.title ? decode(st.title) : '—';
   $('nowCh').textContent = st.channel ? decode(st.channel) : '';
   const th = safeThumb(st.thumb); if(th && $('rcImg').getAttribute('src') !== th) $('rcImg').src = th;
+  seekSync(st);
   setPlayIcon(st.playing); paintFs(!!st.fs); remoteMute = !!st.mute; paintMute();
   shuffle = !!st.shuffle; repeat = st.repeat || 'all'; paintModes();
   if(document.activeElement !== $('vol') && typeof st.vol === 'number'){ $('vol').value = st.vol; paintVol(); }
@@ -1562,7 +1610,7 @@ if(REMOTE){
   const vi = el('span', 'vi'); vi.innerHTML = ICON.vol;
   vr.append(vi, volButton('low', -5, 'Giảm âm lượng'), el('b', 'vn'), volButton('vol', 5, 'Tăng âm lượng'), $('vol')); vr.children[2].id = 'volN';
   vi.style.cursor = 'pointer'; vi.onclick = () => { sendCmd('mute'); remoteMute = !remoteMute; paintMute(); };
-  dock.append($('ctl'), vr); document.body.append(dock);
+  dock.append(seekBuild(), $('ctl'), vr); document.body.append(dock);
   const fb = el('button'); fb.id = 'fsRemote'; vr.append(fb); paintFs(false);
   fb.onclick = () => { sendCmd('fs', { on: !tvFsShown }); paintFs(!tvFsShown); };      // phóng to / thu nhỏ màn hình TV (không phải bảng điều khiển trên điện thoại)
   $('fsBtn').remove();
@@ -1617,7 +1665,7 @@ if(REMOTE && !cfg.pass){
 else{ loadPlaylists(); wsConnect(); refreshMe(); }
 if(REMOTE){ pollState(); ping(); setInterval(ping, 20000); }
 else{
-  pollCmds(); setInterval(() => publishState(false), 5000);
+  pollCmds(); setInterval(() => publishState(wsReady && !!(ready && player.getPlayerState && player.getPlayerState() === 1)), 5000);   // đang phát + có kênh tức thì: báo giây hiện tại mỗi 5 giây để điện thoại chạy thanh tua đúng
   const s = document.createElement('script'); s.src = 'https://www.youtube.com/iframe_api'; document.head.append(s);
 }
 </script>
