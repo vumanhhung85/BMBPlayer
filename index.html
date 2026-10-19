@@ -95,6 +95,8 @@
     background:linear-gradient(90deg,rgba(0,0,0,.72),rgba(0,0,0,.35)); border-left:5px solid var(--good); border-radius:12px; padding:9px 20px}
   #ovNext .lbl{font-size:clamp(11px,1.2vw,16px); color:var(--good); font-weight:700; letter-spacing:1px}
   #ovNext .t{font-size:clamp(15px,2vw,28px); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  #ovSeek{left:50%; bottom:11vh; transform:translate(-50%,12px); background:rgba(0,0,0,.72); border-radius:999px; padding:8px 24px; font-size:clamp(16px,2.2vw,32px); font-weight:700; font-variant-numeric:tabular-nums; white-space:nowrap}
+  #ovSeek.show{transform:translate(-50%,0)}
   #ovCount{right:calc(2vw + 15vh); top:2.4vh; transform:translateY(-12px); background:rgba(0,0,0,.6); border-radius:999px; padding:6px 16px; font-size:clamp(13px,1.6vw,22px); font-weight:700}
   #ovAdd{right:2.2vw; top:12.5vh; transform:translateX(16px); max-width:46vw; background:rgba(5,95,70,.85); border-left:5px solid var(--good); border-radius:12px; padding:9px 18px}
   #ovAdd.show{transform:none}
@@ -201,6 +203,7 @@
   <div class="ov" id="ovTitle"><div><div class="lbl">ĐANG HÁT</div><div class="t" id="ovTitleT"></div></div></div>
   <div class="ov" id="ovNext"><div class="lbl">TIẾP THEO</div><div class="t" id="ovNextT"></div></div>
   <div class="ov" id="ovCount"></div>
+  <div class="ov" id="ovSeek"></div>
   <div class="ov" id="ovAdd"><div class="lbl" id="ovAddL">ĐÃ THÊM</div><div class="t" id="ovAddT"></div></div>
   <div class="ov" id="lock"></div>
   <div class="ov" id="toast"></div>
@@ -273,6 +276,7 @@ if(NATIVE){ try{ NATIVE.setVolume(vol); }catch(e){} }          // người dùng
 let lock = null;                // null | 'muted' (đang phát im lặng vì bị chặn) | 'tap' (chưa phát được, cần một lần chạm)
 let unlocked = false;           // đã có thao tác của người dùng trên trang này
 let roomOpen = !bc.ws, lastSession = null, connTxt = '';
+let seekOn = !bc.ws, nPeers = bc.ws ? 0 : 1;     // seekOn: admin cho phép thanh tua (Worker báo trong tin 'room'); nPeers: số điện thoại / máy tính bảng đang nối
 /* Chưa có mã phòng (mở trang gốc lần đầu, hoặc trình duyệt chế độ Khách/ẩn danh xoá mất mã đã nhớ) → hỏi gán phòng.
    ?local=1 = chạy thử trong cùng trình duyệt (BroadcastChannel) như trước. */
 const needSetup = !bc.ws && !params.has('local');
@@ -668,6 +672,27 @@ setInterval(()=>{
   }
 }, 500);
 
+/* ---------- Tua bài (thanh trượt + ±10 giây trên remote), chỉ khi admin bật ---------- */
+function curT(){ try{ return ready && cur >= 0 ? Math.max(0, +player.getCurrentTime() || 0) : 0; }catch(e){ return 0; } }
+function curDur(){ try{ return ready && cur >= 0 ? Math.max(0, +player.getDuration() || 0) : 0; }catch(e){ return 0; } }
+function fmtT(s){ s = Math.max(0, Math.floor(s || 0)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60; return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(x).padStart(2, '0'); }
+function seekCmd(c){
+  if(!seekOn || !ready || cur < 0 || !queue[cur]) return;
+  const d = curDur();
+  let t = typeof c.t === 'number' && isFinite(c.t) ? c.t : curT() + (+c.by || 0);
+  t = Math.max(0, d > 1 ? Math.min(t, d - 1) : t);
+  try{ player.seekTo(t, true); }catch(e){ return; }
+  $('ovSeek').textContent = (typeof c.by === 'number' ? (c.by < 0 ? '⏪ ' : '⏩ ') : '') + fmtT(t) + (d > 0 ? ' / ' + fmtT(d) : '');
+  flash('ovSeek', 1800);
+  setTimeout(pushPos, 250);
+}
+function pushPos(){
+  if(!seekOn || !nPeers || !ready || cur < 0) return;
+  let playing = false; try{ playing = player.getPlayerState() === 1; }catch(e){}
+  bc.postMessage({ type:'pos', payload:{ cur, t: curT(), dur: curDur(), playing } });
+}
+setInterval(pushPos, 3000);
+
 /* ---------- Đồng bộ với remote ---------- */
 function push(){
   bc.postMessage({ type:'state', payload:{
@@ -675,6 +700,7 @@ function push(){
     playing: ready && player.getPlayerState && player.getPlayerState()===1,
     muted: userMuted,
     volume: vol,
+    seek: seekOn, t: curT(), dur: curDur(),
     nowTitle: cur>=0 ? queue[cur].title : null,
     cur, queue: queue.map(q=>({ id:q.id, title:q.title }))
   }});
@@ -691,6 +717,7 @@ bc.onmessage = ev => {
     case 'play': playPause(); break;
     case 'next': next(); break;
     case 'replay': replay(); break;
+    case 'seek': seekCmd(c); break;
     case 'mute': toggleMute(); break;
     case 'vol': setVol(+c.value || 0); break;
     case 'prio': prio(+c.index); break;
@@ -746,6 +773,7 @@ if(bc.ws){
     if(lastSession !== null && m.session !== lastSession) resetSession();     // phòng đóng/mở lại = phiên hát mới, xoá hàng chờ cũ
     lastSession = m.session; roomOpen = !!m.open; window.__bmbOpen = roomOpen;   /* APK 2.4: chỉ hỏi cập nhật khi phòng đóng */
     if(m.name) roomName = m.name;
+    { const was = seekOn; seekOn = !!m.seek; nPeers = (m.remotes || 0) + (m.tablets || 0); if(was !== seekOn) setTimeout(push, 0); }
     paintGuestQr(m.open ? m.qr : '', m.name);
     if(!m.open){ resetSession(); roomNote('Phòng chưa mở — chờ nhân viên mở phòng'); paintRoomTag(); connTxt = ''; $('hint').textContent = HINT0; }
     else {

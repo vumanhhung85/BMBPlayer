@@ -125,3 +125,9 @@ Tắt cả tin nhắn lẫn nút: biến `TG_LETAN = 0` (như cũ).
 - Cần secret `GUEST_SECRET` (cùng giá trị với kho-karaoke/bmbplayer) để người dùng dùng được Kho; biến tuỳ chọn `USER_SEARCH_PER_WEEK`, `MAX_USERS`.
 - Bảng D1 tự tạo ở lần gọi đầu; bảng playlist cũ giữ nguyên (playlist cũ thuộc về quản trị).
 - Mã riêng của người dùng vẫn ghép TV (📱 mã 6 số / QR) và dùng kênh tức thì được: nhac-playlist cấp vé `nhac-<id>.<hết hạn>.<chữ ký>` (cùng GUEST_SECRET), bmbplayer kiểm vé ở `/nhac/ws` và `/api/nhac/pair` (hàm `nhacUserOk`).
+
+## Thanh tua bài (remote ⇄ TV)
+- Remote điện thoại / máy tính bảng có thanh trượt + nút ⏪10 / 10⏩ để tua bài đang hát trên TV (index.html); TV hiện thời gian tua ở giữa màn hình.
+- Công tắc **BẬT/TẮT** ở `quay.html` → tab ⚙️ Cài đặt → "Thanh tua bài" (**chỉ admin**; mặc định BẬT, áp dụng mọi phòng). Lưu ở D1 `order_meta` khoá `seek_on` (bảng tự tạo). Worker cũng chặn lệnh `seek` khi đang TẮT.
+- Phòng đang mở nhận thay đổi khi TV / điện thoại nối lại hoặc ở lần mở phòng kế tiếp. TV chỉ báo vị trí bài (tin `pos`, ~3 giây/lần) khi có điện thoại / máy tính bảng đang nối.
+- Cần deploy cả Worker (push `main`) và trang; trang mới + Worker cũ thì thanh tua tự ẩn.

@@ -48,6 +48,7 @@
   .opt{padding:0 12px 3px; color:var(--quiet); font-size:13px; display:flex; align-items:center; gap:8px; line-height:1.4}
 
   .list{flex:1; overflow:auto; padding:0 12px 190px}
+  body.hasSeek .list{padding-bottom:244px}
   .secHead{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 0 3px; font-size:14px}
   .secAct{display:flex; gap:6px; flex:0 0 auto}
   .hotTabs{display:inline-flex; background:#0e0e16; border:1px solid var(--line); border-radius:12px; padding:3px; gap:3px}
@@ -102,6 +103,20 @@
   .vol input::-webkit-slider-runnable-track{height:8px; border-radius:99px; background:linear-gradient(90deg,#7c3aed,#c084fc var(--p,100%),#2c2c3c var(--p,100%))}
   .vol input::-webkit-slider-thumb{-webkit-appearance:none; width:26px; height:26px; margin-top:-9px; border-radius:50%; background:#fff; border:3px solid #a855f7; box-shadow:0 2px 8px rgba(0,0,0,.5)}
   .vol .vi{color:var(--quiet); display:flex} .vol .vi svg{width:20px; height:20px; fill:currentColor} .vol input{flex:1; accent-color:#a855f7; height:28px}
+  .seekRow{display:none; align-items:center; gap:8px}
+  body.hasSeek .seekRow{display:flex}
+  .seekRow .sk{flex:none; min-width:48px; height:38px; padding:0 8px; border-radius:19px; background:#2e2e44; border:1.5px solid #5a5a7a; color:#fff; font-size:13px; font-weight:700; font-family:inherit}
+  .seekRow .sk:active{transform:scale(.94)}
+  .seekRow .tm{flex:none; min-width:38px; font-size:12.5px; color:var(--quiet); text-align:center; font-variant-numeric:tabular-nums}
+  .seekRow input{flex:1; min-width:0; height:38px; margin:0; background:transparent; -webkit-appearance:none; appearance:none; --p:0%; touch-action:none}
+  .seekRow input::-webkit-slider-runnable-track{height:6px; border-radius:3px; background:linear-gradient(90deg,var(--accent2) var(--p),rgba(128,128,150,.35) var(--p))}
+  .seekRow input::-moz-range-track{height:6px; border-radius:3px; background:rgba(128,128,150,.35)}
+  .seekRow input::-moz-range-progress{height:6px; border-radius:3px; background:var(--accent2)}
+  .seekRow input::-webkit-slider-thumb{-webkit-appearance:none; width:22px; height:22px; margin-top:-8px; border-radius:50%; background:#FFD21A; border:2px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,.4)}
+  .seekRow input::-moz-range-thumb{width:18px; height:18px; border-radius:50%; background:#FFD21A; border:2px solid #fff}
+  .seekRow.off{opacity:.45; pointer-events:none}
+  body.wide #side .seekRow{padding:8px 10px 2px}
+  .roomOff #dock .seekRow{ opacity:.6 }
   .roomOff #dock{ pointer-events:none } .roomOff #dock .ctrlRow, .roomOff #dock .vol{ opacity:.6 }
   .row.tap{cursor:pointer} .row.tap:active{background:#1c1830}
   .row .num{flex:0 0 auto; width:26px; text-align:center; color:var(--quiet); font-weight:800; font-size:14px}
@@ -284,6 +299,7 @@
   #snack{ background:#E3F6EC; border:1px solid #6CCB9B; color:#0B5E3B; box-shadow:0 10px 30px -10px rgba(75,18,114,.5) }
   #snack.warn{ background:#FFF1D6; border-color:#F2B94A; color:#7A4A00 }
 
+  .seekRow .sk{ background:#fff; border:1.5px solid #CDB8E3; color:var(--grape) }
   #dock{ background:#fff; border-top:1px solid var(--line); box-shadow:0 -10px 24px -12px rgba(75,18,114,.35) }
   .ctrlRow .vn, .vol .vn{ color:var(--grape); font-weight:700 }
   .ctrlRow button{ background:#fff; border:1.5px solid #CDB8E3; color:var(--grape) }
@@ -449,6 +465,7 @@
     <button id="sDown"><span class="i"></span><span class="l">Giảm âm</span></button>
     <button id="sUp"><span class="i"></span><span class="l">Tăng âm</span></button>
   </div>
+  <div class="seekHost"></div>
   <div class="sVol">Âm lượng <b id="sVolN">–</b></div>
   <div class="sHead">BÀI KẾ TIẾP (<span id="sCount">0</span>)</div>
   <div class="sList" id="sList"></div>
@@ -457,6 +474,7 @@
 <div class="odOv" id="pk"><div class="odCard pkCard"><img id="pkImg" alt=""><div class="pkT" id="pkT"></div><div class="pkBtns" id="pkBtns"></div></div></div>
 
 <div id="dock">
+  <div class="seekHost"></div>
   <div class="ctrlRow">
     <button id="replayBtn" aria-label="Hát lại"></button>
     <button class="primary" id="playBtn" aria-label="Phát / Dừng"></button>
@@ -1388,12 +1406,47 @@ $('vol').addEventListener('change', e => { volHold = Date.now(); volSend(+e.targ
 function paintMute(m){ $('muteBtn').innerHTML = m ? IC.mute : IC.vol; $('muteBtn').classList.toggle('off', !!m);
   $('sMute').querySelector('.i').innerHTML = m ? IC.mute : IC.vol; $('sMute').classList.toggle('off', !!m); $('sMute').querySelector('.l').textContent = m ? 'Bật tiếng' : 'Tắt tiếng'; }
 
+/* ---------- Thanh tua bài: kéo thanh hoặc bấm ±10 giây (chỉ hiện khi admin bật trong quầy → Cài đặt) ---------- */
+const fmtT = s => { s = Math.max(0, Math.floor(s || 0)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60; return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(x).padStart(2, '0'); };
+const sk = { on:false, t:0, dur:0, at:0, playing:false, drag:false, hold:0, rows:[] };
+function seekMake(host){
+  const row = el('div', 'seekRow off');
+  const back = el('button', 'sk', '⏪ 10'), fwd = el('button', 'sk', '10 ⏩'), tc = el('span', 'tm', '0:00'), td = el('span', 'tm', '--:--');
+  const rg = document.createElement('input'); rg.type = 'range'; rg.min = 0; rg.max = 1000; rg.value = 0; rg.setAttribute('aria-label', 'Tua bài');
+  back.type = fwd.type = 'button'; back.title = 'Lùi 10 giây'; fwd.title = 'Tới 10 giây';
+  const mark = () => { sk.at = Date.now(); sk.hold = Date.now() + 1500; seekPaint(); };
+  const jump = by => { send('seek', { by }); sk.t = Math.max(0, Math.min(sk.dur || 1e9, seekNow() + by)); mark(); };
+  back.onclick = () => jump(-10); fwd.onclick = () => jump(10);
+  rg.addEventListener('input', () => { sk.drag = true; const v = +rg.value; sk.rows.forEach(r => { r._tc.textContent = fmtT(v / 1000 * sk.dur); r._rg.style.setProperty('--p', v / 10 + '%'); if(r._rg !== rg) r._rg.value = v; }); });
+  rg.addEventListener('change', () => { const t = Math.round(+rg.value / 1000 * sk.dur); sk.drag = false; send('seek', { t }); sk.t = t; mark(); });
+  row.append(back, tc, rg, td, fwd); row._tc = tc; row._td = td; row._rg = rg;
+  host.replaceChildren(row); sk.rows.push(row);
+}
+const seekNow = () => Math.min(sk.dur || 1e9, sk.t + (sk.playing ? (Date.now() - sk.at) / 1000 : 0));
+function seekPaint(){
+  if(sk.drag) return;
+  const live = sk.on && sk.dur > 0, t = live ? seekNow() : 0, v = live ? Math.round(t / sk.dur * 1000) : 0;
+  sk.rows.forEach(r => { r.classList.toggle('off', !live); r._tc.textContent = fmtT(t); r._td.textContent = live ? fmtT(sk.dur) : '--:--'; r._rg.value = v; r._rg.style.setProperty('--p', v / 10 + '%'); });
+}
+function seekSync(s){          // s = {t, dur, playing}: giây đang phát do TV báo; giữa hai lần báo thì tự chạy theo đồng hồ
+  if(Date.now() < sk.hold){ sk.dur = +s.dur || sk.dur; sk.playing = !!s.playing; return; }   // vừa tua xong: bỏ qua báo cáo cũ còn trên đường về
+  sk.t = +s.t || 0; sk.dur = +s.dur || 0; sk.playing = !!s.playing; sk.at = Date.now(); seekPaint();
+}
+function seekEnable(on){
+  on = !!on; if(on === sk.on) return;
+  sk.on = on; document.body.classList.toggle('hasSeek', on); seekPaint();
+}
+document.querySelectorAll('.seekHost').forEach(seekMake);
+setInterval(seekPaint, 500);
+
 /* ---------- Nhận trạng thái ---------- */
 bc.onmessage = ev => {
   const m = ev.data || {};
   if(m.type === 'dead' && /^[\w-]{11}$/.test(m.id || '')){ markDead(m.id); return; }
+  if(m.type === 'pos'){ if(sk.on && m.payload) seekSync(m.payload); return; }       // giây đang phát (TV báo ~3 giây/lần)
   if(m.type !== 'state') return;
   const s = m.payload || {};
+  seekEnable(s.seek); if(s.seek) seekSync({ t:s.t, dur:s.dur, playing:s.playing });
   $('nowTitle').textContent = s.apiFailed ? '⚠ Màn hình phát không tải được YouTube, xem hướng dẫn trên màn hình phát'
     : s.needStart ? '⚠ TV đang chờ một lần bấm OK / chạm màn hình để bật tiếng'
     : s.ready === false && s.cur >= 0 ? '⏳ Màn hình phát đang khởi động YouTube…'

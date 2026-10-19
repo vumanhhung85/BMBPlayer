@@ -438,6 +438,14 @@ tbody tr:hover td{background:#FBF8FE}
       <button class="btn btn-ghost btn-sm" id="vtTat" style="display:none">Tắt vân tay</button>
     </div>
 
+    <div id="seekSec" style="display:none">
+      <div class="sect-lbl">⏩ Thanh tua bài trên điện thoại / máy tính bảng <span class="tagx">chỉ admin</span></div>
+      <div class="hint" id="seekInfo">Đang tải…</div>
+      <div class="actions wrap" style="margin-bottom:22px">
+        <button class="btn btn-y btn-sm" id="seekBtn" disabled>…</button>
+      </div>
+    </div>
+
     <div id="apkSec" style="display:none">
       <div class="sect-lbl">📦 Phát hành APK BMBPlayer</div>
       <div class="hint" id="apkInfo">Đang tải…</div>
@@ -1054,6 +1062,7 @@ function hienTheoQuyen(){
   $('tabTaiKhoan').style.display = S.quanLy  ? '' : 'none';
   $('tabCaiDatApp').style.display = S.quanLy ? '' : 'none';   /* Cài đặt: quản lý + admin (vân tay); mục Phát hành APK chỉ admin cao nhất */
   $('apkSec').style.display = S.sieuAdmin ? '' : 'none';
+  $('seekSec').style.display = S.vaiTro === 'admin' ? '' : 'none';
   $('phongAdmin').style.display  = S.vaiTro==='admin' ? '' : 'none';   /* phòng cố định — chỉ admin thêm/xoá */
   $('btnThuHoiMtb').style.display = S.quanLy ? '' : 'none';
   $('selCN').style.display       = S.vaiTro==='admin' ? '' : 'none';
@@ -2058,7 +2067,25 @@ function apkLen(){
     toast('Đã phát hành BMBPlayer ' + i.vn + '.'); $('apkFile').value = ''; APK.file = null; $('apkRead').style.display = 'none'; apkVe();
   }).catch(function(){ toast('Mất kết nối khi tải lên — thử lại.'); $('apkUp').disabled = false; });
 }
-function cdMo(){ vtVe(); if(S.sieuAdmin) apkVe(); }
+function seekVe(){
+  api('admin.seekGet', {}).then(function(r){
+    if(!r || !r.ok){ $('seekInfo').textContent = (r && r.msg) || 'Không hỏi được cài đặt.'; return; }
+    seekVe2(r.on);
+  }).catch(function(){ $('seekInfo').textContent = 'Không kết nối được máy chủ.'; });
+}
+function seekVe2(on){
+  var b = $('seekBtn'); b.disabled = false; b.dataset.on = on ? '1' : '0';
+  b.textContent = on ? 'Tắt thanh tua' : 'Bật thanh tua';
+  $('seekInfo').innerHTML = 'Hiện đang <b>' + (on ? 'BẬT' : 'TẮT') + '</b> (áp dụng cho mọi phòng). Bật: remote điện thoại / máy tính bảng có thanh trượt và nút tua ±10 giây cho bài đang hát trên TV. Phòng đang mở sẽ nhận thay đổi khi điện thoại / TV nối lại, hoặc ở lần mở phòng kế tiếp.';
+}
+$('seekBtn').onclick = function(){
+  var b = $('seekBtn'), want = b.dataset.on !== '1'; b.disabled = true;
+  api('admin.seekSet', {on:want}).then(function(r){
+    if(!r || !r.ok){ b.disabled = false; alert((r && r.msg) || 'Không lưu được.'); return; }
+    seekVe2(r.on);
+  }).catch(function(){ b.disabled = false; alert('Không kết nối được máy chủ.'); });
+};
+function cdMo(){ vtVe(); if(S.vaiTro === 'admin') seekVe(); if(S.sieuAdmin) apkVe(); }
 $('lgVt').addEventListener('click', vtDangNhap);
 $('vtBat').addEventListener('click', vtBat);
 $('vtTat').addEventListener('click', vtTat);

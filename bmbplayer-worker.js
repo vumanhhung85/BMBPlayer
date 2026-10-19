@@ -57,7 +57,7 @@ import { DurableObject } from 'cloudflare:workers';
 const enc = new TextEncoder();
 const ID_RE = /^[A-Za-z0-9_-]{1,40}$/;                                  // mã phòng = order_phong.id của Order (vd P1A2B3C4D5E6)
 const TOKEN_RE = /^([A-Za-z0-9_-]{1,40})\.(\d{1,6})\.([\w-]{22})$/;
-const ACTIONS = new Set(['add', 'play', 'next', 'replay', 'mute', 'vol', 'prio', 'up', 'remove', 'hello']);
+const ACTIONS = new Set(['add', 'play', 'next', 'replay', 'mute', 'vol', 'prio', 'up', 'remove', 'hello', 'seek']);
 const MAX_MSG = 4096, MAX_STATE = 32768, MAX_REMOTES = 2, RATE_PER_SEC = 15;
 const SVC_ACTIVE_MS = 2 * 3600 * 1000, SVC_DONE_MS = 15 * 1000;     // yêu cầu gọi lễ tân trên TV: đang xử lý hiện tối đa 2 giờ; xong/huỷ hiện 15 giây
 
@@ -390,6 +390,8 @@ async function handleApi(request, env, ctx) {
         case 'admin.mauList':            res = await adminMauList(env, body); break;
         case 'admin.mauSave':            res = await adminMauSave(env, body); break;
         case 'admin.mauAn':              res = await adminMauAn(env, body); break;
+        case 'admin.seekGet':            res = await adminSeekGet(env, body); break;
+        case 'admin.seekSet':            res = await adminSeekSet(env, body); break;
         case 'admin.phongThem':          res = await adminPhongThem(env, body); break;
         case 'admin.phongXoa':           res = await adminPhongXoa(env, body); break;
         case 'admin.taiKhoan.danhSach':  res = await tkDanhSach(env, body); break;
@@ -978,6 +980,32 @@ async function adminMauAn(env, body) {
 // Phòng (CHỈ admin — phòng là cố định). Cột token/ma4 vẫn sinh để giữ đúng cấu trúc bảng cũ, nhưng không còn dùng
 // (khách vào bằng QR trên TV). Phòng mới tạo ở trạng thái ĐÓNG — quầy bấm mở khi có khách.
 // ============================================================
+/* ---------- Công tắc "thanh tua bài" trên điện thoại / máy tính bảng (admin bật/tắt ở quay.html → Cài đặt) ----------
+   Lưu ở order_meta khoá 'seek_on' ('1' | '0'); chưa đặt = BẬT. Áp dụng cho mọi phòng. TV + remote nhận cờ `seek` trong tin 'room';
+   Worker còn chặn lệnh 'seek' khi đang tắt (không tin vào trang). Bộ nhớ đệm 20 giây trong mỗi isolate. */
+let seekCache = { v: true, at: 0 };
+async function seekOn(env) {
+  if (Date.now() - seekCache.at < 20000) return seekCache.v;
+  let v = true;
+  try { const r = await env.DB.prepare(`SELECT v FROM order_meta WHERE k = 'seek_on'`).first(); if (r && r.v === '0') v = false; } catch (e) { /* chưa có bảng = mặc định bật */ }
+  seekCache = { v, at: Date.now() };
+  return v;
+}
+async function adminSeekGet(env, body) {
+  const [, loi] = await canPhien(env, body, 'admin');
+  if (loi) return loi;
+  seekCache.at = 0;
+  return ok({ on: await seekOn(env) });
+}
+async function adminSeekSet(env, body) {
+  const [, loi] = await canPhien(env, body, 'admin');
+  if (loi) return loi;
+  const on = body.on === true || body.on === 1 || body.on === '1';
+  await pushBangSan(env);                                   // tạo order_meta nếu chưa có
+  await env.DB.prepare(`INSERT INTO order_meta (k, v) VALUES ('seek_on', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v`).bind(on ? '1' : '0').run();
+  seekCache = { v: on, at: Date.now() };
+  return ok({ on });
+}
 async function adminPhongThem(env, body) {
   const [ss, loi] = await canPhien(env, body, 'admin');
   if (loi) return loi;
@@ -1535,7 +1563,7 @@ export class Room extends DurableObject {
   async roomMsg(c, extra){
     c = c || await this.cfg();
     return Object.assign({ type: 'room', open: c.open, since: c.since, session: c.session, name: c.name, bname: c.bname, branch: c.branch, tv: this.sockets('tv').length > 0,
-      remotes: this.sockets('remote').length, tablets: this.sockets('tablet').length }, extra || {});
+      remotes: this.sockets('remote').length, tablets: this.sockets('tablet').length, seek: await seekOn(this.env) }, extra || {});
   }
   /* Phần riêng từng vai trò: TV nhận mã QR khách để vẽ ở góc màn hình, máy tính bảng nhận vé tìm bài */
   async roleExtra(c, role){
@@ -1732,7 +1760,13 @@ export class Room extends DurableObject {
         out.id = p.id; out.title = String(p.title || 'Bài không tên').slice(0, 200);
         if(p.prio === true) out.prio = true;
       }else if(p.action === 'vol'){ out.value = Math.max(0, Math.min(100, +p.value || 0));
-      }else if(p.action === 'prio' || p.action === 'up' || p.action === 'remove'){ out.index = Math.max(0, Math.min(500, +p.index | 0)); }
+      }else if(p.action === 'prio' || p.action === 'up' || p.action === 'remove'){ out.index = Math.max(0, Math.min(500, +p.index | 0));
+      }else if(p.action === 'seek'){                                 // tua bài đang hát: t = giây tuyệt đối, hoặc by = ±giây; admin tắt thì bỏ
+        if(!(await seekOn(this.env))) return;
+        if(typeof p.t === 'number' && isFinite(p.t)) out.t = Math.max(0, Math.min(86400, p.t));
+        else if(typeof p.by === 'number' && isFinite(p.by)) out.by = Math.max(-600, Math.min(600, p.by));
+        else return;
+      }
       const msg = JSON.stringify({ type: 'cmd', payload: out });
       for(const tv of this.sockets('tv')){ try{ tv.send(msg); }catch(e){} }
       return;
@@ -1742,7 +1776,8 @@ export class Room extends DurableObject {
       const c = await this.cfg(); if(!c.open) return;
       await this.ctx.storage.put('last', data);
       for(const r of this.listeners()){ try{ r.send(data); }catch(e){} }
-    }else if(m.type === 'dead'){
+    }else if(m.type === 'dead' || m.type === 'pos'){          // 'pos' = giây đang phát (nhẹ, không lưu): remote vẽ thanh tua
+      if(m.type === 'pos' && data.length > 512) return;
       for(const r of this.listeners()){ try{ r.send(data); }catch(e){} }
     }
   }
