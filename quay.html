@@ -1014,6 +1014,8 @@ function start(){
   $('hTt').textContent = S.bname || 'Quầy phục vụ';
   $('whoTx').textContent = (S.hoTen || S.user) + ' · ' + (VT_TEN[S.vaiTro] || S.vaiTro);
   hienTheoQuyen();
+  /* trên web (không phải app): quản lý hiện 2 nút Bảo trì / Đặt phòng, mở app quản trị cùng tab, bên đó có nút ← Quầy để quay lại */
+  if(!appQ() && S.quanLy) $('qlNav').className = 'qlnav show';
   veChonChiNhanh();
   if(S.vaiTro==='admin' && !S.branch){ alert('Chưa có chi nhánh nào đang hoạt động.'); return; }
   tick();
@@ -1783,8 +1785,9 @@ $('lgP').addEventListener('keydown', function(e){ if(e.key==='Enter') login(); }
 $('btnOut').addEventListener('click', function(){ logout(true); });
 $('btnPush').addEventListener('click', puMo);
 function moTrangQl(loai, ten){
-  if(!confirm('Chuyển sang trang ' + ten + ' (app quản trị)?\n\nBạn sẽ rời màn Quầy. Muốn quay lại Quầy thì thoát trang ' + ten + ' ra.')) return;
-  try{ BMBNative.quayMoAdmin(loai); }catch(e){}
+  if(!confirm('Chuyển sang trang ' + ten + ' (app quản trị)?\n\nBạn sẽ rời màn Quầy. Bấm nút ← Quầy ở đầu trang ' + ten + ' để quay lại.')) return;
+  if(typeof BMBNative !== 'undefined' && typeof BMBNative.quayMoAdmin === 'function'){ try{ BMBNative.quayMoAdmin(loai); }catch(e){} return; }
+  location.href = 'https://boommusicbox.vn/admin.html?tu=quay' + (loai === 'datphong' ? '&tab=dat-phong' : '');
 }
 $('btnQlBaoTri').addEventListener('click', function(){ moTrangQl('baotri', 'Bảo trì'); });
 $('btnQlDatPhong').addEventListener('click', function(){ moTrangQl('datphong', 'Đặt phòng'); });
