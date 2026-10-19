@@ -445,9 +445,9 @@
 
 <div id="modal">
   <div class="card">
-    <h3>Kết nối tới Worker</h3>
-    <label for="apiUrl">Địa chỉ Worker</label>
-    <input id="apiUrl" type="url" value="https://nhac-playlist.vumanhhung85.workers.dev" placeholder="https://nhac-playlist.vumanhhung85.workers.dev" autocomplete="off">
+    <h3 id="mTitle">Tài khoản</h3>
+    <label for="apiUrl" id="apiLbl" style="display:none">Địa chỉ Worker</label>
+    <input id="apiUrl" style="display:none" type="url" value="https://nhac-playlist.vumanhhung85.workers.dev" placeholder="https://nhac-playlist.vumanhhung85.workers.dev" autocomplete="off">
     <label for="pass">Mã của bạn</label>
     <input id="pass" type="password" placeholder="Mã riêng của bạn (người quản lý gửi cho bạn)" autocomplete="off">
     <div id="acct">
@@ -455,8 +455,7 @@
       <div class="btns"><button id="acctPass">Đổi mã của tôi</button><button id="acctUsers">Quản lý người dùng</button></div>
     </div>
     <div class="btns"><button id="mClose">Đóng</button><button id="mSave" class="pri">Lưu</button></div>
-    <div class="hint">Hai thông tin này chỉ lưu trong trình duyệt của thiết bị này. Khoá YouTube API nằm trong Worker, không nằm trong trang.<br>
-      Trang này có hai chế độ: mở bình thường để <b>phát nhạc</b> (trên TV), thêm <b>?mode=remote</b> vào địa chỉ (hoặc mở remoteTV.html) để <b>điều khiển</b> từ điện thoại.</div>
+    <div class="hint">Mã chỉ lưu trong trình duyệt của thiết bị này. Mỗi người dùng một mã riêng để thấy playlist của mình.</div>
   </div>
 </div>
 
@@ -540,7 +539,7 @@ function apiFail(e){
 }
 
 /* ---------- Cài đặt ---------- */
-function openSettings(){ $('apiUrl').value = cfg.api; $('pass').value = cfg.pass; $('modal').style.display = 'flex'; paintMe(); if(cfg.pass && !me) refreshMe(); }
+function openSettings(){ $('apiUrl').style.display = $('apiLbl').style.display = 'none'; $('apiUrl').value = cfg.api; $('pass').value = cfg.pass; $('modal').style.display = 'flex'; paintMe(); if(cfg.pass && !me) refreshMe(); }
 
 /* ---------- Tài khoản từng người ---------- */
 let me = null, meP = null;
@@ -624,6 +623,8 @@ $('usrAdd').onclick = async () => {
   try{ const x = await api('/api/admin/users/create', { name }); $('usrName').value = ''; showCode(x); usrLoad(); }catch(e){ apiFail(e); }
 };
 $('gear').onclick = openSettings;
+// Địa chỉ Worker được ẩn (đã có sẵn mặc định). Cần đổi: chạm 5 lần liên tiếp vào tiêu đề cửa sổ để hiện ô nhập.
+(() => { let n = 0, t = 0; $('mTitle').onclick = () => { const now = Date.now(); n = now - t < 1500 ? n + 1 : 1; t = now; if(n >= 5){ n = 0; $('apiUrl').style.display = $('apiLbl').style.display = ''; } }; })();
 $('mClose').onclick = () => { $('modal').style.display = 'none'; };
 $('mSave').onclick = () => {
   cfg.api = $('apiUrl').value.trim(); cfg.pass = $('pass').value;
@@ -656,7 +657,7 @@ async function loadPlaylists(selectName){
     const want = selectName || curName || (saved && saved.name);
     const pick = playlists.some(p => p.name === want) ? want : (playlists[0] && playlists[0].name);
     if(pick){ sel.value = pick; await loadPlaylist(pick, false); }
-  }catch(e){ apiFail(e); $('startInfo').textContent = 'Chưa kết nối được. Bấm ⚙ để nhập địa chỉ Worker và mật khẩu.'; }
+  }catch(e){ apiFail(e); $('startInfo').textContent = 'Chưa kết nối được. Bấm ⚙ để nhập mã của bạn.'; }
 }
 async function loadPlaylist(name, keep){
   try{
@@ -1678,7 +1679,7 @@ if(REMOTE && !cfg.pass){
   else if(tokValid() && !fromQr){ $('rcStatus').textContent = 'Đang nối tới TV…'; wsConnect(); }
   else if(fromQr) openSettings();                // quét QR: nhập mật khẩu một lần, các lần sau quét là dùng được ngay
   else openPair();
-}else if(!cfg.api || !cfg.pass){ $('startInfo').textContent = cfg.api ? 'Nhập mật khẩu truy cập ở cửa sổ vừa mở.' : 'Bấm ⚙ để nhập địa chỉ Worker và mật khẩu.'; openSettings(); }
+}else if(!cfg.api || !cfg.pass){ $('startInfo').textContent = cfg.api ? 'Nhập mã của bạn ở cửa sổ vừa mở.' : 'Bấm ⚙ để nhập mã của bạn.'; openSettings(); }
 else{ loadPlaylists(); wsConnect(); refreshMe(); }
 if(REMOTE){ pollState(); ping(); setInterval(ping, 20000); }
 else{
