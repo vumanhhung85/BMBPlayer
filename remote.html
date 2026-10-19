@@ -1390,18 +1390,21 @@ function uiBuildSheet(){            // một lần: sao chép mọi luật font-
 function uiApply(){
   if(UI.size > 0 && !uiSheet) uiBuildSheet();
   document.documentElement.style.setProperty('--fs', UI_FS[UI.size]);
-  document.querySelectorAll('#uiMenu .uiSeg').forEach(g => g.querySelectorAll('button').forEach(b => b.classList.toggle('on', String(UI[g.dataset.k]) === b.dataset.v)));
+  const ok = wideOk(), eff = (UI.layout === 'wide' && !ok) ? 'auto' : UI.layout;       // màn hình hẹp: bỏ nút Ngang, lựa chọn Ngang đã lưu tạm coi như Tự động
+  document.querySelectorAll('#uiMenu .uiSeg').forEach(g => g.querySelectorAll('button').forEach(b => { const v = g.dataset.k === 'layout' ? eff : UI[g.dataset.k]; b.classList.toggle('on', String(v) === b.dataset.v); if(b.dataset.v === 'wide') b.style.display = ok ? '' : 'none'; }));
   applyWide(); setTimeout(stickTop, 60);
 }
 const WIDE_MQ = matchMedia('(orientation: landscape) and (min-width: 900px)');
 let maxH = 0, maxHLand = null;
+/* Ép giao diện ngang (2 cột) chỉ khi màn hình đủ rộng cả hai chiều: điện thoại thì thanh trên bị bóp nát, nút Aa biến mất không quay lại được */
+const wideOk = () => Math.min(innerWidth, Math.max(maxH, innerHeight)) >= 500;
 function applyWide(){
   const land = WIDE_MQ.matches;
   if(maxHLand !== land){ maxHLand = land; maxH = 0; }
   maxH = Math.max(maxH, innerHeight);
   const a = document.activeElement, typing = a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName);
   if(typing && params.get('wide') == null) return;
-  const w = params.get('wide') === '1' || (params.get('wide') !== '0' && (UI.layout === 'wide' || (UI.layout === 'auto' && land && maxH >= 500)));
+  const w = params.get('wide') === '1' || (params.get('wide') !== '0' && ((UI.layout === 'wide' && wideOk()) || (UI.layout === 'auto' && land && maxH >= 500)));
   document.body.classList.toggle('wide', w);
   if(w && curTab === 'queue') tab('search');
 }
@@ -1428,7 +1431,7 @@ document.querySelectorAll('#uiMenu .uiSeg button').forEach(b => b.onclick = () =
   lsSet(UI_KEY, JSON.stringify(UI)); uiApply();
 });
 uiApply();
-addEventListener('resize', () => setTimeout(applyWide, 150));
+addEventListener('resize', () => setTimeout(() => { applyWide(); uiApply(); }, 150));
 document.addEventListener('focusout', () => setTimeout(applyWide, 400));
 $('playBtn').onclick = () => send('play'); $('nextBtn').onclick = () => send('next');
 $('replayBtn').onclick = () => send('replay');
