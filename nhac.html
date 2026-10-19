@@ -1475,10 +1475,23 @@ function paintLink(){
 function wsSend(o){ if(wsReady && ws && ws.readyState === 1){ try{ ws.send(JSON.stringify(o)); return true; }catch(e){} } return false; }
 function wsRetry(){ clearTimeout(wsTimer); wsTries++; wsTimer = setTimeout(wsConnect, Math.min(30000, 1000 * Math.pow(2, wsTries - 1))); }
 function wsKick(){ if(!wsStop && (!ws || ws.readyState > 1)){ clearTimeout(wsTimer); wsTimer = setTimeout(wsConnect, 200); } }
-function wsConnect(){
+async function wsAuth(){          // quản trị gửi thẳng mã; người dùng gửi vé do Worker nhac-playlist cấp (mã riêng không đi qua bmbplayer)
+  const role = REMOTE ? 'remote' : 'tv';
+  if(cfg.pass){
+    await ensureMe();
+    if(me && me.id && !me.admin && !me.legacy){
+      let t = khoTicketNow(); if(!t){ await refreshMe(); t = khoTicketNow(); }
+      if(t) return { type:'auth', role, guest: t };
+    }
+    return { type:'auth', role, pass: cfg.pass };
+  }
+  return REMOTE && tokValid() ? { type:'auth', tok: pairTok } : null;
+}
+async function wsConnect(){
   if(wsStop || !('WebSocket' in window)) return;
-  const auth = cfg.pass ? { type:'auth', role: REMOTE ? 'remote' : 'tv', pass: cfg.pass } : (REMOTE && tokValid() ? { type:'auth', tok: pairTok } : null);
-  if(!auth) return;
+  const auth = await wsAuth();
+  if(wsStop || !auth) return;
+  if(ws && ws.readyState <= 1) return;                       // đã có kết nối (do chờ lấy vé nên có thể gọi trùng)
   try{ ws = new WebSocket(PHONG_API.replace(/^http/, 'ws') + '/nhac/ws?room=' + encodeURIComponent(ROOM)); }catch(e){ return wsRetry(); }
   const me = ws;
   me.onopen = () => { try{ me.send(JSON.stringify(auth)); }catch(e){} };
@@ -1489,6 +1502,7 @@ function wsConnect(){
     const was = wsReady; wsReady = false; clearInterval(wsPing); paintLink();
     if(!REMOTE && was){ clearTimeout(pollTimer); pollTimer = setTimeout(pollCmds, 300); }      // TV: quay về hỏi định kỳ ngay
     if(ev.code === 4001){                                                                     // sai mật khẩu / vé hết hạn: không thử lại vô ích
+      if(cfg.pass && me && me.id && !me.admin && wsTries < 3){ try{ localStorage.removeItem('np_kho'); }catch(e){} refreshMe().then(wsRetry); return; }   // vé người dùng hết hạn: xin vé mới rồi nối lại
       if(!cfg.pass && pairTok){ pairTok = ''; try{ localStorage.removeItem(TOK_KEY); }catch(e){} paintLink(); if(REMOTE) openPair(); }
       return;
     }
@@ -1532,7 +1546,9 @@ async function openPairTv(){
   $('pairCode').textContent = '––––––'; $('pairQr').replaceChildren(); $('pairLeft').textContent = 'Đang xin mã…';
   $('pairModal').style.display = 'flex';
   try{
-    const res = await fetch(PHONG_API + '/api/nhac/pair', { method:'POST', headers:{ 'x-pass': cfg.pass, 'content-type':'application/json' }, body: JSON.stringify({ room: ROOM }) });
+    await ensureMe();
+    const guest = me && me.id && !me.admin && !me.legacy ? (khoTicketNow() || (await refreshMe(), khoTicketNow())) : '';
+    const res = await fetch(PHONG_API + '/api/nhac/pair', { method:'POST', headers:{ 'x-pass': guest ? '' : cfg.pass, 'content-type':'application/json' }, body: JSON.stringify(guest ? { room: ROOM, guest } : { room: ROOM }) });
     const d = await res.json().catch(() => ({}));
     if(!res.ok) throw new Error(d.error || ('Lỗi ' + res.status));
     const url = location.origin + location.pathname + '?mode=remote&room=' + encodeURIComponent(ROOM) + '&code=' + d.code;

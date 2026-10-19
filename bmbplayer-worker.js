@@ -1763,6 +1763,14 @@ const NHAC_ACTIONS = new Set(['toggle', 'next', 'prev', 'vol', 'shuffle', 'repea
 const NHAC_ROOM_RE = /^[\w-]{1,20}$/;
 const PAIR_MS = 5 * 60 * 1000, PAIR_TOKEN_MS = 24 * 3600 * 1000, MAX_LIST = 400000;
 const nhacPass = env => env.NHAC_PASS || env.APP_PASS;
+/* Vé người dùng của nhac.html: nhac-<id>.<hết hạn ms>.<chữ ký>, do Worker nhac-playlist cấp (cùng GUEST_SECRET, cùng cách ký với vé khách của kho).
+   Cho người trong nhà dùng mã riêng vẫn ghép TV / điều khiển tức thì được. Chỉ dùng cho phòng nhạc. */
+async function nhacUserOk(env, t){
+  if(!env.GUEST_SECRET) return false;
+  const m = /^(nhac-u[a-z0-9]{5})\.(\d{13})\.([\w-]{22})$/.exec(String(t || ''));
+  if(!m || +m[2] < Date.now()) return false;
+  return same(m[3], await hmac(env.GUEST_SECRET, 'guest|' + m[1] + '.' + m[2]));
+}
 async function nhacToken(env, room, exp){ return room + '.' + exp + '.' + await hmac(env.SECRET, 'nhac|' + room + '|' + exp); }
 async function nhacTokenOk(env, room, tok){
   const m = /^([\w-]{1,20})\.(\d{13})\.([\w-]{22})$/.exec(String(tok || ''));
@@ -1806,6 +1814,7 @@ export class NhacRoom extends DurableObject {
       if(!m || m.type !== 'auth'){ try{ ws.close(4001, 'auth'); }catch(e){} return; }
       let role = null, full = false;
       if(m.pass && same(m.pass, nhacPass(this.env))){ role = m.role === 'tv' ? 'tv' : 'remote'; full = true; }
+      else if(m.guest && await nhacUserOk(this.env, m.guest)){ role = m.role === 'tv' ? 'tv' : 'remote'; full = true; }       // mã riêng của người trong nhà
       else if(m.tok && await nhacTokenOk(this.env, a.room, m.tok)) role = 'remote';
       if(!role){ try{ ws.send(JSON.stringify({ type: 'denied', reason: m.tok ? 'token' : 'pass' })); ws.close(4001, 'auth'); }catch(e){} return; }
       a.auth = true; a.role = role; a.full = full; ws.serializeAttachment(a);
@@ -2602,8 +2611,9 @@ export default {
       return env.NHAC.get(env.NHAC.idFromName(room)).fetch(req);
     }
     if(u.pathname === '/api/nhac/pair' && req.method === 'POST'){        // TV (có mật khẩu) xin mã 6 số sống 5 phút
-      if(!nhacPass(env) || !same(req.headers.get('x-pass') || '', nhacPass(env))) return jres({ error: 'Sai mật khẩu' }, 401, ch);
       const body = await req.json().catch(() => ({})), room = String(body.room || '');
+      const passOk = !!nhacPass(env) && same(req.headers.get('x-pass') || '', nhacPass(env));
+      if(!passOk && !(body.guest && await nhacUserOk(env, body.guest))) return jres({ error: 'Sai mật khẩu' }, 401, ch);
       if(!NHAC_ROOM_RE.test(room)) return jres({ error: 'Tên phòng không hợp lệ' }, 400, ch);
       return jres(await call(regStub(env), '/pair/new', { room }), 200, ch);
     }
