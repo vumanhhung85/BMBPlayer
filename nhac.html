@@ -5,13 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Playlist nhạc yêu thích</title>
 <style>
-  :root{ --bg:#0a0a0f; --panel:#15151f; --line:#2a2a3a; --ink:#f2f2f7; --quiet:#9a9ab0; --accent:#8b5cf6; --accent2:#c084fc; --good:#34d399; --warn:#fbbf24; --bad:#f43f5e; }
+  :root{ --bg:#0d6a74; --panel:#0a4e57; --line:#2f8790; --ink:#ffffff; --quiet:#cfe9eb; --accent:#ea5a0c; --accent2:#ff9a3d; --good:#34d399; --warn:#fbbf24; --bad:#f43f5e; }
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%}
-  body{background:var(--bg); color:var(--ink); font-family:-apple-system,"Segoe UI",Roboto,Arial,sans-serif; display:flex; flex-direction:column; overflow:hidden}
+  body{background:linear-gradient(180deg,#0b5f69 0%,#117b84 100%) fixed,#0d6a74; color:var(--ink); font-family:-apple-system,"Segoe UI",Roboto,Arial,sans-serif; display:flex; flex-direction:column; overflow:hidden}
   button{font-family:inherit; cursor:pointer; color:var(--ink)}
 
-  header{display:flex; align-items:center; gap:10px; padding:10px 16px; background:linear-gradient(135deg,#1a1530,#0a0a0f); border-bottom:1px solid var(--line); flex:0 0 auto}
+  header{display:flex; align-items:center; gap:10px; padding:10px 16px; background:linear-gradient(135deg,#07424b,#0a5059); border-bottom:1px solid var(--line); flex:0 0 auto}
   .logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent2)); display:flex;align-items:center;justify-content:center;font-size:18px}
   header .ttl{white-space:nowrap}
   header select{background:var(--panel); color:var(--ink); border:1px solid var(--line); border-radius:10px; padding:8px 10px; font-size:14px; max-width:220px}
@@ -24,14 +24,14 @@
   #playerWrap{position:relative; background:#000; width:100%; aspect-ratio:16/9; flex:none}
   #playerWrap iframe, #yt{position:absolute; inset:0; width:100%; height:100%; border:0}
   #startOverlay{position:absolute; inset:0; z-index:5; display:flex; align-items:center; justify-content:center; text-align:center; padding:20px;
-    background:radial-gradient(900px 500px at 50% 40%, #241b3a 0%, #0a0a0f 75%)}
+    background:radial-gradient(900px 500px at 50% 40%, #12818a 0%, #06404a 75%)}
   #startOverlay h2{font-size:clamp(20px,3vw,34px); margin-bottom:8px}
   #startOverlay p{color:var(--quiet); margin-bottom:16px; line-height:1.6; max-width:52ch}
   #startBtn{background:linear-gradient(135deg,var(--accent),var(--accent2)); border:none; color:#fff; font-weight:700; font-size:18px; padding:14px 28px; border-radius:14px}
 
   /* Thẻ "đang phát" của chế độ điều khiển */
   #remoteCard{display:none; align-items:center; gap:14px; padding:16px 18px 4px}
-  #rcImg{width:150px; aspect-ratio:16/9; object-fit:cover; border-radius:10px; background:#20202e; flex:0 0 auto}
+  #rcImg{width:150px; aspect-ratio:16/9; object-fit:cover; border-radius:10px; background:#0c4f58; flex:0 0 auto}
   #rcStatus{color:var(--quiet); font-size:14px; line-height:1.5}
   body.remote #remoteCard{display:flex}
   body.remote #playerWrap, body.remote #fsBtn{display:none}
@@ -43,15 +43,15 @@
   #tvQr .box{background:#fff; border-radius:10px; padding:6px; line-height:0}
   #tvQr img{width:128px; height:128px; image-rendering:pixelated; display:block}
   #tvQr span{font-size:10.5px; color:var(--quiet); white-space:nowrap}
-  #tvQr b{font-size:13px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; line-height:1; background:linear-gradient(135deg,#ffd21a,#c084fc); -webkit-background-clip:text; background-clip:text; color:transparent}
+  #tvQr b{font-size:13px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; line-height:1; background:linear-gradient(135deg,#ffd21a,#5fe0d6); -webkit-background-clip:text; background-clip:text; color:transparent}
   body.remote #tvQr{display:none}
   /* Toàn màn hình TV: mã QR + tên ứng dụng treo ở góc trên trái, đè lên video */
-  #fsBadge{display:none; position:fixed; top:14px; left:14px; z-index:70; flex-direction:column; align-items:center; gap:7px; padding:10px 12px 9px; border-radius:18px; background:rgba(12,8,28,.66); backdrop-filter:blur(6px); border:1px solid rgba(255,255,255,.16); box-shadow:0 6px 24px #0008; pointer-events:none}
+  #fsBadge{display:none; position:fixed; top:14px; left:14px; z-index:70; flex-direction:column; align-items:center; gap:7px; padding:10px 12px 9px; border-radius:18px; background:rgba(4,48,56,.72); backdrop-filter:blur(6px); border:1px solid rgba(255,255,255,.16); box-shadow:0 6px 24px #0008; pointer-events:none}
   body.tvfull #fsBadge{display:flex}
   #fsBadge .box{background:#fff; border-radius:12px; padding:6px; line-height:0}
   #fsBadge img{width:150px; height:150px; image-rendering:pixelated; display:block}
-  #fsBadge .nm{font-weight:800; font-size:15px; letter-spacing:.14em; text-transform:uppercase; line-height:1; background:linear-gradient(135deg,#ffd21a,#c084fc); -webkit-background-clip:text; background-clip:text; color:transparent}
-  #fsBadge .sb{font-size:10.5px; color:#cfc8ea; margin-top:-2px}
+  #fsBadge .nm{font-weight:800; font-size:15px; letter-spacing:.14em; text-transform:uppercase; line-height:1; background:linear-gradient(135deg,#ffd21a,#5fe0d6); -webkit-background-clip:text; background-clip:text; color:transparent}
+  #fsBadge .sb{font-size:10.5px; color:#d4eef0; margin-top:-2px}
   #now{padding:12px 18px 4px}
   #now .nt{font-weight:700; font-size:clamp(16px,2vw,22px); line-height:1.35}
   #now .nc{color:var(--quiet); font-size:13px; margin-top:2px; min-height:18px}
@@ -69,20 +69,20 @@
   .pane{padding:0 14px 40px; overflow:auto; flex:1; min-height:240px}
 
   .row{display:flex; align-items:center; gap:10px; padding:8px 4px; border-bottom:1px solid var(--line); cursor:pointer; border-radius:8px}
-  .row:hover{background:#17172233}
-  .row.cur{background:#1b1530}
+  .row:hover{background:#ffffff14}
+  .row.cur{background:#0e5c66}
   .row.off{opacity:.45; cursor:default}
   .row .n{width:24px; text-align:center; color:var(--quiet); font-size:12px; flex:0 0 auto}
   .row.cur .n{color:var(--accent2)}
-  .row img{width:80px; height:45px; object-fit:cover; border-radius:6px; background:#20202e; flex:0 0 auto}
+  .row img{width:80px; height:45px; object-fit:cover; border-radius:6px; background:#0c4f58; flex:0 0 auto}
   .row .meta{flex:1; min-width:0}
   .row .name{font-size:14px; font-weight:600; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden}
   .row .sub{color:var(--quiet); font-size:12px; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
   .acts{display:flex; gap:4px; flex:0 0 auto}
-  .acts button, .addBtn{background:#20202e; border:1px solid var(--line); border-radius:8px; padding:6px 8px; font-size:12px}
+  .acts button, .addBtn{background:#0c4f58; border:1px solid var(--line); border-radius:8px; padding:6px 8px; font-size:12px}
   .addBtn{background:var(--accent); border:none; color:#fff; font-weight:700; padding:8px 12px; font-size:13px}
-  .addBtn.alt{background:#20202e; border:1px solid var(--line); color:var(--ink)}
-  .addBtn:disabled{background:#20202e; color:var(--quiet); border:1px solid var(--line)}
+  .addBtn.alt{background:#0c4f58; border:1px solid var(--line); color:var(--ink)}
+  .addBtn:disabled{background:#0c4f58; color:var(--quiet); border:1px solid var(--line)}
   .verBox{margin:2px 0 6px 18px; border-left:2px solid var(--line); padding-left:8px}
   /* TV: phóng video ra kín cả cửa sổ trình duyệt (điện thoại bấm ⛶ → lệnh 'fs'); thêm toàn màn hình thật nếu Chrome cho phép */
   body.tvfull{overflow:hidden}
@@ -91,20 +91,20 @@
   #soundBanner{display:none; position:fixed; left:50%; top:14px; transform:translateX(-50%); z-index:90; background:#3a1f12; color:#fdba74; border:1px solid #f59e0b; border-radius:14px; padding:12px 18px; font-size:clamp(14px,1.6vw,20px); font-weight:700; text-align:center; max-width:90vw; box-shadow:0 8px 30px rgba(0,0,0,.6)}
   #soundBanner small{display:block; font-weight:400; opacity:.85; margin-top:4px}
   body.remote #fsRemote{display:flex}
-  #fsRemote{display:none; position:absolute; right:12px; top:-46px; width:40px; height:40px; align-items:center; justify-content:center; background:rgba(32,32,46,.95); border:1px solid var(--line); border-radius:50%; color:var(--ink); padding:0}
+  #fsRemote{display:none; position:absolute; right:12px; top:-46px; width:40px; height:40px; align-items:center; justify-content:center; background:rgba(10,78,87,.95); border:1px solid var(--line); border-radius:50%; color:var(--ink); padding:0}
   #fsRemote svg{width:20px; height:20px; fill:currentColor}
   #fsRemote.on{border-color:#FFD21A; color:#FFD21A}
-  .row .tag{display:inline-block; font-size:11px; font-weight:700; padding:1px 7px; border-radius:999px; background:#2a2140; color:var(--accent2); margin-right:4px}
-  .row .tag.hot{background:#3a1f12; color:#fdba74}
+  .row .tag{display:inline-block; font-size:11px; font-weight:700; padding:1px 8px; border-radius:999px; background:#1a9aa0; color:#fff; margin-right:4px}
+  .row .tag.hot{background:rgba(255,255,255,.14); color:#ffc83d}
   .feedEnd{color:var(--quiet); text-align:center; padding:14px 6px; font-size:13px}
   @media (min-width:900px){ body:not(.remote) .row img{width:88px; height:50px} body:not(.remote) #results .row{padding:6px 4px} body:not(.remote) .row .name{font-size:13px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden} }
   .msg{color:var(--quiet); text-align:center; padding:28px 8px; line-height:1.6}
   .secHead{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:12px 0 6px; font-size:14px}
   .secHead button{background:var(--accent); border:none; color:#fff; font-weight:700; border-radius:10px; padding:8px 12px; font-size:13px}
-  .secHead button.ghost{background:#20202e; border:1px solid var(--line)}
+  .secHead button.ghost{background:#0c4f58; border:1px solid var(--line)}
 
   #addBox{display:flex; gap:8px; padding:12px 0 4px}
-  #addBox input{flex:1; background:var(--panel); border:1px solid var(--line); color:var(--ink); border-radius:12px; padding:12px 14px; font-size:16px; min-width:0}
+  #addBox input{flex:1; background:#f2fbfb; border:none; color:#0b4a53; border-radius:12px; padding:12px 14px; font-size:16px; min-width:0}
   #addBox button{background:var(--accent); border:none; color:#fff; font-weight:700; border-radius:12px; padding:0 18px; font-size:15px}
   .hint{color:var(--quiet); font-size:12px; line-height:1.5; padding:2px 0 6px}
 
@@ -116,14 +116,14 @@
   #modal .card{background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:20px; width:min(480px,100%); max-height:92vh; overflow:auto}
   #modal h3{margin-bottom:10px}
   #modal label{display:block; font-size:13px; color:var(--quiet); margin:12px 0 4px}
-  #modal input{width:100%; background:#0e0e16; border:1px solid var(--line); color:var(--ink); border-radius:10px; padding:11px; font-size:15px}
+  #modal input{width:100%; background:#05252c; border:1px solid var(--line); color:var(--ink); border-radius:10px; padding:11px; font-size:15px}
   #modal .btns{display:flex; gap:8px; margin-top:16px}
-  #modal .btns button{flex:1; background:#20202e; border:1px solid var(--line); border-radius:10px; padding:11px; font-weight:600}
+  #modal .btns button{flex:1; background:#0c4f58; border:1px solid var(--line); border-radius:10px; padding:11px; font-weight:600}
   #modal .btns button.pri{background:var(--accent); border:none; color:#fff}
   #modal .hint{margin-top:12px}
 
   /* Kênh tức thì + ghép mã */
-  #link{font-size:12px; padding:4px 10px; border-radius:999px; background:#20202e; color:var(--quiet); white-space:nowrap}
+  #link{font-size:12px; padding:4px 10px; border-radius:999px; background:#0c4f58; color:var(--quiet); white-space:nowrap}
   #link.on{background:#12361f; color:var(--good)}
   #pairBtn{display:none}
   #scanBtn{display:none}
@@ -135,9 +135,9 @@
   #pairCode{font-size:clamp(44px,9vw,72px); font-weight:800; letter-spacing:.12em; color:var(--accent2); margin:6px 0}
   #pairQr{background:#fff; border-radius:12px; padding:10px; display:inline-block; margin:8px 0}
   #pairQr img{width:220px; height:220px; image-rendering:pixelated; display:block}
-  #pairIn{width:100%; background:#0e0e16; border:1px solid var(--line); color:var(--ink); border-radius:12px; padding:14px; font-size:28px; text-align:center; letter-spacing:.2em; margin:10px 0}
+  #pairIn{width:100%; background:#05252c; border:1px solid var(--line); color:var(--ink); border-radius:12px; padding:14px; font-size:28px; text-align:center; letter-spacing:.2em; margin:10px 0}
   #pairModal .btns{display:flex; gap:8px; margin-top:12px}
-  #pairModal .btns button{flex:1; background:#20202e; border:1px solid var(--line); border-radius:10px; padding:11px; font-weight:600}
+  #pairModal .btns button{flex:1; background:#0c4f58; border:1px solid var(--line); border-radius:10px; padding:11px; font-weight:600}
   #pairModal .btns button.pri{background:var(--accent); border:none; color:#fff}
   .tabs .ti{display:none} .tabs .cnt{font-size:12px; color:var(--quiet)}
 
@@ -149,31 +149,31 @@
   body.remote header{padding:8px 12px; gap:8px; border-bottom:none}
   body.remote header .logo{width:34px; height:34px; border-radius:50%}
   body.remote header .ttl{display:none}
-  body.remote header select{background:linear-gradient(135deg,#FFD21A,#f5b800); color:#4a148c; border:none; border-radius:999px; font-weight:900; padding:6px 12px; max-width:46vw; font-size:14px}
+  body.remote header select{background:linear-gradient(135deg,#FFD21A,#f5b800); color:#3a2a00; border:none; border-radius:999px; font-weight:900; padding:6px 12px; max-width:46vw; font-size:14px}
   body.remote header .ico{padding:6px 9px; font-size:14px}
   body.remote #link{font-size:0; padding:0; width:10px; height:10px; border-radius:50%; background:var(--quiet)} body.remote #link.on{background:var(--good)}
-  body.remote #now{padding:8px 14px; background:#16102a; border-top:1px solid var(--line); display:flex; align-items:center; gap:10px; font-size:14px}
+  body.remote #now{padding:8px 14px; background:#06404a; border-top:1px solid var(--line); display:flex; align-items:center; gap:10px; font-size:14px}
   body.remote #now::before{content:"♪"; flex:0 0 auto; width:26px; height:26px; border-radius:50%; background:linear-gradient(135deg,var(--accent),var(--accent2)); display:flex; align-items:center; justify-content:center; font-size:14px}
   body.remote #now .nt{font-size:14px; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden}
   body.remote #now .nc{display:none}
-  body.remote #remoteCard{display:block; padding:3px 14px 5px; background:#16102a}
+  body.remote #remoteCard{display:block; padding:3px 14px 5px; background:#06404a}
   body.remote #rcImg{display:none}
-  body.remote #rcStatus{font-size:12px; color:#c4b5fd}
+  body.remote #rcStatus{font-size:12px; color:#bfe6e8}
   body.remote .tabs{display:flex; gap:8px; padding:8px 10px 10px; background:var(--bg); border-bottom:none}
-  body.remote .tabs button{flex:1; min-width:0; background:#14141c; border:1px solid var(--line); color:#7c7c92; padding:9px 4px 8px; border-radius:14px; font-weight:700; display:flex; flex-direction:column; align-items:center; gap:2px}
+  body.remote .tabs button{flex:1; min-width:0; background:#f2fbfb; border:none; color:#0b4a53; padding:9px 4px 8px; border-radius:14px; font-weight:700; display:flex; flex-direction:column; align-items:center; gap:2px}
   body.remote .tabs .ti{display:block; font-size:21px; line-height:1; filter:grayscale(.7)} body.remote .tabs .tl{font-size:13px; white-space:nowrap}
-  body.remote .tabs .cnt{display:inline-block; min-width:20px; padding:0 6px; border-radius:99px; background:#2a2a3a; color:var(--ink); line-height:19px}
-  body.remote .tabs button.on{background:linear-gradient(135deg,#7c3aed,#a855f7); border-color:#c4a1ff; color:#fff; box-shadow:0 4px 16px rgba(139,92,246,.55)}
-  body.remote .tabs button.on .ti{filter:none; font-size:23px} body.remote .tabs button.on .tl{font-size:14px} body.remote .tabs button.on .cnt{background:#fff; color:#6d28d9}
+  body.remote .tabs .cnt{display:inline-block; min-width:20px; padding:0 6px; border-radius:99px; background:#d6eef0; color:#0b4a53; line-height:19px}
+  body.remote .tabs button.on{background:linear-gradient(180deg,#ff8a2b,#ea5a0c); border-color:#ffb35c; color:#fff; box-shadow:0 4px 16px rgba(234,90,12,.5)}
+  body.remote .tabs button.on .ti{filter:none; font-size:23px} body.remote .tabs button.on .tl{font-size:14px} body.remote .tabs button.on .cnt{background:#fff; color:#c2410c}
   body.remote #tAdd{order:-1}
   body.remote #side{border:none}
   body.remote .pane{padding:0 16px 190px; overflow:visible; min-height:0}
   body.remote #addBox{padding:12px 0 4px}
-  body.remote #addBox button{background:linear-gradient(135deg,#7c3aed,#a855f7)}
+  body.remote #addBox button{background:linear-gradient(180deg,#ff8a2b,#ea5a0c)}
   body.remote .row{gap:12px; padding:10px 0; border-radius:0}
   body.remote .row img{width:96px; height:54px; border-radius:8px}
   body.remote .row .n{display:none}
-  body.remote .row.cur{background:linear-gradient(135deg,#2a1856,#1b1530); border:2px solid #FFD21A; border-radius:14px; padding:10px; margin:8px 0; box-shadow:0 0 0 3px rgba(255,210,26,.18),0 6px 22px rgba(139,92,246,.45)}
+  body.remote .row.cur{background:linear-gradient(135deg,#0b4a53,#0e5c66); border:2px solid #FFD21A; border-radius:14px; padding:10px; margin:8px 0; box-shadow:0 0 0 3px rgba(255,210,26,.18),0 6px 22px rgba(234,90,12,.4)}
   body.remote .row.cur .name{color:#fff; font-size:15px}
   body.remote .row.cur .sub{color:#FFD21A; font-weight:800; letter-spacing:.5px}
   /* điện thoại: dòng bài gọn, nút sắp xếp/xoá ẩn sau nút ⋯ */
@@ -182,7 +182,7 @@
   body.remote .row.open .acts{display:flex}
   body.remote .acts button{padding:7px 14px; font-size:14px}
   .rowMore{display:none}
-  body.remote .rowMore{display:block; flex:0 0 auto; background:#20202e; border:1px solid var(--line); border-radius:50%; width:36px; height:36px; font-size:18px; line-height:1; color:var(--quiet)}
+  body.remote .rowMore{display:block; flex:0 0 auto; background:#0c4f58; border:1px solid var(--line); border-radius:50%; width:36px; height:36px; font-size:18px; line-height:1; color:var(--quiet)}
   body.remote .row.open .rowMore{color:#FFD21A; border-color:#FFD21A}
   body.remote .addBtn{border-radius:10px; padding:9px 12px}
   .eq{display:inline-flex; align-items:flex-end; gap:2px; height:12px; margin-right:6px; vertical-align:-1px}
@@ -191,40 +191,40 @@
   .eq.stop i{animation:none}
   @keyframes eq{50%{transform:scaleY(.35)}}
   #dock{display:none}
-  body.remote #dock{display:flex; position:fixed; left:0; right:0; bottom:0; z-index:40; flex-direction:column; gap:10px; background:rgba(21,21,31,.97); border-top:1px solid var(--line); padding:10px 16px calc(10px + env(safe-area-inset-bottom))}
+  body.remote #dock{display:flex; position:fixed; left:0; right:0; bottom:0; z-index:40; flex-direction:column; gap:10px; background:rgba(4,48,56,.96); border-top:1px solid var(--line); padding:10px 16px calc(10px + env(safe-area-inset-bottom))}
   body.remote #ctl{display:flex; gap:14px; align-items:center; justify-content:center; padding:0; flex-wrap:nowrap}
-  body.remote #ctl .big{width:54px; height:54px; flex:0 0 auto; background:#20202e; border:1px solid var(--line); border-radius:50%; display:flex; align-items:center; justify-content:center; padding:0; font-size:0}
+  body.remote #ctl .big{width:54px; height:54px; flex:0 0 auto; background:#0c4f58; border:1px solid var(--line); border-radius:50%; display:flex; align-items:center; justify-content:center; padding:0; font-size:0}
   body.remote #ctl .big svg{width:26px; height:26px; fill:currentColor}
-  body.remote #ctl .big.pri{width:68px; height:68px; background:linear-gradient(135deg,#7c3aed,#c084fc); border:none; box-shadow:0 6px 20px rgba(139,92,246,.6)} body.remote #ctl .big.pri svg{width:34px; height:34px}
-  body.remote #ctl .big.on{background:#2a1856; color:#FFD21A; border-color:#FFD21A}
+  body.remote #ctl .big.pri{width:68px; height:68px; background:linear-gradient(180deg,#ff8a2b,#ea5a0c); border:none; box-shadow:0 6px 20px rgba(234,90,12,.5)} body.remote #ctl .big.pri svg{width:34px; height:34px}
+  body.remote #ctl .big.on{background:#0b4a53; color:#FFD21A; border-color:#FFD21A}
   body.remote #ctl .big:active{transform:scale(.94)}
   body.remote #ctl .vol{display:none}
   body.remote #volRow{display:flex; align-items:center; gap:12px; padding:0 4px}
   #volRow{display:none}
   /* Âm lượng hiện trên TV khi đổi từ điện thoại / nút trên TV (giống BMBPlayer) */
   #volOsd{position:fixed; right:2.2vw; top:50%; z-index:90; pointer-events:none; opacity:0; transform:translate(16px,-50%); transition:opacity .35s, transform .35s;
-    display:flex; flex-direction:column; align-items:center; gap:1.4vh; background:rgba(10,8,22,.84); border:2px solid rgba(192,132,252,.55); border-radius:22px; padding:2.2vh 1.4vw; min-width:clamp(64px,6vw,110px); box-shadow:0 10px 40px rgba(0,0,0,.6)}
+    display:flex; flex-direction:column; align-items:center; gap:1.4vh; background:rgba(4,48,56,.86); border:2px solid rgba(95,224,214,.55); border-radius:22px; padding:2.2vh 1.4vw; min-width:clamp(64px,6vw,110px); box-shadow:0 10px 40px rgba(0,0,0,.6)}
   #volOsd.show{opacity:1; transform:translate(0,-50%)}
   #volOsd svg{width:clamp(26px,3vw,48px); height:clamp(26px,3vw,48px); fill:#fff}
   #volOsd .vb{width:clamp(10px,.9vw,16px); height:26vh; background:rgba(255,255,255,.15); border-radius:99px; overflow:hidden; display:flex; align-items:flex-end}
-  #volOsd .vb i{display:block; width:100%; background:linear-gradient(0deg,#7c3aed,#FFD21A); border-radius:99px; transition:height .15s}
+  #volOsd .vb i{display:block; width:100%; background:linear-gradient(0deg,#ea5a0c,#FFD21A); border-radius:99px; transition:height .15s}
   #volOsd b{font-size:clamp(20px,2.6vw,42px); font-weight:800; color:#FFD21A; font-variant-numeric:tabular-nums}
   #volOsd.muted b{color:#f87171} #volOsd.muted .vb i{background:#555}
   body.remote #volOsd{display:none}
   /* Âm lượng bằng nút −/+ (không dùng thanh trượt, tránh kéo nhầm); #vol vẫn giữ làm nơi lưu giá trị nhưng ẩn */
   #vol{display:none !important}
-  .vbtn{width:46px; height:46px; flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; border-radius:50%; background:#20202e; border:1px solid var(--line); color:var(--ink); padding:0; touch-action:manipulation; -webkit-user-select:none; user-select:none}
+  .vbtn{width:46px; height:46px; flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; border-radius:50%; background:#0c4f58; border:1px solid var(--line); color:var(--ink); padding:0; touch-action:manipulation; -webkit-user-select:none; user-select:none}
   .vbtn svg{width:22px; height:22px; fill:currentColor} .vbtn:active{background:var(--accent)}
   .vnum{min-width:38px; text-align:center; color:#FFD21A; font-weight:800; font-size:17px; font-variant-numeric:tabular-nums}
   body.remote #volRow{justify-content:center; gap:14px; padding:2px 4px}
   body.remote #volRow .vbtn{width:54px; height:54px} body.remote #volRow .vbtn svg{width:26px; height:26px}
-  body.remote #volRow .vi{width:54px; height:54px; align-items:center; justify-content:center; border-radius:50%; background:#20202e; border:1px solid var(--line); color:var(--ink)}
+  body.remote #volRow .vi{width:54px; height:54px; align-items:center; justify-content:center; border-radius:50%; background:#0c4f58; border:1px solid var(--line); color:var(--ink)}
   body.remote #volRow .vi svg{width:26px; height:26px}
   body.remote #volRow .vn{min-width:48px; text-align:center; font-size:22px; font-weight:800}
   #volRow .vi{color:var(--quiet); display:flex} #volRow .vi svg{width:20px; height:20px; fill:currentColor} #volRow .vi.off{color:#f87171}
-  #volRow input{flex:1; -webkit-appearance:none; appearance:none; background:transparent; height:28px; accent-color:#a855f7; touch-action:none}
-  #volRow input::-webkit-slider-runnable-track{height:8px; border-radius:99px; background:linear-gradient(90deg,#7c3aed,#c084fc var(--p,100%),#2c2c3c var(--p,100%))}
-  #volRow input::-webkit-slider-thumb{-webkit-appearance:none; width:26px; height:26px; margin-top:-9px; border-radius:50%; background:#fff; border:3px solid #a855f7; box-shadow:0 2px 8px rgba(0,0,0,.5)}
+  #volRow input{flex:1; -webkit-appearance:none; appearance:none; background:transparent; height:28px; accent-color:#ea5a0c; touch-action:none}
+  #volRow input::-webkit-slider-runnable-track{height:8px; border-radius:99px; background:linear-gradient(90deg,#ea5a0c,#ff9a3d var(--p,100%),#1b6f78 var(--p,100%))}
+  #volRow input::-webkit-slider-thumb{-webkit-appearance:none; width:26px; height:26px; margin-top:-9px; border-radius:50%; background:#fff; border:3px solid #ea5a0c; box-shadow:0 2px 8px rgba(0,0,0,.5)}
   #volRow .vn{min-width:30px; text-align:right; color:#FFD21A; font-size:15px; font-variant-numeric:tabular-nums}
   @media (max-width:420px){ body.remote #ctl{gap:8px} body.remote #ctl .big{width:46px; height:46px} body.remote #ctl .big svg{width:22px; height:22px} body.remote #ctl .big.pri{width:58px; height:58px} }
   @media (max-width:480px){ header{gap:6px; padding:8px 10px} header .ttl{display:none} header select{max-width:150px} #link{font-size:11px; padding:3px 8px} }
@@ -232,14 +232,15 @@
   /* ===== VMH nhạc — điện thoại / máy tính bảng: bố cục, khoảng cách, vị trí icon học theo MHPlayer (remote.html) ===== */
   .brand{display:none}
   #menuBtn{display:none}
-  body.remote header{padding:5px 12px; gap:8px; background:linear-gradient(135deg,#1a1530,#0a0a0f)}
+  body.remote header{padding:5px 12px; gap:8px; background:linear-gradient(135deg,#07424b,#0a5059)}
   body.remote header .logo, body.remote header .sp, body.remote header > .ico{display:none !important}
   body.remote .brand{display:flex; align-items:center; gap:7px; flex:0 0 auto; min-width:0}
-  body.remote .brand i{font-style:normal; width:28px; height:28px; border-radius:50%; background:linear-gradient(135deg,var(--accent),var(--accent2)); display:flex; align-items:center; justify-content:center; font-size:15px}
-  body.remote .brand b{font-size:19px; font-weight:900; letter-spacing:.2px; white-space:nowrap; background:linear-gradient(135deg,#fff,#c4b5fd 55%,#FFD21A); -webkit-background-clip:text; background-clip:text; color:transparent}
+  body.remote .brand b{font-size:19px; font-weight:800; letter-spacing:-.3px; white-space:nowrap; color:#fff}
+  body.remote .brand b span{color:#ffc83d}
+  body.remote .brand svg{width:36px; height:30px; flex:0 0 auto; display:block}
   body.remote header select{margin-left:auto; padding:3px 12px; font-size:13px; font-weight:900; max-width:38vw; text-overflow:ellipsis}
   body.remote #link{margin:0 2px}
-  body.remote #menuBtn{display:inline-flex; align-items:center; justify-content:center; background:none; border:1px solid var(--line); color:var(--ink); border-radius:10px; width:32px; height:28px; font-size:16px; line-height:1; padding:0}
+  body.remote #menuBtn{display:inline-flex; align-items:center; justify-content:center; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.35); color:var(--ink); border-radius:12px; width:40px; height:40px; font-size:20px; line-height:1; padding:0}
   body.remote #now{padding:5px 12px; gap:8px; font-size:13px}
   body.remote #now::before{width:22px; height:22px; font-size:14px}
   body.remote #now .nt{font-size:13px; font-weight:700}
@@ -247,12 +248,12 @@
   body.remote #rcStatus{font-size:11.5px}
   body.remote .tabs{gap:6px; padding:6px 12px}
   body.remote .tabs button{flex-direction:row; justify-content:center; gap:6px; padding:5px 4px; border-radius:999px; opacity:.85}
-  body.remote .tabs button.on{opacity:1; box-shadow:0 2px 10px rgba(139,92,246,.5)}
+  body.remote .tabs button.on{opacity:1; box-shadow:0 2px 10px rgba(234,90,12,.45)}
   body.remote .tabs .ti{font-size:15px} body.remote .tabs button.on .ti{font-size:15px}
   body.remote .tabs .tl, body.remote .tabs button.on .tl{font-size:13px}
   body.remote .tabs .cnt{min-width:20px; padding:0 6px; line-height:17px; font-size:12px}
   body.remote #paneAdd > .hint{display:none}
-  body.remote #addBox{position:sticky; top:var(--stickTop,0px); z-index:25; background:var(--bg); gap:8px; padding:4px 12px 6px; margin:0 -12px}
+  body.remote #addBox{position:sticky; top:var(--stickTop,0px); z-index:25; background:#0c646e; gap:8px; padding:4px 12px 6px; margin:0 -12px}
   body.remote #addBox input{border-radius:999px; padding:9px 16px}
   body.remote #addBox button{border-radius:999px; padding:0 16px; font-size:18px}
   body.remote .pane{padding:0 12px 190px}
@@ -261,36 +262,36 @@
   body.remote .row .name{font-size:14px; font-weight:600}
   body.remote .row.cur{padding:10px; margin:8px 0}
   body.remote #results .row .addBtn:not(.more){display:none}
-  body.remote #results .row{cursor:pointer} body.remote #results .row:active{background:#1c1830}
-  body.remote .row .more{background:none; border:none; color:var(--accent2); font-size:12px; font-weight:700; padding:4px 0 0; display:block; text-align:left}
+  body.remote #results .row{cursor:pointer} body.remote #results .row:active{background:#0f6a73}
+  body.remote .row .more{background:none; border:none; color:#ffc83d; font-size:12px; font-weight:700; padding:4px 0 0; display:block; text-align:left}
   body.remote .verBox{margin:0 0 4px 12px}
   /* hộp chọn khi bấm một bài trong kết quả (như MHPlayer) */
   #pkOv{position:fixed; inset:0; z-index:80; background:rgba(0,0,0,.72); display:none; align-items:center; justify-content:center; padding:18px}
   #pkOv.show{display:flex}
   #pkCard{background:var(--panel); border:1px solid var(--line); border-radius:18px; width:min(440px,100%); overflow:hidden; padding:0 0 16px}
-  #pkCard img{display:block; width:100%; aspect-ratio:16/9; object-fit:cover; background:#20202e}
+  #pkCard img{display:block; width:100%; aspect-ratio:16/9; object-fit:cover; background:#0c4f58}
   #pkCard .pkT{padding:12px 16px 4px; font-weight:700; font-size:15px; line-height:1.4}
   #pkCard .pkS{padding:0 16px; color:var(--quiet); font-size:12.5px}
   #pkCard .pkB{display:flex; flex-direction:column; gap:10px; padding:12px 16px 0}
-  #pkCard .pkB button{border:none; border-radius:12px; padding:14px 10px; font:inherit; font-weight:800; font-size:16px; color:#fff; background:linear-gradient(135deg,#7c3aed,#a855f7); letter-spacing:.3px}
+  #pkCard .pkB button{border:none; border-radius:12px; padding:14px 10px; font:inherit; font-weight:800; font-size:16px; color:#fff; background:linear-gradient(180deg,#ff8a2b,#ea5a0c); letter-spacing:.3px}
   #pkCard .pkB button.y{background:linear-gradient(135deg,#f59e0b,#fbbf24); color:#2b1400}
-  #pkCard .pkB button.g{background:#20202e; color:var(--ink); border:1px solid var(--line)}
+  #pkCard .pkB button.g{background:#0c4f58; color:var(--ink); border:1px solid var(--line)}
   #pkCard .pkB button:disabled{opacity:.55}
   /* menu ⋮ */
   #vmMenu{position:fixed; inset:0; z-index:65; background:rgba(0,0,0,.6); display:none; align-items:flex-start; justify-content:flex-end; padding:46px 10px 10px}
   #vmMenu.show{display:flex}
-  #vmMenu .box{background:#17142a; border:1px solid #3b2f63; border-radius:14px; min-width:250px; max-width:92vw; overflow:hidden; box-shadow:0 12px 40px rgba(0,0,0,.6)}
-  #vmMenu button{display:block; width:100%; text-align:left; background:none; border:none; border-bottom:1px solid #2a2440; color:var(--ink); padding:13px 16px; font:inherit; font-size:15px}
-  #vmMenu .inf{padding:10px 16px; color:var(--quiet); font-size:12.5px; border-bottom:1px solid #2a2440; line-height:1.5}
+  #vmMenu .box{background:#07414a; border:1px solid #2f8790; border-radius:14px; min-width:250px; max-width:92vw; overflow:hidden; box-shadow:0 12px 40px rgba(0,0,0,.6)}
+  #vmMenu button{display:block; width:100%; text-align:left; background:none; border:none; border-bottom:1px solid #1f6f78; color:var(--ink); padding:13px 16px; font:inherit; font-size:15px}
+  #vmMenu .inf{padding:10px 16px; color:var(--quiet); font-size:12.5px; border-bottom:1px solid #1f6f78; line-height:1.5}
   #vmMenu .box > :last-child{border-bottom:none}
   /* thanh điều khiển dưới: số đo như MHPlayer */
-  body.remote #dock{background:#15151f; border-top:1px solid #3a3a52; box-shadow:0 -8px 20px rgba(0,0,0,.6); gap:10px}
-  body.remote #ctl .big{background:#2e2e44; border:1.5px solid #5a5a7a; color:#fff}
+  body.remote #dock{background:#06404a; border-top:1px solid #2f8790; box-shadow:0 -8px 20px rgba(0,0,0,.6); gap:10px}
+  body.remote #ctl .big{background:#1b6f78; border:1.5px solid #5fb7bd; color:#fff}
   body.remote #ctl .big.pri{border:none}
-  body.remote #ctl .big.on{background:#2a1856; border-color:#FFD21A}
-  body.remote #volRow{gap:14px} body.remote #volRow .vi, body.remote #volRow .vbtn{background:#2e2e44; border:1.5px solid #5a5a7a; color:#fff}
+  body.remote #ctl .big.on{background:#0b4a53; border-color:#FFD21A}
+  body.remote #volRow{gap:14px} body.remote #volRow .vi, body.remote #volRow .vbtn{background:#1b6f78; border:1.5px solid #5fb7bd; color:#fff}
   body.remote #volRow .vn{min-width:26px; font-size:16px}
-  body.remote #fsRemote{position:static; display:flex; flex:0 0 auto; width:54px; height:54px; background:#2e2e44; border:1.5px solid #5a5a7a; color:#fff}
+  body.remote #fsRemote{position:static; display:flex; flex:0 0 auto; width:54px; height:54px; background:#1b6f78; border:1.5px solid #5fb7bd; color:#fff}
   body.remote #fsRemote.on{border-color:#FFD21A; color:#FFD21A}
   body.remote #fsRemote svg{width:26px; height:26px}
   @media (max-width:420px){ body.remote #volRow{gap:8px} body.remote #volRow .vi, body.remote #volRow .vbtn, body.remote #fsRemote{width:46px; height:46px} body.remote #volRow .vn{min-width:24px; font-size:15px} }
@@ -303,18 +304,18 @@
   body.wide #paneAdd{display:block !important}
   body.wide #paneAdd .pane, body.wide .pane{padding-bottom:30px}
   body.wide #addBox{top:0}
-  body.wide #wideSide{grid-column:2; grid-row:1 / span 2; display:flex; flex-direction:column; min-height:0; background:#100e1c; border-left:1px solid var(--line)}
-  body.wide #wideSide #now{display:flex !important; padding:8px 12px; background:#1a1430}
+  body.wide #wideSide{grid-column:2; grid-row:1 / span 2; display:flex; flex-direction:column; min-height:0; background:#07414a; border-left:1px solid var(--line)}
+  body.wide #wideSide #now{display:flex !important; padding:8px 12px; background:#06404a}
   body.wide #wideSide #remoteCard{display:block; padding:0}
   body.wide #wideSide #rcImg{display:block; width:100%; max-height:30vh; aspect-ratio:16/9; object-fit:cover; border-radius:0}
-  body.wide #wideSide #rcStatus{padding:4px 12px; background:#16102a}
+  body.wide #wideSide #rcStatus{padding:4px 12px; background:#06404a}
   body.wide #wideSide #dock{position:static; box-shadow:none; background:transparent; border-top:none; border-bottom:1px solid var(--line); padding:10px 8px}
   body.wide #wideSide .wHead{padding:10px 12px 4px; font-size:12.5px; font-weight:800; color:#FFD21A; letter-spacing:.6px}
   body.wide #wideSide #paneList{display:block !important; flex:1; overflow:auto; min-height:0; padding:0 10px 16px}
   body.wide #results{display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:12px; align-items:start}
   body.wide #results > *{grid-column:1 / -1}
   body.wide #results > .rowWrap{grid-column:auto}
-  body.wide #results > .rowWrap > .row{flex-direction:column; align-items:stretch; gap:6px; border:none; background:#16161f; border-radius:12px; padding:0 0 10px; overflow:hidden}
+  body.wide #results > .rowWrap > .row{flex-direction:column; align-items:stretch; gap:6px; border:none; background:#0a4e57; border-radius:12px; padding:0 0 10px; overflow:hidden}
   body.wide #results > .rowWrap > .row img{width:100%; height:auto; aspect-ratio:16/9; border-radius:0}
   body.wide #results > .rowWrap > .row .meta{padding:0 10px}
   @media (min-width:900px){
@@ -1426,7 +1427,7 @@ if(REMOTE){
   top.append(document.querySelector('header'), $('now'), $('remoteCard'), document.querySelector('.tabs'));
   document.body.prepend(top);
   const hd = document.querySelector('header');
-  const brand = el('div', 'brand'); brand.innerHTML = '<i>♪</i><b>VMHPlayer</b>'; hd.prepend(brand);
+  const brand = el('div', 'brand'); brand.innerHTML = '<svg viewBox="0 0 40 34" aria-hidden="true"><rect x="1" y="12" width="3" height="10" rx="1.5" fill="#ff7a3d"/><rect x="6" y="7" width="3" height="20" rx="1.5" fill="#ff5a4d"/><path d="M12 30V8c0-3 3-4 5-2l3 3 3-3c2-2 5-1 5 2v22c0 1-1 2-2 2h-2c-1 0-2-1-2-2V15l-2 2-2-2v15c0 1-1 2-2 2h-2c-1 0-2-1-2-2z" fill="#ffb02e"/><rect x="17" y="13" width="6" height="10" rx="3" fill="#fff"/><rect x="31" y="7" width="3" height="20" rx="1.5" fill="#5fe0d6"/><rect x="36" y="12" width="3" height="10" rx="1.5" fill="#9af2ea"/></svg><b>VMH<span>Player</span></b>'; hd.prepend(brand);
   const menuBtn = el('button'); menuBtn.id = 'menuBtn'; menuBtn.textContent = '⋮'; menuBtn.title = 'Menu'; hd.append(menuBtn);
   const vmm = el('div'); vmm.id = 'vmMenu'; document.body.append(vmm);
   const mItem = (t, id) => { const b = el('button', null, t); b.onclick = () => { vmm.classList.remove('show'); $(id).click(); }; return b; };
