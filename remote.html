@@ -244,6 +244,14 @@
   #pair .pBack{border:1px solid var(--line); border-radius:14px; padding:12px 20px; font:inherit; font-weight:700; font-size:15px; color:var(--ink); background:#20202e; display:none}
   #pair .pBack.show{display:inline-block}
   #pair .pNote{color:var(--quiet); font-size:12.5px; max-width:560px; line-height:1.5}
+  #uiBtn{background:none; border:1px solid var(--line); color:var(--ink); border-radius:10px; padding:3px 9px; font-size:13px; font-weight:800}
+  body.wide #uiBtn{order:4}
+  #uiMenu{display:none; position:fixed; top:54px; right:10px; z-index:80; width:min(320px,calc(100vw - 20px)); background:#fff; color:#24123A; border:1px solid #E2D6F0; border-radius:16px; padding:12px 14px 14px; box-shadow:0 14px 40px rgba(40,8,70,.45)}
+  #uiMenu.show{display:block}
+  #uiMenu .uiT{font-size:12.5px; font-weight:800; color:#7B6A91; margin:6px 0 6px; letter-spacing:.3px}
+  #uiMenu .uiSeg{display:flex; gap:6px}
+  #uiMenu .uiSeg button{flex:1; min-width:0; padding:9px 4px; border-radius:12px; border:1.5px solid #CDB8E3; background:#fff; color:#4B1272; font:inherit; font-size:14px; font-weight:700}
+  #uiMenu .uiSeg button.on{background:#FFD21A; border-color:#FFD21A; color:#3A0F5A}
   /* ===== Giao diện SÁNG — cùng tone với quầy (tím chuỗi Boom + vàng, nền tím nhạt) ===== */
   :root{ --bg:#F4EEFA; --panel:#FFFFFF; --line:#E2D6F0; --ink:#24123A; --quiet:#7B6A91; --accent:#6B21A8; --accent2:#8B2FBE; --good:#17935F; --warn:#B8700A; --grape:#4B1272; --tint:#EFE4F8; --sh:0 1px 2px rgba(75,18,114,.06),0 6px 16px -8px rgba(75,18,114,.2); }
   body{ background:var(--bg); color:var(--ink); font-family:"Be Vietnam Pro","Segoe UI",Roboto,-apple-system,Arial,sans-serif }
@@ -388,9 +396,16 @@
 <header>
   <img class="logoImg" src="Logo_BoomBox.png" alt="Boom Music Box">
   <div class="room" id="roomTag" style="cursor:pointer">PHÒNG</div>
+  <button id="uiBtn" aria-label="Cỡ chữ và giao diện" title="Cỡ chữ / giao diện">Aa</button>
   <button id="gear" aria-label="Cài đặt">⚙</button>
 </header>
 
+<div id="uiMenu">
+  <div class="uiT">CỠ CHỮ</div>
+  <div class="uiSeg" data-k="size"><button data-v="0">Vừa</button><button data-v="1">Lớn</button><button data-v="2">Rất lớn</button></div>
+  <div class="uiT">GIAO DIỆN</div>
+  <div class="uiSeg" data-k="layout"><button data-v="auto">Tự động</button><button data-v="tall">Đứng</button><button data-v="wide">Ngang</button></div>
+</div>
 <div id="roomBanner" style="display:none;padding:12px 14px;background:#3a2a10;color:#fbbf24;font-weight:700;font-size:15px;text-align:center"></div>
 <div id="now"><div class="ic">♪</div><div class="t" id="nowTitle">—</div></div>
 
@@ -1358,6 +1373,26 @@ $('sDown').onclick = $('dnBtn').onclick = () => volStep(-5); $('sUp').onclick = 
 /* Bố cục rộng (máy tính bảng ngang). KHÔNG phụ thuộc chiều cao hiện tại: bàn phím ảo bật lên làm cao màn hình tụt < 500 →
    trước đây tự chuyển về bố cục dọc giữa lúc đang gõ, ô tìm mất tiêu điểm (bấm vào ô không gõ được). Nay nhớ chiều cao lớn nhất đã thấy
    của hướng hiện tại, và đang gõ trong ô nhập thì không đổi bố cục. */
+/* Tuỳ chọn cỡ chữ / giao diện (Aa trên thanh trên) — nhớ theo từng máy. Người lớn tuổi thích giao diện đứng + chữ to. */
+const UI_KEY = 'bmb_r_ui', UI = { layout:'auto', size:0 }, UI_FS = [1, 1.18, 1.36];
+try{ const o = JSON.parse(lsGet(UI_KEY) || '{}'); if(['auto', 'tall', 'wide'].includes(o.layout)) UI.layout = o.layout; if([0, 1, 2].includes(o.size)) UI.size = o.size; }catch(e){}
+let uiSheet = null;
+function uiBuildSheet(){            // một lần: sao chép mọi luật font-size:NNpx thành calc(NNpx * hệ số), không đụng bố cục
+  const walk = rules => { let out = '';
+    for(const r of rules){
+      if(r.cssRules && r.media){ const inner = walk(r.cssRules); if(inner) out += '@media ' + r.media.mediaText + '{' + inner + '}'; }
+      else if(r.style && r.selectorText){ const m = /^([\d.]+)px$/.exec(r.style.getPropertyValue('font-size')); if(m) out += r.selectorText + '{font-size:calc(' + m[1] + 'px * var(--fs,1)) !important}'; }
+    } return out; };
+  let css = '';
+  for(const sh of document.styleSheets){ try{ css += walk(sh.cssRules); }catch(e){} }
+  uiSheet = document.createElement('style'); uiSheet.textContent = css; document.head.append(uiSheet);
+}
+function uiApply(){
+  if(UI.size > 0 && !uiSheet) uiBuildSheet();
+  document.documentElement.style.setProperty('--fs', UI_FS[UI.size]);
+  document.querySelectorAll('#uiMenu .uiSeg').forEach(g => g.querySelectorAll('button').forEach(b => b.classList.toggle('on', String(UI[g.dataset.k]) === b.dataset.v)));
+  applyWide(); setTimeout(stickTop, 60);
+}
 const WIDE_MQ = matchMedia('(orientation: landscape) and (min-width: 900px)');
 let maxH = 0, maxHLand = null;
 function applyWide(){
@@ -1366,7 +1401,7 @@ function applyWide(){
   maxH = Math.max(maxH, innerHeight);
   const a = document.activeElement, typing = a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName);
   if(typing && params.get('wide') == null) return;
-  const w = params.get('wide') === '1' || (params.get('wide') !== '0' && land && maxH >= 500);
+  const w = params.get('wide') === '1' || (params.get('wide') !== '0' && (UI.layout === 'wide' || (UI.layout === 'auto' && land && maxH >= 500)));
   document.body.classList.toggle('wide', w);
   if(w && curTab === 'queue') tab('search');
 }
@@ -1386,6 +1421,13 @@ function markStuck(){
 addEventListener('scroll', markStuck, { passive:true });
 $('paneSearch').addEventListener('scroll', markStuck, { passive:true });
 stickTop();
+$('uiBtn').onclick = e => { e.stopPropagation(); $('uiMenu').classList.toggle('show'); };
+document.addEventListener('click', e => { if(!e.target.closest('#uiMenu') && !e.target.closest('#uiBtn')) $('uiMenu').classList.remove('show'); });
+document.querySelectorAll('#uiMenu .uiSeg button').forEach(b => b.onclick = () => {
+  const k = b.parentNode.dataset.k; UI[k] = k === 'size' ? +b.dataset.v : b.dataset.v;
+  lsSet(UI_KEY, JSON.stringify(UI)); uiApply();
+});
+uiApply();
 addEventListener('resize', () => setTimeout(applyWide, 150));
 document.addEventListener('focusout', () => setTimeout(applyWide, 400));
 $('playBtn').onclick = () => send('play'); $('nextBtn').onclick = () => send('next');
