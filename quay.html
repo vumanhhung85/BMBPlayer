@@ -438,6 +438,11 @@ tbody tr:hover td{background:#FBF8FE}
       <button class="btn btn-ghost btn-sm" id="vtTat" style="display:none">Tắt vân tay</button>
     </div>
 
+    <div id="tgSecCd" style="display:none">
+      <div class="sect-lbl">✈️ Telegram của tài khoản quản lý chi nhánh</div>
+      <div id="tgHostCd" style="margin-bottom:22px"></div>
+    </div>
+
     <div id="seekSec" style="display:none">
       <div class="sect-lbl">⏩ Thanh tua bài trên điện thoại / máy tính bảng <span class="tagx">chỉ admin</span></div>
       <div class="hint" id="seekInfo">Đang tải…</div>
@@ -478,12 +483,12 @@ tbody tr:hover td{background:#FBF8FE}
     <div class="hint">Khách gọi lễ tân thì máy này hiện thông báo kèm nút <b>Tiếp nhận</b>, kể cả khi đã tắt màn hình hoặc đóng trang quầy.
       Máy đang mở trang quầy sẽ không hiện thông báo trùng, vì trang đã kêu chuông. Mỗi máy (điện thoại, máy tính) bật riêng một lần.</div>
     <ul class="pu-note" id="puNote"></ul>
-    <div class="tgbox" id="tgBox" style="display:none">
+    <div id="tgHostPu"><div class="tgbox" id="tgBox" style="display:none">
       <b class="t">✈️ Telegram</b> <span class="sub">(kênh phụ, không bắt buộc)</span>
       <div class="sub" id="tgMoTa">Kết nối để nhận đơn gọi lễ tân ngay trên Telegram kể cả khi không mở trang quầy, và bấm <b>Tiếp nhận / Đã xong / Huỷ</b> ngay trong tin nhắn. Quản lý và nhân viên quầy của chi nhánh cùng nhận một đơn.</div>
       <div class="st" id="tgTt">Đang kiểm tra…</div>
       <div class="actions wrap" id="tgNut"></div>
-    </div>
+    </div></div>
     <div class="actions wrap">
       <button class="btn btn-y btn-sm" id="puBat">Bật thông báo</button>
       <button class="btn btn-ghost btn-sm" id="puThu" style="display:none">Gửi thử</button>
@@ -829,7 +834,8 @@ function puTrangThai(cls, tieuDe, chiTiet){
 /* ---------- Telegram riêng (quản lý + nhân viên quầy) ---------- */
 var TG = { st:null, timer:null, link:'' };
 function tgDuocNhan(){ return S.vaiTro === 'manager' || S.vaiTro === 'quay'; }
-function tgTai(){
+function tgTai(host){
+  if(host && $('tgBox').parentNode !== host) host.appendChild($('tgBox'));     // một khối Telegram dùng chung: đặt vào chỗ đang mở (Cài đặt hoặc hộp 🔔)
   var box = $('tgBox');
   if(!tgDuocNhan()){ box.style.display = 'none'; return; }
   box.style.display = '';
@@ -872,7 +878,7 @@ function tgBamKetNoi(ev){
   clearInterval(TG.timer);
   var lan = 0;
   TG.timer = setInterval(function(){
-    if(++lan > 60 || !$('modalPush').classList.contains('show')){ clearInterval(TG.timer); return; }
+    if(++lan > 60 || $('tgBox').offsetParent === null){ clearInterval(TG.timer); return; }   // thôi hỏi khi khối Telegram đã bị ẩn / đóng
     if(document.hidden) return;
     api('tg.trangThai').then(function(r){
       if(r && r.ok && r.ketNoi){ clearInterval(TG.timer); TG.st = r; tgVe(); toast('Đã kết nối Telegram'); }
@@ -891,7 +897,7 @@ function tgThaoTac(act){
 }
 function puMo(){
   $('modalPush').classList.add('show');
-  tgTai();
+  tgTai($('tgHostPu'));
   if(!appQ()){ var b0 = $('puApp'); if(b0) b0.style.display = 'none'; }
   puCapNhat();
 }
@@ -2085,7 +2091,8 @@ $('seekBtn').onclick = function(){
     seekVe2(r.on);
   }).catch(function(){ b.disabled = false; alert('Không kết nối được máy chủ.'); });
 };
-function cdMo(){ vtVe(); if(S.vaiTro === 'admin') seekVe(); if(S.sieuAdmin) apkVe(); }
+function cdMo(){ vtVe(); if(S.vaiTro === 'admin') seekVe(); if(S.sieuAdmin) apkVe();
+  var tg = tgDuocNhan(); $('tgSecCd').style.display = tg ? '' : 'none'; if(tg) tgTai($('tgHostCd')); else clearInterval(TG.timer); }
 $('lgVt').addEventListener('click', vtDangNhap);
 $('vtBat').addEventListener('click', vtBat);
 $('vtTat').addEventListener('click', vtTat);
