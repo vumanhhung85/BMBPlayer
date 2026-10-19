@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#4B1272">
+<title>Hướng dẫn BMBPlayer</title>
+<link rel="icon" href="icon-192.png">
+<style>
+/* ===== Font tự lưu (không phụ thuộc Google Fonts → PDF và trang web giống hệt nhau) ===== */
+@font-face{font-family:'BVP';font-weight:400;src:url(huongdan/fonts/be-vietnam-pro-latin-400-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'BVP';font-weight:400;src:url(huongdan/fonts/be-vietnam-pro-vietnamese-400-normal.woff2) format('woff2');unicode-range:U+0102-0103,U+0110-0111,U+0128-0129,U+0168-0169,U+01A0-01A1,U+01AF-01B0,U+0300-0301,U+0303-0304,U+0308-0309,U+0323,U+0329,U+1EA0-1EF9,U+20AB}
+@font-face{font-family:'BVP';font-weight:500;src:url(huongdan/fonts/be-vietnam-pro-latin-500-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'BVP';font-weight:500;src:url(huongdan/fonts/be-vietnam-pro-vietnamese-500-normal.woff2) format('woff2');unicode-range:U+0102-0103,U+0110-0111,U+0128-0129,U+0168-0169,U+01A0-01A1,U+01AF-01B0,U+0300-0301,U+0303-0304,U+0308-0309,U+0323,U+0329,U+1EA0-1EF9,U+20AB}
+@font-face{font-family:'BVP';font-weight:600;src:url(huongdan/fonts/be-vietnam-pro-latin-600-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'BVP';font-weight:600;src:url(huongdan/fonts/be-vietnam-pro-vietnamese-600-normal.woff2) format('woff2');unicode-range:U+0102-0103,U+0110-0111,U+0128-0129,U+0168-0169,U+01A0-01A1,U+01AF-01B0,U+0300-0301,U+0303-0304,U+0308-0309,U+0323,U+0329,U+1EA0-1EF9,U+20AB}
+@font-face{font-family:'BVP';font-weight:700;src:url(huongdan/fonts/be-vietnam-pro-latin-700-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'BVP';font-weight:700;src:url(huongdan/fonts/be-vietnam-pro-vietnamese-700-normal.woff2) format('woff2');unicode-range:U+0102-0103,U+0110-0111,U+0128-0129,U+0168-0169,U+01A0-01A1,U+01AF-01B0,U+0300-0301,U+0303-0304,U+0308-0309,U+0323,U+0329,U+1EA0-1EF9,U+20AB}
+@font-face{font-family:'Baloo';font-weight:700;src:url(huongdan/fonts/baloo-2-latin-700-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'Baloo';font-weight:700;src:url(huongdan/fonts/baloo-2-vietnamese-700-normal.woff2) format('woff2');unicode-range:U+0102-0103,U+0110-0111,U+0128-0129,U+0168-0169,U+01A0-01A1,U+01AF-01B0,U+0300-0301,U+0303-0304,U+0308-0309,U+0323,U+0329,U+1EA0-1EF9,U+20AB}
+@font-face{font-family:'Baloo';font-weight:800;src:url(huongdan/fonts/baloo-2-latin-800-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'Baloo';font-weight:800;src:url(huongdan/fonts/baloo-2-vietnamese-800-normal.woff2) format('woff2');unicode-range:U+0102-0103,U+0110-0111,U+0128-0129,U+0168-0169,U+01A0-01A1,U+01AF-01B0,U+0300-0301,U+0303-0304,U+0308-0309,U+0323,U+0329,U+1EA0-1EF9,U+20AB}
+
+:root{
+  --grape:#4B1272;--deep:#3A0F5A;--purple:#6B21A8;--violet:#8B2FBE;--yellow:#FFD21A;--orange:#F26A1B;
+  --ink:#24123A;--mute:#7B6A91;--tint:#F4EEFA;--tint2:#EFE4F8;--line:#E2D6F0;--ok:#17935F;--bad:#D6314F;
+  --rainbow:linear-gradient(90deg,#FF8A00,#F2433A 22%,#9B3FD0 45%,#2B7FD9 68%,#22B573 86%,#F7C600);
+  --fh:'Baloo','BVP','Segoe UI',Roboto,sans-serif;--fb:'BVP','Segoe UI',Roboto,Arial,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--fb);color:var(--ink);background:#FBF8FE;line-height:1.65;font-size:16px;-webkit-font-smoothing:antialiased;
+  -webkit-print-color-adjust:exact;print-color-adjust:exact}
+img{max-width:100%;display:block}
+a{color:var(--purple)}
+
+/* ===== thanh điều hướng (chỉ trên màn hình) ===== */
+.nav{position:sticky;top:0;z-index:50;background:linear-gradient(110deg,#3E0F60,var(--grape) 55%,var(--purple));color:#fff;
+  box-shadow:0 8px 24px -12px rgba(40,8,70,.7)}
+.nav .in{max-width:1080px;margin:0 auto;padding:10px 18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.nav .lg{display:flex;align-items:center;gap:10px;font-family:var(--fh);font-weight:800;font-size:19px;letter-spacing:.2px}
+.nav .lg img{width:36px;height:36px;border-radius:10px;background:#fff}
+.tabs{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap}
+.tabs button{font:600 14px var(--fb);border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.1);color:#EBDDF7;
+  padding:8px 16px;border-radius:999px;cursor:pointer;transition:.18s}
+.tabs button:hover{background:rgba(255,255,255,.2);color:#fff}
+.tabs button.on{background:var(--yellow);border-color:var(--yellow);color:var(--deep);box-shadow:0 4px 14px -4px rgba(255,210,26,.7)}
+.pdfbtn{font:700 13.5px var(--fb);text-decoration:none;color:var(--deep);background:#fff;padding:8px 16px;border-radius:999px}
+.pdfbtn:hover{background:var(--yellow)}
+
+.doc{display:none}
+.doc.on{display:block}
+
+/* ===== bìa ===== */
+.cover{position:relative;overflow:hidden;color:#fff;background:radial-gradient(900px 480px at 85% 0,rgba(214,51,198,.45),transparent 60%),linear-gradient(160deg,#2C0A47,var(--grape) 55%,#6B21A8);
+  padding:64px 18px 0}
+.cover .rb{position:absolute;left:0;right:0;bottom:0;height:10px;background:var(--rainbow)}
+.cover .in{max-width:1080px;margin:0 auto;display:grid;grid-template-columns:1.05fr .95fr;gap:20px;align-items:end;min-height:560px}
+.cover .tx{padding-bottom:70px;align-self:center;position:relative;z-index:3}
+.cover .kick{display:inline-flex;align-items:center;gap:10px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);padding:6px 14px 6px 6px;border-radius:999px;font-weight:600;font-size:14px}
+.cover .kick img{width:30px;height:30px;border-radius:9px;background:#fff}
+.cover h1{font-family:var(--fh);font-weight:800;font-size:clamp(40px,6.4vw,76px);line-height:1;margin:22px 0 14px;letter-spacing:-.5px}
+.cover h1 em{font-style:normal;background:var(--rainbow);-webkit-background-clip:text;background-clip:text;color:transparent}
+.cover .sub{font-size:clamp(17px,2.2vw,22px);color:#E6D5F5;max-width:30ch}
+.cover .chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:26px}
+.cover .chips span{background:var(--yellow);color:var(--deep);font-weight:700;font-size:13.5px;padding:7px 14px;border-radius:999px}
+.cover .art{position:relative;height:560px}
+.cover .art .ph{position:absolute;right:6%;bottom:-40px;width:248px;z-index:2;transform:rotate(3deg)}
+.cover .art .lp{position:absolute;right:20%;bottom:36px;width:430px;transform:rotate(-2deg)}
+.cover .art.g .ph{width:268px;right:30%;transform:rotate(-2deg)}
+.cover .art.g .ph2{position:absolute;right:2%;bottom:-70px;width:248px;transform:rotate(5deg);z-index:1}
+
+/* ===== khung thiết bị ===== */
+.phone{background:#160A26;border-radius:34px;padding:8px;box-shadow:0 30px 50px -22px rgba(20,4,40,.7),0 0 0 2px #3A2358 inset}
+.phone .fig{border-radius:27px;overflow:hidden;position:relative;background:#fff}
+.laptop{filter:drop-shadow(0 30px 28px rgba(20,4,40,.5))}
+.laptop .scr{background:#160A26;border-radius:12px 12px 0 0;padding:9px 9px 6px}
+.laptop .scr .fig{border-radius:5px;overflow:hidden;position:relative}
+.laptop .base{height:12px;background:linear-gradient(#cfc6da,#9d92ad);border-radius:0 0 14px 14px;margin:0 -3%}
+.tvf{background:#0d0618;border-radius:14px;padding:9px;box-shadow:0 26px 40px -20px rgba(20,4,40,.7)}
+.tvf .fig{border-radius:6px;overflow:hidden;position:relative}
+.photo{background:#fff;border-radius:16px;padding:8px;box-shadow:0 20px 36px -18px rgba(36,18,58,.55);border:1px solid var(--line)}
+.photo .fig{border-radius:10px;overflow:hidden;position:relative}
+.dlg{filter:drop-shadow(0 18px 22px rgba(36,18,58,.38))}
+.dlg .fig{position:relative}
+figure{margin:0}
+figcaption{font-size:13px;color:var(--mute);text-align:center;margin-top:10px;line-height:1.45}
+.hl{position:absolute;border:3px solid var(--yellow);border-radius:12px;box-shadow:0 0 0 2px rgba(75,18,114,.65),0 0 16px 2px rgba(255,210,26,.85);pointer-events:none}
+.hl[data-n]::after{content:attr(data-n);position:absolute;left:-11px;top:-13px;width:25px;height:25px;border-radius:50%;background:var(--orange);color:#fff;
+  font:700 13px/25px var(--fb);text-align:center;box-shadow:0 2px 6px rgba(0,0,0,.35)}
+
+/* ===== bố cục nội dung ===== */
+.wrap{max-width:1080px;margin:0 auto;padding:0 18px}
+.toc{padding:44px 0 6px}
+.toc h2{font-family:var(--fh);font-size:26px;color:var(--grape);margin-bottom:16px}
+.toc ol{list-style:none;display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;counter-reset:t}
+.toc li{counter-increment:t;background:#fff;border:1px solid var(--line);border-radius:14px;padding:11px 14px 11px 52px;position:relative;font-weight:600;font-size:15px}
+.toc li::before{content:counter(t,decimal-leading-zero);position:absolute;left:12px;top:50%;transform:translateY(-50%);font:800 22px var(--fh);
+  background:var(--rainbow);-webkit-background-clip:text;background-clip:text;color:transparent}
+.toc a{text-decoration:none;color:inherit}
+
+.chap{padding:54px 0 8px}
+.chap>.wrap>header{display:flex;align-items:flex-end;gap:18px;margin-bottom:22px;border-bottom:3px solid var(--tint2);padding-bottom:14px;position:relative}
+.chap>.wrap>header::after{content:'';position:absolute;left:0;bottom:-3px;width:120px;height:3px;background:var(--rainbow)}
+.chap .num{font-family:var(--fh);font-weight:800;font-size:76px;line-height:.8;color:transparent;-webkit-text-stroke:2px var(--violet);opacity:.9}
+.chap h2{font-family:var(--fh);font-weight:800;font-size:clamp(28px,4vw,40px);line-height:1.05;color:var(--grape)}
+.chap .lead{color:var(--mute);font-size:16px;margin-top:4px}
+h3{font-family:var(--fh);font-weight:700;font-size:22px;color:var(--purple);margin:0 0 6px;line-height:1.2}
+p{margin:0 0 10px}
+.mt{margin-top:22px}
+
+.step{display:grid;grid-template-columns:1fr minmax(190px,270px);gap:28px;align-items:center;background:#fff;border:1px solid var(--line);
+  border-radius:22px;padding:24px;margin-bottom:20px;box-shadow:0 12px 30px -22px rgba(75,18,114,.45);break-inside:avoid}
+.step.rev{grid-template-columns:minmax(190px,270px) 1fr}
+.step>*{min-width:0}
+.sbs figure{max-width:100%}
+.step.rev .figs{order:-1}
+.qrbox{width:190px}.qrbox img{width:100%}
+.qrstep{grid-template-columns:1fr 210px}
+.step.wide{grid-template-columns:1fr}
+.step .figs{display:flex;gap:14px;justify-content:center;align-items:flex-start}
+.step .figs .phone{width:100%;max-width:250px}
+.step.two .figs .phone{max-width:200px}
+.step.three{grid-template-columns:1fr}
+.step.three .figs .phone{max-width:210px}
+.badge{display:inline-flex;align-items:center;gap:8px;font-weight:700;font-size:12.5px;letter-spacing:.4px;text-transform:uppercase;color:#fff;
+  background:linear-gradient(110deg,var(--grape),var(--violet));padding:4px 12px 4px 4px;border-radius:999px;margin-bottom:10px}
+.badge b{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--yellow);color:var(--deep);font-size:13px}
+ul.tick,ol.no{margin:6px 0 10px 0;padding:0;list-style:none}
+ul.tick li{position:relative;padding-left:26px;margin:6px 0}
+ul.tick li::before{content:'';position:absolute;left:2px;top:.55em;width:12px;height:12px;border-radius:50%;background:var(--rainbow)}
+ol.no{counter-reset:o}
+ol.no li{counter-increment:o;position:relative;padding-left:34px;margin:8px 0}
+ol.no li::before{content:counter(o);position:absolute;left:0;top:1px;width:24px;height:24px;border-radius:50%;background:var(--grape);color:#fff;font:700 13px/24px var(--fb);text-align:center}
+.note{border-radius:14px;padding:11px 14px;margin:12px 0;font-size:14.5px;line-height:1.55;border-left:5px solid var(--violet);background:var(--tint)}
+.note.tip{border-left-color:var(--ok);background:#E9F8F0}
+.note.warn{border-left-color:var(--orange);background:#FFF3E6}
+.note b{color:var(--grape)}
+kbd,.k{font:600 .88em var(--fb);background:var(--tint2);border:1px solid #D9C6EC;border-bottom-width:2px;border-radius:7px;padding:1px 8px;white-space:nowrap;color:var(--grape)}
+.k.y{background:var(--yellow);border-color:#E6B800;color:var(--deep)}
+.k.g{background:#E3F6EC;border-color:#A9E0C4;color:#0F7A4D}
+.k.r{background:#FFF1F3;border-color:#F5B5C0;color:var(--bad)}
+
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin:6px 0 18px}
+.card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:18px;box-shadow:0 12px 30px -22px rgba(75,18,114,.45);break-inside:avoid}
+.card .ic{font-size:30px;line-height:1;margin-bottom:8px}
+.card h4{font:800 18px var(--fh);color:var(--grape);margin-bottom:4px}
+.card p{font-size:14.5px;color:#4E3A68;margin:0}
+.flow{display:flex;align-items:stretch;gap:0;margin:8px 0 22px;flex-wrap:wrap;justify-content:center}
+.flow .n{background:linear-gradient(160deg,var(--grape),var(--purple));color:#fff;border-radius:16px;padding:14px 16px;min-width:170px;text-align:center;font-weight:600;font-size:14.5px;flex:1 1 170px;max-width:260px}
+.flow .n small{display:block;font-weight:400;opacity:.85;font-size:12.5px;margin-top:2px}
+.flow .a{align-self:center;font-size:26px;color:var(--violet);padding:0 8px;font-weight:800}
+
+table{width:100%;border-collapse:separate;border-spacing:0;background:#fff;border:1px solid var(--line);border-radius:16px;overflow:hidden;font-size:14.5px;margin:8px 0 14px;break-inside:avoid}
+th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+th{background:var(--grape);color:#fff;font-weight:700;font-size:13px}
+tr:last-child td{border-bottom:0}
+td.c,th.c{text-align:center}
+td.y{color:var(--ok);font-weight:800}
+td.n{color:#B9A8CF}
+tbody tr:nth-child(even) td{background:#FBF8FE}
+.legend{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+.legend span{display:inline-flex;align-items:center;gap:7px;font-size:13.5px;background:#fff;border:1px solid var(--line);border-radius:999px;padding:4px 12px 4px 8px}
+.legend i{width:14px;height:14px;border-radius:5px;display:inline-block}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
+.sbs{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;align-items:flex-start;margin:6px 0}
+.sbs figure{flex:0 1 auto}
+
+/* chế độ khách — đồ hoạ lớn hơn */
+.big{font-size:17px}
+.stepno{font-family:var(--fh);font-weight:800;font-size:64px;line-height:.8;color:var(--yellow);text-shadow:0 3px 0 var(--grape);-webkit-text-stroke:2px var(--grape)}
+.keys{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:10px 0}
+.keys div{background:var(--tint);border-radius:14px;padding:10px 12px;font-size:14px;text-align:center}
+.keys b{display:block;font-size:22px}
+
+.faq details{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 16px;margin-bottom:8px;break-inside:avoid}
+.faq summary{font-weight:700;color:var(--grape);cursor:pointer}
+.faq details[open] summary{margin-bottom:6px}
+.foot{margin-top:44px;background:linear-gradient(110deg,#3E0F60,var(--grape));color:#E6D5F5;text-align:center;padding:26px 18px 30px;position:relative;font-size:14px}
+.foot::before{content:'';position:absolute;left:0;right:0;top:0;height:6px;background:var(--rainbow)}
+.foot b{color:#fff;font-family:var(--fh);font-size:20px}
+.foot small{display:block;margin-top:4px;font-size:11.5px;opacity:.7}
+
+@media(max-width:860px){
+  .cover .in{grid-template-columns:1fr;min-height:0}
+  .cover .art{height:420px;order:-1}
+  .cover .art .lp{display:none}
+  .cover .art .ph{right:auto;left:50%;margin-left:-124px;bottom:-30px}
+  .cover .art.g .ph{left:50%;right:auto;margin-left:-190px;width:230px}
+  .cover .art.g .ph2{right:auto;left:50%;margin-left:10px;width:210px}
+  .cover .tx{padding-bottom:40px}
+  .step,.step.rev,.qrstep,.tvauto{grid-template-columns:1fr}
+  .step.rev .figs{order:0}
+  .row2{grid-template-columns:1fr}
+  .tabs{margin-left:0}
+  .chap .num{font-size:54px}
+  .step{padding:16px}
+  .sbs figure[style*="230px"]{width:30%!important;min-width:100px}
+}
+
+
+/* ===== Bản nhanh khách (1 tờ A4) ===== */
+.qk{display:flex;flex-direction:column;min-height:1120px;max-width:794px;margin:24px auto;background:#fff;box-shadow:0 20px 50px -20px rgba(40,8,70,.5);position:relative;overflow:hidden}
+.qk .top{background:radial-gradient(500px 240px at 90% 0,rgba(214,51,198,.45),transparent 60%),linear-gradient(160deg,#2C0A47,var(--grape) 60%,#6B21A8);color:#fff;padding:26px 34px 22px;display:flex;align-items:center;gap:18px;position:relative}
+.qk .top::after{content:'';position:absolute;left:0;right:0;bottom:0;height:7px;background:var(--rainbow)}
+.qk .top img{width:62px;height:62px;border-radius:16px;background:#fff}
+.qk .top h1{font-family:var(--fh);font-weight:800;font-size:34px;line-height:1.05}
+.qk .top h1 em{font-style:normal;background:var(--rainbow);-webkit-background-clip:text;background-clip:text;color:transparent}
+.qk .top p{color:#E6D5F5;font-size:14px;margin:2px 0 0}
+.qk .sts{padding:22px 24px 8px;display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.qk .st{border:1.5px solid var(--line);border-radius:16px;padding:10px 10px 12px;text-align:center;position:relative;background:#fff}
+.qk .st .n{position:absolute;left:-6px;top:-8px;width:28px;height:28px;border-radius:50%;background:var(--yellow);color:var(--deep);font:800 16px/28px var(--fh);box-shadow:0 0 0 2px var(--grape)}
+.qk .st .ph{background:#160A26;border-radius:18px;padding:4px;width:132px;margin:2px auto 8px}
+.qk .st .ph img{border-radius:12px;width:100%}
+.qk .st .ph.qrp{background:#fff;border:1px solid var(--line)}
+.qk .st h4{font:800 17px/1.15 var(--fh);color:var(--grape);margin-bottom:3px}
+.qk .st p{font-size:12.5px;line-height:1.45;color:#4E3A68;margin:0}
+.qk .st .k{font-size:10.5px;padding:0 5px}
+.qk .mid{margin:14px 24px 0;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.qk .box{border-radius:16px;padding:16px 18px;font-size:13.5px;line-height:1.5}
+.qk .box h5{font:800 16px var(--fh);color:var(--grape);margin-bottom:4px}
+.qk .box.a{background:var(--tint)}.qk .box.b{background:#FFF3E6}
+.qk .box ul{list-style:none;padding:0;margin:0}.qk .box li{padding-left:16px;position:relative;margin:3px 0}
+.qk .box li::before{content:'';position:absolute;left:2px;top:.5em;width:8px;height:8px;border-radius:50%;background:var(--rainbow)}
+.qk .keys2{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.qk .keys2 span{background:#fff;border:1px solid #F0C9A0;border-radius:9px;padding:2px 8px;font-size:11.5px;font-weight:600}
+.qk .tipbar{margin:14px 24px 0;font-size:13.5px!important;background:var(--grape);color:#fff;border-radius:14px;padding:10px 16px;font-size:12.5px;display:flex;gap:10px;align-items:center}
+.qk .tipbar b{color:var(--yellow)}
+.qk .foot{margin-top:auto;padding:14px 18px 16px;font-size:12px}
+.qk .foot b{font-size:17px}
+
+/* ===== In ra PDF: A4 ===== */
+@page{size:A4;margin:12mm 12mm 14mm}
+@page :first{margin:0}
+@media print{
+  html{font-size:13.4px}
+  body{background:#fff}
+  .nav,.pdfbtn,.tabs{display:none!important}
+  .doc{display:none!important}
+  body[data-print="quan-ly"] #quan-ly,body[data-print="khach"] #khach,body[data-print="nhanh"] #nhanh{display:block!important}
+  #nhanh .qk{margin:0;box-shadow:none;max-width:none;width:210mm;height:296mm;overflow:hidden}
+  body[data-print="nhanh"]{margin:0}
+  .cover{min-height:297mm;padding-top:30mm;display:flex;align-items:stretch}
+  .cover .in{min-height:0;width:100%;grid-template-columns:1fr;align-content:start}
+  .cover .art{height:430px;order:2}
+  .cover .art .lp{display:block;width:390px;right:28%}
+  .cover .art .ph{width:228px;right:4%;bottom:-20px}
+  .cover .art.g .ph{width:236px;right:34%}.cover .art.g .ph2{width:218px;right:6%;bottom:-40px}
+  .cover .tx{padding-bottom:12px}
+  .cover h1{font-size:62px}
+  .wrap{max-width:none;padding:0}
+  .toc{padding:8mm 0 0}.chap{padding:7mm 0 0}
+  .pb{break-before:page}
+  .chap>.wrap>header{break-after:avoid}
+  .step,.card,table,.note{box-shadow:none}
+  .foot{margin-top:10mm}
+  .step{padding:16px;gap:20px;grid-template-columns:1fr 175px!important}
+  .step.rev{grid-template-columns:175px 1fr!important}
+  .step.wide,.step.three{grid-template-columns:1fr!important}
+  .step.rev .figs{order:-1!important}
+  .row2{grid-template-columns:1fr 1fr!important}
+  .step.three .figs{justify-content:flex-start}
+  .step .figs .phone{max-width:165px}
+  .step.three .figs .phone{max-width:150px}
+  .qrstep{grid-template-columns:1fr 190px!important}
+  .tvauto{grid-template-columns:1fr 250px!important}
+  .tvauto .figs .dlg{max-width:250px!important}
+  .qrbox{width:160px}
+  .pbk{break-before:page}
+  .tvauto{font-size:12.4px;padding:12px 14px;gap:14px;grid-template-columns:1fr 230px!important}
+  .tvauto h3{font-size:18px}.tvauto p{margin-bottom:6px}.tvauto ol.no li{margin:5px 0}.tvauto .note{margin:6px 0 0;padding:7px 11px}
+  #ql2 header{margin-bottom:10px}#ql2 .qrstep{padding:12px 16px;margin-bottom:12px}
+  .tvauto .figs .dlg{max-width:230px!important}
+  #khach #kh5 .card{padding:11px 14px}#khach #kh5 .card .ic{font-size:22px;margin-bottom:3px}
+  #khach .faq details{padding:7px 13px;margin-bottom:5px}
+  #khach .faq.mt{margin-top:10px}
+  #khach .foot{margin-top:6mm;padding:14px 18px 16px}
+  #khach #kh5 .chap-h{}
+  h3,.badge{break-after:avoid}
+  .step,.card,.note,table,figure{break-inside:avoid}
+  .chap{padding-top:5mm}
+  .faq details{border:1px solid var(--line)}
+  .faq details>*{display:block}
+}
+@media print{details:not([open])>*:not(summary){display:block}}
+</style>
+</head>
+<body>
+
+<div class="nav"><div class="in">
+  <div class="lg"><img src="huongdan/img/logoB.png" alt="BMBPlayer">BMBPlayer · Hướng dẫn</div>
+  <div class="tabs" role="tablist">
+    <button id="tbQl" data-d="quan-ly" role="tab">Quản lý &amp; Admin</button>
+    <button id="tbKh" data-d="khach" role="tab">Khách hàng</button>
+    <button id="tbNh" data-d="nhanh" role="tab">Khách · Bản nhanh A4</button>
+  </div>
+  <a class="pdfbtn" id="pdfLink" href="huongdan/huong-dan-quan-ly-admin.pdf" download>⬇ Tải PDF</a>
+</div></div>
+
+<!-- ======================================================================== -->
+<!--                       HƯỚNG DẪN QUẢN LÝ & ADMIN                          -->
+<!-- ======================================================================== -->
+<main class="doc" id="quan-ly">
+
+<section class="cover">
+  <div class="in">
+    <div class="tx">
+      <span class="kick"><img src="huongdan/img/logoB.png" alt="">BMBPlayer · Boom Music Box</span>
+      <h1>Hướng dẫn<br>sử dụng <em>BMBPlayer</em></h1>
+      <p class="sub">Dành cho Quản lý chi nhánh &amp; Admin</p>
+      <div class="chips"><span>Quầy phục vụ</span><span>TV &amp; máy tính bảng</span><span>Menu</span><span>Cập nhật ứng dụng</span></div>
+    </div>
+    <div class="art">
+      <div class="laptop lp"><div class="scr"><div class="fig"><img src="huongdan/img/q_desk.jpg" alt=""></div></div><div class="base"></div></div>
+      <div class="phone ph"><div class="fig"><img src="huongdan/img/q_queue.jpg" alt=""></div></div>
+    </div>
+  </div>
+  <div class="rb"></div>
+</section>
+
+<section class="toc"><div class="wrap">
+  <h2>Nội dung</h2>
+  <ol>
+    <li><a href="#ql1">Làm quen với BMBPlayer</a></li>
+    <li><a href="#ql2">Cài ứng dụng &amp; đăng nhập</a></li>
+    <li><a href="#ql3">Hàng đợi — trái tim của quầy</a></li>
+    <li><a href="#ql4">Lịch sử đơn &amp; đối soát</a></li>
+    <li><a href="#ql5">TV, máy tính bảng &amp; phòng</a></li>
+    <li><a href="#ql6">Menu nước &amp; dịch vụ</a></li>
+    <li><a href="#ql7">Tài khoản &amp; vân tay</a></li>
+    <li><a href="#ql8">Cập nhật BMBPlayer</a></li>
+    <li><a href="#ql9">Gặp sự cố? Xử lý nhanh</a></li>
+  </ol>
+</div></section>
+
+<!-- 1 -->
+<section class="chap" id="ql1"><div class="wrap">
+  <header><span class="num">01</span><div><h2>Làm quen với BMBPlayer</h2><p class="lead">Một hệ thống cho cả việc hát và việc phục vụ trong phòng.</p></div></header>
+
+  <div class="cards">
+    <div class="card"><div class="ic">📺</div><h4>TV trong phòng</h4><p>Phát bài hát khách chọn. Góc trái luôn có <b>mã QR</b> để khách quét, và hiện các yêu cầu khách đã gửi cho lễ tân.</p></div>
+    <div class="card"><div class="ic">📱</div><h4>Điện thoại khách &amp; máy tính bảng</h4><p>Chọn bài, điều khiển TV, <b>gọi lễ tân</b>, gọi nước theo số lượng, báo sự cố — không cần cài ứng dụng.</p></div>
+    <div class="card"><div class="ic">🧾</div><h4>Quầy phục vụ</h4><p>Nhận yêu cầu <b>ngay lập tức</b>, xác nhận, theo dõi phòng, quản lý TV, menu và nhân viên.</p></div>
+  </div>
+
+  <div class="flow">
+    <div class="n">Khách quét QR trên TV<small>chọn bài · gọi nước · báo sự cố</small></div><div class="a">→</div>
+    <div class="n">Quầy nhận yêu cầu<small>chuông + rung + thông báo</small></div><div class="a">→</div>
+    <div class="n">Lễ tân xác nhận &amp; phục vụ<small>khách thấy trạng thái ngay trên máy</small></div>
+  </div>
+
+  <h3>Ai làm được gì?</h3>
+  <table>
+    <thead><tr><th>Chức năng</th><th class="c">Nhân viên quầy</th><th class="c">Quản lý chi nhánh</th><th class="c">Admin</th><th class="c">Admin cao nhất</th></tr></thead>
+    <tbody>
+      <tr><td>Hàng đợi, lịch sử đơn, mở/đóng phòng, gán TV, QR khách</td><td class="c y">✔</td><td class="c y">✔</td><td class="c y">✔</td><td class="c y">✔</td></tr>
+      <tr><td>Báo món <b>Còn hàng / Hết hàng</b></td><td class="c y">✔</td><td class="c y">✔</td><td class="c y">✔</td><td class="c y">✔</td></tr>
+      <tr><td>Sửa menu: thêm, ẩn, bỏ, sắp xếp món</td><td class="c">khi được cấp quyền</td><td class="c y">✔</td><td class="c y">✔</td><td class="c y">✔</td></tr>
+      <tr><td>Tài khoản quầy, gỡ / thu hồi máy tính bảng, vân tay</td><td class="c n">—</td><td class="c y">✔</td><td class="c y">✔</td><td class="c y">✔</td></tr>
+      <tr><td>Chọn chi nhánh, thêm / xoá phòng, menu mẫu toàn chuỗi</td><td class="c n">—</td><td class="c n">—</td><td class="c y">✔</td><td class="c y">✔</td></tr>
+      <tr><td>Phát hành bản ứng dụng mới</td><td class="c n">—</td><td class="c n">—</td><td class="c n">—</td><td class="c y">✔</td></tr>
+    </tbody>
+  </table>
+  <div class="note tip"><b>Địa chỉ cần nhớ:</b> trang quầy <span class="k">bmb.id.vn/quay.html</span> · tải ứng dụng Android <span class="k">bmb.id.vn/app.apk</span>. Tài khoản đăng nhập là tài khoản của hệ thống quản lý Boom Music Box.</div>
+</div></section>
+
+<!-- 2 -->
+<section class="chap pb" id="ql2"><div class="wrap">
+  <header><span class="num">02</span><div><h2>Cài ứng dụng &amp; đăng nhập</h2><p class="lead">Dùng app BMBPlayer trên Android để nhận chuông và rung ngay cả khi tắt màn hình.</p></div></header>
+
+  <div class="step qrstep">
+    <div>
+      <span class="badge"><b>1</b> Tải và cài đặt</span>
+      <h3>Cài BMBPlayer trên điện thoại, máy tính bảng hoặc TV box</h3>
+      <ol class="no">
+        <li><b>Quét mã QR bên cạnh</b> bằng camera, hoặc mở trình duyệt vào <span class="k">bmb.id.vn/app.apk</span> để tải ứng dụng.</li>
+        <li>Mở file vừa tải rồi bấm <span class="k y">Cài đặt</span>. Máy hỏi quyền “cài ứng dụng từ nguồn này” thì cho phép.</li>
+        <li>Lần đầu mở, ứng dụng hỏi dùng làm <b>TV</b>, <b>Máy tính bảng</b> hay <b>Quầy</b> — chọn đúng vai trò của thiết bị.</li>
+      </ol>
+    </div>
+    <div class="figs"><figure class="photo qrbox"><div class="fig"><img src="huongdan/img/qr_apk.png" alt="QR tải BMBPlayer"></div><figcaption><b>Quét để tải BMBPlayer</b><br>bmb.id.vn/app.apk</figcaption></figure></div>
+  </div>
+
+  <div class="step tvauto">
+    <div>
+      <span class="badge"><b>2</b> Dành cho TV</span>
+      <h3>Cho TV tự mở BMBPlayer mỗi khi bật máy</h3>
+      <p>Cài xong, hãy làm <b>2 việc</b> sau trên mỗi TV để bật TV lên là vào thẳng BMBPlayer, nhân viên không phải mở tay. Mở menu ẩn bằng cách bấm <span class="k y">QUAY LẠI 3 lần</span> liên tục (hoặc nút <span class="k">MENU</span> trên điều khiển).</p>
+      <ol class="no">
+        <li><b>Đặt BMBPlayer làm màn hình chính.</b> Chọn dòng <b>“Chọn ứng dụng màn hình chính (Home)”</b>. Android hiện danh sách — chọn <b>BMBPlayer</b>, rồi bấm <span class="k y">Luôn luôn</span> (không chọn “Một lần”). Từ nay nút <b>HOME</b> và mỗi lần bật TV đều đưa về BMBPlayer.</li>
+        <li><b>Bật tự mở khi bật máy.</b> Chọn dòng <b>“Tự mở khi bật máy: TẮT (bấm để bật)”</b>. Dòng này đổi thành <b>BẬT</b> là xong. Nếu TV hỏi quyền “hiển thị trên các ứng dụng khác”, hãy cho phép cho BMBPlayer.</li>
+      </ol>
+      <div class="note tip"><b>Kiểm tra:</b> tắt hẳn TV (rút điện vài giây hoặc tắt nguồn) rồi bật lại — chờ 1–2 phút, BMBPlayer phải tự mở. Mỗi TV chỉ cần làm <b>một lần</b>.</div>
+    </div>
+    <div class="figs"><figure class="dlg" style="width:100%;max-width:300px"><div class="fig"><img src="huongdan/img/tvmenu.png" alt=""><i class="hl" data-n="1" style="left:1%;top:54%;width:58%;height:7%"></i><i class="hl" data-n="2" style="left:1%;top:61.5%;width:58%;height:7%"></i></div></figure></div>
+  </div>
+
+  <div class="step wide pbk">
+    <div>
+      <span class="badge"><b>3</b> Google Play Protect</span>
+      <h3>Máy hiện cảnh báo “Đã chặn ứng dụng”? Làm như sau</h3>
+      <p>Play Protect cảnh báo vì BMBPlayer được phát hành riêng, không qua CH Play. Ứng dụng tải từ đúng địa chỉ <b>bmb.id.vn</b> là an toàn. Đừng bấm <b>Tôi hiểu</b> — nút đó sẽ huỷ việc cài.</p>
+      <ol class="no">
+        <li>Bấm <span class="k y">Chi tiết khác</span> (mũi tên xuống).</li>
+        <li>Chữ nhỏ <span class="k y">Tiếp tục cài đặt</span> hiện ra phía dưới — bấm vào đó.</li>
+      </ol>
+      <div class="sbs">
+        <figure class="dlg" style="width:230px"><div class="fig"><img src="huongdan/img/pp1.png" alt=""><i class="hl" data-n="1" style="left:4%;top:66%;width:38%;height:8%"></i></div></figure>
+        <figure class="dlg" style="width:230px"><div class="fig"><img src="huongdan/img/pp2.png" alt=""><i class="hl" data-n="2" style="left:4%;top:68%;width:36%;height:7%"></i></div></figure>
+        <figure class="dlg" style="width:230px"><div class="fig"><img src="huongdan/img/pp3.png" alt=""><i class="hl" data-n="2" style="left:4%;top:72%;width:36%;height:6%"></i></div></figure>
+      </div>
+      <p style="font-size:13px;color:var(--mute);text-align:center">Tuỳ máy và đời Android, hộp thoại có thể hiện một trong các dạng trên — cách làm giống nhau: tìm chữ “Tiếp tục cài đặt”.</p>
+    </div>
+  </div>
+
+  <div class="step rev">
+    <div>
+      <span class="badge"><b>4</b> Đăng nhập quầy</span>
+      <h3>Đăng nhập bằng tài khoản được cấp</h3>
+      <p>Nhập tên đăng nhập rồi bấm <span class="k y">Đăng nhập</span>. Tài khoản <b>quản lý chi nhánh</b> và <b>admin</b> có thêm các tab Menu, Tài khoản quầy, Cài đặt. Admin còn có ô chọn chi nhánh ngay trên đầu trang.</p>
+      <p>Đã bật vân tay? Chạm <span class="k">Đăng nhập bằng vân tay</span> — nhanh hơn nhiều (xem chương 7).</p>
+    </div>
+    <div class="figs"><figure class="dlg" style="width:100%;max-width:300px"><div class="fig"><img src="huongdan/img/login.jpg" alt="" style="border-radius:20px"><i class="hl" data-n="1" style="left:3%;top:62%;width:94%;height:30%"></i></div></figure></div>
+  </div>
+</div></section>
+
+<!-- 3 -->
+<section class="chap pb" id="ql3"><div class="wrap">
+  <header><span class="num">03</span><div><h2>Hàng đợi — trái tim của quầy</h2><p class="lead">Mọi yêu cầu của khách hiện ở đây theo thời gian thực.</p></div></header>
+
+  <div class="step">
+    <div>
+      <span class="badge"><b>1</b> Đọc nhanh màn hình</span>
+      <h3>Số liệu và tình trạng phòng</h3>
+      <ul class="tick">
+        <li><b>Bốn ô số</b> trên cùng: <span class="k" style="background:#FFE9D2;border-color:#F5B87A;color:#B35400">Đã gửi</span> chờ xác nhận · <span class="k">Đã xác nhận</span> · <span class="k g">Đã phục vụ hôm nay</span> · <span class="k r">Đơn nghi ngờ</span>.</li>
+        <li><b>Ô phòng</b> cho biết phòng nào đang hát và đã hát bao lâu:</li>
+      </ul>
+      <div class="legend"><span><i style="background:#17935F"></i>Đang mở</span><span><i style="background:#F5A11B"></i>Mở từ 6 giờ trở lên</span><span><i style="background:#fff;border:1px solid #CDB8E3"></i>Trống</span></div>
+      <p>Dưới đó là <b>ba cột</b>: Đã gửi → Đã xác nhận → Đơn nghi ngờ. Đơn mới luôn nằm đầu cột.</p>
+    </div>
+    <div class="figs"><figure class="phone"><div class="fig"><img src="huongdan/img/q_queue.jpg" alt=""><i class="hl" data-n="1" style="left:3%;top:15.5%;width:94%;height:14%"></i><i class="hl" data-n="2" style="left:3%;top:31%;width:94%;height:18%"></i></div></figure></div>
+  </div>
+
+  <div class="step rev">
+    <div>
+      <span class="badge"><b>2</b> Xử lý một đơn</span>
+      <h3>Xác nhận → Phục vụ → Nhập POS</h3>
+      <ol class="no">
+        <li>Đơn mới ở cột <b>Đã gửi</b>: bấm <span class="k y">Xác nhận</span> — khách thấy ngay “đã xác nhận” trên máy của họ. Không làm được thì bấm <span class="k">Huỷ</span>.</li>
+        <li>Mang đồ vào phòng xong, bấm <span class="k g">Đã phục vụ</span>.</li>
+        <li>Đơn có <b>nước</b> sẽ nhắc <b>“Nhớ nhập POS”</b>. Nhập vào máy tính tiền rồi bấm <span class="k y">Đã nhập</span> để cuối ca đối soát không sót.</li>
+      </ol>
+      <p>Thời gian chờ đổi màu <b>xám → vàng → đỏ</b> khi đơn để lâu. Mỗi đơn có mã <span class="k">#XXXXXX</span> để tra cứu.</p>
+      <div class="note warn"><b>Đơn nghi ngờ</b> (một máy gọi quá nhiều lần liên tục) bị tách sang cột riêng và làm mờ. Bấm <span class="k r">Chặn thiết bị 24h</span> nếu đúng là gọi phá.</div>
+    </div>
+    <div class="figs"><figure class="phone"><div class="fig"><img src="huongdan/img/q_queue2.jpg" alt=""></div></figure></div>
+  </div>
+
+  <div class="step wide">
+    <div>
+      <span class="badge"><b>3</b> Chuông · rung · thông báo</span>
+      <h3>Có đơn là biết ngay — kể cả khi tắt màn hình</h3>
+      <div class="row2">
+        <div>
+          <ul class="tick">
+            <li>Khi app ở chế độ <b>Quầy</b>, thanh thông báo luôn có dòng <b>“BMB Quầy đang nhận đơn”</b>.</li>
+            <li>Đơn mới <b>kêu chuông riêng và rung</b>, rồi <b>nhắc lại mỗi 30 giây</b> cho tới khi có người bấm Xác nhận.</li>
+            <li>Chi nhánh đã nối Telegram nhận thêm tin báo trong nhóm.</li>
+            <li>Dùng trang web thay cho app? Bấm nút <span class="k">🔔</span> trên đầu trang để bật thông báo trên máy đó.</li>
+          </ul>
+          <div class="note tip"><b>Mẹo:</b> đừng gạt tắt dòng “BMB Quầy đang nhận đơn” và hãy cho app chạy nền — đó là thứ giúp chuông luôn kêu.</div>
+        </div>
+        <figure class="photo" style="max-width:380px;margin:0 auto"><div class="fig"><img src="huongdan/img/notif.jpg" alt=""></div><figcaption>Thông báo đơn mới trên điện thoại quầy</figcaption></figure>
+      </div>
+    </div>
+  </div>
+</div></section>
+
+<!-- 4 -->
+<section class="chap" id="ql4"><div class="wrap">
+  <header><span class="num">04</span><div><h2>Lịch sử đơn &amp; đối soát</h2><p class="lead">Dùng cuối ca để khớp với báo cáo máy tính tiền.</p></div></header>
+  <div class="step">
+    <div>
+      <ul class="tick">
+        <li>Tab <b>📅 Lịch sử đơn</b>: xem lại đơn theo ngày, dùng nút ◀ ▶ hoặc <span class="k">Hôm nay</span>.</li>
+        <li><b>Một ngày tính từ 06:00 sáng đến 06:00 sáng hôm sau</b> — trọn một ca mở cửa, nên đơn lúc 1–2 giờ sáng vẫn thuộc ngày hôm trước.</li>
+        <li>Cột <b>POS</b> cho biết đơn có nước đã được nhập vào máy tính tiền hay chưa; ô <b>“Có nước, chưa nhập POS”</b> là việc cần xử lý trước khi chốt ca.</li>
+        <li>Bấm <span class="k y">⬇ Tải CSV đối soát</span> để lấy bảng chi tiết, mở được bằng Excel.</li>
+      </ul>
+    </div>
+    <div class="figs"><figure class="phone"><div class="fig"><img src="huongdan/img/q_hist.jpg" alt=""></div></figure></div>
+  </div>
+</div></section>
+
+<!-- 5 -->
+<section class="chap pb" id="ql5"><div class="wrap">
+  <header><span class="num">05</span><div><h2>TV, máy tính bảng &amp; phòng</h2><p class="lead">Mỗi phòng có 1 TV và có thể có 1 máy tính bảng.</p></div></header>
+
+  <div class="step">
+    <div>
+      <span class="badge"><b>1</b> Mở / đóng phòng</span>
+      <h3>Vào tab 📺 TV &amp; MTB</h3>
+      <ul class="tick">
+        <li>Mỗi phòng hiện trạng thái: <b>Đang mở từ…</b>, TV đã nối, máy tính bảng, số điện thoại đang kết nối.</li>
+        <li><span class="k y">Mở phòng</span> khi khách vào. <b>Mỗi lần mở là một QR khách mới</b> trên TV — khách lượt trước không vào lại được.</li>
+        <li><span class="k">Đóng phòng</span> khi khách ra: điện thoại khách bị ngắt và hàng chờ bài trên TV được xoá.</li>
+        <li><span class="k">QR khách</span> / <span class="k">Đổi QR khách</span>: dùng khi TV hỏng hoặc khách nhờ quét lại.</li>
+      </ul>
+    </div>
+    <div class="figs"><figure class="phone"><div class="fig"><img src="huongdan/img/q_tv2.jpg" alt=""></div></figure></div>
+  </div>
+
+  <div class="step rev">
+    <div>
+      <span class="badge"><b>2</b> Gán TV &amp; máy tính bảng</span>
+      <h3>Thiết bị chưa gán sẽ hiện mã 6 số + QR</h3>
+      <ol class="no">
+        <li>Bật TV hoặc máy tính bảng mới: màn hình hiện <b>mã gán 6 số</b> và QR.</li>
+        <li>Trên điện thoại đã đăng nhập quầy, <b>quét QR đó bằng camera</b> — trang quầy mở thẳng, đầu trang báo <b>“đang chờ gán”</b>. (Hoặc bấm <span class="k">📺 Gán TV &amp; MTB</span> ở phòng rồi quét / nhập mã.)</li>
+        <li>Bấm <span class="k y">Gán … này vào đây</span> ở <b>đúng phòng</b>. Thiết bị tự vào phòng sau vài giây.</li>
+      </ol>
+      <p>Máy tính bảng đã gán sẽ tự quét QR trên TV khi cần đổi phòng. Cần chuyển thiết bị: dùng <span class="k">Gỡ TV</span> / <span class="k">Gỡ máy tính bảng</span>.</p>
+      <div class="note warn"><b>Mất máy tính bảng?</b> Bấm <span class="k r">🔒 Thu hồi mọi máy tính bảng</span> — mọi máy bị gỡ khỏi phòng và phải gán lại từng máy.</div>
+    </div>
+    <div class="figs"><figure class="phone"><div class="fig"><img src="huongdan/img/q_gan2.jpg" alt=""></div></figure></div>
+  </div>
+
+  <div class="step">
+    <div>
+      <span class="badge"><b>3</b> Mã QR của phòng</span>
+      <h3>QR góc trái TV — cửa vào của khách</h3>
+      <p>Khi phòng mở, TV hiện QR kèm tên phòng ở giữa. Khách quét bằng camera điện thoại là vào được trang chọn bài và gọi lễ tân. Bên dưới QR, TV hiện luôn các yêu cầu khách vừa gửi cho lễ tân.</p>
+      <p>Cần in <b>thẻ QR đánh giá</b> cho khách? Bấm <span class="k">⭐ In QR ĐÁNH GIÁ</span> (thẻ riêng, không có số phòng) — chi nhánh cần có đường dẫn Google Maps trong app quản lý BMB.</p>
+      <div class="note"><b>Admin:</b> thêm phòng bằng ô “Thêm phòng” (nhiều phòng cách nhau dấu phẩy), có nút Xoá phòng và Chép liên kết TV ở từng phòng.</div>
+    </div>
+    <div class="figs"><figure class="photo" style="max-width:250px"><div class="fig"><img src="huongdan/img/tvqr.jpg" alt=""></div><figcaption>Góc trái TV khi phòng đang mở</figcaption></figure></div>
+  </div>
+</div></section>
+
+<!-- 6 -->
+<section class="chap pb" id="ql6"><div class="wrap">
+  <header><span class="num">06</span><div><h2>Menu nước &amp; dịch vụ</h2><p class="lead">Khách chỉ thấy những gì còn bán — bạn chủ động bật tắt ngay tại quầy.</p></div></header>
+  <div class="step">
+    <div>
+      <span class="badge"><b>1</b> Tab 🍺 Menu</span>
+      <h3>Hết hàng thì bấm một nút</h3>
+      <ul class="tick">
+        <li><span class="k g">✅ Còn hàng</span> ⇄ <span class="k r">⛔ Hết hàng</span>: món hết tự ẩn khỏi màn hình khách; hàng về bấm lại.</li>
+        <li>Món được nhóm: <b>Bia · Nước uống · Đồ ăn · Phục vụ thêm · Dịch vụ / báo sự cố</b>. Dịch vụ là nút bấm gọi; nước là chọn số lượng.</li>
+      </ul>
+      <p><b>Quản lý &amp; tài khoản được cấp quyền</b> còn có:</p>
+      <ul class="tick">
+        <li><span class="k">Ẩn / Hiện</span> tạm không bán · <span class="k r">Bỏ</span> xoá khỏi menu chi nhánh (đơn cũ không bị ảnh hưởng) · <span class="k">▲ ▼</span> xếp thứ tự hiện cho khách.</li>
+        <li><span class="k y">＋ Chọn từ menu mẫu</span> lấy món có sẵn của chuỗi · <span class="k">✏️ Tạo món riêng</span> cho chi nhánh.</li>
+      </ul>
+      <div class="note"><b>Admin:</b> “Menu mẫu toàn chuỗi” ở cuối trang — sửa tên, icon hay nhóm một món mẫu thì mọi chi nhánh đang dùng món đó tự cập nhật.</div>
+    </div>
+    <div class="figs"><figure class="phone"><div class="fig"><img src="huongdan/img/q_menu.jpg" alt=""></div></figure></div>
+  </div>
+</div></section>
+
+<!-- 7 -->
+<section class="chap" id="ql7"><div class="wrap">
+  <header><span class="num">07</span><div><h2>Tài khoản &amp; vân tay</h2><p class="lead">Dành cho quản lý chi nhánh và admin.</p></div></header>
+  <div class="cards">
+    <div class="card"><div class="ic">👥</div><h4>Tab Tài khoản quầy</h4>
+      <p>Tạo tài khoản cho nhân viên quầy của chi nhánh bằng <b>＋ Tạo tài khoản mới</b>.</p>
+      <ul class="tick" style="font-size:14px"><li><span class="k r">Khoá</span>: nhân viên bị đăng xuất ngay và không vào lại được. <span class="k g">Mở</span> để cho dùng lại.</li><li>Cột <b>Sửa menu</b>: tích để cho phép nhân viên đó chỉnh menu.</li></ul>
+      <p style="margin-top:6px">Tài khoản quản lý và kỹ thuật được tạo trong app quản lý BMB.</p></div>
+    <div class="card"><div class="ic">🖐</div><h4>Đăng nhập bằng vân tay</h4>
+      <p>Có trong <b>app BMBPlayer Android bản 2.4 trở lên</b> (không có khi mở bằng Chrome hay iPhone).</p>
+      <ol class="no" style="font-size:14px"><li>Vào tab <b>⚙️ Cài đặt</b> → <span class="k y">Bật vân tay</span>.</li><li>Làm theo hướng dẫn trên màn hình để xác nhận tài khoản rồi quét vân tay.</li><li>Lần sau chạm <span class="k">Đăng nhập bằng vân tay</span> ở màn đăng nhập.</li></ol>
+      <p style="font-size:14px">Máy cần đã đặt <b>khoá màn hình + vân tay</b> (Android 9 trở lên). Thêm vân tay mới trong máy thì bật lại. <span class="k">Tắt vân tay</span> bất cứ lúc nào.</p></div>
+  </div>
+</div></section>
+
+<!-- 8 -->
+<section class="chap pb" id="ql8"><div class="wrap">
+  <header><span class="num">08</span><div><h2>Cập nhật BMBPlayer</h2><p class="lead">Phát hành một lần — mọi TV, máy tính bảng và máy quầy tự báo có bản mới.</p></div></header>
+
+  <div class="step">
+    <div>
+      <span class="badge"><b>1</b> Phát hành bản mới — Admin cao nhất</span>
+      <h3>⚙️ Cài đặt → Phát hành APK BMBPlayer</h3>
+      <ol class="no">
+        <li>Mở tab <b>⚙️ Cài đặt</b> trên quầy. Khung đầu cho biết <b>bản đang phát hành</b>.</li>
+        <li>Chọn file <b>BMBPlayer.apk đã ký</b>. Trang tự đọc số phiên bản — không cần gõ tay, bản chưa ký hoặc không phải BMBPlayer sẽ bị chặn.</li>
+        <li>Bấm <span class="k y">Tải lên &amp; phát hành</span>.</li>
+      </ol>
+      <p>Chỉ <b>admin cao nhất</b> thấy mục này. Thiết bị đang chạy bản <b>2.4 trở lên</b> sẽ tự báo có bản mới.</p>
+    </div>
+    <div class="figs"><figure class="dlg" style="width:100%;max-width:380px"><div class="fig"><img src="huongdan/img/q_apk.jpg" alt="" style="border-radius:18px"></div></figure></div>
+  </div>
+
+  <div class="step wide">
+    <div>
+      <span class="badge"><b>2</b> Trên thiết bị — tự báo</span>
+      <h3>Hộp “Có bản BMBPlayer mới”</h3>
+      <ul class="tick">
+        <li>Máy quầy báo khi mở app. <b>TV và máy tính bảng chỉ hỏi khi phòng đang đóng</b> (hoặc buổi sáng 9–12 giờ lúc ít khách), nên không làm gián đoạn khách đang hát.</li>
+        <li>Không ai bấm thì hộp tự đóng sau ít phút và <b>hỏi lại sau</b>. Bấm <span class="k">Để sau</span> cũng vậy.</li>
+        <li>Bấm <span class="k y">Cập nhật ngay</span>, rồi bấm <span class="k y">Cài đặt</span> trên hộp của Android. Mất khoảng <b>1 phút</b>, sau đó BMBPlayer <b>tự mở lại</b>.</li>
+      </ul>
+      <div class="sbs">
+        <figure class="tvf" style="width:420px;max-width:100%"><div class="fig"><img src="huongdan/img/tvupd_c.jpg" alt=""><i class="hl" data-n="1" style="left:74.5%;top:57%;width:15%;height:14%"></i></div><figcaption>Trên TV</figcaption></figure>
+        <figure class="phone" style="width:190px"><div class="fig"><img src="huongdan/img/mtbupd.jpg" alt=""><i class="hl" data-n="1" style="left:58%;top:58.4%;width:34%;height:4.4%"></i></div><figcaption style="color:#ccc;margin-bottom:4px">Trên máy tính bảng / điện thoại</figcaption></figure>
+      </div>
+    </div>
+  </div>
+
+  <div class="step wide">
+    <div>
+      <span class="badge"><b>3</b> Trên thiết bị — tự kiểm tra</span>
+      <h3>Muốn cập nhật ngay? Mở menu ẩn của ứng dụng</h3>
+      <p>Menu ẩn chỉ dành cho nhân viên. Mở bằng <b>một trong ba cách</b>: bấm <span class="k y">QUAY LẠI 3 lần</span> liên tục · bấm nút <span class="k">MENU</span> trên điều khiển TV · chạm <b>5 lần</b> vào góc trên bên phải màn hình. Rồi chọn <b>Kiểm tra bản cập nhật</b>.</p>
+      <div class="row2">
+        <figure class="dlg" style="max-width:460px"><div class="fig"><img src="huongdan/img/tvmenu.png" alt=""><i class="hl" data-n="1" style="left:1%;top:16.5%;width:40%;height:7.5%"></i></div></figure>
+        <div>
+          <table>
+            <thead><tr><th>Mục trong menu</th><th>Dùng khi</th></tr></thead>
+            <tbody>
+              <tr><td><b>Tải lại trang</b></td><td>Màn hình đứng hoặc lỗi hiển thị</td></tr>
+              <tr><td><b>Kiểm tra bản cập nhật</b></td><td>Muốn cập nhật ngay</td></tr>
+              <tr><td><b>Đổi chế độ</b></td><td>Chuyển thiết bị giữa TV / Máy tính bảng / Quầy</td></tr>
+              <tr><td><b>Cài đặt Wi-Fi · Android</b></td><td>Đổi mạng, chỉnh hệ thống</td></tr>
+              <tr><td><b>Tự mở khi bật máy</b></td><td>Bật để app tự chạy sau khi mất điện</td></tr>
+              <tr><td><b>Dọn bộ nhớ đệm</b></td><td>Giải phóng bộ nhớ (vẫn giữ phòng đã gán)</td></tr>
+              <tr><td><b>Xoá dữ liệu trang</b></td><td>Muốn gán lại phòng từ đầu</td></tr>
+              <tr><td><b>Thoát BMBPlayer</b></td><td>Đóng ứng dụng</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div></section>
+
+<!-- 9 -->
+<section class="chap" id="ql9"><div class="wrap">
+  <header><span class="num">09</span><div><h2>Gặp sự cố? Xử lý nhanh</h2><p class="lead">Những tình huống hay gặp nhất tại quầy.</p></div></header>
+  <table>
+    <thead><tr><th style="width:34%">Hiện tượng</th><th>Cách xử lý</th></tr></thead>
+    <tbody>
+      <tr><td>TV báo <b>“Phòng chưa mở — chờ nhân viên mở phòng”</b></td><td>Quầy → tab TV &amp; MTB → <span class="k y">Mở phòng</span> đúng phòng đó.</td></tr>
+      <tr><td>TV / máy tính bảng hiện <b>mã 6 số</b></td><td>Thiết bị chưa gán phòng — làm theo mục “Gán TV &amp; máy tính bảng” (chương 5).</td></tr>
+      <tr><td>Khách báo <b>QR hết hiệu lực</b> hoặc không vào được</td><td>Nhờ khách quét QR <b>mới</b> ở góc trái TV. Cần thì bấm <span class="k">Đổi QR khách</span>.</td></tr>
+      <tr><td><b>Mất máy tính bảng</b></td><td><span class="k r">Thu hồi mọi máy tính bảng</span>, sau đó gán lại những máy còn dùng.</td></tr>
+      <tr><td>Không nghe chuông khi có đơn</td><td>Kiểm tra app đang chạy chế độ Quầy (có dòng “BMB Quầy đang nhận đơn”), cho phép thông báo và chạy nền. Dùng web thì bấm 🔔.</td></tr>
+      <tr><td>TV đứng hình, trắng màn hình</td><td>Mở menu ẩn → <b>Tải lại trang</b>. Vẫn lỗi: <b>Xoá dữ liệu trang</b> rồi gán lại phòng.</td></tr>
+      <tr><td>Cài / cập nhật bị <b>Play Protect chặn</b></td><td>Bấm <b>Chi tiết khác</b> → <b>Tiếp tục cài đặt</b> (chương 2).</td></tr>
+      <tr><td>Báo <b>“Cần cập nhật trình hiển thị web”</b></td><td>Vào CH Play cập nhật <b>Android System WebView</b> (hoặc Google Chrome) rồi mở lại BMBPlayer.</td></tr>
+    </tbody>
+  </table>
+</div></section>
+
+<div class="foot"><b>BMBPlayer</b><br>Boom Music Box · bmb.id.vn<small>© 2026 VMH</small></div>
+</main>
+
+<!-- ======================================================================== -->
+<!--                          HƯỚNG DẪN KHÁCH HÀNG                            -->
+<!-- ======================================================================== -->
+<main class="doc" id="khach">
+
+<section class="cover">
+  <div class="in">
+    <div class="tx">
+      <span class="kick"><img src="huongdan/img/logoB.png" alt="">BMBPlayer · Boom Music Box</span>
+      <h1>Hát thả ga<br>cùng <em>BMBPlayer</em></h1>
+      <p class="sub">Chọn bài &amp; gọi lễ tân ngay trên điện thoại của bạn</p>
+      <div class="chips"><span>Không cần cài ứng dụng</span><span>Không cần đăng ký</span><span>Chỉ cần quét QR</span></div>
+    </div>
+    <div class="art g">
+      <div class="phone ph"><div class="fig"><img src="huongdan/img/g_ph_search.jpg" alt=""></div></div>
+      <div class="phone ph2"><div class="fig"><img src="huongdan/img/g_ph_order.jpg" alt=""></div></div>
+    </div>
+  </div>
+  <div class="rb"></div>
+</section>
+
+<section class="chap" id="kh1"><div class="wrap big">
+  <header><span class="num">1</span><div><h2>Quét mã QR trên TV</h2><p class="lead">Mất chưa đầy 5 giây.</p></div></header>
+  <div class="step">
+    <div>
+      <ol class="no">
+        <li>Nhìn lên TV, tìm <b>mã QR ở góc trái màn hình</b> (có ghi tên phòng ở giữa).</li>
+        <li>Mở <b>camera</b> điện thoại và hướng vào mã QR.</li>
+        <li>Chạm vào đường liên kết hiện ra. Trang chọn bài mở ngay — <b>không cần cài ứng dụng, không cần đăng ký</b>.</li>
+      </ol>
+      <div class="note tip"><b>Mẹo:</b> nhiều bạn cùng phòng có thể quét — mỗi người một điện thoại, ai cũng chọn bài được.</div>
+      <div class="note"><b>Báo “kết nối wifi của quán”?</b> Hãy nối wifi của quán rồi quét lại. <b>Báo “mã QR đã hết hiệu lực”?</b> Quét mã QR mới ở góc trái TV (mỗi lượt hát có mã mới).</div>
+    </div>
+    <div class="figs"><figure class="photo" style="max-width:250px"><div class="fig"><img src="huongdan/img/tvqr.jpg" alt=""></div><figcaption>Mã QR ở góc trái màn hình TV</figcaption></figure></div>
+  </div>
+</div></section>
+
+<section class="chap" id="kh2"><div class="wrap big">
+  <header><span class="num">2</span><div><h2>Tìm và chọn bài hát</h2><p class="lead">Thư viện bài hát phong phú, đủ thể loại tiếng Việt và tiếng nước ngoài.</p></div></header>
+  <div class="step three">
+    <div>
+      <ol class="no">
+        <li>Ở tab <span class="k y">🔍 Tìm bài</span>, gõ <b>tên bài hát</b> hoặc tên ca sĩ rồi bấm <span class="k y">Tìm</span>.</li>
+        <li>Chưa nghĩ ra bài? Xem mục <b>Bài hot</b>, chuyển giữa <span class="k">Nhạc Việt</span> và <span class="k">Quốc tế</span>.</li>
+        <li>Chạm vào bài muốn hát, rồi chọn:
+          <ul class="tick"><li><span class="k y">CHỌN</span> — thêm vào hàng chờ, hát theo thứ tự.</li><li><span class="k" style="background:#FFE9D2;border-color:#F5B87A;color:#B35400">ƯU TIÊN</span> — hát ngay sau bài đang phát.</li></ul></li>
+      </ol>
+    </div>
+    <div class="figs">
+      <figure class="phone"><div class="fig"><img src="huongdan/img/g_ph_search.jpg" alt=""></div><figcaption style="color:#d8c9ea">Gõ tên bài hát</figcaption></figure>
+      <figure class="phone"><div class="fig"><img src="huongdan/img/g_ph_pick.jpg" alt=""></div><figcaption style="color:#d8c9ea">Chọn hoặc ưu tiên</figcaption></figure>
+    </div>
+  </div>
+</div></section>
+
+<section class="chap pb" id="kh3"><div class="wrap big">
+  <header><span class="num">3</span><div><h2>Hàng chờ &amp; điều khiển</h2><p class="lead">Bạn làm chủ buổi hát ngay trên điện thoại.</p></div></header>
+  <div class="step rev">
+    <div>
+      <p>Tab <span class="k y">🎶 Hàng chờ</span> cho thấy <b>bài đang hát</b> (khung vàng) và các bài kế tiếp. Chạm một bài trong hàng chờ để:</p>
+      <ul class="tick"><li><b>Ưu tiên</b> — hát ngay sau bài này.</li><li><b>Đẩy lên</b> — dịch lên một bậc.</li><li><b>Xoá</b> — bỏ khỏi hàng chờ.</li></ul>
+      <p>Hàng nút phía dưới điều khiển TV:</p>
+      <div class="keys"><div><b>↺</b>Hát lại</div><div><b>▶ / ⏸</b>Phát / Dừng</div><div><b>⏭</b>Qua bài</div><div><b>🔇</b>Tắt tiếng</div><div><b>🔉 🔊</b>Giảm / tăng âm</div></div>
+    </div>
+    <div class="figs"><figure class="phone"><div class="fig"><img src="huongdan/img/g_ph_queue.jpg" alt=""></div></figure></div>
+  </div>
+</div></section>
+
+<section class="chap" id="kh4"><div class="wrap big">
+  <header><span class="num">4</span><div><h2>Gọi lễ tân &amp; gọi nước</h2><p class="lead">Cần gì cứ bấm — nhân viên sẽ lên phòng.</p></div></header>
+  <div class="step three">
+    <div>
+      <ol class="no">
+        <li>Mở tab <span class="k" style="background:#FFE9D2;border-color:#F5B87A;color:#B35400">🛎️ Gọi lễ tân</span>.</li>
+        <li><b>Cần hỗ trợ</b>: chạm vào nút phù hợp (thay pin micro, micro rè, dọn phòng, gọi nhân viên…).</li>
+        <li><b>Gọi nước</b>: bấm <span class="k">＋</span> để chọn số lượng từng món; thêm ghi chú nếu cần.</li>
+        <li>Bấm <span class="k" style="background:#F26A1B;border-color:#D95B10;color:#fff">Gửi yêu cầu</span>. Màn hình báo <b>“Đã gửi yêu cầu tới lễ tân”</b>, yêu cầu cũng hiện ở góc TV.</li>
+      </ol>
+      <p>Muốn xem lại? Bấm <span class="k">📋 Đơn đã gọi</span> — trạng thái <b>Đã gửi → Đã xác nhận</b> tự cập nhật khi lễ tân nhận.</p>
+      <div class="note"><b>Lưu ý:</b> ứng dụng không tính tiền. Giá do nhân viên xác nhận trực tiếp với bạn. Món nào hết hàng sẽ tự ẩn.</div>
+    </div>
+    <div class="figs">
+      <figure class="phone"><div class="fig"><img src="huongdan/img/g_ph_order.jpg" alt=""></div></figure>
+      <figure class="phone"><div class="fig"><img src="huongdan/img/mtbsent.jpg" alt=""></div></figure>
+      <figure class="phone"><div class="fig"><img src="huongdan/img/donda.jpg" alt=""></div></figure>
+    </div>
+  </div>
+</div></section>
+
+<section class="chap" id="kh5"><div class="wrap">
+  <header><span class="num">5</span><div><h2>Mẹo &amp; hỏi đáp</h2><p class="lead">Những điều hay được hỏi nhất.</p></div></header>
+  <div class="row2">
+    <div class="card"><div class="ic">📟</div><h4>Phòng có máy tính bảng</h4><p>Dùng y như điện thoại: tìm bài, hàng chờ, gọi lễ tân. Không cần quét QR — máy đã nối sẵn với phòng của bạn.</p></div>
+    <div class="card"><div class="ic">🙋</div><h4>Cần giúp đỡ?</h4><p>Cứ bấm <b>Gọi nhân viên</b> trong tab Gọi lễ tân, hoặc nhờ nhân viên của quán — bạn sẽ được hỗ trợ ngay.</p></div>
+  </div>
+  <div class="faq mt">
+    <details open><summary>Tôi không quét được mã QR?</summary><p>Đưa camera lại gần hơn, giữ thẳng vào màn hình TV. Vẫn không được thì nhờ nhân viên mở lại phòng hoặc đổi mã QR cho bạn.</p></details>
+    <details open><summary>Bạn bè trong phòng cũng chọn bài được chứ?</summary><p>Được. Mỗi người quét QR trên điện thoại của mình, mọi bài sẽ xếp chung vào một hàng chờ.</p></details>
+    <details open><summary>Chọn nhầm bài thì sao?</summary><p>Vào tab Hàng chờ, chạm vào bài đó rồi chọn <b>Xoá</b>. Nếu bài đang phát, chọn <b>Qua bài</b>.</p></details>
+    <details open><summary>Tôi gọi nước rồi, bao giờ có?</summary><p>Lễ tân nhận yêu cầu ngay và lên phòng trong ít phút. Trong “Đơn đã gọi”, trạng thái sẽ đổi sang <b>Đã xác nhận</b> khi lễ tân nhận đơn của bạn.</p></details>
+    <details open><summary>Hết giờ hát thì điện thoại có tự thoát không?</summary><p>Có. Khi phòng đóng, điện thoại của bạn tự ngắt. Muốn hát tiếp, nhờ nhân viên mở phòng và quét mã QR mới trên TV.</p></details>
+  </div>
+</div></section>
+
+<div class="foot"><b>BMBPlayer</b><br>Boom Music Box · bmb.id.vn<small>© 2026 VMH</small></div>
+</main>
+
+
+<!-- ======================================================================== -->
+<!--                  BẢN NHANH CHO KHÁCH — 1 TỜ A4 ĐỂ IN                      -->
+<!-- ======================================================================== -->
+<main class="doc" id="nhanh">
+<div class="qk">
+  <div class="top"><img src="huongdan/img/logoB.png" alt=""><div><h1>Hát thả ga cùng <em>BMBPlayer</em></h1><p>Chọn bài &amp; gọi lễ tân ngay trên điện thoại — không cần cài ứng dụng, không cần đăng ký.</p></div></div>
+
+  <div class="sts">
+    <div class="st"><span class="n">1</span><div class="ph qrp"><img src="huongdan/img/tvqr.jpg" alt=""></div><h4>Quét QR trên TV</h4><p>Mở <b>camera</b>, hướng vào mã QR ở <b>góc trái TV</b>, chạm vào liên kết hiện ra.</p></div>
+    <div class="st"><span class="n">2</span><div class="ph"><img src="huongdan/img/g_ph_search.jpg" alt=""></div><h4>Tìm bài hát</h4><p>Gõ tên bài hoặc ca sĩ rồi bấm <span class="k y">Tìm</span>. Thư viện đủ nhạc Việt và nước ngoài.</p></div>
+    <div class="st"><span class="n">3</span><div class="ph"><img src="huongdan/img/g_ph_pick.jpg" alt=""></div><h4>Chọn bài</h4><p><span class="k y">CHỌN</span> hát theo thứ tự · <span class="k" style="background:#FFE9D2;border-color:#F5B87A;color:#B35400">ƯU TIÊN</span> hát ngay sau bài đang phát.</p></div>
+    <div class="st"><span class="n">4</span><div class="ph"><img src="huongdan/img/g_ph_order.jpg" alt=""></div><h4>Gọi lễ tân &amp; nước</h4><p>Tab <b>🛎️ Gọi lễ tân</b> → chọn món/yêu cầu → <b>Gửi yêu cầu</b>.</p></div>
+  </div>
+
+  <div class="mid">
+    <div class="box a"><h5>🎶 Điều khiển ngay trên điện thoại</h5>
+      <ul><li><b>Hàng chờ:</b> chạm một bài để <b>Ưu tiên · Đẩy lên · Xoá</b>.</li><li><b>Nút dưới cùng:</b> Hát lại · Phát/Dừng · Qua bài · Tắt tiếng · Âm lượng.</li><li>Cả phòng cùng quét được — mọi bài xếp chung một hàng chờ.</li></ul></div>
+    <div class="box b"><h5>🛎️ Cần gì cứ bấm</h5>
+      <p>Thay pin micro, micro rè, dọn phòng, gọi nhân viên, gọi nước… Lễ tân nhận <b>ngay lập tức</b> và lên phòng.</p>
+      <div class="keys2"><span>📋 Đơn đã gọi → xem trạng thái</span><span>Đã gửi → Đã xác nhận</span></div></div>
+  </div>
+
+  <div class="tipbar"><span style="font-size:22px">💡</span><div><b>Không vào được?</b> Nối wifi của quán rồi quét lại. Báo “QR hết hiệu lực” thì quét <b>mã QR mới</b> ở góc trái TV. Cần giúp: bấm <b>Gọi nhân viên</b> hoặc nhờ nhân viên quán.</div></div>
+
+  <div class="foot"><b>BMBPlayer</b><br>Boom Music Box · bmb.id.vn<small>© 2026 VMH</small></div>
+</div>
+</main>
+
+<script>
+(function(){
+  var docs=['quan-ly','khach','nhanh'], q=new URLSearchParams(location.search), pr=q.get('print');
+  var pdf={ 'quan-ly':'huongdan/huong-dan-quan-ly-admin.pdf','khach':'huongdan/huong-dan-khach.pdf','nhanh':'huongdan/huong-dan-khach-nhanh-A4.pdf' };
+  function show(d){
+    if(docs.indexOf(d)<0) d='quan-ly';
+    docs.forEach(function(x){ document.getElementById(x).classList.toggle('on', x===d); });
+    document.getElementById('tbQl').classList.toggle('on', d==='quan-ly');
+    document.getElementById('tbKh').classList.toggle('on', d==='khach');
+    document.getElementById('tbNh').classList.toggle('on', d==='nhanh');
+    document.getElementById('pdfLink').href = pdf[d];
+    document.title = (d==='nhanh' ? 'Bản nhanh cho khách (A4)' : d==='khach' ? 'Hướng dẫn cho khách' : 'Hướng dẫn cho Quản lý & Admin') + ' · BMBPlayer';
+  }
+  if(pr && docs.indexOf(pr)>=0){ document.body.setAttribute('data-print',pr); show(pr); return; }
+  var h=(location.hash||'').replace('#','');
+  show(h==='khach'||h==='nhanh'?h:'quan-ly');
+  Array.prototype.forEach.call(document.querySelectorAll('.tabs button'),function(b){
+    b.addEventListener('click',function(){ var d=b.getAttribute('data-d'); show(d); history.replaceState(null,'','#'+d); window.scrollTo(0,0); });
+  });
+  window.addEventListener('hashchange',function(){ var h=(location.hash||'').replace('#',''); if(docs.indexOf(h)>=0) show(h); });
+})();
+</script>
+</body>
+</html>
