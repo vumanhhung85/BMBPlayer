@@ -295,6 +295,14 @@ tbody tr:hover td{background:#FBF8FE}
 .pu-note{font-size:12.5px;color:var(--txt-dim);margin-top:4px}
 .pu-note li{margin:3px 0 3px 18px}
 .modal-box .actions.wrap{flex-wrap:wrap}
+.tgbox{margin:14px 0 4px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--tint)}
+.tgbox b.t{font-size:14.5px}
+.tgbox .sub{font-size:12.5px;color:var(--txt-dim);margin-top:2px;line-height:1.5}
+.tgbox .st{margin:8px 0;font-size:14px}
+.tgbox .st.ok{color:#168a55;font-weight:700}
+.tgbox .st.warn{color:#b26b00;font-weight:700}
+.tgbox .actions{margin-top:8px}
+.tgbox a.btn{text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
 /* ── app BMBPlayer: quản lý chi nhánh mở Bảo trì / Đặt phòng (admin.html) ── */
 .qlnav{display:none;gap:8px;padding:0 0 12px;flex-wrap:wrap}
 .qlnav.show{display:flex}
@@ -463,6 +471,12 @@ tbody tr:hover td{background:#FBF8FE}
     <div class="hint">Khách gọi lễ tân thì máy này hiện thông báo kèm nút <b>Tiếp nhận</b>, kể cả khi đã tắt màn hình hoặc đóng trang quầy.
       Máy đang mở trang quầy sẽ không hiện thông báo trùng, vì trang đã kêu chuông. Mỗi máy (điện thoại, máy tính) bật riêng một lần.</div>
     <ul class="pu-note" id="puNote"></ul>
+    <div class="tgbox" id="tgBox" style="display:none">
+      <b class="t">✈️ Telegram</b> <span class="sub">(kênh phụ, không bắt buộc)</span>
+      <div class="sub" id="tgMoTa">Kết nối để nhận đơn gọi lễ tân ngay trên Telegram kể cả khi không mở trang quầy, và bấm <b>Tiếp nhận / Đã xong / Huỷ</b> ngay trong tin nhắn. Quản lý và nhân viên quầy của chi nhánh cùng nhận một đơn.</div>
+      <div class="st" id="tgTt">Đang kiểm tra…</div>
+      <div class="actions wrap" id="tgNut"></div>
+    </div>
     <div class="actions wrap">
       <button class="btn btn-y btn-sm" id="puBat">Bật thông báo</button>
       <button class="btn btn-ghost btn-sm" id="puThu" style="display:none">Gửi thử</button>
@@ -805,8 +819,72 @@ function puTrangThai(cls, tieuDe, chiTiet){
   $('puSt').className = 'pu-st ' + (cls || '');
   $('puSt').innerHTML = '<span>' + (cls === 'ok' ? '✅' : cls === 'bad' ? '⛔' : cls === 'warn' ? '⚠️' : 'ℹ️') + '</span><span><b>' + tieuDe + '</b>' + (chiTiet || '') + '</span>';
 }
+/* ---------- Telegram riêng (quản lý + nhân viên quầy) ---------- */
+var TG = { st:null, timer:null, link:'' };
+function tgDuocNhan(){ return S.vaiTro === 'manager' || S.vaiTro === 'quay'; }
+function tgTai(){
+  var box = $('tgBox');
+  if(!tgDuocNhan()){ box.style.display = 'none'; return; }
+  box.style.display = '';
+  $('tgTt').className = 'st'; $('tgTt').textContent = 'Đang kiểm tra…'; $('tgNut').innerHTML = '';
+  api('tg.trangThai').then(function(r){
+    if(!r || !r.ok) throw new Error((r && r.msg) || 'loi');
+    TG.st = r; tgVe();
+  }).catch(function(){ $('tgTt').textContent = 'Chưa kiểm tra được trạng thái Telegram, đóng rồi mở lại.'; });
+}
+function tgVe(){
+  var t = TG.st || {}, tt = $('tgTt'), nut = $('tgNut');
+  clearInterval(TG.timer);
+  if(!t.coBot){ tt.className = 'st warn'; tt.textContent = 'Hệ thống chưa cài bot Telegram, báo admin.'; nut.innerHTML = ''; return; }
+  if(t.ketNoi){
+    tt.className = 'st ' + (t.tamDung ? 'warn' : 'ok');
+    tt.textContent = (t.tamDung ? '⏸️ Đã kết nối' : '✅ Đã kết nối') + (t.ten ? ' với ' + t.ten : '') + (t.tamDung ? ', đang TẠM DỪNG thông báo.' : ', đang nhận thông báo.');
+    nut.innerHTML = (t.tamDung ? '<button class="btn btn-y btn-sm" data-tg="tiep">▶️ Nhận lại</button>' : '<button class="btn btn-ghost btn-sm" data-tg="dung">⏸️ Tạm dừng</button>')
+      + (t.bot ? '<a class="btn btn-ghost btn-sm" href="https://t.me/' + esc(t.bot) + '" target="_blank" rel="noopener">💬 Mở bot</a>' : '')
+      + '<button class="btn btn-ghost btn-sm" data-tg="ngat">🔕 Ngắt kết nối</button>';
+    return;
+  }
+  tt.className = 'st'; tt.textContent = 'Chưa kết nối.';
+  /* nút là đường link thật (mã tạo sẵn) để bấm là mở thẳng Telegram, không bị chặn cửa sổ bật lên */
+  nut.innerHTML = '<a class="btn btn-y btn-sm" id="tgKn" href="#" target="_blank" rel="noopener">✈️ Kết nối Telegram</a>'
+    + '<span class="sub" style="align-self:center">Mở Telegram, bấm <b>Start / Bắt đầu</b></span>';
+  $('tgKn').addEventListener('click', tgBamKetNoi);
+  tgTaoLink();
+}
+function tgTaoLink(){
+  api('tg.taoMa').then(function(r){
+    var a = $('tgKn'); if(!a) return;
+    if(r && r.ok && r.link){ a.href = r.link; }
+    else $('tgTt').textContent = (r && r.msg) || 'Chưa tạo được mã kết nối, đóng rồi mở lại.';
+  }).catch(function(){ var t = $('tgTt'); if(t) t.textContent = 'Chưa tạo được mã kết nối, đóng rồi mở lại.'; });
+}
+function tgBamKetNoi(ev){
+  var a = $('tgKn');
+  if(!a || a.getAttribute('href') === '#'){ ev.preventDefault(); toast('Đang chuẩn bị mã, bấm lại sau 1 giây.'); return; }
+  /* sau khi bấm: kiểm tra mỗi 3 giây (tối đa 3 phút) để hiện "đã kết nối"; mã mới cho lần bấm sau */
+  clearInterval(TG.timer);
+  var lan = 0;
+  TG.timer = setInterval(function(){
+    if(++lan > 60 || !$('modalPush').classList.contains('show')){ clearInterval(TG.timer); return; }
+    if(document.hidden) return;
+    api('tg.trangThai').then(function(r){
+      if(r && r.ok && r.ketNoi){ clearInterval(TG.timer); TG.st = r; tgVe(); toast('Đã kết nối Telegram'); }
+    }).catch(function(){});
+  }, 3000);
+  setTimeout(tgTaoLink, 1500);
+}
+function tgThaoTac(act){
+  if(act === 'ngat' && !confirm('Ngắt kết nối Telegram của tài khoản này? Sẽ không nhận đơn qua Telegram nữa.')) return;
+  var p = act === 'ngat' ? api('tg.ngat') : api('tg.tamDung', { bat: act === 'dung' });
+  p.then(function(r){
+    if(!r || !r.ok) throw new Error('loi');
+    TG.st = r; tgVe();
+    toast(act === 'ngat' ? 'Đã ngắt kết nối Telegram' : act === 'dung' ? 'Đã tạm dừng thông báo Telegram' : 'Đã bật lại thông báo Telegram');
+  }).catch(function(){ toast('Không lưu được, thử lại.'); });
+}
 function puMo(){
   $('modalPush').classList.add('show');
+  tgTai();
   if(!appQ()){ var b0 = $('puApp'); if(b0) b0.style.display = 'none'; }
   puCapNhat();
 }
@@ -1791,6 +1869,7 @@ function moTrangQl(loai, ten){
 }
 $('btnQlBaoTri').addEventListener('click', function(){ moTrangQl('baotri', 'Bảo trì'); });
 $('btnQlDatPhong').addEventListener('click', function(){ moTrangQl('datphong', 'Đặt phòng'); });
+$('tgNut').addEventListener('click', function(e){ var b = e.target.closest ? e.target.closest('[data-tg]') : null; if(b) tgThaoTac(b.getAttribute('data-tg')); });
 $('puDong').addEventListener('click', function(){ $('modalPush').classList.remove('show'); });
 $('puBat').addEventListener('click', puBat);
 $('puTat').addEventListener('click', puTat);

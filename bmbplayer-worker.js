@@ -406,6 +406,10 @@ async function handleApi(request, env, ctx) {
         case 'app.sync':                 res = await appSync(env, body); break;              // dịch vụ nền của app: đơn đang mở + nút có chữ ký
         case 'app.huy':                  res = await appHuy(env, body); break;               // đăng xuất / tắt nhận trên app
         case 'app.veAdmin':              res = await appVeAdmin(env, body); break;           // quản lý: mở admin.html (Bảo trì / Đặt phòng) không đăng nhập lại
+        case 'tg.trangThai':             res = await tgRiengTrangThai(env, body); break;   // Telegram riêng của chính tài khoản đang đăng nhập (quản lý + nhân viên quầy)
+        case 'tg.taoMa':                 res = await tgRiengTaoMa(env, body); break;
+        case 'tg.tamDung':               res = await tgRiengTamDung(env, body); break;
+        case 'tg.ngat':                  res = await tgRiengNgat(env, body); break;
         default:                         res = fail('unknown_action: ' + action, 400);
       }
     } catch (e) {
@@ -2280,6 +2284,71 @@ async function appVeAdmin(env, body) {
     env.DB.prepare('DELETE FROM sso_ve WHERE het_han < ?').bind(now - 3600000)
   ]);
   return ok({ ve, url: 'https://boommusicbox.vn/admin.html' });
+}
+
+/* ---------- Kết nối Telegram riêng ngay trong quầy (quay.html) ----------
+   Cùng cơ chế với admin.html → Cài đặt → Thông báo: mã dùng 1 lần (bảng tg_ma_ket_noi) → deep link t.me/<bot>?start=<mã> → bot (webhook nằm ở
+   bmb-quanly-worker) ghi tg_chat_id vào tai_khoan. Worker này chỉ tạo mã / đọc trạng thái / tạm dừng / ngắt cho CHÍNH tài khoản đang đăng nhập.
+   Người nhận tin "gọi lễ tân" = manager + quay đã kết nối (xem tgDon). */
+let tgRiengXong = false;
+async function tgRiengBangSan(env) {
+  if (tgRiengXong) return;
+  await env.DB.prepare('CREATE TABLE IF NOT EXISTS tg_ma_ket_noi (ma TEXT PRIMARY KEY, username TEXT NOT NULL, het_han INTEGER NOT NULL)').run();
+  tgRiengXong = true;
+}
+async function tgRiengBot(env) {
+  const { results } = await env.DB.prepare(`SELECT khoa, gia_tri FROM cai_dat WHERE khoa IN ('tg_bot_token', 'tg_bot_username')`).all();
+  const m = {}; (results || []).forEach(r => { m[r.khoa] = String(r.gia_tri || '').trim(); });
+  let bot = m.tg_bot_username || '';
+  if (!bot && m.tg_bot_token) {
+    const j = await fetch('https://api.telegram.org/bot' + m.tg_bot_token + '/getMe', { signal: AbortSignal.timeout(5000) }).then(r => r.json()).catch(() => ({}));
+    bot = (j && j.ok && j.result && j.result.username) || '';
+  }
+  return { coBot: !!m.tg_bot_token, bot };
+}
+async function tgRiengDoc(env, ss) {
+  const [u, b] = await Promise.all([
+    env.DB.prepare('SELECT tg_chat_id, tg_ten, tg_tam_dung, tg_ket_noi_luc FROM tai_khoan WHERE username = ?').bind(ss.u).first(),
+    tgRiengBot(env)
+  ]);
+  return ok({ coBot: b.coBot, bot: b.bot, ketNoi: !!(u && u.tg_chat_id && u.tg_ket_noi_luc), ten: (u && u.tg_ten) || '', tamDung: !!(u && u.tg_tam_dung) });
+}
+async function tgRiengTrangThai(env, body) {
+  const [ss, loi] = await canPhien(env, body);
+  if (loi) return loi;
+  await tgRiengBangSan(env);
+  return tgRiengDoc(env, ss);
+}
+async function tgRiengTaoMa(env, body) {
+  const [ss, loi] = await canPhien(env, body);
+  if (loi) return loi;
+  await tgRiengBangSan(env);
+  const b = await tgRiengBot(env);
+  if (!b.bot) return fail('chua_co_bot', 400, 'Hệ thống chưa cài bot Telegram — báo admin.');
+  const A = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+  const ma = [...crypto.getRandomValues(new Uint8Array(20))].map(x => A[x % A.length]).join('');
+  const now = Date.now();
+  await env.DB.batch([
+    env.DB.prepare('DELETE FROM tg_ma_ket_noi WHERE het_han < ?').bind(now),      // chỉ dọn mã hết hạn (mã cũ của chính người này giữ lại tới khi kết nối xong)
+    env.DB.prepare('INSERT INTO tg_ma_ket_noi (ma, username, het_han) VALUES (?,?,?)').bind(ma, ss.u, now + 15 * 60000)
+  ]);
+  return ok({ link: 'https://t.me/' + b.bot + '?start=' + ma });
+}
+async function tgRiengTamDung(env, body) {
+  const [ss, loi] = await canPhien(env, body);
+  if (loi) return loi;
+  await env.DB.prepare('UPDATE tai_khoan SET tg_tam_dung = ? WHERE username = ?').bind(body.bat ? 1 : 0, ss.u).run();
+  return tgRiengDoc(env, ss);
+}
+async function tgRiengNgat(env, body) {
+  const [ss, loi] = await canPhien(env, body);
+  if (loi) return loi;
+  const u = await env.DB.prepare('SELECT tg_chat_id FROM tai_khoan WHERE username = ?').bind(ss.u).first();
+  if (u && u.tg_chat_id) {
+    try { const t = await tgToken(env); if (t) await tgGoi(t, 'sendMessage', { chat_id: u.tg_chat_id, text: '🔕 Đã ngắt kết nối Telegram từ màn Quầy.' }); } catch (e) {}
+  }
+  await env.DB.prepare(`UPDATE tai_khoan SET tg_chat_id = '', tg_ten = '', tg_tam_dung = 0, tg_ket_noi_luc = NULL WHERE username = ?`).bind(ss.u).run();
+  return tgRiengDoc(env, ss);
 }
 
 /* ---------- API thông báo đẩy (action trong POST /api) ---------- */
