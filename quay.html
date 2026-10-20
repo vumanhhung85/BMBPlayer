@@ -454,6 +454,24 @@ tbody tr:hover td{background:#FBF8FE}
       </div>
     </div>
 
+    <div id="decoSec" style="display:none">
+      <div class="sect-lbl">🎉 Trang trí tivi theo dịp lễ <span class="tagx">chỉ admin</span></div>
+      <div class="hint">Hiện trên màn hình tivi: hoa, bí ngô, tuyết… rơi ở màn hình chờ và vài hình nhỏ ở góc khi đang hát (không che lời bài). <b>Tự động</b> = tivi tự đổi theo ngày lễ. Chọn một chủ đề cụ thể để ép dùng cho chương trình riêng của BMB. Áp dụng cho mọi tivi, tivi nhận sau tối đa 10 phút.</div>
+      <div class="fld"><select id="decoSel" disabled>
+        <option value="auto">Tự động theo ngày lễ</option>
+        <option value="off">Tắt (không trang trí)</option>
+        <option value="hoa">🌸 Hoa (8/3 · 20/10 · 20/11)</option>
+        <option value="tim">❤️ Tim (Valentine 14/2)</option>
+        <option value="co">🎆 Cờ hoa, pháo hoa (30/4 · 1/5 · 2/9)</option>
+        <option value="halloween">🎃 Halloween</option>
+        <option value="noel">❄️ Noel, tuyết</option>
+        <option value="namMoi">🥂 Năm mới dương lịch</option>
+        <option value="tet">🧧 Tết Nguyên Đán</option>
+        <option value="trungthu">🏮 Trung thu</option>
+      </select></div>
+      <div class="hint" id="decoMsg" style="margin-bottom:22px"></div>
+    </div>
+
     <div id="apkSec" style="display:none">
       <div class="sect-lbl">📦 Phát hành APK BMBPlayer</div>
       <div class="hint" id="apkInfo">Đang tải…</div>
@@ -1078,6 +1096,7 @@ function hienTheoQuyen(){
   $('tabCaiDatApp').style.display = S.quanLy ? '' : 'none';   /* Cài đặt: quản lý + admin (vân tay); mục Phát hành APK chỉ admin cao nhất */
   $('apkSec').style.display = S.sieuAdmin ? '' : 'none';
   $('seekSec').style.display = S.vaiTro === 'admin' ? '' : 'none';
+  $('decoSec').style.display = S.vaiTro === 'admin' ? '' : 'none';
   $('phongAdmin').style.display  = S.vaiTro==='admin' ? '' : 'none';   /* phòng cố định — chỉ admin thêm/xoá */
   $('btnThuHoiMtb').style.display = S.quanLy ? '' : 'none';
   $('selCN').style.display       = S.vaiTro==='admin' ? '' : 'none';
@@ -2158,7 +2177,21 @@ $('seekBtn').onclick = function(){
     seekVe2(r.on);
   }).catch(function(){ b.disabled = false; alert('Không kết nối được máy chủ.'); });
 };
-function cdMo(){ vtVe(); if(S.vaiTro === 'admin') seekVe(); if(S.sieuAdmin) apkVe();
+function decoVe(){
+  api('admin.decoGet', {}).then(function(r){
+    if(!r || !r.ok){ $('decoMsg').textContent = (r && r.msg) || 'Không hỏi được cài đặt.'; return; }
+    $('decoSel').value = r.deco; $('decoSel').disabled = false; $('decoMsg').textContent = '';
+  }).catch(function(){ $('decoMsg').textContent = 'Không kết nối được máy chủ.'; });
+}
+$('decoSel').onchange = function(){
+  var sel = $('decoSel'); sel.disabled = true;
+  api('admin.decoSet', {deco:sel.value}).then(function(r){
+    sel.disabled = false;
+    if(!r || !r.ok){ alert((r && r.msg) || 'Không lưu được.'); decoVe(); return; }
+    $('decoMsg').textContent = 'Đã lưu. Tivi sẽ đổi trong vòng 10 phút.';
+  }).catch(function(){ sel.disabled = false; alert('Không kết nối được máy chủ.'); });
+};
+function cdMo(){ vtVe(); if(S.vaiTro === 'admin'){ seekVe(); decoVe(); } if(S.sieuAdmin) apkVe();
   var tg = tgDuocNhan(); $('tgSecCd').style.display = tg ? '' : 'none'; if(tg) tgTai($('tgHostCd')); else clearInterval(TG.timer); }
 $('lgVt').addEventListener('click', vtDangNhap);
 $('vtBat').addEventListener('click', vtBat);

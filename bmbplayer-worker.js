@@ -394,6 +394,8 @@ async function handleApi(request, env, ctx) {
         case 'admin.mauAn':              res = await adminMauAn(env, body); break;
         case 'admin.seekGet':            res = await adminSeekGet(env, body); break;
         case 'admin.seekSet':            res = await adminSeekSet(env, body); break;
+        case 'admin.decoGet':            res = await adminDecoGet(env, body); break;
+        case 'admin.decoSet':            res = await adminDecoSet(env, body); break;
         case 'admin.phongThem':          res = await adminPhongThem(env, body); break;
         case 'admin.phongXoa':           res = await adminPhongXoa(env, body); break;
         case 'admin.taiKhoan.danhSach':  res = await tkDanhSach(env, body); break;
@@ -1007,6 +1009,34 @@ async function adminSeekSet(env, body) {
   await env.DB.prepare(`INSERT INTO order_meta (k, v) VALUES ('seek_on', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v`).bind(on ? '1' : '0').run();
   seekCache = { v: on, at: Date.now() };
   return ok({ on });
+}
+/* ---------- Trang trí tivi theo dịp lễ (admin chọn ở quay.html → Cài đặt) ----------
+   Lưu ở order_meta khoá 'deco': 'auto' (mặc định: TV tự chọn theo ngày) | 'off' | khoá chủ đề ép dùng luôn.
+   TV hỏi GET /api/deco (công khai, chỉ trả chuỗi này) mỗi 10 phút. Danh sách chủ đề phải khớp THEMES trong index.html. */
+const DECO_OK = ['auto', 'off', 'hoa', 'tim', 'halloween', 'noel', 'co', 'tet', 'trungthu', 'namMoi'];
+let decoCache = { v: 'auto', at: 0 };
+async function decoGet(env) {
+  if (Date.now() - decoCache.at < 60000) return decoCache.v;
+  let v = 'auto';
+  try { const r = await env.DB.prepare(`SELECT v FROM order_meta WHERE k = 'deco'`).first(); if (r && DECO_OK.includes(r.v)) v = r.v; } catch (e) { /* chưa có bảng = tự động */ }
+  decoCache = { v, at: Date.now() };
+  return v;
+}
+async function adminDecoGet(env, body) {
+  const [, loi] = await canPhien(env, body, 'admin');
+  if (loi) return loi;
+  decoCache.at = 0;
+  return ok({ deco: await decoGet(env) });
+}
+async function adminDecoSet(env, body) {
+  const [, loi] = await canPhien(env, body, 'admin');
+  if (loi) return loi;
+  const v = String(body.deco || '');
+  if (!DECO_OK.includes(v)) return fail('bad_deco', 400, 'Chủ đề không hợp lệ.');
+  await pushBangSan(env);
+  await env.DB.prepare(`INSERT INTO order_meta (k, v) VALUES ('deco', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v`).bind(v).run();
+  decoCache = { v, at: Date.now() };
+  return ok({ deco: v });
 }
 async function adminPhongThem(env, body) {
   const [ss, loi] = await canPhien(env, body, 'admin');
@@ -2626,6 +2656,11 @@ export default {
     if(u.pathname === '/api/ver' && req.method === 'GET'){
       const v = env.CF_VERSION_METADATA || {};
       return jres({ id: v.id || '', tag: v.tag || '', at: v.timestamp || '' }, 200, originOk ? { 'Access-Control-Allow-Origin': origin, 'Vary': 'Origin' } : {});
+    }
+
+    // Chủ đề trang trí tivi đang chọn (công khai, chỉ một chuỗi ngắn)
+    if(u.pathname === '/api/deco' && req.method === 'GET'){
+      return jres({ deco: await decoGet(env) }, 200, Object.assign({ 'Cache-Control': 'no-store' }, originOk ? { 'Access-Control-Allow-Origin': origin, 'Vary': 'Origin' } : {}));
     }
 
     /* Màn quầy (quay.html): WebSocket "cái chuông" của chi nhánh — có đơn / đổi trạng thái thì quầy tự tải lại hàng đợi */

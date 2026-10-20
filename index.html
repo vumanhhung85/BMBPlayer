@@ -160,6 +160,20 @@
   .qchip.cur{border-color:var(--accent); background:#241b3a}
   .empty{color:var(--quiet); font-size:14px}
   kbd{background:#000;border:1px solid var(--line);border-radius:6px;padding:1px 7px;font-size:12px}
+  /* ===== Trang trí theo dịp lễ: hình rơi ở màn chờ, vài hình nhỏ ở góc khi đang hát (không che lời bài). Admin bật/tắt/ép chủ đề ở quầy → Cài đặt ===== */
+  #decoMsg{display:none; font-size:clamp(18px,2.8vw,40px); font-weight:800; color:var(--thC,#fcd34d); text-shadow:0 3px 20px rgba(0,0,0,.6); max-width:88vw; line-height:1.3}
+  body.th #decoMsg{display:block}
+  body.th #idle{background:radial-gradient(1300px 700px at 50% 38%, var(--thA) 0%, var(--thB) 45%, var(--bg) 78%)}
+  #deco{position:fixed; inset:0; z-index:6; pointer-events:none; overflow:hidden; display:none}
+  body.th:not(.nodeco) #deco{display:block}
+  #deco .p{position:absolute; top:0; left:0; line-height:1; will-change:transform; animation:decoFall linear infinite; text-shadow:0 2px 8px rgba(0,0,0,.35)}
+  @keyframes decoFall{from{transform:translate3d(0,-14vh,0) rotate(0)} to{transform:translate3d(var(--dx),112vh,0) rotate(var(--rot))}}
+  body:not(.idleOn) #deco .p{display:none}
+  #deco .cn{display:none; position:absolute; right:1.6vw; bottom:5vh; gap:.8vh; font-size:6.5vh; line-height:1}
+  #deco .cn span{display:block; transform-origin:50% 100%; animation:decoSway 4s ease-in-out infinite alternate; filter:drop-shadow(0 3px 8px rgba(0,0,0,.6))}
+  #deco .cn span:nth-child(2){animation-delay:-1.3s} #deco .cn span:nth-child(3){animation-delay:-2.6s}
+  @keyframes decoSway{from{transform:rotate(-5deg)} to{transform:rotate(5deg)}}
+  body:not(.idleOn) #deco .cn{display:flex}
 </style>
 </head>
 <body>
@@ -169,6 +183,7 @@
   <div id="yt"></div>
   <div id="swap"><img class="logo" src="Logo_BoomBox.png" alt=""><div class="s1">SẮP HÁT</div><div class="s2" id="swapT"></div></div>
   <img id="cornerLogo" src="Logo_BoomBox.png" alt="">
+  <div id="deco"></div>
 
   <!-- Màn hình chờ: mở lên là sẵn sàng, không có nút phải bấm -->
   <div id="idle">
@@ -176,6 +191,7 @@
     <h1>Boom Music Box <span>Player</span></h1>
     <div id="clock">--:--</div>
     <div id="dateLine"></div>
+    <div id="decoMsg"></div>
     <div id="readyPill"><i></i><span id="readyTxt">Đang khởi động…</span></div>
     <div id="roomNote"></div>
     <p id="hint">Chọn bài trên điện thoại hoặc máy tính bảng — bài sẽ tự phát lên màn hình này.</p>
@@ -827,6 +843,93 @@ if(bc.ws){
   }
   check();
   setInterval(check, 20 * 60 * 1000);
+})();
+
+/* ---------- Trang trí theo dịp lễ ----------
+   Chủ đề lấy từ Worker (GET /api/deco, mỗi 10 phút): 'auto' = tự chọn theo ngày | 'off' | khoá chủ đề ép dùng.
+   Thử nhanh trên trình duyệt: ?deco=halloween (ép chủ đề) · ?decodate=2026-12-24 (giả ngày). Danh sách khoá phải khớp DECO_OK trong Worker.
+   Nhẹ cho TV box yếu: chỉ animate transform, 26 hình (máy ít nhân/ít RAM: 14), chỉ chạy ở màn chờ — đang hát chỉ còn 3 hình tĩnh ở góc. */
+(function(){
+  const THEMES = {
+    hoa:      { p:['🌸','🌺','🌷','🌹','🌼','💐'], c:['💐','🌹','🌷'], A:'#4a1d3d', B:'#1f0e1b', C:'#fbcfe8', msg:'Chúc mừng ngày lễ — hoa tươi cho mọi nụ cười' },
+    tim:      { p:['❤️','💖','💕','💗','🌹','💝'], c:['❤️','💖','🌹'], A:'#4a1230', B:'#1d0a14', C:'#fda4af', msg:'Chúc mừng Valentine ❤️' },
+    co:       { p:['🎆','🎇','⭐','🎉','🇻🇳','🎊'], c:['🇻🇳','⭐','🎆'], A:'#5a1414', B:'#1f0a0a', C:'#fde047', msg:'Mừng ngày lễ lớn của dân tộc' },
+    halloween:{ p:['🎃','🦇','👻','🕸️','🎃','🍬'], c:['🎃','🦇','👻'], A:'#4a2208', B:'#170c06', C:'#fb923c', msg:'Happy Halloween 🎃' },
+    noel:     { p:['❄️','❅','❆','❄️','✨','🎁'], c:['🎄','🎁','⛄'], A:'#12303a', B:'#09151a', C:'#ffffff', msg:'Giáng sinh an lành — Merry Christmas 🎄', snow:true },
+    namMoi:   { p:['🎆','🎇','🎉','🥂','✨','🎊'], c:['🥂','🎆','🎉'], A:'#2c1a4d', B:'#120a22', C:'#fcd34d', msg:'Chúc mừng năm mới 🎉' },
+    tet:      { p:['🌼','🌸','🧧','🏮','🎆','🎊'], c:['🏮','🧧','🌼'], A:'#5a1414', B:'#1f0909', C:'#fde047', msg:'Chúc mừng năm mới — Vạn sự như ý 🧧' },
+    trungthu: { p:['🏮','🌕','🥮','✨','🏮','⭐'], c:['🏮','🌕','🥮'], A:'#3a2a0c', B:'#171006', C:'#fde68a', msg:'Vui Tết Trung thu 🏮' }
+  };
+  /* Dịp lễ dương lịch: tháng, từ ngày – đến ngày (gồm cả hai đầu) */
+  const RULES = [
+    { m:2,  a:13, b:14, t:'tim',       msg:'Chúc mừng Valentine 14/2 ❤️' },
+    { m:3,  a:7,  b:8,  t:'hoa',       msg:'Chúc mừng Ngày Quốc tế Phụ nữ 8/3 🌷' },
+    { m:4,  a:29, b:30, t:'co',        msg:'Mừng Ngày Giải phóng miền Nam 30/4 🇻🇳' },
+    { m:5,  a:1,  b:1,  t:'co',        msg:'Chúc mừng Ngày Quốc tế Lao động 1/5' },
+    { m:8,  a:31, b:31, t:'co',        msg:'Mừng Quốc khánh 2/9 🇻🇳' },
+    { m:9,  a:1,  b:2,  t:'co',        msg:'Mừng Quốc khánh 2/9 🇻🇳' },
+    { m:10, a:19, b:20, t:'hoa',       msg:'Chúc mừng Ngày Phụ nữ Việt Nam 20/10 🌹' },
+    { m:10, a:25, b:31, t:'halloween', msg:'Happy Halloween 🎃' },
+    { m:11, a:19, b:20, t:'hoa',       msg:'Tri ân Ngày Nhà giáo Việt Nam 20/11 💐' },
+    { m:12, a:20, b:26, t:'noel',      msg:'Giáng sinh an lành — Merry Christmas 🎄' },
+    { m:12, a:27, b:31, t:'namMoi',    msg:'Chúc mừng năm mới 🎉' },
+    { m:1,  a:1,  b:2,  t:'namMoi',    msg:'Chúc mừng năm mới 🎉' }
+  ];
+  /* Ngày lễ tính theo âm lịch: ghi sẵn ngày dương tương ứng [tháng, ngày] — mùng 1 Tết, và 15/8 âm (Trung thu). Hết năm 2031 thì bổ sung thêm. */
+  const TET = { 2027:[2,6], 2028:[1,26], 2029:[2,13], 2030:[2,3], 2031:[1,23] };
+  const TRUNGTHU = { 2027:[9,15], 2028:[10,3], 2029:[9,22], 2030:[9,12] };
+  const DAY = 86400000, du = (y, m, d) => Date.UTC(y, m - 1, d);
+
+  function autoPick(now){
+    const y = now.getFullYear(), today = du(y, now.getMonth() + 1, now.getDate());
+    for(const yy of [y, y + 1]){ const tt = TET[yy]; if(tt){ const t0 = du(yy, tt[0], tt[1]); if(today >= t0 - 3 * DAY && today <= t0 + 6 * DAY) return { key:'tet', msg: today < t0 ? 'Chúc mừng năm mới — sắp sang Xuân 🌼' : 'Chúc mừng năm mới — Vạn sự như ý 🧧' }; } }
+    const tr = TRUNGTHU[y]; if(tr){ const t0 = du(y, tr[0], tr[1]); if(today >= t0 - 2 * DAY && today <= t0) return { key:'trungthu', msg:'Vui Tết Trung thu 🏮' }; }
+    const m = now.getMonth() + 1, d = now.getDate();
+    for(const r of RULES) if(r.m === m && d >= r.a && d <= r.b) return { key:r.t, msg:r.msg };
+    return null;
+  }
+  const q = new URLSearchParams(location.search);
+  let setting = q.get('deco') || 'auto';
+  const fakeDate = /^\d{4}-\d{2}-\d{2}$/.test(q.get('decodate') || '') ? new Date(q.get('decodate') + 'T12:00:00') : null;
+  const weak = (navigator.hardwareConcurrency || 4) <= 2 || (navigator.deviceMemory || 4) <= 1;
+  let curKey = null, curMsg = null;
+
+  function build(th){
+    const T = THEMES[th.key], box = $('deco'), b = document.body, n = weak ? 14 : 26, r = (a, z) => a + Math.random() * (z - a);
+    box.replaceChildren();
+    for(let i = 0; i < n; i++){
+      const s = document.createElement('span'), dur = r(T.snow ? 11 : 9, T.snow ? 20 : 17);
+      s.className = 'p'; s.textContent = T.p[i % T.p.length];
+      s.style.cssText = 'left:' + r(0, 98).toFixed(1) + 'vw;font-size:' + (T.snow ? r(2, 4.2) : r(2.6, 5.4)).toFixed(1) + 'vh;animation-duration:' + dur.toFixed(1) + 's;animation-delay:-' + r(0, dur).toFixed(1) + 's;--dx:' + r(-14, 14).toFixed(1) + 'vw;--rot:' + Math.round(r(-300, 300)) + 'deg';
+      box.append(s);
+    }
+    const cn = document.createElement('div'); cn.className = 'cn';
+    T.c.forEach(e => { const s = document.createElement('span'); s.textContent = e; cn.append(s); });
+    box.append(cn);
+    b.style.setProperty('--thA', T.A); b.style.setProperty('--thB', T.B); b.style.setProperty('--thC', T.C);
+  }
+  function apply(){
+    let th = null;
+    if(setting === 'off') th = null;
+    else if(THEMES[setting]) th = { key:setting, msg: THEMES[setting].msg };
+    else th = autoPick(fakeDate || new Date());
+    const b = document.body;
+    if(!th){ if(curKey){ $('deco').replaceChildren(); b.classList.remove('th'); curKey = curMsg = null; } return; }
+    if(th.key !== curKey){ build(th); b.classList.add('th'); curKey = th.key; }
+    if(th.msg !== curMsg){ $('decoMsg').textContent = th.msg; curMsg = th.msg; }
+  }
+  /* Màn chờ đang hiện hướng dẫn gán phòng (mã QR + 6 số) thì không thả hình nào đè lên */
+  const sync = () => document.body.classList.toggle('nodeco', getComputedStyle($('setup')).display !== 'none');
+  new MutationObserver(sync).observe($('setup'), { attributes:true, attributeFilter:['style'] }); sync();
+
+  function fetchSetting(){
+    if(q.get('deco')) return;
+    if(!(location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) return;
+    fetch('/api/deco', { cache:'no-store' }).then(r => r.ok ? r.json() : null).then(v => { if(v && typeof v.deco === 'string'){ setting = v.deco; apply(); } }).catch(() => {});
+  }
+  apply(); fetchSetting();
+  setInterval(fetchSetting, 10 * 60 * 1000);
+  setInterval(apply, 30 * 60 * 1000);               // qua nửa đêm tự đổi chủ đề
 })();
 
 paintReady(); render(); push();
