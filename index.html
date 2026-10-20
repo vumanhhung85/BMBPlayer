@@ -139,6 +139,8 @@
   body.ui #panel{transform:none}
   /* TV thật trong phòng (đã gán phòng): remote lo mọi điều khiển → không hiện bảng điều khiển khi rê chuột */
   body.inroom #panel{display:none}
+  /* Chạy trong APK BMBPlayer (TV box, chuột bay/remote): không bao giờ hiện bảng này, kể cả khi chưa gán phòng — nó che mã QR và 6 số gán */
+  body.inapp #panel{display:none}
   #verTag{position:absolute; right:1.2vw; bottom:1.2vh; z-index:14; font-size:clamp(11px,1.05vw,15px); color:#cfcfe6; background:rgba(0,0,0,.55); border-radius:8px; padding:4px 10px;
     opacity:0; transition:opacity .3s; pointer-events:none; font-variant-numeric:tabular-nums}
   body.ui #verTag{opacity:.95}
@@ -261,6 +263,7 @@ let player = null, ready = false, apiReady = false;
     fetch('/api/ver', { cache:'no-store' }).then(r => r.ok ? r.json() : null).then(v => { if(v && v.at) show(new Date(v.at)); }).catch(() => {});
 })();
 if(bc.ws) document.body.classList.add('inroom');
+if(/BMBPlayerApp\//.test(navigator.userAgent)) document.body.classList.add('inapp');
 new MutationObserver(() => document.body.classList.toggle('idleOn', $('idle').style.display !== 'none' && getComputedStyle($('idle')).display !== 'none'))
   .observe($('idle'), { attributes:true, attributeFilter:['style'] });
 document.body.classList.toggle('idleOn', getComputedStyle($('idle')).display !== 'none');
