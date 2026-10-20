@@ -138,6 +138,8 @@ const NHOM = ['bia', 'nuoc', 'an', 'khac', 'dv'];
 const loaiTheoNhom = nhom => nhom === 'dv' ? 'SV' : 'DR';
 const nhomHopLe = v => NHOM.includes(v) ? v : '';
 // Icon là emoji chọn từ thư viện — chặn ký tự HTML phòng khi bị gửi bậy
+// Icon món: emoji, hoặc 'img:<10 hex>' = ảnh trong R2 (khóa mon/<10 hex>, xem khối "Ảnh món" phía dưới)
+const iconChu = v => (/^img:[0-9a-f]{10}$/.test(String(v || '')) ? '' : String(v || ''));
 const iconHopLe = v => { const x = s(v, 16); return /[<>&"'`]/.test(x) ? '' : x; };
 const tenHopLe = (v, max = 60) => s(v, max).replace(/[\u0000-\u001F\u007F]/g, '').replace(/\s+/g, ' ');
 // Sắp món: theo nhóm, rồi theo thứ tự chi nhánh tự xếp
@@ -1199,7 +1201,7 @@ function tgBanPhim(don, items) {
 const tgBanPhimHoiHuy = id => ({ inline_keyboard: [[{ text: '⚠️ Xác nhận huỷ đơn', callback_data: 'od:H:' + id }, { text: 'Không', callback_data: 'od:b:' + id }]] });
 
 function tgNoiDung(don, items, nguoi, nguoiLam) {
-  const mon = items.map(i => '• ' + (i.icon ? escHtml(i.icon) + ' ' : '') + escHtml(i.label) + (i.type === 'DR' && i.qty > 1 ? ' ×' + (+i.qty | 0) : '')).join('\n');
+  const mon = items.map(i => '• ' + (iconChu(i.icon) ? escHtml(iconChu(i.icon)) + ' ' : '') + escHtml(i.label) + (i.type === 'DR' && i.qty > 1 ? ' ×' + (+i.qty | 0) : '')).join('\n');
   const dong = [TG_TIEUDE[don.trang_thai] || TG_TIEUDE.MOI, 'Phòng: <b>' + escHtml(don.ten_phong) + '</b> · #' + escHtml(String(don.id).slice(-6).toUpperCase()), mon];
   if (don.ghi_chu) dong.push('Ghi chú: “' + escHtml(String(don.ghi_chu).slice(0, 200)) + '”');
   if (don.trang_thai === 'MOI') {
@@ -2110,7 +2112,7 @@ const nutKy = (env, orderId, u, cn, exp) => hmac(env.SECRET, 'pa|' + orderId + '
 
 /* ---------- Gửi thông báo của 1 đơn ---------- */
 function pushNoiDung(don, items, nguoi) {
-  const mon = items.map(i => (i.icon ? i.icon + ' ' : '') + i.label + (i.type === 'DR' && i.qty > 1 ? ' ×' + (+i.qty | 0) : '')).join(', ');
+  const mon = items.map(i => (iconChu(i.icon) ? iconChu(i.icon) + ' ' : '') + i.label + (i.type === 'DR' && i.qty > 1 ? ' ×' + (+i.qty | 0) : '')).join(', ');
   const st = don.trang_thai;
   const title = st === 'MOI' ? '🛎️ ' + don.ten_phong + ' gọi lễ tân'
     : st === 'NHAN' ? '✅ ' + don.ten_phong + ' · đã xác nhận'
@@ -2459,6 +2461,42 @@ async function pushBam(env, body, ctx) {
 
 
 /* ============================================================
+   Ảnh món (menu mẫu + món riêng)
+   Ảnh đã được trình duyệt cắt vuông, thu 256 px, nén WebP/JPEG (~10–25 KB) trước khi gửi lên.
+   Lưu R2 (binding FILES) khóa mon/<10 ký tự đầu SHA-256>. Trong bảng menu, cột icon giữ 'img:<10 hex>'
+   (không đổi cấu trúc D1). Cùng nội dung → cùng khóa nên không bị lưu trùng; phục vụ kèm cache 1 năm (immutable).
+   ============================================================ */
+const MON_ANH_MAX = 150 * 1024;
+const MON_ANH_RE = /^\/mon\/([0-9a-f]{10})$/;
+function loaiAnh(b) {
+  if (b.length > 12 && b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 && b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50) return 'image/webp';
+  if (b.length > 3 && b[0] === 0xFF && b[1] === 0xD8 && b[2] === 0xFF) return 'image/jpeg';
+  if (b.length > 8 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4E && b[3] === 0x47) return 'image/png';
+  return '';
+}
+async function monAnhTai(req, env, ch) {
+  const ss = await getSession(env, { session: req.headers.get('x-session') || '' }).catch(() => null);
+  if (!ss) return jres({ ok: false, error: 'unauthorized', msg: 'Phiên đã hết, đăng nhập lại.' }, 401, ch);
+  if (!ss.suaMenu) return jres({ ok: false, error: 'forbidden', msg: 'Tài khoản chưa được cấp quyền sửa menu.' }, 403, ch);
+  if (!env.FILES) return jres({ ok: false, error: 'no_r2', msg: 'Worker chưa gắn R2 (binding FILES).' }, 501, ch);
+  const len = Number(req.headers.get('content-length') || 0);
+  if (!len || len > MON_ANH_MAX) return jres({ ok: false, error: 'size', msg: 'Ảnh rỗng hoặc quá lớn (tối đa 150 KB sau khi nén).' }, 413, ch);
+  const buf = await req.arrayBuffer();
+  const u8 = new Uint8Array(buf), ct = loaiAnh(u8);
+  if (buf.byteLength !== len || !ct) return jres({ ok: false, error: 'khong_phai_anh', msg: 'File không phải ảnh WebP/JPEG/PNG.' }, 400, ch);
+  const dg = new Uint8Array(await crypto.subtle.digest('SHA-256', buf));
+  const h = Array.from(dg.slice(0, 5), x => x.toString(16).padStart(2, '0')).join('');
+  await env.FILES.put('mon/' + h, buf, { httpMetadata: { contentType: ct } });
+  return jres({ ok: true, icon: 'img:' + h }, 200, ch);
+}
+async function monAnhDoc(env, h) {
+  const o = env.FILES ? await env.FILES.get('mon/' + h) : null;
+  if (!o) return new Response('Không có ảnh.', { status: 404, headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'public, max-age=60' } });
+  return new Response(o.body, { headers: { 'content-type': (o.httpMetadata && o.httpMetadata.contentType) || 'image/webp', 'cache-control': 'public, max-age=31536000, immutable', 'access-control-allow-origin': '*', 'x-content-type-options': 'nosniff' } });
+}
+
+
+/* ============================================================
    Phát hành APK (từ 10/2026) — thay cho việc chép dist/BMBPlayer.apk lên GitHub.
    Chỉ admin CAO NHẤT (tai_khoan.sieu_admin = 1) tải lên được, từ quay.html → Cài đặt.
    File nằm trong R2 (binding FILES, bucket bmbplayer-files) tại apk/BMBPlayer.apk; số phiên bản nằm ở bảng riêng order_app_phat_hanh
@@ -2537,6 +2575,16 @@ export default {
       const cn = String(b.cn || '').slice(0, 40);
       if(cn) ctx.waitUntil(pokeQuay(env, cn, 'ql'));
       return jres({ ok: true });
+    }
+
+    /* Ảnh món: GET /mon/<hash> (công khai, cache dài) · PUT /api/admin/mon-anh (cần phiên có quyền sửa menu) */
+    { const mm = MON_ANH_RE.exec(u.pathname); if(mm && req.method === 'GET') return monAnhDoc(env, mm[1]); }
+    if(u.pathname === '/api/admin/mon-anh'){
+      const ch0 = cors(req, env), org = req.headers.get('Origin');
+      if(org && !origins(env).includes(org)) return jres({ ok: false, error: 'origin' }, 403, ch0);
+      if(req.method === 'OPTIONS') return new Response(null, { status: 204, headers: ch0 });
+      if(req.method === 'PUT') return monAnhTai(req, env, ch0);
+      return jres({ ok: false, error: 'method' }, 405, ch0);
     }
 
     /* Phát hành / tự cập nhật APK (xem khối "Phát hành APK" phía trên) */

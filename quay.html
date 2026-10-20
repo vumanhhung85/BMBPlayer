@@ -234,7 +234,10 @@ tbody tr:hover td{background:#FBF8FE}
 .mauchon .mico{font-size:21px;width:28px;text-align:center}
 .mauchon.co{opacity:.5;cursor:default}
 .lnk{font-size:12px;color:var(--purple);cursor:pointer;margin-left:auto;font-weight:600}
-.icbtn{font-size:30px;width:64px;height:56px;border-radius:14px;background:var(--field);border:1px dashed #C9B3E0;cursor:pointer}
+.mico img,.icbtn img{width:100%;height:100%;object-fit:cover;border-radius:7px;display:block}
+.mrow .mico{height:34px}.mauchon .mico{height:28px}
+.icrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.icbtn{overflow:hidden;padding:0;font-size:30px;width:64px;height:56px;border-radius:14px;background:var(--field);border:1px dashed #C9B3E0;cursor:pointer}
 .icthuvien{display:none;margin-top:10px;background:var(--field);border:1px solid var(--line);border-radius:12px;padding:10px;max-height:260px;overflow-y:auto}
 .icthuvien.show{display:block}
 .icthuvien .lbl{font-size:11.5px;font-weight:700;color:var(--txt-mute);margin:6px 2px 4px}
@@ -547,8 +550,14 @@ tbody tr:hover td{background:#FBF8FE}
   <div class="modal-box rong">
     <h3 id="monTieuDe">Tạo món riêng</h3>
     <div class="hint" id="monGhiChu"></div>
-    <div class="fld"><span>Icon — bấm để chọn</span>
-      <button type="button" class="icbtn" id="monIcon">🍽️</button>
+    <div class="fld"><span>Icon hoặc ảnh món — bấm ô vuông để chọn icon</span>
+      <div class="icrow">
+        <button type="button" class="icbtn" id="monIcon">🍽️</button>
+        <button type="button" class="btn btn-ghost btn-sm" id="btnMonAnh">📷 Chọn ảnh</button>
+        <button type="button" class="btn btn-ghost btn-sm" id="btnMonBoAnh" style="display:none">Bỏ ảnh</button>
+        <input type="file" id="monAnhFile" accept="image/*" style="display:none">
+      </div>
+      <div class="hint" id="monAnhTin" style="margin-top:6px">Ảnh được tự cắt vuông giữa, thu nhỏ 256 px và nén (khoảng 10–25 KB) nên gọi món vẫn nhanh.</div>
       <div class="icthuvien" id="icThuVien"></div>
     </div>
     <div class="fld"><span>Tên món</span><input id="monTen" maxlength="60" placeholder="vd: Bia Larue"></div>
@@ -1477,7 +1486,11 @@ var ICON_TV = [
   ['Phục vụ',      '🧻 🧽 🥢 🍴 🥄 🍽️ 🧂 🚬 🔥 🎂 🎉 🎈 🎁'],
   ['Dịch vụ / sự cố','🔋 🎤 🎧 🎵 🎶 📺 🔊 🔇 💡 ❄️ 🌡️ 🥵 📶 🛜 🔌 🧹 🚽 🙋 🛎️ 🧾 ⚠️ 🆘 ⭐']
 ];
-var MN = { items:[], mau:[], moMode:'', moId:0 };
+var MN = { items:[], mau:[], moMode:'', moId:0, icon:'🍽️', anhCho:null, anhUrl:'' };
+/* Icon món: emoji, hoặc "img:<10 hex>" = ảnh trên máy chủ (/mon/<hex>) */
+var IMG_RE = /^img:([0-9a-f]{10})$/;
+function monUrl(ic){ var m = IMG_RE.exec(ic||''); return m ? apkBase() + '/mon/' + m[1] : ''; }
+function icoHtml(ic){ var u = monUrl(ic); return u ? '<img src="'+esc(u)+'" alt="" loading="lazy" decoding="async">' : esc(ic||'•'); }
 
 function loadMenuAdmin(){
   $('menuList').innerHTML = '<div class="empty">Đang tải…</div>';
@@ -1512,7 +1525,7 @@ function drawMenuChiNhanh(){
       var tag = (m.mauId ? '' : '<span class="tagx">riêng</span>') + (m.an ? '<span class="tagx">đang ẩn</span>' : '');
       var sub = laDv ? 'khách bấm gọi' : 'khách chọn số lượng';
       html += '<div class="mrow'+(m.an?' an':'')+(m.hetHang?' het':'')+'">'
-        + '<span class="mico">'+esc(m.icon||'•')+'</span>'
+        + '<span class="mico">'+icoHtml(m.icon)+'</span>'
         + '<div class="mten">'+esc(m.label)+tag+'<small>'+sub+'</small></div><div class="grp">';
       if(!laDv) html += '<button class="btn btn-sm btn-sw '+(m.hetHang?'btn-het':'btn-con')+'" data-act="het" data-id="'+m.id+'">'
         + (m.hetHang ? '⛔ Hết hàng' : '✅ Còn hàng') + '</button>';
@@ -1582,7 +1595,7 @@ function moChonMau(){
       html += '<div class="nhomhd">'+g.ten+'<span class="lnk" data-nhom="'+g.k+'">chọn cả nhóm</span></div>';
       ds.forEach(function(m){
         html += '<label class="mauchon'+(m.daChon?' co':'')+'"><input type="checkbox" data-mau="'+m.id+'" data-g="'+g.k+'"'
-          + (m.daChon?' checked disabled':'')+'><span class="mico">'+esc(m.icon||'•')+'</span>'
+          + (m.daChon?' checked disabled':'')+'><span class="mico">'+icoHtml(m.icon)+'</span>'
           + '<span>'+esc(m.ten)+(m.daChon?' <span class="tagx">đã có</span>':'')+'</span></label>';
       });
     });
@@ -1618,7 +1631,7 @@ function dungThuVien(){
   }).join('');
   Array.prototype.forEach.call(tv.querySelectorAll('.luoi span'), function(sp){
     sp.addEventListener('click', function(){
-      $('monIcon').textContent = this.textContent;
+      MN.icon = this.textContent; MN.anhCho = null; veIconMon();
       Array.prototype.forEach.call(tv.querySelectorAll('.luoi span.on'), function(x){ x.className=''; });
       this.className = 'on';
       tv.classList.remove('show');
@@ -1635,19 +1648,66 @@ function moMon(mode, m){
   $('monNhom').innerHTML = NHOM.map(function(g){ return '<option value="'+g.k+'">'+g.ten+'</option>'; }).join('');
   $('monTen').value = m ? (m.label || m.ten || '') : '';
   $('monNhom').value = m ? m.nhom : 'nuoc';
-  $('monIcon').textContent = (m && m.icon) ? m.icon : '🍽️';
+  MN.icon = (m && m.icon) ? m.icon : '🍽️'; MN.anhCho = null; veIconMon();
   $('icThuVien').classList.remove('show');
   $('modalMon').classList.add('show');
 }
+function veIconMon(){
+  var b = $('monIcon'), u = MN.anhCho ? MN.anhUrl : monUrl(MN.icon), co = !!u;
+  if(co) b.innerHTML = '<img src="'+esc(u)+'" alt="">'; else b.textContent = MN.icon;
+  $('btnMonBoAnh').style.display = co ? '' : 'none';
+  $('btnMonAnh').textContent = co ? '📷 Đổi ảnh' : '📷 Chọn ảnh';
+}
+/* Cắt vuông giữa, thu 256 px, nền trắng, nén WebP (máy không hỗ trợ thì JPEG) → Blob ~10–25 KB */
+function nenAnh(file){
+  return new Promise(function(ok, ko){
+    var url = URL.createObjectURL(file), im = new Image();
+    im.onload = function(){
+      URL.revokeObjectURL(url);
+      var w = im.naturalWidth, h = im.naturalHeight, s = Math.min(w, h), N = 256;
+      if(!s){ ko(); return; }
+      var c = document.createElement('canvas'); c.width = c.height = N;
+      var g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, N, N); g.imageSmoothingQuality = 'high';
+      g.drawImage(im, (w-s)/2, (h-s)/2, s, s, 0, 0, N, N);
+      var thu = function(kieu, q, tiep){ c.toBlob(function(b){ if(b && b.type === kieu && b.size <= 140*1024) ok(b); else tiep(b); }, kieu, q); };
+      thu('image/webp', 0.8, function(){ thu('image/jpeg', 0.8, function(b){ b ? c.toBlob(function(b2){ b2 ? ok(b2) : ko(); }, 'image/jpeg', 0.6) : ko(); }); });
+    };
+    im.onerror = function(){ URL.revokeObjectURL(url); ko(); };
+    im.src = url;
+  });
+}
+function chonAnhMon(){
+  var f = $('monAnhFile').files[0]; $('monAnhFile').value = '';
+  if(!f) return;
+  $('monAnhTin').textContent = 'Đang xử lý ảnh…';
+  nenAnh(f).then(function(b){
+    MN.anhCho = b; if(MN.anhUrl) URL.revokeObjectURL(MN.anhUrl); MN.anhUrl = URL.createObjectURL(b); veIconMon();
+    $('monAnhTin').textContent = 'Ảnh sau khi nén: ' + Math.max(1, Math.round(b.size/1024)) + ' KB. Bấm Lưu để tải lên.';
+  }).catch(function(){ $('monAnhTin').textContent = 'Không đọc được ảnh này (thử ảnh JPG/PNG/WebP).'; });
+}
+function boAnhMon(){
+  MN.anhCho = null; if(IMG_RE.test(MN.icon)) MN.icon = '🍽️';
+  veIconMon(); $('monAnhTin').textContent = 'Đã bỏ ảnh — món sẽ dùng icon.';
+}
+function taiAnhLen(b){
+  return fetch(apkBase() + '/api/admin/mon-anh', { method:'PUT', headers:{'x-session':S.tok, 'content-type':b.type}, body:b })
+    .then(function(r){ return r.json(); });
+}
 function luuMon(vanTao){
-  var ten = $('monTen').value.trim(), nhom = $('monNhom').value, icon = $('monIcon').textContent;
+  var ten = $('monTen').value.trim(), nhom = $('monNhom').value;
   if(!ten){ alert('Nhập tên món.'); return; }
-  var laMau = MN.moMode==='mau';
-  var data = laMau ? {ten:ten, nhom:nhom, icon:icon} : {label:ten, nhom:nhom, icon:icon};
-  if(MN.moId) data.id = MN.moId;
-  if(vanTao) data.vanTao = true;
   $('btnMonLuu').disabled = true;
-  api(laMau ? 'admin.mauSave' : 'admin.menuSave', data).then(function(r){
+  var truoc = MN.anhCho ? taiAnhLen(MN.anhCho).then(function(r){
+    if(!r || !r.ok) throw { loi:r };
+    MN.icon = r.icon; MN.anhCho = null; return r;
+  }) : Promise.resolve();
+  truoc.then(function(){
+    var laMau = MN.moMode==='mau', icon = MN.icon;
+    var data = laMau ? {ten:ten, nhom:nhom, icon:icon} : {label:ten, nhom:nhom, icon:icon};
+    if(MN.moId) data.id = MN.moId;
+    if(vanTao) data.vanTao = true;
+    return api(laMau ? 'admin.mauSave' : 'admin.menuSave', data);
+  }).then(function(r){
     $('btnMonLuu').disabled = false;
     if(r && !r.ok && r.error==='co_trong_mau'){
       if(confirm(r.msg + '\n\nBấm OK nếu vẫn muốn tạo món riêng (khác với món mẫu).')) luuMon(true);
@@ -1655,8 +1715,12 @@ function luuMon(vanTao){
     }
     if(!r || !r.ok){ baoLoi(r, 'Lưu thất bại.'); return; }
     $('modalMon').classList.remove('show');
-    loadMenuAdmin();
-  }).catch(function(){ $('btnMonLuu').disabled = false; alert('Mất kết nối.'); });
+    loadMenuAdmin(); if(MN.moMode==='mau') loadMau();
+  }).catch(function(e){
+    $('btnMonLuu').disabled = false;
+    if(e && e.loi){ baoLoi(e.loi, 'Không tải được ảnh lên.'); return; }
+    alert('Mất kết nối.');
+  });
 }
 
 /* ---------- menu mẫu toàn chuỗi (admin) ---------- */
@@ -1670,7 +1734,7 @@ function loadMau(){
       if(!ds.length) return;
       html += '<div class="nhomhd">'+g.ten+' <span class="n">'+ds.length+' món</span></div>';
       ds.forEach(function(m){
-        html += '<div class="mrow'+(m.an?' an':'')+'"><span class="mico">'+esc(m.icon||'•')+'</span>'
+        html += '<div class="mrow'+(m.an?' an':'')+'"><span class="mico">'+icoHtml(m.icon)+'</span>'
           + '<div class="mten">'+esc(m.ten)+(m.an?'<span class="tagx">ngừng dùng</span>':'')+'<small>mã '+esc(m.ma)+'</small></div><div class="grp">'
           + '<button class="btn btn-ghost btn-sm" data-mau-sua="'+m.id+'">Sửa</button>'
           + '<button class="btn btn-ghost btn-sm" data-mau-an="'+m.id+'">'+(m.an?'Dùng lại':'Ngừng dùng')+'</button></div></div>';
@@ -1902,6 +1966,9 @@ $('btnMonRieng').addEventListener('click', function(){ moMon('rieng', null); });
 $('btnMauMoi').addEventListener('click', function(){ moMon('mau', null); });
 $('btnMonLuu').addEventListener('click', function(){ luuMon(false); });
 $('btnMonHuy').addEventListener('click', function(){ $('modalMon').classList.remove('show'); });
+$('btnMonAnh').addEventListener('click', function(){ $('monAnhFile').click(); });
+$('monAnhFile').addEventListener('change', chonAnhMon);
+$('btnMonBoAnh').addEventListener('click', boAnhMon);
 $('monIcon').addEventListener('click', function(){ dungThuVien(); $('icThuVien').classList.toggle('show'); });
 $('btnAccAdd').addEventListener('click', openAccModal);
 $('btnAccCancel').addEventListener('click', closeAccModal);

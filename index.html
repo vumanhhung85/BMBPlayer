@@ -753,7 +753,7 @@ function svcPaint(){
     const e = document.createElement('span'); e.className = 'e'; e.textContent = t[2];
     const hs = document.createElement('span'); hs.textContent = t[0]; h.append(e, hs);
     const b = document.createElement('div'); b.className = 'b';
-    b.textContent = (x.items || []).map(i => (i.icon ? i.icon + ' ' : '') + i.label + (i.type === 'DR' && i.qty > 1 ? ' ×' + i.qty : '')).join(' · ');
+    b.textContent = (x.items || []).map(i => (i.icon && !/^img:[0-9a-f]{10}$/.test(i.icon) ? i.icon + ' ' : '') + i.label + (i.type === 'DR' && i.qty > 1 ? ' ×' + i.qty : '')).join(' · ');
     const m = document.createElement('div'); m.className = 'm'; m.textContent = t[1];
     c.append(h, b, m); box.append(c);
   });
