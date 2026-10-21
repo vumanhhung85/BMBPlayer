@@ -593,8 +593,9 @@ function playPause(){
 }
 function replay(){ if(ready && cur>=0){ player.seekTo(0,true); player.playVideo(); } }
 function applyMute(){ $('muteBtn').textContent = (userMuted ? '🔇 Tiếng: Tắt' : '🔊 Tiếng: Bật'); }
-function toggleMute(){
-  if(!ready) return;
+function toggleMute(on){                    // on = true/false: đặt hẳn (remote gửi theo icon đang thấy, không đảo ngược nếu máy đó lệch); không có → đảo như cũ
+  if(!ready){ push(); return; }
+  if(typeof on === 'boolean' && on === userMuted){ push(); return; }
   userMuted = !userMuted;
   if(userMuted) player.mute(); else if(lock !== 'muted') player.unMute();
   applyMute(); volOsd(); push();
@@ -726,6 +727,7 @@ function push(){
     cur, queue: queue.map(q=>({ id:q.id, title:q.title }))
   }});
 }
+const idOk = c => { if(!c.id || (queue[+c.index] || {}).id === c.id) return true; push(); return false; };   // remote gửi kèm id bài: hàng chờ đã đổi (máy khác vừa thêm/xoá) thì bỏ lệnh và báo lại hàng chờ mới, không xoá nhầm bài
 bc.onmessage = ev => {
   const m = ev.data || {};
   if(m.type === 'svc'){ svcSet(m.list); return; }                 // trạng thái yêu cầu gọi lễ tân của phòng
@@ -734,15 +736,17 @@ bc.onmessage = ev => {
   const c = m.payload || {};
   switch(c.action){
     case 'add': addSong(c, c.prio === true); break;
-    case 'up': up(+c.index); break;
-    case 'play': playPause(); break;
+    case 'up': if(!idOk(c)) break; up(+c.index); break;
+    case 'play':{                                                   // on = true/false: muốn phát / muốn dừng; đã đúng sẵn thì chỉ báo lại trạng thái
+      if(typeof c.on === 'boolean'){ let pl = false; try{ pl = ready && player.getPlayerState() === 1; }catch(e){} if(c.on === pl){ push(); break; } }
+      playPause(); break; }
     case 'next': next(); break;
     case 'replay': replay(); break;
     case 'seek': seekCmd(c); break;
-    case 'mute': toggleMute(); break;
+    case 'mute': toggleMute(typeof c.on === 'boolean' ? c.on : undefined); break;
     case 'vol': setVol(+c.value || 0); break;
-    case 'prio': prio(+c.index); break;
-    case 'remove': removeAt(+c.index); break;
+    case 'prio': if(!idOk(c)) break; prio(+c.index); break;
+    case 'remove': if(!idOk(c)) break; removeAt(+c.index); break;
     case 'hello': push(); break;
   }
 };

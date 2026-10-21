@@ -1351,7 +1351,7 @@ const IC = {
 $('replayBtn').innerHTML = IC.replay; $('playBtn').innerHTML = IC.play; $('nextBtn').innerHTML = IC.next; $('muteBtn').innerHTML = IC.vol;
 $('dnBtn').innerHTML = IC.low; $('upBtn').innerHTML = IC.vol; $('volLo').innerHTML = IC.low; $('volHi').innerHTML = IC.vol;
 [['sPlay', IC.play], ['sNext', IC.next], ['sReplay', IC.replay], ['sMute', IC.vol], ['sDown', IC.low], ['sUp', IC.vol]].forEach(([id, ic]) => { $(id).querySelector('.i').innerHTML = ic; });
-$('sPlay').onclick = () => send('play'); $('sNext').onclick = () => send('next'); $('sReplay').onclick = () => send('replay');
+$('sPlay').onclick = () => send('play', { on:!lastPlaying }); $('sNext').onclick = () => send('next'); $('sReplay').onclick = () => send('replay');
 $('sMute').onclick = () => $('muteBtn').click();
 function volStep(d){
   const v = Math.max(0, Math.min(100, (+$('vol').value || 0) + d));
@@ -1444,9 +1444,13 @@ document.querySelectorAll('#uiMenu .uiSeg button').forEach(b => b.onclick = () =
 uiApply();
 addEventListener('resize', () => setTimeout(() => { applyWide(); uiApply(); }, 150));
 document.addEventListener('focusout', () => setTimeout(applyWide, 400));
-$('playBtn').onclick = () => send('play'); $('nextBtn').onclick = () => send('next');
+$('playBtn').onclick = () => send('play', { on:!lastPlaying }); $('nextBtn').onclick = () => send('next');
 $('replayBtn').onclick = () => send('replay');
-$('muteBtn').onclick = () => { lastMuted = !lastMuted; paintMute(lastMuted); muteHold = Date.now(); send('mute'); };   // đổi icon ngay, TV xác nhận sau
+/* Tắt/bật tiếng: gửi "đặt hẳn" theo icon đang thấy (không phải lệnh đảo) → máy lệch trạng thái bấm cũng không bị ngược với TV.
+   Đổi icon ngay; 1,7 giây sau lấy lại đúng theo TV (TV bỏ qua lệnh / chưa sẵn sàng thì icon tự trả về). */
+let tvMuted = null, muteT = 0, lastPlaying = false;
+$('muteBtn').onclick = () => { lastMuted = !lastMuted; paintMute(lastMuted); muteHold = Date.now(); send('mute', { on:lastMuted });
+  clearTimeout(muteT); muteT = setTimeout(() => { if(tvMuted !== null){ lastMuted = tvMuted; paintMute(lastMuted); } }, 1700); };
 /* Âm lượng: trong lúc kéo và ngay sau khi thả, không để trạng thái cũ từ TV kéo thanh trượt về chỗ cũ */
 let volTimer, volDrag = false, volHold = 0, volSent = -1, muteHold = 0, lastMuted = false;
 const volNum = v => { $('volN').textContent = v; $('sVolN').textContent = v; $('vol').style.setProperty('--p', v + '%'); };
@@ -1507,8 +1511,9 @@ bc.onmessage = ev => {
     : s.needStart ? '⚠ TV đang chờ một lần bấm OK / chạm màn hình để bật tiếng'
     : s.ready === false && s.cur >= 0 ? '⏳ Màn hình phát đang khởi động YouTube…'
     : (s.nowTitle || '—');
-  $('playBtn').innerHTML = s.playing ? IC.pause : IC.play;
-  if(Date.now() - muteHold > 1500){ lastMuted = !!s.muted; paintMute(lastMuted); }
+  $('playBtn').innerHTML = s.playing ? IC.pause : IC.play; lastPlaying = !!s.playing;
+  tvMuted = !!s.muted;
+  if(Date.now() - muteHold > 1500){ lastMuted = tvMuted; paintMute(lastMuted); }
   if(typeof s.volume === 'number' && !volDrag && Date.now() - volHold > 1500){ $('vol').value = s.volume; volNum(s.volume); volSent = s.volume; }
   const q = s.queue || [], cur = s.cur;
   const up = q.filter((x, i) => i > cur).length;                      // số bài sắp hát (không tính bài đang hát)
@@ -1536,8 +1541,8 @@ function queueRow(it, i, cur, n){
 function queueAsk(it, i, cur){
   if(i === cur) return pickBox(it.title, thumbOf(it.id), [['HÁT LẠI', '', () => send('replay')], ['QUA BÀI', 'y', () => send('next')]], true);
   const b = [];
-  if(i > cur + 1) b.push(['ƯU TIÊN', 'y', () => { send('prio', { index:i }); snack('⏫ Hát ngay sau bài này: ' + it.title); }], ['ĐẨY LÊN', '', () => send('up', { index:i })]);
-  b.push(['XOÁ', 'r', () => send('remove', { index:i })]);
+  if(i > cur + 1) b.push(['ƯU TIÊN', 'y', () => { send('prio', { index:i, id:it.id }); snack('⏫ Hát ngay sau bài này: ' + it.title); }], ['ĐẨY LÊN', '', () => send('up', { index:i, id:it.id })]);
+  b.push(['XOÁ', 'r', () => send('remove', { index:i, id:it.id })]);
   pickBox(it.title, thumbOf(it.id), b, true);
 }
 /* Cột phải trên máy tính bảng xoay ngang */

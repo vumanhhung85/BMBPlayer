@@ -33,7 +33,7 @@
     const url = api.replace(/^http/, 'ws') + '/ws?role=' + wsRole + '&r=' + encodeURIComponent(token) + (dev ? '&d=' + encodeURIComponent(dev) : '');
     const persistent = wsRole !== 'remote';               // TV và máy tính bảng: luôn chờ / nối lại, không bỏ cuộc
     const ch = { ws: true, role: wsRole, tablet: wsRole === 'tablet', token, roomId: token.split('.')[0], onmessage: null, onroom: null, onstatus: null, status: 'connecting', last: null };
-    let sock = null, tries = 0, timer = null, ping = null, stopped = false, waitedSince = 0, checking = false;
+    let sock = null, tries = 0, timer = null, ping = null, stopped = false, waitedSince = 0, checking = false, lastRx = Date.now();
     const setStatus = (s, info) => { ch.status = s; if(ch.onstatus) ch.onstatus(s, info); };
     function schedule(ms){ clearTimeout(timer); timer = setTimeout(connect, ms); }
     function dead(){                                     // mã bị đổi (gán TV/máy tính bảng khác): quên mã, báo trang
@@ -58,8 +58,13 @@
       if(stopped) return;
       setStatus('connecting');
       try{ sock = new WebSocket(url); }catch(e){ return schedule(5000); }
-      sock.onopen = () => { tries = 0; try{ sock.send('sync'); }catch(e){} clearInterval(ping); ping = setInterval(() => { try{ sock.send('ping'); }catch(e){} }, 25000); };
+      sock.onopen = () => { tries = 0; lastRx = Date.now(); try{ sock.send('sync'); }catch(e){} clearInterval(ping);
+        ping = setInterval(() => {
+          if(Date.now() - lastRx > 100000) return recycle();             // 100 giây không nhận được gì (kể cả 'pong' 25 giây/lần): socket đã chết ngầm → nối lại
+          try{ sock.send('ping'); }catch(e){}
+        }, 25000); };
       sock.onmessage = ev => {
+        lastRx = Date.now();
         if(ev.data === 'pong') return;
         let m; try{ m = JSON.parse(ev.data); }catch(e){ return; }
         if(m.type === 'room'){
@@ -89,10 +94,22 @@
       };
       sock.onerror = () => {};
     }
+    /* Socket chết ngầm (điện thoại ngủ máy / đổi mạng: trình duyệt vẫn báo 'đang nối' nhưng không còn tin nào tới): bỏ và nối lại.
+       Máy khác đổi trạng thái (tắt tiếng, dừng nhạc...) mà máy này không nhận được thì icon bị lệch thực tế. */
+    function recycle(){ clearInterval(ping); const s = sock; try{ s.onclose = null; s.close(); }catch(e){} setStatus('offline'); schedule(200); }
+    function probe(){
+      if(stopped) return;
+      if(!sock || sock.readyState > 1){ schedule(100); return; }
+      if(sock.readyState !== 1) return;
+      const s0 = sock, t0 = Date.now();
+      try{ s0.send('sync'); s0.send('ping'); }catch(e){}                   // xin lại trạng thái mới nhất + thử xem còn sống không
+      setTimeout(() => { if(!stopped && sock === s0 && lastRx < t0) recycle(); }, 4000);
+    }
+    window.addEventListener('online', probe);
     ch.postMessage = msg => { if(sock && sock.readyState === 1) sock.send(JSON.stringify(msg)); };
     ch.close = () => { stopped = true; try{ sock.close(); }catch(e){} };
-    document.addEventListener('visibilitychange', () => {   // điện thoại ngủ máy rồi mở lại: nối lại ngay
-      if(document.visibilityState === 'visible' && !stopped && (!sock || sock.readyState > 1)) schedule(100);
+    document.addEventListener('visibilitychange', () => {   // điện thoại ngủ máy rồi mở lại: nối lại ngay (hoặc làm tươi trạng thái nếu còn nối)
+      if(document.visibilityState === 'visible') probe();
     });
     connect();
     return ch;

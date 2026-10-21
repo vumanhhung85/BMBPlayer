@@ -1886,7 +1886,8 @@ export class Room extends DurableObject {
         out.id = p.id; out.title = String(p.title || 'Bài không tên').slice(0, 200);
         if(p.prio === true) out.prio = true;
       }else if(p.action === 'vol'){ out.value = Math.max(0, Math.min(100, +p.value || 0));
-      }else if(p.action === 'prio' || p.action === 'up' || p.action === 'remove'){ out.index = Math.max(0, Math.min(500, +p.index | 0));
+      }else if(p.action === 'prio' || p.action === 'up' || p.action === 'remove'){ out.index = Math.max(0, Math.min(500, +p.index | 0)); if(/^[\w-]{11}$/.test(p.id || '')) out.id = p.id;   // id bài: TV đối chiếu, hàng chờ đã đổi thì bỏ lệnh
+      }else if(p.action === 'play' || p.action === 'mute'){ if(typeof p.on === 'boolean') out.on = p.on;                       // đặt hẳn phát/dừng, bật/tắt tiếng (không đảo)
       }else if(p.action === 'seek'){                                 // tua bài đang hát: t = giây tuyệt đối, hoặc by = ±giây; admin tắt thì bỏ
         if(!(await seekOn(this.env))) return;
         if(typeof p.t === 'number' && isFinite(p.t)) out.t = Math.max(0, Math.min(86400, p.t));
