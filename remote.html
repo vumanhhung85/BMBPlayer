@@ -1626,7 +1626,7 @@ function showPair(why){
   $('pairH').textContent = hasDv ? 'Máy tính bảng chưa vào phòng' : 'Máy tính bảng chưa gán phòng';
   if(pairing) return; pairing = true;
   const BASE = location.origin + location.pathname.replace(/[^/]*$/, '');
-  let code = '', key = '', exp = 0, t = null;
+  let code = '', key = '', exp = 0, t = null, shown = 0;
   const err = x => { $('pairErr').textContent = x || ''; };
   async function post(path, body){
     const r = await fetch(phongApi() + path, { method:'POST', headers:{ 'content-type':'application/json' }, body: JSON.stringify(body || {}) });
@@ -1640,7 +1640,7 @@ function showPair(why){
       const r = await post('/api/tv/pair/new', { kind:'tb' });
       if(r.s === 429){ err(r.d.error || 'Xin mã quá nhiều lần, đợi một lát.'); t = setTimeout(fresh, 60000); return; }
       if(r.s !== 200) throw new Error(r.d.error || ('Lỗi ' + r.s));
-      code = r.d.code; key = r.d.key; exp = r.d.exp; err('');
+      code = r.d.code; key = r.d.key; exp = r.d.exp; err(''); if(!shown) shown = Date.now();
       $('pairCode').textContent = code.slice(0, 3) + ' ' + code.slice(3);
       const q = qrcode(0, 'M'); q.addData(BASE + 'quay.html#gan=' + code); q.make();
       const img = document.createElement('img'); img.alt = 'QR gán máy tính bảng'; img.src = q.createDataURL(6, 1);
@@ -1659,7 +1659,7 @@ function showPair(why){
       }
       if(r.s === 404 || r.s === 403) return fresh();
     }catch(e){}
-    paintExp(); t = setTimeout(poll, 2500);
+    paintExp(); t = setTimeout(poll, Date.now() - shown < 180000 ? 2500 : 8000);   // để màn gán cả ngày thì hỏi thưa lại
   }
   fresh();
 }

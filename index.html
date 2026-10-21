@@ -316,7 +316,7 @@ if(needSetup){
 const BASE = location.origin + location.pathname.replace(/[^/]*$/, '');
 function qrImg(text, cell, level){ const q = qrcode(0, level || 'M'); q.addData(text); q.make(); return q.createDataURL(cell || 8, 2); }
 function startPairing(){
-  let code = '', key = '', exp = 0, pollT = null;
+  let code = '', key = '', exp = 0, pollT = null, shown = 0;
   const api = phongApi();
   const err = t => { $('setupErr').textContent = t || ''; };
   async function post(path, body){
@@ -330,7 +330,7 @@ function startPairing(){
       const r = await post('/api/tv/pair/new');
       if(r.s === 429){ err(r.d.error || 'Xin mã quá nhiều lần, đợi một lát.'); pollT = setTimeout(fresh, 60000); return; }
       if(r.s !== 200) throw new Error(r.d.error || ('Lỗi ' + r.s));
-      code = r.d.code; key = r.d.key; exp = r.d.exp; err('');
+      code = r.d.code; key = r.d.key; exp = r.d.exp; err(''); if(!shown) shown = Date.now();
       $('pairCode').textContent = code.slice(0, 3) + ' ' + code.slice(3);
       const img = document.createElement('img'); img.alt = 'QR gán phòng'; img.src = qrImg(BASE + 'quay.html#gan=' + code, 8);
       $('pairQr').replaceChildren(img);
@@ -352,7 +352,8 @@ function startPairing(){
       }
       if(r.s === 404 || r.s === 403) return fresh();
     }catch(e){ /* mất mạng: hỏi lại sau */ }
-    paintExp(); pollT = setTimeout(poll, 2500);
+    /* 3 phút đầu từ lúc mở màn gán: 2,5 giây/lần (đang có người gán thì vào ngay); sau đó 8 giây/lần — TV chưa gán để cả ngày không tốn hàng chục nghìn lượt */
+    paintExp(); pollT = setTimeout(poll, Date.now() - shown < 180000 ? 2500 : 8000);
   }
   fresh();
 }
@@ -708,9 +709,10 @@ function seekCmd(c){
 function pushPos(){
   if(!seekOn || !nPeers || !ready || cur < 0) return;
   let playing = false; try{ playing = player.getPlayerState() === 1; }catch(e){}
+  if(!playing) return;                     // dừng/đổi bài đã có tin 'state' kèm giây; remote tự chạy đồng hồ giữa hai lần báo
   bc.postMessage({ type:'pos', payload:{ cur, t: curT(), dur: curDur(), playing } });
 }
-setInterval(pushPos, 3000);
+setInterval(pushPos, 10000);              // 10 giây chỉ để chỉnh lệch: 23+ TV × 3 giây/lần tốn nhiều lượt Durable Object
 
 /* ---------- Đồng bộ với remote ---------- */
 function push(){

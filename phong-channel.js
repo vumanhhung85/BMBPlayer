@@ -44,10 +44,13 @@
     /* Mã hết hiệu lực trong lúc máy tắt thì Worker từ chối ngay ở bước nối (trình duyệt chỉ thấy "mất kết nối"):
        sau vài lần không nối được, hỏi Worker xem mã còn dùng được không. */
     async function checkToken(){
-      if(checking || !persistent) return; checking = true;
+      if(checking) return; checking = true;
       try{
         const r = await fetch(api + '/api/tokcheck', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ r: token, role: wsRole }) });
-        if(r.ok){ const d = await r.json(); if(d.valid === false) dead(); }
+        if(r.ok){ const d = await r.json(); if(d.valid === false){
+          if(persistent) dead();
+          else{ stopped = true; clearTimeout(timer); setStatus('rotated'); }   // điện thoại khách giữ mã QR lượt trước: dừng hẳn, không nối lại mãi (mỗi lần nối tốn 1 lượt Worker + Durable Object + D1)
+        } }
       }catch(e){}
       checking = false;
     }

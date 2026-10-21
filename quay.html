@@ -2212,7 +2212,7 @@ Array.prototype.forEach.call(document.querySelectorAll('.tab'), function(t){
     if(p==='p7') cdMo();
     if(p==='p2') datNgayLS(LS.ngay || ngayHomNay());   /* lần đầu: ngày hiện tại; sau đó giữ ngày đang xem */
     if(TV.tm){ clearInterval(TV.tm); TV.tm = null; }
-    if(p==='p3'){ loadTv(); TV.tm = setInterval(function(){ if(document.visibilityState==='visible' && !document.getElementById('qsOv')) loadTv(); }, 10000); }
+    if(p==='p3'){ loadTv(); TV.tm = setInterval(function(){ if(document.visibilityState==='visible' && !document.getElementById('qsOv')) loadTv(); }, 30000); }   /* 30 giây: mỗi lần hỏi = 1 lượt cho MỖI phòng (23+ phòng) */
   });
 });
 

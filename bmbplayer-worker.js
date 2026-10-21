@@ -58,7 +58,7 @@ const enc = new TextEncoder();
 const ID_RE = /^[A-Za-z0-9_-]{1,40}$/;                                  // mã phòng = order_phong.id của Order (vd P1A2B3C4D5E6)
 const TOKEN_RE = /^([A-Za-z0-9_-]{1,40})\.(\d{1,6})\.([\w-]{22})$/;
 const ACTIONS = new Set(['add', 'play', 'next', 'replay', 'mute', 'vol', 'prio', 'up', 'remove', 'hello', 'seek']);
-const MAX_MSG = 4096, MAX_STATE = 32768, MAX_REMOTES = 2, RATE_PER_SEC = 15;
+const MAX_MSG = 4096, MAX_STATE = 131072, MAX_REMOTES = 2, RATE_PER_SEC = 15;
 const SVC_ACTIVE_MS = 2 * 3600 * 1000, SVC_DONE_MS = 15 * 1000;     // yêu cầu gọi lễ tân trên TV: đang xử lý hiện tối đa 2 giờ; xong/huỷ hiện 15 giây
 
 /* ---------- Mã ---------- */
@@ -336,7 +336,21 @@ async function rlDonRac(env) {
 // ============================================================
 // Router
 // ============================================================
+/* Chỉ mục cho các câu hỏi chạy nhiều nhất (quầy hỏi đơn 45 giây/lần mỗi màn, khách gửi yêu cầu). Không có chỉ mục thì mỗi lần hỏi
+   D1 đọc LẠI CẢ BẢNG order_don (càng lâu càng nhiều đơn → chậm + tốn lượt đọc). Tạo một lần mỗi isolate, có rồi thì bỏ qua. */
+let idxXong = false;
+async function bangChiMuc(env) {
+  if (idxXong) return; idxXong = true;
+  try {
+    await env.DB.batch([
+      env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_order_don_cn_tao ON order_don (chi_nhanh_id, tao_luc)'),
+      env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_order_don_phong_tao ON order_don (phong_id, tao_luc)'),
+      env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_order_phong_cn ON order_phong (chi_nhanh_id)')
+    ]);
+  } catch (e) { console.error('bangChiMuc:', e); }
+}
 async function handleApi(request, env, ctx) {
+    await bangChiMuc(env);
     const origin = request.headers.get('Origin');
     const originOk = !origin || origins(env).includes(origin);
 
@@ -1368,7 +1382,9 @@ async function quayTv(env, body) {
   ]);
   const rows = phongRs.results.sort(sapPhong);
   const rooms = await Promise.all(rows.map(async r => {
-    const st = await call(roomStub(env, r.id), '/status', { id: r.id });   // đồng thời bắt phòng đọc lại D1
+    // Một phòng lỗi (Durable Object bận/khởi động lại) thì phòng đó hiện như chưa có TV — KHÔNG làm hỏng cả bảng 23+ phòng
+    let st = {};
+    try { st = await call(roomStub(env, r.id), '/status', { id: r.id, open: !!r.dang_mo, mo: r.mo_luc || 0 }); } catch (e) { console.error('quayTv status', r.id, e); st = { err: 1 }; }
     const x = { roomId: r.id, roomName: r.ten_phong, open: !!r.dang_mo, since: r.mo_luc || 0,
       tv: !!st.tv, tablets: st.tablets || 0, remotes: st.remotes || 0, offNet: st.offNet || 0 };
     if (st.open) x.tokQr = await mkToken(env, r.id, 'qr', st.genQ);
@@ -1696,8 +1712,12 @@ export class Room extends DurableObject {
     await this.syncDb();
     await this.ctx.storage.setAlarm(Date.now() + RESYNC_MS);
   }
-  async status(){
-    const c = await this.syncDb(), net = this.env.NET_CHECK || 'off';
+  /* Quầy hỏi tình trạng (tab TV & phòng, 23+ phòng mỗi lần): KHÔNG đọc D1 mỗi lần nữa — quầy gửi kèm trạng thái mở/đóng đọc từ D1,
+     chỉ khi lệch với phòng này đang nhớ thì mới đọc lại D1 (mở/đóng đã được báo sang ngay lúc bấm + lưới an toàn 5 phút). */
+  async status(body){
+    let c = await this.cfg();
+    if(!body || body.open === undefined || !!body.open !== c.open || (body.open && (+body.mo || 0) !== c.moLuc) || !c.rid) c = await this.syncDb();
+    const net = this.env.NET_CHECK || 'off';
     let off = 0;
     for(const ws of this.sockets('remote')){ const a = ws.deserializeAttachment() || {}; if(a.off) off++; }
     return { remotes: this.sockets('remote').length, tablets: this.sockets('tablet').length, tv: this.sockets('tv').length > 0, net, offNet: off,
@@ -1716,7 +1736,7 @@ export class Room extends DurableObject {
       return jres({ valid, open: c.open, role, id: t ? t.id : '' });
     }
     await this.remember(String(body.id || ''));
-    if(u.pathname === '/status') return jres(await this.status());
+    if(u.pathname === '/status') return jres(await this.status(body));
     if(u.pathname === '/sync'){ const c = await this.syncDb(); return jres({ ok: true, open: c.open }); }
     if(u.pathname === '/svc'){ await this.svcPut(body.don || {}); return jres({ ok: true }); }
     if(u.pathname === '/rotate'){
@@ -2737,7 +2757,7 @@ export default {
       if(!originOk) return jres({ error: 'origin' }, 403, ch);
       const body = await req.json().catch(() => ({})), t = parseToken(body.r);
       if(!t) return jres({ valid: false }, 200, ch);
-      const role = body.role === 'tv' ? 'tv' : 'tablet';
+      const role = body.role === 'tv' ? 'tv' : body.role === 'remote' ? 'remote' : 'tablet';
       return jres(await call(roomStub(env, t.id), '/check', { r: body.r, role }), 200, ch);
     }
 
