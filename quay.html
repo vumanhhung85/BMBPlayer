@@ -399,6 +399,7 @@ tbody tr:hover td{background:#FBF8FE}
       <button class="btn btn-y btn-sm" id="btnPhongThem">+ Thêm phòng</button>
     </div>
     <button class="btn btn-ghost btn-sm" id="btnThuHoiMtb" style="display:none;margin:6px 8px 6px 0;border-color:#F5B5C0;color:#D6314F">🔒 Thu hồi mọi máy tính bảng</button>
+    <button class="btn btn-ghost btn-sm" id="btnNhatKy" style="display:none;margin:6px 8px 6px 0">🧾 Nhật ký kết nối</button>
     <button class="btn btn-ghost btn-sm" id="btnPrintRv" style="margin:6px 0 6px;border-color:#A9E0C4;color:#0F7A4D">⭐ In QR ĐÁNH GIÁ (thẻ riêng, không số phòng)</button>
     <div class="hint" id="rvHint" style="margin:4px 0 6px">Dùng đường dẫn Google Maps của chi nhánh.</div>
     <div class="tvgrid" id="tvList"><div class="mut">Đang tải…</div></div>
@@ -516,6 +517,17 @@ tbody tr:hover td{background:#FBF8FE}
       <button class="btn btn-bad btn-sm" id="puTat" style="display:none">Tắt trên máy này</button>
       <button class="btn btn-ghost btn-sm" id="puDong">Đóng</button>
     </div>
+  </div>
+</div>
+
+<!-- Modal nhật ký kết nối -->
+<div class="modal-overlay" id="modalNhatKy">
+  <div class="modal-box rong">
+    <h3>Nhật ký kết nối</h3>
+    <div class="hint">Mỗi phòng giữ 60 sự kiện gần nhất. <b>Máy rớt</b> = máy tự mất kết nối (mạng/ngủ/đóng app). <b>Server cắt</b> = hệ thống chủ động đóng (kèm lý do). Gặp phòng bị out thì mở bảng này ngay, chụp gửi kỹ thuật.</div>
+    <div class="fld" style="display:flex;gap:6px;align-items:center"><select id="nkPhong" style="flex:1"></select><button class="btn btn-ghost btn-sm" id="btnNkTai">Tải lại</button></div>
+    <div id="nkList" style="max-height:55vh;overflow:auto;font-size:12px;line-height:1.5"></div>
+    <div class="actions"><button class="btn btn-ghost btn-sm" id="btnNkDong">Đóng</button></div>
   </div>
 </div>
 
@@ -1099,6 +1111,7 @@ function hienTheoQuyen(){
   $('decoSec').style.display = S.vaiTro === 'admin' ? '' : 'none';
   $('phongAdmin').style.display  = S.vaiTro==='admin' ? '' : 'none';   /* phòng cố định — chỉ admin thêm/xoá */
   $('btnThuHoiMtb').style.display = S.quanLy ? '' : 'none';
+  $('btnNhatKy').style.display = S.quanLy ? '' : 'none';
   $('selCN').style.display       = S.vaiTro==='admin' ? '' : 'none';
 }
 function veChonChiNhanh(){
@@ -1978,6 +1991,41 @@ $('lsSau').addEventListener('click', function(){ datNgayLS(congNgay(LS.ngay || n
 $('lsHomNay').addEventListener('click', function(){ datNgayLS(ngayHomNay()); });
 $('btnPrintRv').addEventListener('click', printReview);
 $('btnThuHoiMtb').addEventListener('click', thuHoiMtb);
+/* ---- Nhật ký kết nối ---- */
+var NK = [];
+function nkGio(t){ var d = new Date(t), z = function(n){ return (n<10?'0':'')+n; }; return z(d.getHours())+':'+z(d.getMinutes())+':'+z(d.getSeconds()); }
+function nkVe(){
+  var ph = $('nkPhong').value, ROLE = {tv:'TV', tablet:'MTB', remote:'ĐT'}, rows = NK.filter(function(e){ return !ph || e.p === ph; });
+  if(!rows.length){ $('nkList').innerHTML = '<div class="mut">Chưa có sự kiện nào.</div>'; return; }
+  $('nkList').innerHTML = rows.slice(0, 150).map(function(e){
+    var ro = e.role ? (ROLE[e.role]||e.role)+' ' : '', tx, mau = '';
+    if(e.ev === 'noi') tx = ro+'nối vào'+(e.dev ? ' (máy '+esc(e.dev)+')' : '');
+    else if(e.ev === 'dut'){ tx = ro+'<b>máy rớt</b> mã '+e.code+(e.why ? ' "'+esc(e.why)+'"' : '')+(e.tuoi != null ? ', đã nối '+e.tuoi+'s' : ''); mau = 'color:#D6314F'; }
+    else if(e.ev === 'cat'){ tx = ro+'<b>server cắt</b> mã '+e.code+' — '+esc(e.why||'')+(e.n ? ' ('+e.n+' máy)' : '')+(e.im != null ? ', im '+e.im+'s' : ''); mau = 'color:#B7791F'; }
+    else if(e.ev === 'tuchoi'){ tx = ro+'bị từ chối mã '+e.code+' "'+esc(e.why||'')+'" (đang '+(e.dem||0)+' máy)'; mau = 'color:#B7791F'; }
+    else if(e.ev === 'mo') tx = '<b>phòng MỞ</b>';
+    else if(e.ev === 'dong') tx = '<b>phòng ĐÓNG</b>';
+    else if(e.ev === 'xoa'){ tx = '<b>phòng bị xoá khỏi hệ thống</b>'; mau = 'color:#D6314F'; }
+    else if(e.ev === 'loi'){ tx = ro+'lỗi kết nối'; mau = 'color:#D6314F'; }
+    else tx = esc(e.ev);
+    return '<div style="padding:3px 0;border-bottom:1px solid #eee;'+mau+'"><span class="mut">'+nkGio(e.t)+'</span> <b>'+esc(e.p||'')+'</b> · '+tx+'</div>';
+  }).join('');
+}
+function nkTai(){
+  $('nkList').innerHTML = '<div class="mut">Đang tải…</div>';
+  return api('quay.nhatKy').then(function(r){
+    if(!r || !r.ok){ if(r && r.msg==='HET_PHIEN') logout(); $('nkList').innerHTML = '<div class="mut">Không tải được.</div>'; return; }
+    NK = r.log || [];
+    var cur = $('nkPhong').value, names = {}; NK.forEach(function(e){ names[e.p] = 1; });
+    (TV.rooms||[]).forEach(function(x){ names[x.roomName] = 1; });
+    $('nkPhong').innerHTML = '<option value="">Tất cả phòng</option>' + Object.keys(names).sort().map(function(n){ return '<option value="'+esc(n)+'"'+(n===cur?' selected':'')+'>'+esc(n)+'</option>'; }).join('');
+    nkVe();
+  }).catch(function(){ $('nkList').innerHTML = '<div class="mut">Không tải được.</div>'; });
+}
+$('btnNhatKy').addEventListener('click', function(){ $('modalNhatKy').classList.add('show'); nkTai(); });
+$('btnNkTai').addEventListener('click', nkTai);
+$('nkPhong').addEventListener('change', nkVe);
+$('btnNkDong').addEventListener('click', function(){ $('modalNhatKy').classList.remove('show'); });
 $('btnChonMau').addEventListener('click', moChonMau);
 $('btnChonMauOk').addEventListener('click', xacNhanChonMau);
 $('btnChonMauHuy').addEventListener('click', function(){ $('modalChonMau').classList.remove('show'); });

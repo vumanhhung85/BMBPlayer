@@ -387,6 +387,7 @@ async function handleApi(request, env, ctx) {
         case 'quay.don':                 res = await quayDon(env, body, ctx); break;
         case 'quay.phong':               res = await quayPhong(env, body, ctx); break;
         case 'quay.tv':                  res = await quayTv(env, body); break;
+        case 'quay.nhatKy':              res = await quayNhatKy(env, body); break;
         case 'quay.ganTv':               res = await quayGanTv(env, body, ip); break;
         case 'quay.tvCheck':             res = await quayTvCheck(env, body, ip); break;
         case 'quay.doiQr':               res = await quayDoiQr(env, body); break;
@@ -1372,6 +1373,17 @@ async function phongCuaChiNhanh(env, ss, roomId) {
   return [p, null];
 }
 
+// ---------- quay.nhatKy: nhật ký kết nối của các phòng (mỗi phòng giữ 60 sự kiện gần nhất) — tìm nguyên nhân phòng/máy bị out ----------
+async function quayNhatKy(env, body) {
+  const [ss, loi] = await canPhien(env, body, 'quanLy');
+  if (loi) return loi;
+  const { results } = await env.DB.prepare('SELECT id, ten_phong FROM order_phong WHERE chi_nhanh_id = ?').bind(ss.b).all();
+  const ds = await Promise.all((results || []).map(async r => {
+    try { const x = await call(roomStub(env, r.id), '/nhatky', { id: r.id }); return (x.nk || []).map(e => Object.assign({ p: r.ten_phong }, e)); } catch (e) { return []; }
+  }));
+  const all = [].concat(...ds).sort((a, b) => b.t - a.t).slice(0, 300);
+  return ok({ log: all, now: Date.now() });
+}
 // ---------- quay.tv: phòng + TV / máy tính bảng / điện thoại đang nối + QR khách của lượt đang mở ----------
 async function quayTv(env, body) {
   const [ss, loi] = await canPhien(env, body);
@@ -1602,7 +1614,7 @@ export class Room extends DurableObject {
       tvIp: m.get('tvIp') || '', rid: m.get('rid') || '', moLuc: m.get('moLuc') || 0, name: m.get('name') || '', bname: m.get('bname') || '', branch: m.get('branch') || '', gone: !!m.get('gone') };
   }
   async mangOk(ip, c){ return netKey(ip) === c.tvIp || (!!c.branch && (await mangCo(this.env, c.branch, ip)).has); }
-  async remember(id){ if(ID_RE.test(id || '') && (await this.ctx.storage.get('rid')) !== id) await this.ctx.storage.put('rid', id); }
+  async remember(id){ if(ID_RE.test(id || '')) this.nkRid = id; if(ID_RE.test(id || '') && (await this.ctx.storage.get('rid')) !== id) await this.ctx.storage.put('rid', id); }
   sockets(role){
     const l = this.ctx.getWebSockets(role);
     return role === 'remote' ? l.filter(w => (w.deserializeAttachment() || {}).ok) : l;   // điện thoại khách chỉ tính sau khi qua kiểm tra lúc 'sync'
@@ -1622,8 +1634,19 @@ export class Room extends DurableObject {
       if(dup || now - last > 90000){             // bỏ cờ ok trước (socket đang đóng vẫn còn trong getWebSockets) → không bị đếm nữa
         try{ a.ok = false; a.reaped = 1; w.serializeAttachment(a); }catch(e){}
         try{ w.close(dup ? 4006 : 4007, dup ? 'dup' : 'stale'); }catch(e){}
+        this.ghi('cat', { role: 'remote', code: dup ? 4006 : 4007, why: dup ? 'cùng máy nối lại' : 'im >90s', im: Math.round((now - last) / 1000), dev: (a.dev || '').slice(0, 8) });
       }
     }
+  }
+  /* Nhật ký kết nối: 60 sự kiện gần nhất của phòng (nối / đóng + mã / từ chối / mở-đóng phòng). Chỉ ghi chuyện hiếm, không ghi tin nhắn. */
+  async ghi(ev, o){
+    try{
+      const e = Object.assign({ t: Date.now(), ev }, o || {});
+      console.log('nk', this.nkRid || '', JSON.stringify(e));
+      let l = (await this.ctx.storage.get('nk')) || [];
+      l.push(e); if(l.length > 60) l = l.slice(-60);
+      await this.ctx.storage.put('nk', l);
+    }catch(x){}
   }
   listeners(){ return this.sockets('remote').concat(this.sockets('tablet')); }        // máy nhận trạng thái TV
   async roomMsg(c, extra){
@@ -1670,15 +1693,19 @@ export class Room extends DurableObject {
   }
   async endGuests(){                                   // hết lượt: ngắt điện thoại khách (kể cả máy đang chờ phòng mở)
     const msg = JSON.stringify(await this.roomMsg(null, { open: false, reason: 'closed' }));
+    const n = this.ctx.getWebSockets('remote').length;
     for(const ws of this.ctx.getWebSockets('remote')){ try{ if((ws.deserializeAttachment() || {}).ok) ws.send(msg); ws.close(4001, 'closed'); }catch(e){} }
+    if(n) this.ghi('cat', { role: 'remote', code: 4001, why: 'hết lượt/đóng phòng', n });
   }
   async applyOpen(c, mo){                              // lượt mới: phiên mới + QR khách mới (QR lượt trước chết luôn)
+    await this.ghi('mo', { mo: mo || 0 });
     await this.endGuests();
     await this.ctx.storage.put({ open: true, since: mo || Date.now(), moLuc: mo, session: c.session + 1, genQ: c.genQ + 1 });
     await this.ctx.storage.delete(['last', 'svc']);
     await this.broadcastRoom();
   }
   async applyClose(c){
+    await this.ghi('dong', {});
     await this.ctx.storage.put({ open: false, since: 0, moLuc: 0, session: c.session + 1 });
     await this.ctx.storage.delete(['last', 'svc']);
     await this.endGuests();
@@ -1695,6 +1722,7 @@ export class Room extends DurableObject {
       if(c.open) await this.applyClose(c);
       c = await this.cfg();
       await this.ctx.storage.put({ gone: true, genT: c.genT + 1, genB: c.genB + 1 });
+      await this.ghi('xoa', { why: 'phòng không còn trong D1' });
       for(const ws of this.ctx.getWebSockets()){ try{ ws.close(4002, 'rotated'); }catch(e){} }
       return await this.cfg();
     }
@@ -1738,12 +1766,15 @@ export class Room extends DurableObject {
     await this.remember(String(body.id || ''));
     if(u.pathname === '/status') return jres(await this.status(body));
     if(u.pathname === '/sync'){ const c = await this.syncDb(); return jres({ ok: true, open: c.open }); }
+    if(u.pathname === '/nhatky') return jres({ nk: (await this.ctx.storage.get('nk')) || [] });
     if(u.pathname === '/svc'){ await this.svcPut(body.don || {}); return jres({ ok: true }); }
     if(u.pathname === '/rotate'){
       const role = body.kind === 'tv' ? 'tv' : body.kind === 'tb' ? 'tablet' : 'remote', c = await this.cfg();
       const g = c[GEN[role]] + 1;
       await this.ctx.storage.put(GEN[role], g);
+      const nr = this.ctx.getWebSockets(role).length;
       for(const ws of this.ctx.getWebSockets(role)){ try{ ws.close(4002, 'rotated'); }catch(e){} }
+      if(nr) await this.ghi('cat', { role, code: 4002, why: 'đổi mã', n: nr });
       if(role === 'remote') await this.broadcastRoom();   // TV vẽ lại QR mới
       return jres({ ok: true, gen: g });
     }
@@ -1781,17 +1812,19 @@ export class Room extends DurableObject {
     if(role === 'remote'){
       this.ctx.acceptWebSocket(server, ['remote']);
       const dev = /^[\w-]{6,40}$/.test(u.searchParams.get('d') || '') ? u.searchParams.get('d') : '';
-      server.serializeAttachment({ role, ip, id: t.id, n: 0, t: 0, ok: false, dev, at: Date.now() });   // chưa cho vào: chờ 'sync' mới kiểm phòng mở / mạng / số máy
+      server.serializeAttachment({ role, ip, id: t.id, n: 0, t: 0, ok: false, dev, at: Date.now() });
+      await this.ghi('noi', { role, dev: dev.slice(0, 8), ip: netKey(ip) });   // chưa cho vào: chờ 'sync' mới kiểm phòng mở / mạng / số máy
       return new Response(null, { status: 101, webSocket: client });
     }
     if(role === 'tv'){
-      for(const old of this.sockets('tv')){ try{ old.send(JSON.stringify({ type: 'room', open: c.open, replaced: true })); old.close(4000, 'replaced'); }catch(e){} }
+      for(const old of this.sockets('tv')){ try{ old.send(JSON.stringify({ type: 'room', open: c.open, replaced: true })); old.close(4000, 'replaced'); }catch(e){} await this.ghi('cat', { role: 'tv', code: 4000, why: 'TV mới thay TV cũ' }); }
       await this.ctx.storage.put('tvIp', netKey(ip));
       if(c.branch) await mangHoc(this.env, c.branch, ip);   // TV của chi nhánh nối vào: nhớ IP (kể cả đường mạng thứ 2)
       if(!(await this.ctx.storage.getAlarm())) await this.ctx.storage.setAlarm(Date.now() + RESYNC_MS);
     }
     this.ctx.acceptWebSocket(server, [role]);
-    server.serializeAttachment({ role, ip, id: t.id, n: 0, t: 0, ok: true });
+    server.serializeAttachment({ role, ip, id: t.id, n: 0, t: 0, ok: true, at: Date.now() });
+    await this.ghi('noi', { role, ip: netKey(ip) });
     await this.broadcastRoom();                          // báo số máy đang nối cho mọi bên
     return new Response(null, { status: 101, webSocket: client });
   }
@@ -1805,7 +1838,7 @@ export class Room extends DurableObject {
         this.reapRemotes(ws, a0);                         // bỏ kết nối "ma" trước khi đếm số máy (xem reapRemotes)
         const net = this.env.NET_CHECK || 'off', off = net !== 'off' && c.tvIp && !(await this.mangOk(a0.ip, c));
         const deny = !c.open ? [4003, 'notopen'] : (off && net === 'on') ? [4004, 'network'] : this.sockets('remote').length >= MAX_REMOTES ? [4005, 'full'] : null;
-        if(deny){ try{ ws.send(JSON.stringify(await this.roomMsg(c, { id: a0.id, reason: deny[1] }))); ws.close(deny[0], deny[1]); }catch(e){} return; }
+        if(deny){ try{ ws.send(JSON.stringify(await this.roomMsg(c, { id: a0.id, reason: deny[1] }))); ws.close(deny[0], deny[1]); }catch(e){} await this.ghi('tuchoi', { role: 'remote', code: deny[0], why: deny[1], dem: this.sockets('remote').length, dev: (a0.dev || '').slice(0, 8) }); return; }
         a0.ok = true; a0.off = !!off; ws.serializeAttachment(a0);
         await this.broadcastRoom();
       }
@@ -1853,8 +1886,18 @@ export class Room extends DurableObject {
       for(const r of this.listeners()){ try{ r.send(data); }catch(e){} }
     }
   }
-  async webSocketClose(ws, code, reason){ try{ ws.close(code === 1005 || code === 1006 ? 1000 : code, reason); }catch(e){} await this.broadcastRoom(); }
-  async webSocketError(ws){ try{ ws.close(1011, 'error'); }catch(e){} await this.broadcastRoom(); }
+  async webSocketClose(ws, code, reason){
+    const a = ws.deserializeAttachment() || {};
+    try{ ws.close(code === 1005 || code === 1006 ? 1000 : code, reason); }catch(e){}
+    if(!a.reaped && code < 4000 && (a.ok || a.role !== 'remote')) await this.ghi('dut', { role: a.role, code, why: String(reason || '').slice(0, 30), tuoi: a.at ? Math.round((Date.now() - a.at) / 1000) : undefined, dev: (a.dev || '').slice(0, 8) || undefined });   // máy tự rớt (mạng/ngủ/đóng app); socket do server cắt đã ghi dòng 'cat'
+    await this.broadcastRoom();
+  }
+  async webSocketError(ws){
+    const a = ws.deserializeAttachment() || {};
+    try{ ws.close(1011, 'error'); }catch(e){}
+    await this.ghi('loi', { role: a.role, code: 1011 });
+    await this.broadcastRoom();
+  }
 }
 
 /* ============================================================
