@@ -1565,7 +1565,8 @@ const BANNER = {
   network:'Vui lòng kết nối wifi của quán rồi quét lại mã QR trên TV.',
   full:'Phòng đã đủ số điện thoại kết nối. Vui lòng nhờ nhân viên hỗ trợ.',
   replaced:'Phòng đã chuyển sang thiết bị khác.', dup:'Phòng đang mở ở một tab khác trên máy này. Hãy dùng tab đó (hoặc tải lại trang này).', expired:'Không nối được phòng. Vui lòng quét lại mã QR trên TV.',
-  offline:'Mất kết nối, đang nối lại…', connecting:'Đang nối vào phòng…'
+  offline:'Mất kết nối, đang nối lại…', connecting:'Đang nối vào phòng…',
+  notv:'TV của phòng đang mất kết nối nên lệnh chưa gửi được. Đang chờ TV nối lại — trang tự chạy tiếp khi TV về.'
 };
 function banner(t){ const b = $('roomBanner'); b.textContent = t || ''; b.style.display = t ? 'block' : 'none'; document.body.classList.toggle('roomOff', !!t); }
 if(GUEST){
@@ -1575,7 +1576,7 @@ if(GUEST){
     if(m.gt){ const first = !guestTok; guestTok = m.gt; noTicket = false; if(first){ showQuota(); renderKho(); loadIndex(); probeEn(); } }
     else if(m.open && !guestTok && !noTicket) setTimeout(() => { if(!guestTok && !noTicket){ noTicket = true; renderKho(); } }, 4000);   // chờ tin kèm vé tới (có thể tới sau tin phòng)
     window.__bmbOpen = !!m.open;   /* APK 2.4: chỉ hỏi cập nhật khi phòng đóng */
-    if(m.open){ banner(''); send('hello'); } else banner(BANNER[m.reason === 'notopen' ? 'waiting' : 'closed']);
+    if(m.open){ if(m.tv === false) banner(BANNER.notv); else{ banner(''); send('hello'); } } else banner(BANNER[m.reason === 'notopen' ? 'waiting' : 'closed']);
   };
   bc.onstatus = s => { if(bc.tablet && s === 'rotated') return showPair('Máy tính bảng đã được gỡ khỏi phòng (hoặc phòng đã gán máy khác).');
     if(s !== 'open' && s !== 'closed' && s !== 'waiting') banner(BANNER[s] || ''); else if(s === 'waiting') banner(BANNER.waiting); };

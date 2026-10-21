@@ -1617,7 +1617,24 @@ export class Room extends DurableObject {
   async remember(id){ if(ID_RE.test(id || '')) this.nkRid = id; if(ID_RE.test(id || '') && (await this.ctx.storage.get('rid')) !== id) await this.ctx.storage.put('rid', id); }
   sockets(role){
     const l = this.ctx.getWebSockets(role);
-    return role === 'remote' ? l.filter(w => (w.deserializeAttachment() || {}).ok) : l;   // điện thoại khách chỉ tính sau khi qua kiểm tra lúc 'sync'
+    return l.filter(w => { const a = w.deserializeAttachment() || {}; return role === 'remote' ? !!a.ok : a.ok !== false; });   // điện thoại khách chỉ tính sau khi qua kiểm tra lúc 'sync'; socket vừa bị dọn (ok=false) không tính
+  }
+  /* Kết nối "ma" của TV / máy tính bảng: mất mạng đột ngột thì Worker không nhận tin đóng, quầy và điện thoại vẫn tưởng TV còn nối.
+     Máy ping 25 giây/lần; im quá 120 giây → đóng (mã 4007, máy tự nối lại) và không đếm nữa. Trả về số socket đã dọn. */
+  reapStale(){
+    const now = Date.now(); let n = 0;
+    for(const role of ['tv', 'tablet']) for(const w of this.ctx.getWebSockets(role)){
+      const a = w.deserializeAttachment() || {};
+      if(a.ok === false) continue;
+      let last = Math.max(+a.at || 0, +a.t || 0);
+      try{ const ts = this.ctx.getWebSocketAutoResponseTimestamp(w); if(ts) last = Math.max(last, ts.getTime()); }catch(e){}
+      if(!last || now - last <= 120000) continue;            // không có mốc giờ nào (socket cũ trước bản này): để yên
+      try{ a.ok = false; a.reaped = 1; w.serializeAttachment(a); }catch(e){}
+      try{ w.close(4007, 'stale'); }catch(e){}
+      this.ghi('cat', { role, code: 4007, why: 'im >120s', im: Math.round((now - last) / 1000) });
+      n++;
+    }
+    return n;
   }
   /* Kết nối "ma" của điện thoại khách: máy ngủ / tab bị trình duyệt đóng băng / mất wifi thì Worker thường KHÔNG nhận được tin đóng,
      socket cũ vẫn được đếm. Máy đó mở lại là nối thêm socket mới → sau vài lần, phòng "đủ số điện thoại" dù chẳng ai đang dùng.
@@ -1639,14 +1656,15 @@ export class Room extends DurableObject {
     }
   }
   /* Nhật ký kết nối: 60 sự kiện gần nhất của phòng (nối / đóng + mã / từ chối / mở-đóng phòng). Chỉ ghi chuyện hiếm, không ghi tin nhắn. */
-  async ghi(ev, o){
-    try{
-      const e = Object.assign({ t: Date.now(), ev }, o || {});
-      console.log('nk', this.nkRid || '', JSON.stringify(e));
+  ghi(ev, o){
+    const e = Object.assign({ t: Date.now(), ev }, o || {});
+    try{ console.log('nk', this.nkRid || '', JSON.stringify(e)); }catch(x){}
+    this.nkQ = (this.nkQ || Promise.resolve()).then(async () => {          // xếp hàng: nhiều sự kiện cùng lúc không ghi đè nhau
       let l = (await this.ctx.storage.get('nk')) || [];
       l.push(e); if(l.length > 60) l = l.slice(-60);
       await this.ctx.storage.put('nk', l);
-    }catch(x){}
+    }).catch(() => {});
+    return this.nkQ;
   }
   listeners(){ return this.sockets('remote').concat(this.sockets('tablet')); }        // máy nhận trạng thái TV
   async roomMsg(c, extra){
@@ -1737,12 +1755,14 @@ export class Room extends DurableObject {
   }
   async alarm(){                                       // TV đang bật: 5 phút/lần tự đọc lại D1 (lưới an toàn nếu Order chưa báo sang)
     if(!this.ctx.getWebSockets('tv').length) return;
+    this.reapStale();
     await this.syncDb();
     await this.ctx.storage.setAlarm(Date.now() + RESYNC_MS);
   }
   /* Quầy hỏi tình trạng (tab TV & phòng, 23+ phòng mỗi lần): KHÔNG đọc D1 mỗi lần nữa — quầy gửi kèm trạng thái mở/đóng đọc từ D1,
      chỉ khi lệch với phòng này đang nhớ thì mới đọc lại D1 (mở/đóng đã được báo sang ngay lúc bấm + lưới an toàn 5 phút). */
   async status(body){
+    if(this.reapStale()) await this.broadcastRoom();
     let c = await this.cfg();
     if(!body || body.open === undefined || !!body.open !== c.open || (body.open && (+body.mo || 0) !== c.moLuc) || !c.rid) c = await this.syncDb();
     const net = this.env.NET_CHECK || 'off';
@@ -1836,6 +1856,7 @@ export class Room extends DurableObject {
       const c = a0.role === 'remote' && !a0.ok ? await this.syncDb() : await this.cfg();
       if(a0.role === 'remote' && !a0.ok){
         this.reapRemotes(ws, a0);                         // bỏ kết nối "ma" trước khi đếm số máy (xem reapRemotes)
+        this.reapStale();                                 // TV / máy tính bảng ma: roomMsg bên dưới báo đúng TV còn nối hay không
         const net = this.env.NET_CHECK || 'off', off = net !== 'off' && c.tvIp && !(await this.mangOk(a0.ip, c));
         const deny = !c.open ? [4003, 'notopen'] : (off && net === 'on') ? [4004, 'network'] : this.sockets('remote').length >= MAX_REMOTES ? [4005, 'full'] : null;
         if(deny){ try{ ws.send(JSON.stringify(await this.roomMsg(c, { id: a0.id, reason: deny[1] }))); ws.close(deny[0], deny[1]); }catch(e){} await this.ghi('tuchoi', { role: 'remote', code: deny[0], why: deny[1], dem: this.sockets('remote').length, dev: (a0.dev || '').slice(0, 8) }); return; }
