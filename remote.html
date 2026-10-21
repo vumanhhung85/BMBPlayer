@@ -1564,7 +1564,7 @@ const BANNER = {
   rotated: 'Mã QR này đã hết hiệu lực. Vui lòng quét mã QR mới ở góc trái màn hình TV.',
   network:'Vui lòng kết nối wifi của quán rồi quét lại mã QR trên TV.',
   full:'Phòng đã đủ số điện thoại kết nối. Vui lòng nhờ nhân viên hỗ trợ.',
-  replaced:'Phòng đã chuyển sang thiết bị khác.', expired:'Không nối được phòng. Vui lòng quét lại mã QR trên TV.',
+  replaced:'Phòng đã chuyển sang thiết bị khác.', dup:'Phòng đang mở ở một tab khác trên máy này. Hãy dùng tab đó (hoặc tải lại trang này).', expired:'Không nối được phòng. Vui lòng quét lại mã QR trên TV.',
   offline:'Mất kết nối, đang nối lại…', connecting:'Đang nối vào phòng…'
 };
 function banner(t){ const b = $('roomBanner'); b.textContent = t || ''; b.style.display = t ? 'block' : 'none'; document.body.classList.toggle('roomOff', !!t); }

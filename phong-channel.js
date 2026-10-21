@@ -26,7 +26,11 @@
       return bc;
     }
     const api = phongApi(), wsRole = role === 'tv' ? 'tv' : role === 'tablet' ? 'tablet' : 'remote';
-    const url = api.replace(/^http/, 'ws') + '/ws?role=' + wsRole + '&r=' + encodeURIComponent(token);
+    /* Điện thoại khách gửi kèm mã máy (cùng mã bmb_dev của gọi lễ tân): máy nối lại thì Worker đóng socket cũ của chính máy đó,
+       không để socket "ma" chiếm chỗ làm phòng báo đủ số điện thoại */
+    let dev = '';
+    if(wsRole === 'remote'){ dev = lsGet('bmb_dev') || ''; if(!dev){ dev = 'D' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); lsSet('bmb_dev', dev); } }
+    const url = api.replace(/^http/, 'ws') + '/ws?role=' + wsRole + '&r=' + encodeURIComponent(token) + (dev ? '&d=' + encodeURIComponent(dev) : '');
     const persistent = wsRole !== 'remote';               // TV và máy tính bảng: luôn chờ / nối lại, không bỏ cuộc
     const ch = { ws: true, role: wsRole, tablet: wsRole === 'tablet', token, roomId: token.split('.')[0], onmessage: null, onroom: null, onstatus: null, status: 'connecting', last: null };
     let sock = null, tries = 0, timer = null, ping = null, stopped = false, waitedSince = 0, checking = false;
@@ -67,6 +71,7 @@
         if(stopped) return;
         const c = ev.code;
         if(c === 4002 && persistent) return dead();
+        if(c === 4006){ stopped = true; setStatus('dup'); return; }        // cùng máy vừa mở phòng ở tab/lần nối khác → tab này nhường
         if(c === 4003){                                   // khách quét lúc phòng chưa mở: chờ nhân viên mở, thử lại tối đa 5 phút
           waitedSince = waitedSince || Date.now();
           if(Date.now() - waitedSince < 300000){ setStatus('waiting'); return schedule(6000); }

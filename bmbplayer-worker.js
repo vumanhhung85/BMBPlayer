@@ -1591,6 +1591,24 @@ export class Room extends DurableObject {
     const l = this.ctx.getWebSockets(role);
     return role === 'remote' ? l.filter(w => (w.deserializeAttachment() || {}).ok) : l;   // điện thoại khách chỉ tính sau khi qua kiểm tra lúc 'sync'
   }
+  /* Kết nối "ma" của điện thoại khách: máy ngủ / tab bị trình duyệt đóng băng / mất wifi thì Worker thường KHÔNG nhận được tin đóng,
+     socket cũ vẫn được đếm. Máy đó mở lại là nối thêm socket mới → sau vài lần, phòng "đủ số điện thoại" dù chẳng ai đang dùng.
+     Mỗi lần có máy mới xin vào: (1) cùng máy (mã máy bmb_dev, gửi qua ?d=) → đóng socket cũ của chính máy đó (mã 4006);
+     (2) socket không ping quá 90 giây (máy khách ping 25 giây/lần, Worker tự trả 'pong' và ghi giờ) → coi là đã mất, đóng. */
+  reapRemotes(cur, a0){
+    const now = Date.now();
+    for(const w of this.ctx.getWebSockets('remote')){
+      if(w === cur) continue;
+      const a = w.deserializeAttachment() || {};
+      let last = Math.max(+a.at || 0, +a.t || 0);
+      try{ const ts = this.ctx.getWebSocketAutoResponseTimestamp(w); if(ts) last = Math.max(last, ts.getTime()); }catch(e){}
+      const dup = !!(a0.dev && a.dev === a0.dev);
+      if(dup || now - last > 90000){             // bỏ cờ ok trước (socket đang đóng vẫn còn trong getWebSockets) → không bị đếm nữa
+        try{ a.ok = false; a.reaped = 1; w.serializeAttachment(a); }catch(e){}
+        try{ w.close(dup ? 4006 : 4007, dup ? 'dup' : 'stale'); }catch(e){}
+      }
+    }
+  }
   listeners(){ return this.sockets('remote').concat(this.sockets('tablet')); }        // máy nhận trạng thái TV
   async roomMsg(c, extra){
     c = c || await this.cfg();
@@ -1742,7 +1760,8 @@ export class Room extends DurableObject {
 
     if(role === 'remote'){
       this.ctx.acceptWebSocket(server, ['remote']);
-      server.serializeAttachment({ role, ip, id: t.id, n: 0, t: 0, ok: false });   // chưa cho vào: chờ 'sync' mới kiểm phòng mở / mạng / số máy
+      const dev = /^[\w-]{6,40}$/.test(u.searchParams.get('d') || '') ? u.searchParams.get('d') : '';
+      server.serializeAttachment({ role, ip, id: t.id, n: 0, t: 0, ok: false, dev, at: Date.now() });   // chưa cho vào: chờ 'sync' mới kiểm phòng mở / mạng / số máy
       return new Response(null, { status: 101, webSocket: client });
     }
     if(role === 'tv'){
@@ -1763,6 +1782,7 @@ export class Room extends DurableObject {
       const a0 = ws.deserializeAttachment() || {};
       const c = a0.role === 'remote' && !a0.ok ? await this.syncDb() : await this.cfg();
       if(a0.role === 'remote' && !a0.ok){
+        this.reapRemotes(ws, a0);                         // bỏ kết nối "ma" trước khi đếm số máy (xem reapRemotes)
         const net = this.env.NET_CHECK || 'off', off = net !== 'off' && c.tvIp && !(await this.mangOk(a0.ip, c));
         const deny = !c.open ? [4003, 'notopen'] : (off && net === 'on') ? [4004, 'network'] : this.sockets('remote').length >= MAX_REMOTES ? [4005, 'full'] : null;
         if(deny){ try{ ws.send(JSON.stringify(await this.roomMsg(c, { id: a0.id, reason: deny[1] }))); ws.close(deny[0], deny[1]); }catch(e){} return; }
