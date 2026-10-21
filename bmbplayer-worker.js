@@ -411,6 +411,8 @@ async function handleApi(request, env, ctx) {
         case 'admin.seekSet':            res = await adminSeekSet(env, body); break;
         case 'admin.decoGet':            res = await adminDecoGet(env, body); break;
         case 'admin.decoSet':            res = await adminDecoSet(env, body); break;
+        case 'admin.scoreGet':           res = await adminScoreGet(env, body); break;
+        case 'admin.scoreSet':           res = await adminScoreSet(env, body); break;
         case 'admin.phongThem':          res = await adminPhongThem(env, body); break;
         case 'admin.phongXoa':           res = await adminPhongXoa(env, body); break;
         case 'admin.taiKhoan.danhSach':  res = await tkDanhSach(env, body); break;
@@ -1052,6 +1054,33 @@ async function adminDecoSet(env, body) {
   await env.DB.prepare(`INSERT INTO order_meta (k, v) VALUES ('deco', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v`).bind(v).run();
   decoCache = { v, at: Date.now() };
   return ok({ deco: v });
+}
+/* ---------- Điểm vui cuối bài (admin bật/tắt cho TOÀN BỘ chi nhánh ở quay.html → Cài đặt) ----------
+   Lưu ở order_meta khoá 'score': 'off' (mặc định) | 'on' (có tiếng trống/vỗ tay) | 'mute' (im lặng). TV nhận cùng GET /api/deco. */
+const SCORE_OK = ['off', 'on', 'mute'];
+let scoreCache = { v: 'off', at: 0 };
+async function scoreGet(env) {
+  if (Date.now() - scoreCache.at < 60000) return scoreCache.v;
+  let v = 'off';
+  try { const r = await env.DB.prepare(`SELECT v FROM order_meta WHERE k = 'score'`).first(); if (r && SCORE_OK.includes(r.v)) v = r.v; } catch (e) { /* chưa có bảng = tắt */ }
+  scoreCache = { v, at: Date.now() };
+  return v;
+}
+async function adminScoreGet(env, body) {
+  const [, loi] = await canPhien(env, body, 'admin');
+  if (loi) return loi;
+  scoreCache.at = 0;
+  return ok({ score: await scoreGet(env) });
+}
+async function adminScoreSet(env, body) {
+  const [, loi] = await canPhien(env, body, 'admin');
+  if (loi) return loi;
+  const v = String(body.score || '');
+  if (!SCORE_OK.includes(v)) return fail('bad_score', 400, 'Giá trị không hợp lệ.');
+  await pushBangSan(env);
+  await env.DB.prepare(`INSERT INTO order_meta (k, v) VALUES ('score', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v`).bind(v).run();
+  scoreCache = { v, at: Date.now() };
+  return ok({ score: v });
 }
 async function adminPhongThem(env, body) {
   const [ss, loi] = await canPhien(env, body, 'admin');
@@ -2765,7 +2794,7 @@ export default {
 
     // Chủ đề trang trí tivi đang chọn (công khai, chỉ một chuỗi ngắn)
     if(u.pathname === '/api/deco' && req.method === 'GET'){
-      return jres({ deco: await decoGet(env) }, 200, Object.assign({ 'Cache-Control': 'no-store' }, originOk ? { 'Access-Control-Allow-Origin': origin, 'Vary': 'Origin' } : {}));
+      return jres({ deco: await decoGet(env), score: await scoreGet(env) }, 200, Object.assign({ 'Cache-Control': 'no-store' }, originOk ? { 'Access-Control-Allow-Origin': origin, 'Vary': 'Origin' } : {}));
     }
 
     /* Màn quầy (quay.html): WebSocket "cái chuông" của chi nhánh — có đơn / đổi trạng thái thì quầy tự tải lại hàng đợi */

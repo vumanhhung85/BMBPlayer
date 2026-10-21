@@ -471,6 +471,15 @@ tbody tr:hover td{background:#FBF8FE}
         <option value="trungthu">🏮 Trung thu</option>
       </select></div>
       <div class="hint" id="decoMsg" style="margin-bottom:22px"></div>
+
+      <div class="sect-lbl">🎤 Điểm vui cuối mỗi bài hát <span class="tagx">chỉ admin</span></div>
+      <div class="hint">Hết bài, tivi hiện màn <b>chấm điểm</b> (số chạy, sao, pháo giấy…) khoảng 8 giây rồi mới sang bài kế. Đây là điểm <b>giải trí ngẫu nhiên</b>, không đo giọng hát thật — đừng quảng cáo là chấm điểm chính xác. Chỉ hiện khi bài được hát gần hết (tua nhảy tới cuối thì không có điểm). Áp dụng cho mọi chi nhánh, tivi nhận sau tối đa 10 phút.</div>
+      <div class="fld"><select id="scoreSel" disabled>
+        <option value="off">Tắt (hết bài sang bài kế ngay)</option>
+        <option value="on">Bật — có tiếng trống và vỗ tay</option>
+        <option value="mute">Bật — im lặng (chỉ hình)</option>
+      </select></div>
+      <div class="hint" id="scoreMsg" style="margin-bottom:22px"></div>
     </div>
 
     <div id="apkSec" style="display:none">
@@ -2239,7 +2248,21 @@ $('decoSel').onchange = function(){
     $('decoMsg').textContent = 'Đã lưu. Tivi sẽ đổi trong vòng 10 phút.';
   }).catch(function(){ sel.disabled = false; alert('Không kết nối được máy chủ.'); });
 };
-function cdMo(){ vtVe(); if(S.vaiTro === 'admin'){ seekVe(); decoVe(); } if(S.sieuAdmin) apkVe();
+function scoreVe(){
+  api('admin.scoreGet', {}).then(function(r){
+    if(!r || !r.ok){ $('scoreMsg').textContent = (r && r.msg) || 'Không hỏi được cài đặt.'; return; }
+    $('scoreSel').value = r.score; $('scoreSel').disabled = false; $('scoreMsg').textContent = '';
+  }).catch(function(){ $('scoreMsg').textContent = 'Không kết nối được máy chủ.'; });
+}
+$('scoreSel').onchange = function(){
+  var sel = $('scoreSel'); sel.disabled = true;
+  api('admin.scoreSet', {score:sel.value}).then(function(r){
+    sel.disabled = false;
+    if(!r || !r.ok){ alert((r && r.msg) || 'Không lưu được.'); scoreVe(); return; }
+    $('scoreMsg').textContent = 'Đã lưu. Tivi sẽ đổi trong vòng 10 phút.';
+  }).catch(function(){ sel.disabled = false; alert('Không kết nối được máy chủ.'); });
+};
+function cdMo(){ vtVe(); if(S.vaiTro === 'admin'){ seekVe(); decoVe(); scoreVe(); } if(S.sieuAdmin) apkVe();
   var tg = tgDuocNhan(); $('tgSecCd').style.display = tg ? '' : 'none'; if(tg) tgTai($('tgHostCd')); else clearInterval(TG.timer); }
 $('lgVt').addEventListener('click', vtDangNhap);
 $('vtBat').addEventListener('click', vtBat);
