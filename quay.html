@@ -2008,9 +2008,9 @@ function nkVe(){
   if(!rows.length){ $('nkList').innerHTML = '<div class="mut">Chưa có sự kiện nào.</div>'; return; }
   $('nkList').innerHTML = rows.slice(0, 150).map(function(e){
     var ro = e.role ? (ROLE[e.role]||e.role)+' ' : '', tx, mau = '';
-    if(e.ev === 'noi') tx = ro+'nối vào'+(e.dev ? ' (máy '+esc(e.dev)+')' : '');
+    if(e.ev === 'noi') tx = ro+'nối vào'+(e.dev ? ' (máy '+esc(e.dev)+')' : '')+(e.ip ? ' · IP <span class="mut">'+esc(e.ip)+'</span>' : '');
     else if(e.ev === 'dut'){ tx = ro+'<b>máy rớt</b> mã '+e.code+(e.why ? ' "'+esc(e.why)+'"' : '')+(e.tuoi != null ? ', đã nối '+e.tuoi+'s' : ''); mau = 'color:#D6314F'; }
-    else if(e.ev === 'cat'){ tx = ro+'<b>server cắt</b> mã '+e.code+' — '+esc(e.why||'')+(e.n ? ' ('+e.n+' máy)' : '')+(e.im != null ? ', im '+e.im+'s' : ''); mau = 'color:#B7791F'; }
+    else if(e.ev === 'cat'){ tx = ro+'<b>server cắt</b> mã '+e.code+' — '+esc(e.why||'')+(e.n ? ' ('+e.n+' máy)' : '')+(e.im != null && e.im >= 0 ? ', im '+e.im+'s' : ''); mau = 'color:#B7791F'; }
     else if(e.ev === 'tuchoi'){ tx = ro+'bị từ chối mã '+e.code+' "'+esc(e.why||'')+'" (đang '+(e.dem||0)+' máy)'; mau = 'color:#B7791F'; }
     else if(e.ev === 'mo') tx = '<b>phòng MỞ</b>';
     else if(e.ev === 'dong') tx = '<b>phòng ĐÓNG</b>';

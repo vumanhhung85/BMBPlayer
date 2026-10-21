@@ -1866,7 +1866,15 @@ export class Room extends DurableObject {
       return new Response(null, { status: 101, webSocket: client });
     }
     if(role === 'tv'){
-      for(const old of this.sockets('tv')){ try{ old.send(JSON.stringify({ type: 'room', open: c.open, replaced: true })); old.close(4000, 'replaced'); }catch(e){} await this.ghi('cat', { role: 'tv', code: 4000, why: 'TV mới thay TV cũ' }); }
+      for(const old of this.sockets('tv')){
+        const oa = old.deserializeAttachment() || {};
+        let last = Math.max(+oa.at || 0, +oa.t || 0);
+        try{ const ts = this.ctx.getWebSocketAutoResponseTimestamp(old); if(ts) last = Math.max(last, ts.getTime()); }catch(e){}
+        const im = last ? Math.round((Date.now() - last) / 1000) : -1;
+        try{ oa.ok = false; oa.reaped = 1; old.serializeAttachment(oa); }catch(e){}      // không đếm nữa, không bị dọn/ghi nhật ký lần 2
+        try{ old.send(JSON.stringify({ type: 'room', open: c.open, replaced: true })); old.close(4000, 'replaced'); }catch(e){}
+        await this.ghi('cat', im > 40 ? { role: 'tv', code: 4000, why: 'dọn kết nối ma cũ của TV (TV nối lại)', im } : { role: 'tv', code: 4000, why: 'TV mới thay TV cũ', im });
+      }
       await this.ctx.storage.put('tvIp', netKey(ip));
       if(c.branch) await mangHoc(this.env, c.branch, ip);   // TV của chi nhánh nối vào: nhớ IP (kể cả đường mạng thứ 2)
       if(!(await this.ctx.storage.getAlarm())) await this.ctx.storage.setAlarm(Date.now() + RESYNC_MS);
@@ -1940,7 +1948,9 @@ export class Room extends DurableObject {
   async webSocketClose(ws, code, reason){
     const a = ws.deserializeAttachment() || {};
     try{ ws.close(code === 1005 || code === 1006 ? 1000 : code, reason); }catch(e){}
-    if(!a.reaped && code < 4000 && (a.ok || a.role !== 'remote')) await this.ghi('dut', { role: a.role, code, why: String(reason || '').slice(0, 30), tuoi: a.at ? Math.round((Date.now() - a.at) / 1000) : undefined, dev: (a.dev || '').slice(0, 8) || undefined });   // máy tự rớt (mạng/ngủ/đóng app); socket do server cắt đã ghi dòng 'cat'
+    const wasOk = a.ok, wasReaped = a.reaped;
+    try{ a.ok = false; ws.serializeAttachment(a); }catch(e){}                        // socket đang đóng không còn được đếm (TV nối lại ngay sau đó không bị coi là 'thay TV cũ')
+    if(!wasReaped && code < 4000 && (wasOk || a.role !== 'remote')) await this.ghi('dut', { role: a.role, code, why: String(reason || '').slice(0, 30), tuoi: a.at ? Math.round((Date.now() - a.at) / 1000) : undefined, dev: (a.dev || '').slice(0, 8) || undefined });   // máy tự rớt (mạng/ngủ/đóng app); socket do server cắt đã ghi dòng 'cat'
     await this.broadcastRoom();
   }
   async webSocketError(ws){
