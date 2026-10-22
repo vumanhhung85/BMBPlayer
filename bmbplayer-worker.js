@@ -388,6 +388,11 @@ async function handleApi(request, env, ctx) {
         case 'quay.phong':               res = await quayPhong(env, body, ctx); break;
         case 'quay.tv':                  res = await quayTv(env, body); break;
         case 'quay.nhatKy':              res = await quayNhatKy(env, body); break;
+        case 'admin.knTongQuan':         res = await adminKnTongQuan(env, body); break;
+        case 'admin.knNhatKy':           res = await adminKnNhatKy(env, body); break;
+        case 'admin.knIp':               res = await adminKnIp(env, body); break;
+        case 'admin.knIpLs':             res = await adminKnIpLs(env, body); break;
+        case 'admin.knMay':              res = await adminKnMay(env, body); break;
         case 'quay.ganTv':               res = await quayGanTv(env, body, ip); break;
         case 'quay.tvCheck':             res = await quayTvCheck(env, body, ip); break;
         case 'quay.doiQr':               res = await quayDoiQr(env, body); break;
@@ -1413,6 +1418,204 @@ async function quayNhatKy(env, body) {
   const all = [].concat(...ds).sort((a, b) => b.t - a.t).slice(0, 300);
   return ok({ log: all, now: Date.now() });
 }
+// ============================================================
+// THEO DÕI KẾT NỐI dài ngày (tab 🔌 Kết nối — chỉ admin)
+// Mỗi sự kiện nối / rớt / server cắt / từ chối / mở-đóng phòng của mọi phòng được ghi thêm vào D1 (ngoài 60 dòng trong phòng).
+// Thời gian lưu — "theo dõi lâu" cho thiết bị của quán, "theo dõi nhanh" cho điện thoại khách:
+//   • kn_sk  (chi tiết từng sự kiện): TV / máy tính bảng / mở-đóng phòng 30 ngày; điện thoại khách 7 ngày
+//   • kn_ngay, kn_ip_ngay (tổng hợp theo ngày kinh doanh), kn_ip (IP chi nhánh đã dùng): 180 ngày
+//   • kn_may (TV / máy tính bảng của từng phòng: app, IP, nhà mạng, lần nối/rớt cuối): giữ luôn, mỗi phòng 2 dòng
+// "Rớt" = máy tự mất kết nối (dut) hoặc server phát hiện máy im lặng quá lâu rồi cắt (cat mã 4007).
+// ============================================================
+const KN_GIU_TB = 30, KN_GIU_DT = 7, KN_GIU_TH = 180;
+let knSan = false, knDonLuc = 0;
+async function knBang(env) {
+  if (knSan) return;
+  await env.DB.batch([
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS kn_sk (id INTEGER PRIMARY KEY AUTOINCREMENT, t INTEGER NOT NULL, cn TEXT NOT NULL DEFAULT '',
+      phong_id TEXT NOT NULL DEFAULT '', phong TEXT NOT NULL DEFAULT '', ev TEXT NOT NULL, role TEXT NOT NULL DEFAULT '', code INTEGER,
+      why TEXT, ip TEXT NOT NULL DEFAULT '', isp TEXT, asn INTEGER, colo TEXT, dev TEXT, ua TEXT, tuoi INTEGER, im INTEGER, n INTEGER)`),
+    env.DB.prepare('CREATE INDEX IF NOT EXISTS kn_sk_t ON kn_sk (t)'),
+    env.DB.prepare('CREATE INDEX IF NOT EXISTS kn_sk_cn ON kn_sk (cn, t)'),
+    env.DB.prepare('CREATE INDEX IF NOT EXISTS kn_sk_ph ON kn_sk (phong_id, t)'),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS kn_ngay (ngay TEXT NOT NULL, cn TEXT NOT NULL, phong_id TEXT NOT NULL, role TEXT NOT NULL,
+      phong TEXT NOT NULL DEFAULT '', noi INTEGER NOT NULL DEFAULT 0, rot INTEGER NOT NULL DEFAULT 0, cat INTEGER NOT NULL DEFAULT 0,
+      tuchoi INTEGER NOT NULL DEFAULT 0, loi INTEGER NOT NULL DEFAULT 0, mo INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (ngay, phong_id, role))`),
+    env.DB.prepare('CREATE INDEX IF NOT EXISTS kn_ngay_cn ON kn_ngay (cn, ngay)'),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS kn_ip (cn TEXT NOT NULL, ip TEXT NOT NULL, isp TEXT, asn INTEGER, colo TEXT, dau INTEGER NOT NULL,
+      cuoi INTEGER NOT NULL, noi INTEGER NOT NULL DEFAULT 0, rot INTEGER NOT NULL DEFAULT 0, vai TEXT NOT NULL DEFAULT '', PRIMARY KEY (cn, ip))`),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS kn_ip_ngay (ngay TEXT NOT NULL, cn TEXT NOT NULL, ip TEXT NOT NULL, noi INTEGER NOT NULL DEFAULT 0,
+      rot INTEGER NOT NULL DEFAULT 0, tv INTEGER NOT NULL DEFAULT 0, tb INTEGER NOT NULL DEFAULT 0, dt INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (ngay, cn, ip))`),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS kn_may (phong_id TEXT NOT NULL, role TEXT NOT NULL, cn TEXT NOT NULL DEFAULT '', phong TEXT NOT NULL DEFAULT '',
+      ip TEXT, isp TEXT, ua TEXT, lan_noi INTEGER, lan_rot INTEGER, tuoi_rot INTEGER, noi INTEGER NOT NULL DEFAULT 0, rot INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (phong_id, role))`)
+  ]);
+  knSan = true;
+}
+/* User-Agent → chuỗi ngắn dễ đọc: "App 2.7 · TV" / "Android 13 · SM-A515F · Chrome 129" / "iPhone iOS 17.5 · Safari" */
+function uaGon(ua) {
+  ua = String(ua || '');
+  if (!ua) return '';
+  const app = /BMBPlayerApp\/([\d.]+)\s*\((\w+)\)/.exec(ua);
+  if (app) return 'App ' + app[1] + ' · ' + (app[2] === 'tv' ? 'TV' : app[2] === 'tablet' ? 'MTB' : app[2]);
+  let os = '', may = '';
+  let m = /Android ([\d.]+)(?:;\s*([^;)]+))?/.exec(ua);
+  if (m) { os = 'Android ' + m[1]; may = (m[2] || '').replace(/Build\/.*/, '').trim(); if (/^(K|wv)$/.test(may)) may = ''; }
+  else if ((m = /(iPhone|iPad)[^)]*OS ([\d_]+)/.exec(ua))) os = m[1] + ' iOS ' + m[2].replace(/_/g, '.');
+  else if (/Windows/.test(ua)) os = 'Windows';
+  else if (/Mac OS X/.test(ua)) os = 'Mac';
+  else if (/Linux/.test(ua)) os = 'Linux';
+  const b = /(Edg|SamsungBrowser|CriOS|Chrome|Firefox|FxiOS)\/(\d+)/.exec(ua);
+  let br = b ? { Edg: 'Edge', CriOS: 'Chrome', FxiOS: 'Firefox', SamsungBrowser: 'Samsung' }[b[1]] || b[1] : (/Safari/.test(ua) ? 'Safari' : '');
+  if (b) br += ' ' + b[2];
+  if (/; wv\)/.test(ua)) br = 'WebView' + (b ? ' ' + b[2] : '');
+  return [os, may, br].filter(Boolean).join(' · ').slice(0, 80);
+}
+const knRot = e => e.ev === 'dut' || (e.ev === 'cat' && e.code === 4007);
+/** Ghi 1 sự kiện của phòng vào D1 (gọi từ Room.ghi, nằm trong hàng đợi của phòng). Lỗi D1 không làm hỏng kết nối. */
+async function knGhi(env, c, e) {
+  if (!env.DB) return;
+  await knBang(env);
+  const ngay = ngayKinhDoanh(e.t), cn = c.branch || '', pid = c.rid || '', ph = c.name || '';
+  const role = e.role || 'phong', rot = knRot(e) ? 1 : 0, ip = String(e.ip || '');
+  const vai = e.role === 'tv' ? 'tv' : e.role === 'tablet' ? 'tb' : e.role === 'remote' ? 'dt' : '';
+  const st = [
+    env.DB.prepare(`INSERT INTO kn_sk (t, cn, phong_id, phong, ev, role, code, why, ip, isp, asn, colo, dev, ua, tuoi, im, n)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(e.t, cn, pid, ph, e.ev, e.role || '', e.code ?? null, e.why ? String(e.why).slice(0, 60) : null,
+      ip, e.isp || null, e.asn || null, e.colo || null, e.dev || null, e.ua || null, e.tuoi ?? null, e.im ?? null, e.n ?? null),
+    env.DB.prepare(`INSERT INTO kn_ngay (ngay, cn, phong_id, role, phong, noi, rot, cat, tuchoi, loi, mo) VALUES (?,?,?,?,?,?,?,?,?,?,?)
+      ON CONFLICT(ngay, phong_id, role) DO UPDATE SET phong = excluded.phong, cn = excluded.cn, noi = noi + excluded.noi, rot = rot + excluded.rot,
+      cat = cat + excluded.cat, tuchoi = tuchoi + excluded.tuchoi, loi = loi + excluded.loi, mo = mo + excluded.mo`)
+      .bind(ngay, cn, pid, role, ph, e.ev === 'noi' ? 1 : 0, rot, e.ev === 'cat' && !rot ? 1 : 0, e.ev === 'tuchoi' ? 1 : 0, e.ev === 'loi' ? 1 : 0, e.ev === 'mo' ? 1 : 0)
+  ];
+  if (ip && cn && (e.ev === 'noi' || rot)) {
+    st.push(env.DB.prepare(`INSERT INTO kn_ip (cn, ip, isp, asn, colo, dau, cuoi, noi, rot, vai) VALUES (?,?,?,?,?,?,?,?,?,?)
+      ON CONFLICT(cn, ip) DO UPDATE SET isp = COALESCE(excluded.isp, isp), asn = COALESCE(excluded.asn, asn), colo = COALESCE(excluded.colo, colo),
+      cuoi = MAX(cuoi, excluded.cuoi), noi = noi + excluded.noi, rot = rot + excluded.rot,
+      vai = CASE WHEN excluded.vai = '' OR instr(vai, excluded.vai) > 0 THEN vai ELSE vai || ',' || excluded.vai END`)
+      .bind(cn, ip, e.isp || null, e.asn || null, e.colo || null, e.t, e.t, e.ev === 'noi' ? 1 : 0, rot, vai));
+    st.push(env.DB.prepare(`INSERT INTO kn_ip_ngay (ngay, cn, ip, noi, rot, tv, tb, dt) VALUES (?,?,?,?,?,?,?,?)
+      ON CONFLICT(ngay, cn, ip) DO UPDATE SET noi = noi + excluded.noi, rot = rot + excluded.rot, tv = tv + excluded.tv, tb = tb + excluded.tb, dt = dt + excluded.dt`)
+      .bind(ngay, cn, ip, e.ev === 'noi' ? 1 : 0, rot, e.ev === 'noi' && vai === 'tv' ? 1 : 0, e.ev === 'noi' && vai === 'tb' ? 1 : 0, e.ev === 'noi' && vai === 'dt' ? 1 : 0));
+  }
+  if (pid && (e.role === 'tv' || e.role === 'tablet') && (e.ev === 'noi' || rot)) {
+    st.push(e.ev === 'noi'
+      ? env.DB.prepare(`INSERT INTO kn_may (phong_id, role, cn, phong, ip, isp, ua, lan_noi, noi) VALUES (?,?,?,?,?,?,?,?,1)
+          ON CONFLICT(phong_id, role) DO UPDATE SET cn = excluded.cn, phong = excluded.phong, ip = excluded.ip, isp = COALESCE(excluded.isp, isp),
+          ua = COALESCE(excluded.ua, ua), lan_noi = excluded.lan_noi, noi = noi + 1`).bind(pid, e.role, cn, ph, ip || null, e.isp || null, e.ua || null, e.t)
+      : env.DB.prepare(`INSERT INTO kn_may (phong_id, role, cn, phong, lan_rot, tuoi_rot, rot) VALUES (?,?,?,?,?,?,1)
+          ON CONFLICT(phong_id, role) DO UPDATE SET lan_rot = excluded.lan_rot, tuoi_rot = excluded.tuoi_rot, rot = rot + 1`)
+        .bind(pid, e.role, cn, ph, e.t, e.tuoi ?? null));
+  }
+  await env.DB.batch(st);
+  if (Date.now() - knDonLuc > 3600000) { knDonLuc = Date.now(); await knDon(env).catch(err => console.error('knDon', err)); }
+}
+/** Dọn dữ liệu quá hạn (tối đa 1 lần/giờ mỗi bản Worker, mỗi lần xoá có giới hạn để không nghẽn D1) */
+async function knDon(env) {
+  const now = Date.now(), ngTH = ngayKinhDoanh(now - KN_GIU_TH * 86400000);
+  await env.DB.batch([
+    env.DB.prepare('DELETE FROM kn_sk WHERE id IN (SELECT id FROM kn_sk WHERE t < ? LIMIT 20000)').bind(now - KN_GIU_TB * 86400000),
+    env.DB.prepare(`DELETE FROM kn_sk WHERE id IN (SELECT id FROM kn_sk WHERE t < ? AND role = 'remote' LIMIT 20000)`).bind(now - KN_GIU_DT * 86400000),
+    env.DB.prepare('DELETE FROM kn_ngay WHERE ngay < ?').bind(ngTH),
+    env.DB.prepare('DELETE FROM kn_ip_ngay WHERE ngay < ?').bind(ngTH),
+    env.DB.prepare('DELETE FROM kn_ip WHERE cuoi < ?').bind(now - KN_GIU_TH * 86400000)
+  ]);
+}
+/* ---------- API tab Kết nối (chỉ admin; cn = '' là xem tất cả chi nhánh) ---------- */
+async function knPhien(env, body) {
+  const ss = await getSession(env, Object.assign({}, body, { branchId: '' }));
+  if (!ss) return [null, failSession()];
+  if (ss.r !== 'admin') return [null, fail('forbidden', 403, 'Chỉ admin xem được tab Kết nối.')];
+  await knBang(env);
+  const so = +body.ngay, ngay = so === 15 || so === 30 ? so : so === 1 ? 1 : 7;
+  const tu = Date.now() - ngay * 86400000;
+  return [{ ss, cn: s(body.cn, 40), ngay, tu, tuNgay: ngayKinhDoanh(tu) }, null];
+}
+const knCn = (q, cot) => q.cn ? [` AND ${cot} = ?`, [q.cn]] : ['', []];
+async function knTenCn(env) {
+  const { results } = await env.DB.prepare(`SELECT id, COALESCE(NULLIF(ten_ngan,''), ten, id) AS ten FROM chi_nhanh`).all();
+  const m = {}; for (const r of results || []) m[r.id] = r.ten; return m;
+}
+async function adminKnTongQuan(env, body) {
+  const [q, loi] = await knPhien(env, body);
+  if (loi) return loi;
+  const [w, b] = knCn(q, 'cn'), RT = `(ev = 'dut' OR (ev = 'cat' AND code = 4007))`;
+  const [theoCn, theoNgay, topPhong, dongLoat, nhaMang, ten] = await Promise.all([
+    env.DB.prepare(`SELECT cn, role, SUM(noi) AS noi, SUM(rot) AS rot, SUM(cat) AS cat, SUM(tuchoi) AS tuchoi, SUM(mo) AS mo
+      FROM kn_ngay WHERE ngay >= ?${w} GROUP BY cn, role`).bind(q.tuNgay, ...b).all(),
+    env.DB.prepare(`SELECT ngay, role, SUM(noi) AS noi, SUM(rot) AS rot FROM kn_ngay WHERE ngay >= ?${w} GROUP BY ngay, role ORDER BY ngay`).bind(q.tuNgay, ...b).all(),
+    env.DB.prepare(`SELECT cn, phong_id, MAX(phong) AS phong, role, SUM(rot) AS rot, SUM(noi) AS noi FROM kn_ngay
+      WHERE ngay >= ? AND role IN ('tv','tablet')${w} GROUP BY phong_id, role HAVING SUM(rot) > 0 ORDER BY SUM(rot) DESC LIMIT 15`).bind(q.tuNgay, ...b).all(),
+    env.DB.prepare(`SELECT cn, t / 10000 AS w, MIN(t) AS t, COUNT(*) AS so, COUNT(DISTINCT phong_id) AS so_phong,
+      GROUP_CONCAT(DISTINCT phong) AS phong, GROUP_CONCAT(DISTINCT role) AS vai, GROUP_CONCAT(DISTINCT isp) AS isp, GROUP_CONCAT(DISTINCT ip) AS ip
+      FROM kn_sk WHERE t >= ? AND ${RT}${w} GROUP BY cn, w HAVING COUNT(DISTINCT phong_id) >= 2 ORDER BY w DESC LIMIT 60`).bind(q.tu, ...b).all(),
+    env.DB.prepare(`SELECT cn, COALESCE(isp, '?') AS isp, COUNT(DISTINCT ip) AS so_ip, SUM(ev = 'noi') AS noi, SUM(${RT}) AS rot
+      FROM kn_sk WHERE t >= ? AND role IN ('tv','tablet')${w} GROUP BY cn, isp ORDER BY rot DESC LIMIT 60`).bind(q.tu, ...b).all(),
+    knTenCn(env)
+  ]);
+  return ok({ ngay: q.ngay, cn: q.cn, ten, theoCn: theoCn.results, theoNgay: theoNgay.results, topPhong: topPhong.results,
+    dongLoat: dongLoat.results, nhaMang: nhaMang.results, giu: { tb: KN_GIU_TB, dt: KN_GIU_DT, th: KN_GIU_TH }, now: Date.now() });
+}
+async function adminKnNhatKy(env, body) {
+  const [q, loi] = await knPhien(env, body);
+  if (loi) return loi;
+  let sql = 'SELECT * FROM kn_sk WHERE t >= ?', b = [q.tu];
+  if (q.cn) { sql += ' AND cn = ?'; b.push(q.cn); }
+  const pid = s(body.phong, 40), role = s(body.role, 10), ev = s(body.ev, 10), ip = s(body.ip, 64), truoc = +body.truoc || 0, quanh = +body.quanh || 0;
+  if (pid) { sql += ' AND phong_id = ?'; b.push(pid); }
+  if (['tv', 'tablet', 'remote'].includes(role)) { sql += ' AND role = ?'; b.push(role); }
+  if (ev === 'rot') sql += ` AND (ev = 'dut' OR (ev = 'cat' AND code = 4007))`;
+  else if (['noi', 'dut', 'cat', 'tuchoi', 'mo', 'dong', 'loi', 'xoa'].includes(ev)) { sql += ' AND ev = ?'; b.push(ev); }
+  if (ip) { sql += ' AND ip = ?'; b.push(ip); }
+  if (quanh) { sql += ' AND t BETWEEN ? AND ?'; b.push(quanh - 120000, quanh + 120000); }     // ±2 phút quanh 1 sự cố
+  if (truoc) { sql += ' AND t < ?'; b.push(truoc); }
+  sql += ' ORDER BY t DESC LIMIT 300';
+  const [{ results }, ten] = await Promise.all([env.DB.prepare(sql).bind(...b).all(), knTenCn(env)]);
+  return ok({ log: results, ten, het: results.length < 300 });
+}
+async function adminKnIp(env, body) {
+  const [q, loi] = await knPhien(env, body);
+  if (loi) return loi;
+  const [w, b] = knCn(q, 'n.cn');
+  const [{ results }, ten] = await Promise.all([env.DB.prepare(`SELECT n.cn, n.ip, i.isp, i.asn, i.colo, i.dau, i.cuoi, i.vai,
+      SUM(n.noi) AS noi, SUM(n.rot) AS rot, SUM(n.tv) AS tv, SUM(n.tb) AS tb, SUM(n.dt) AS dt, COUNT(*) AS so_ngay, MAX(n.ngay) AS ngay_cuoi
+    FROM kn_ip_ngay n LEFT JOIN kn_ip i ON i.cn = n.cn AND i.ip = n.ip
+    WHERE n.ngay >= ?${w} GROUP BY n.cn, n.ip ORDER BY n.cn, (SUM(n.tv) + SUM(n.tb)) DESC, SUM(n.noi) DESC LIMIT 500`).bind(q.tuNgay, ...b).all(), knTenCn(env)]);
+  return ok({ ds: results, ten });
+}
+async function adminKnIpLs(env, body) {
+  const [q, loi] = await knPhien(env, body);
+  if (loi) return loi;
+  const ip = s(body.ip, 64);
+  if (!ip) return fail('missing_ip');
+  const [w, b] = knCn(q, 'cn');
+  const [ngay, sk, info] = await Promise.all([
+    env.DB.prepare(`SELECT ngay, cn, noi, rot, tv, tb, dt FROM kn_ip_ngay WHERE ip = ? AND ngay >= ?${w} ORDER BY ngay DESC`).bind(ip, q.tuNgay, ...b).all(),
+    env.DB.prepare(`SELECT * FROM kn_sk WHERE ip = ? AND t >= ?${w} ORDER BY t DESC LIMIT 200`).bind(ip, q.tu, ...b).all(),
+    env.DB.prepare(`SELECT * FROM kn_ip WHERE ip = ?${w}`).bind(ip, ...b).all()
+  ]);
+  return ok({ ip, ngay: ngay.results, log: sk.results, info: info.results, ten: await knTenCn(env) });
+}
+async function adminKnMay(env, body) {
+  const [q, loi] = await knPhien(env, body);
+  if (loi) return loi;
+  if (!q.cn) return fail('chua_chon_chi_nhanh', 400, 'Chọn một chi nhánh để xem thiết bị từng phòng.');
+  const [phong, may, rotK] = await Promise.all([
+    env.DB.prepare('SELECT id, ten_phong, dang_mo, mo_luc FROM order_phong WHERE chi_nhanh_id = ?').bind(q.cn).all(),
+    env.DB.prepare('SELECT * FROM kn_may WHERE cn = ?').bind(q.cn).all(),
+    env.DB.prepare(`SELECT phong_id, role, SUM(rot) AS rot, SUM(noi) AS noi FROM kn_ngay WHERE cn = ? AND ngay >= ? AND role IN ('tv','tablet') GROUP BY phong_id, role`).bind(q.cn, q.tuNgay).all()
+  ]);
+  const rows = (phong.results || []).sort(sapPhong);
+  const ds = await Promise.all(rows.map(async r => {
+    let st = {};
+    try { st = await call(roomStub(env, r.id), '/status', { id: r.id, open: !!r.dang_mo, mo: r.mo_luc || 0 }); } catch (e) { st = { err: 1 }; }
+    const m = role => (may.results || []).find(x => x.phong_id === r.id && x.role === role) || null;
+    const k = role => (rotK.results || []).find(x => x.phong_id === r.id && x.role === role) || { rot: 0, noi: 0 };
+    return { id: r.id, ten: r.ten_phong, open: !!r.dang_mo, tvOn: !!st.tv, tbOn: st.tablets || 0, dt: st.remotes || 0, err: !!st.err,
+      tv: m('tv'), tb: m('tablet'), tvK: k('tv'), tbK: k('tablet') };
+  }));
+  return ok({ ds, now: Date.now() });
+}
 // ---------- quay.tv: phòng + TV / máy tính bảng / điện thoại đang nối + QR khách của lượt đang mở ----------
 async function quayTv(env, body) {
   const [ss, loi] = await canPhien(env, body);
@@ -1660,7 +1863,7 @@ export class Room extends DurableObject {
       if(!last || now - last <= 120000) continue;            // không có mốc giờ nào (socket cũ trước bản này): để yên
       try{ a.ok = false; a.reaped = 1; w.serializeAttachment(a); }catch(e){}
       try{ w.close(4007, 'stale'); }catch(e){}
-      this.ghi('cat', { role, code: 4007, why: 'im >120s', im: Math.round((now - last) / 1000) });
+      this.ghi('cat', { role, code: 4007, why: 'im >120s', im: Math.round((now - last) / 1000), ip: netKey(a.ip), isp: a.isp, tuoi: a.at ? Math.round((now - a.at) / 1000) : undefined });
       n++;
     }
     return n;
@@ -1680,7 +1883,7 @@ export class Room extends DurableObject {
       if(dup || now - last > 90000){             // bỏ cờ ok trước (socket đang đóng vẫn còn trong getWebSockets) → không bị đếm nữa
         try{ a.ok = false; a.reaped = 1; w.serializeAttachment(a); }catch(e){}
         try{ w.close(dup ? 4006 : 4007, dup ? 'dup' : 'stale'); }catch(e){}
-        this.ghi('cat', { role: 'remote', code: dup ? 4006 : 4007, why: dup ? 'cùng máy nối lại' : 'im >90s', im: Math.round((now - last) / 1000), dev: (a.dev || '').slice(0, 8) });
+        this.ghi('cat', { role: 'remote', code: dup ? 4006 : 4007, why: dup ? 'cùng máy nối lại' : 'im >90s', im: Math.round((now - last) / 1000), dev: (a.dev || '').slice(0, 8), ip: netKey(a.ip), isp: a.isp });
       }
     }
   }
@@ -1690,8 +1893,14 @@ export class Room extends DurableObject {
     try{ console.log('nk', this.nkRid || '', JSON.stringify(e)); }catch(x){}
     this.nkQ = (this.nkQ || Promise.resolve()).then(async () => {          // xếp hàng: nhiều sự kiện cùng lúc không ghi đè nhau
       let l = (await this.ctx.storage.get('nk')) || [];
-      l.push(e); if(l.length > 60) l = l.slice(-60);
+      const e2 = Object.assign({}, e); delete e2.ua; delete e2.asn; delete e2.colo;     // 60 dòng trong phòng: gọn, chi tiết máy nằm ở D1
+      l.push(e2); if(l.length > 60) l = l.slice(-60);
       await this.ctx.storage.put('nk', l);
+      if(this.env.DB){                                                     // lưu dài ngày cho tab Kết nối (admin); D1 chậm/lỗi thì bỏ qua sau 4 giây
+        const c = await this.cfg();
+        if(!c.rid && this.nkRid) c.rid = this.nkRid;
+        await Promise.race([knGhi(this.env, c, e), new Promise(r => setTimeout(r, 4000))]).catch(err => console.error('knGhi', err));
+      }
     }).catch(() => {});
     return this.nkQ;
   }
@@ -1856,13 +2065,15 @@ export class Room extends DurableObject {
     const ok = !c.gone && t.gen === gen && same(t.sig, await hmac(this.env.SECRET, t.id + '|' + KIND[role] + '|' + gen));
     if(!ok) return new Response('bad token', { status: 403 });
     const ip = req.headers.get('CF-Connecting-IP') || '';
+    let kn = {}; try{ kn = JSON.parse(req.headers.get('x-bmb-kn') || '{}') || {}; }catch(e){}           // nhà mạng / trung tâm Cloudflare (Worker chính gắn vào)
+    const mx = { isp: String(kn.isp || '').slice(0, 40) || undefined, asn: +kn.asn || undefined, colo: String(kn.colo || '').slice(0, 6) || undefined, ua: uaGon(req.headers.get('User-Agent')) || undefined };
     const pair = new WebSocketPair(), [client, server] = Object.values(pair);
 
     if(role === 'remote'){
       this.ctx.acceptWebSocket(server, ['remote']);
       const dev = /^[\w-]{6,40}$/.test(u.searchParams.get('d') || '') ? u.searchParams.get('d') : '';
-      server.serializeAttachment({ role, ip, id: t.id, n: 0, t: 0, ok: false, dev, at: Date.now() });
-      await this.ghi('noi', { role, dev: dev.slice(0, 8), ip: netKey(ip) });   // chưa cho vào: chờ 'sync' mới kiểm phòng mở / mạng / số máy
+      server.serializeAttachment({ role, ip, id: t.id, n: 0, t: 0, ok: false, dev, at: Date.now(), isp: mx.isp });
+      await this.ghi('noi', Object.assign({ role, dev: dev.slice(0, 8), ip: netKey(ip) }, mx));   // chưa cho vào: chờ 'sync' mới kiểm phòng mở / mạng / số máy
       return new Response(null, { status: 101, webSocket: client });
     }
     if(role === 'tv'){
@@ -1873,15 +2084,15 @@ export class Room extends DurableObject {
         const im = last ? Math.round((Date.now() - last) / 1000) : -1;
         try{ oa.ok = false; oa.reaped = 1; old.serializeAttachment(oa); }catch(e){}      // không đếm nữa, không bị dọn/ghi nhật ký lần 2
         try{ old.send(JSON.stringify({ type: 'room', open: c.open, replaced: true })); old.close(4000, 'replaced'); }catch(e){}
-        await this.ghi('cat', im > 40 ? { role: 'tv', code: 4000, why: 'dọn kết nối ma cũ của TV (TV nối lại)', im } : { role: 'tv', code: 4000, why: 'TV mới thay TV cũ', im });
+        await this.ghi('cat', Object.assign(im > 40 ? { role: 'tv', code: 4000, why: 'dọn kết nối ma cũ của TV (TV nối lại)', im } : { role: 'tv', code: 4000, why: 'TV mới thay TV cũ', im }, { ip: netKey(oa.ip), isp: oa.isp }));
       }
       await this.ctx.storage.put('tvIp', netKey(ip));
       if(c.branch) await mangHoc(this.env, c.branch, ip);   // TV của chi nhánh nối vào: nhớ IP (kể cả đường mạng thứ 2)
       if(!(await this.ctx.storage.getAlarm())) await this.ctx.storage.setAlarm(Date.now() + RESYNC_MS);
     }
     this.ctx.acceptWebSocket(server, [role]);
-    server.serializeAttachment({ role, ip, id: t.id, n: 0, t: 0, ok: true, at: Date.now() });
-    await this.ghi('noi', { role, ip: netKey(ip) });
+    server.serializeAttachment({ role, ip, id: t.id, n: 0, t: 0, ok: true, at: Date.now(), isp: mx.isp });
+    await this.ghi('noi', Object.assign({ role, ip: netKey(ip) }, mx));
     await this.broadcastRoom();                          // báo số máy đang nối cho mọi bên
     return new Response(null, { status: 101, webSocket: client });
   }
@@ -1896,7 +2107,7 @@ export class Room extends DurableObject {
         this.reapStale();                                 // TV / máy tính bảng ma: roomMsg bên dưới báo đúng TV còn nối hay không
         const net = this.env.NET_CHECK || 'off', off = net !== 'off' && c.tvIp && !(await this.mangOk(a0.ip, c));
         const deny = !c.open ? [4003, 'notopen'] : (off && net === 'on') ? [4004, 'network'] : this.sockets('remote').length >= MAX_REMOTES ? [4005, 'full'] : null;
-        if(deny){ try{ ws.send(JSON.stringify(await this.roomMsg(c, { id: a0.id, reason: deny[1] }))); ws.close(deny[0], deny[1]); }catch(e){} await this.ghi('tuchoi', { role: 'remote', code: deny[0], why: deny[1], dem: this.sockets('remote').length, dev: (a0.dev || '').slice(0, 8) }); return; }
+        if(deny){ try{ ws.send(JSON.stringify(await this.roomMsg(c, { id: a0.id, reason: deny[1] }))); ws.close(deny[0], deny[1]); }catch(e){} await this.ghi('tuchoi', { role: 'remote', code: deny[0], why: deny[1], dem: this.sockets('remote').length, dev: (a0.dev || '').slice(0, 8), ip: netKey(a0.ip), isp: a0.isp }); return; }
         a0.ok = true; a0.off = !!off; ws.serializeAttachment(a0);
         await this.broadcastRoom();
       }
@@ -1950,13 +2161,13 @@ export class Room extends DurableObject {
     try{ ws.close(code === 1005 || code === 1006 ? 1000 : code, reason); }catch(e){}
     const wasOk = a.ok, wasReaped = a.reaped;
     try{ a.ok = false; ws.serializeAttachment(a); }catch(e){}                        // socket đang đóng không còn được đếm (TV nối lại ngay sau đó không bị coi là 'thay TV cũ')
-    if(!wasReaped && code < 4000 && (wasOk || a.role !== 'remote')) await this.ghi('dut', { role: a.role, code, why: String(reason || '').slice(0, 30), tuoi: a.at ? Math.round((Date.now() - a.at) / 1000) : undefined, dev: (a.dev || '').slice(0, 8) || undefined });   // máy tự rớt (mạng/ngủ/đóng app); socket do server cắt đã ghi dòng 'cat'
+    if(!wasReaped && code < 4000 && (wasOk || a.role !== 'remote')) await this.ghi('dut', { role: a.role, code, why: String(reason || '').slice(0, 30), tuoi: a.at ? Math.round((Date.now() - a.at) / 1000) : undefined, dev: (a.dev || '').slice(0, 8) || undefined, ip: netKey(a.ip), isp: a.isp });   // máy tự rớt (mạng/ngủ/đóng app); socket do server cắt đã ghi dòng 'cat'
     await this.broadcastRoom();
   }
   async webSocketError(ws){
     const a = ws.deserializeAttachment() || {};
     try{ ws.close(1011, 'error'); }catch(e){}
-    await this.ghi('loi', { role: a.role, code: 1011 });
+    await this.ghi('loi', { role: a.role, code: 1011, ip: netKey(a.ip), isp: a.isp });
     await this.broadcastRoom();
   }
 }
@@ -2818,7 +3029,9 @@ export default {
       if(!originOk) return new Response('origin', { status: 403 });
       const t = parseToken(u.searchParams.get('r'));
       if(!t) return new Response('bad token', { status: 403 });
-      return roomStub(env, t.id).fetch(req);
+      const cf = req.cf || {}, h = new Headers(req.headers);              // nhà mạng của máy (Viettel/VNPT/FPT…) → biết đường mạng nào của chi nhánh hay rớt
+      h.set('x-bmb-kn', JSON.stringify({ isp: String(cf.asOrganization || '').slice(0, 40), asn: cf.asn || 0, colo: cf.colo || '' }));
+      return roomStub(env, t.id).fetch(new Request(req, { headers: h }));
     }
 
     /* TV chưa gán phòng: xin mã 6 số, rồi hỏi lại tới khi quầy gán (không cần mật khẩu, chỉ đúng tên miền) */

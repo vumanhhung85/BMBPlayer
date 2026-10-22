@@ -313,6 +313,30 @@ tbody tr:hover td{background:#FBF8FE}
 .qlnav .btn:hover{background:rgba(255,255,255,.22)}
 .qlnav .qlhint{flex-basis:100%;font-size:12px;color:rgba(255,255,255,.75)}
 @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+/* ---- tab 🔌 Kết nối (admin) ---- */
+.knbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+.knbar select,.knf select,.knf input{background:#fff;border:1px solid #CDB8E3;color:var(--txt);border-radius:10px;padding:7px 10px;font:inherit;font-size:13px}
+.knseg{display:inline-flex;border:1px solid #CDB8E3;border-radius:999px;overflow:hidden;background:#fff}
+.knseg button{border:0;background:transparent;padding:7px 13px;font:inherit;font-size:13px;color:var(--txt-dim);cursor:pointer}
+.knseg button.on{background:var(--grape);color:#fff;font-weight:700}
+.knsub{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 14px}
+.knsub button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:7px 14px;font:inherit;font-size:13px;color:var(--txt-dim);cursor:pointer}
+.knsub button.on{background:var(--yellow);border-color:var(--yellow);color:#3A0F5A;font-weight:700}
+.knf{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+.knbox{background:#fff;border:1px solid var(--line);border-radius:16px;padding:14px 16px;box-shadow:var(--sh-card);margin-bottom:16px}
+.knbox h3{font-size:15px;margin:0 0 8px;color:var(--grape)}
+.knbox table{font-size:12.8px}.knbox th,.knbox td{padding:7px 9px}
+.kn-tr{cursor:pointer}.kn-tr:hover td{background:#FBF6FF}
+.knchart{width:100%;height:auto;display:block}
+.knleg{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--txt-mute);margin-top:4px}
+.knleg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.knnote{border-left:4px solid var(--gold);background:#FFF8E8;border-radius:10px;padding:8px 12px;font-size:13px;margin:0 0 8px;color:var(--txt)}
+.knnote.r{border-color:var(--bad);background:#FFF1F3}.knnote.g{border-color:var(--ok);background:#EEFAF4}
+.kndot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:0}
+.kn-ev-rot{color:var(--bad);font-weight:700}.kn-ev-cat{color:#B7791F;font-weight:700}.kn-ev-noi{color:var(--ok)}
+.knsm{font-size:11.5px;color:var(--txt-mute)}
+.knchip{display:inline-flex;align-items:center;gap:6px;background:var(--tint);border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-size:12.5px}
+.knchip button{border:0;background:transparent;cursor:pointer;color:var(--bad);font-weight:700}
 </style>
 </head>
 <body>
@@ -346,6 +370,7 @@ tbody tr:hover td{background:#FBF8FE}
         <div class="tab" data-p="p5" id="tabCaiDat" style="display:none">🍺 Menu</div>
         <div class="tab" data-p="p6" id="tabTaiKhoan" style="display:none">👥 Tài khoản quầy</div>
         <div class="tab" data-p="p7" id="tabCaiDatApp" style="display:none">⚙️ Cài đặt</div>
+        <div class="tab" data-p="p8" id="tabKetNoi" style="display:none">🔌 Kết nối</div>
       </div>
       <div class="qlnav" id="qlNav">
         <div class="qlhint">Chuyển sang trang quản trị khác (rời màn Quầy):</div>
@@ -434,6 +459,18 @@ tbody tr:hover td{background:#FBF8FE}
   </div>
 
   <!-- ⚙️ Cài đặt (quản lý chi nhánh + admin): vân tay trên máy này; phát hành APK chỉ dành cho admin cao nhất -->
+  <div class="pg" id="p8">
+    <div class="knbar">
+      <select id="knCn" aria-label="Chi nhánh"></select>
+      <span class="knseg" id="knNgay"><button data-n="1">24 giờ</button><button data-n="7" class="on">7 ngày</button><button data-n="15">15 ngày</button><button data-n="30">30 ngày</button></span>
+      <button class="btn btn-ghost btn-sm" id="knTai">↻ Tải lại</button>
+      <button class="btn btn-ghost btn-sm" id="knChep" title="Chép tóm tắt để gửi kỹ thuật">📋 Chép báo cáo</button>
+    </div>
+    <div class="knsub" id="knSub"><button data-s="tq" class="on">📊 Tổng quan</button><button data-s="may">📺 Thiết bị từng phòng</button><button data-s="nk">🧾 Nhật ký</button><button data-s="ip">🌐 IP &amp; nhà mạng</button></div>
+    <div id="knBody"><div class="mut">Đang tải…</div></div>
+    <div class="hint" style="margin-top:14px">Lưu trữ: <b>chi tiết từng sự kiện</b> của TV / máy tính bảng / mở-đóng phòng giữ <b>30 ngày</b>, của điện thoại khách giữ <b>7 ngày</b> (theo dõi nhanh); <b>số liệu tổng hợp theo ngày</b> và <b>danh sách IP</b> giữ <b>180 ngày</b> (theo dõi lâu). “Rớt” = máy tự mất kết nối hoặc im lặng quá lâu bị hệ thống ngắt. Một ngày tính từ 06:00 sáng.</div>
+  </div>
+
   <div class="pg" id="p7">
     <div class="sect-lbl">🖐 Đăng nhập bằng vân tay trên máy này</div>
     <div class="hint" id="vtNote"></div>
@@ -1122,6 +1159,7 @@ function hienTheoQuyen(){
   $('btnThuHoiMtb').style.display = S.quanLy ? '' : 'none';
   $('btnNhatKy').style.display = S.quanLy ? '' : 'none';
   $('selCN').style.display       = S.vaiTro==='admin' ? '' : 'none';
+  $('tabKetNoi').style.display   = S.vaiTro==='admin' ? '' : 'none';   /* 🔌 Kết nối: chỉ admin */
 }
 function veChonChiNhanh(){
   if(S.vaiTro !== 'admin') return;
@@ -2271,6 +2309,259 @@ $('apkFile').addEventListener('change', apkChon);
 $('apkUp').addEventListener('click', apkLen);
 vtNutDangNhap();
 
+/* =================== Tab 🔌 Kết nối (chỉ admin) =================== */
+var KN = { ngay: 7, cn: '', sub: 'tq', nk: [], nkHet: false, loc: { phong: '', phongTen: '', role: '', ev: '', ip: '', quanh: 0 }, ten: {}, tq: null, ipXem: '' };
+var KN_VAI = { tv: 'TV', tablet: 'MTB', remote: 'ĐT', phong: 'Phòng' };
+function knZ(n){ return (n<10?'0':'')+n; }
+function knTg(t){ var d = new Date(t); return knZ(d.getDate())+'/'+knZ(d.getMonth()+1)+' '+knZ(d.getHours())+':'+knZ(d.getMinutes())+':'+knZ(d.getSeconds()); }
+function knTgN(t){ if(!t) return '—'; var d = new Date(t); return knZ(d.getDate())+'/'+knZ(d.getMonth()+1)+' '+knZ(d.getHours())+':'+knZ(d.getMinutes()); }
+function knTenCn(id){ return KN.ten[id] || (S.branches.filter(function(b){ return b.id===id; })[0] || {}).ten || id || '—'; }
+function knSo(n){ return (+n||0).toLocaleString('vi-VN'); }
+function knTuoi(s){ if(s==null) return ''; s=+s; if(s<90) return s+' giây'; if(s<5400) return Math.round(s/60)+' phút'; return (s/3600).toFixed(1)+' giờ'; }
+function knSuKien(e){
+  var c = e.code, tx, cls = '';
+  if(e.ev==='noi'){ tx = 'nối vào'; cls = 'kn-ev-noi'; }
+  else if(e.ev==='dut'){ tx = 'MÁY RỚT · mã '+c+(e.why?' “'+esc(e.why)+'”':'')+(e.tuoi!=null?' · đã nối '+knTuoi(e.tuoi):''); cls = 'kn-ev-rot'; }
+  else if(e.ev==='cat'){ tx = (c===4007?'MẤT TÍN HIỆU (im lặng, hệ thống ngắt) · mã 4007':'server cắt · mã '+c+' — '+esc(e.why||''))+(e.n?' ('+e.n+' máy)':'')+(e.im!=null&&e.im>=0?' · im '+e.im+'s':''); cls = c===4007?'kn-ev-rot':'kn-ev-cat'; }
+  else if(e.ev==='tuchoi'){ tx = 'bị từ chối · mã '+c+' “'+esc(e.why||'')+'”'; cls = 'kn-ev-cat'; }
+  else if(e.ev==='mo') tx = '<b>Phòng MỞ</b>';
+  else if(e.ev==='dong') tx = '<b>Phòng ĐÓNG</b>';
+  else if(e.ev==='xoa'){ tx = 'phòng bị xoá'; cls = 'kn-ev-rot'; }
+  else if(e.ev==='loi'){ tx = 'lỗi kết nối'; cls = 'kn-ev-rot'; }
+  else tx = esc(e.ev);
+  return '<span class="'+cls+'">'+tx+'</span>';
+}
+function knGoi(action, extra){
+  var d = Object.assign({ cn: KN.cn, ngay: KN.ngay }, extra || {});
+  return api(action, d).then(function(r){
+    if(r && r.msg==='HET_PHIEN'){ logout(); throw new Error('het_phien'); }
+    if(!r || !r.ok) throw new Error((r && r.msg) || 'Không tải được.');
+    if(r.ten) KN.ten = r.ten;
+    return r;
+  });
+}
+function knLoi(err){ $('knBody').innerHTML = '<div class="knnote r">'+esc(err && err.message ? err.message : 'Không tải được.')+'</div>'; }
+function knMo(){
+  if(!$('knCn').options.length){
+    $('knCn').innerHTML = '<option value="">🌐 Tất cả chi nhánh</option>' + S.branches.map(function(b){ return '<option value="'+esc(b.id)+'">'+esc(b.ten)+'</option>'; }).join('');
+    $('knCn').value = KN.cn;
+  }
+  knVe();
+}
+function knVe(){
+  Array.prototype.forEach.call($('knSub').children, function(b){ b.className = b.getAttribute('data-s')===KN.sub ? 'on' : ''; });
+  Array.prototype.forEach.call($('knNgay').children, function(b){ b.className = +b.getAttribute('data-n')===KN.ngay ? 'on' : ''; });
+  $('knBody').innerHTML = '<div class="mut">Đang tải…</div>';
+  if(KN.sub==='tq') knTq();
+  else if(KN.sub==='may') knMay();
+  else if(KN.sub==='nk'){ KN.nk = []; knNk(); }
+  else if(KN.sub==='ip'){ if(KN.ipXem) knIpLs(KN.ipXem); else knIp(); }
+}
+/* ---------- Tổng quan ---------- */
+function knTq(){
+  knGoi('admin.knTongQuan').then(function(r){ KN.tq = r; knTqVe(r); }).catch(knLoi);
+}
+function knTong(rows, role, f){ return rows.filter(function(x){ return !role || x.role===role; }).reduce(function(a, x){ return a + (+x[f]||0); }, 0); }
+function knTqVe(r){
+  var A = r.theoCn || [], h = '';
+  var tvR = knTong(A,'tv','rot'), tbR = knTong(A,'tablet','rot'), dtR = knTong(A,'remote','rot'), tvN = knTong(A,'tv','noi'), mo = knTong(A,'phong','mo'), tc = knTong(A,'remote','tuchoi');
+  h += '<div class="stats">'
+    + '<div class="stat r"><div class="k">TV rớt</div><div class="v">'+knSo(tvR)+'</div></div>'
+    + '<div class="stat r"><div class="k">Máy tính bảng rớt</div><div class="v">'+knSo(tbR)+'</div></div>'
+    + '<div class="stat y"><div class="k">Điện thoại khách rớt</div><div class="v">'+knSo(dtR)+'</div></div>'
+    + '<div class="stat"><div class="k">Rớt đồng loạt (≥2 phòng cùng lúc)</div><div class="v">'+knSo((r.dongLoat||[]).length)+'</div></div>'
+    + '<div class="stat g"><div class="k">Lượt mở phòng</div><div class="v">'+knSo(mo)+'</div></div>'
+    + '<div class="stat"><div class="k">ĐT bị từ chối (đầy/chưa mở)</div><div class="v">'+knSo(tc)+'</div></div>'
+    + '</div>';
+  h += knNhanDinh(r);
+  h += '<div class="knbox"><h3>Số lần rớt theo ngày</h3>'+knChart(r.theoNgay||[])+'<div class="knleg"><span><i style="background:#D6314F"></i>TV</span><span><i style="background:#8B2FBE"></i>Máy tính bảng</span><span><i style="background:#F5B87A"></i>Điện thoại khách</span></div></div>';
+  if(!r.cn){
+    var m = {};
+    A.forEach(function(x){ var o = m[x.cn] = m[x.cn] || { cn: x.cn, tv: 0, tb: 0, dt: 0, mo: 0, tc: 0, noi: 0 };
+      if(x.role==='tv') o.tv += +x.rot; else if(x.role==='tablet') o.tb += +x.rot; else if(x.role==='remote'){ o.dt += +x.rot; o.tc += +x.tuchoi; }
+      else if(x.role==='phong') o.mo += +x.mo; o.noi += +x.noi; });
+    var ds = Object.keys(m).map(function(k){ return m[k]; }).sort(function(a, b){ return (b.tv+b.tb) - (a.tv+a.tb) || b.dt - a.dt; });
+    h += '<div class="knbox"><h3>Theo chi nhánh <span class="knsm">— bấm để xem riêng chi nhánh</span></h3><div class="tblwrap" style="box-shadow:none;border:0"><table><thead><tr><th>Chi nhánh</th><th>Lượt mở phòng</th><th>TV rớt</th><th>MTB rớt</th><th>ĐT rớt</th><th>ĐT bị từ chối</th></tr></thead><tbody>'
+      + (ds.length ? ds.map(function(o){ return '<tr class="kn-tr" data-cn="'+esc(o.cn)+'"><td><b>'+esc(knTenCn(o.cn))+'</b></td><td>'+knSo(o.mo)+'</td><td'+(o.tv?' style="color:#D6314F;font-weight:700"':'')+'>'+knSo(o.tv)+'</td><td>'+knSo(o.tb)+'</td><td>'+knSo(o.dt)+'</td><td>'+knSo(o.tc)+'</td></tr>'; }).join('') : '<tr><td colspan="6" class="mut">Chưa có dữ liệu trong khoảng này.</td></tr>')
+      + '</tbody></table></div></div>';
+  }
+  var tp = r.topPhong || [];
+  h += '<div class="knbox"><h3>Phòng có TV / máy tính bảng rớt nhiều nhất <span class="knsm">— bấm để xem nhật ký</span></h3><div class="tblwrap" style="box-shadow:none;border:0"><table><thead><tr><th>Chi nhánh</th><th>Phòng</th><th>Thiết bị</th><th>Rớt</th><th>Lần nối</th></tr></thead><tbody>'
+    + (tp.length ? tp.map(function(x){ return '<tr class="kn-tr" data-nk-phong="'+esc(x.phong_id)+'" data-nk-ten="'+esc(x.phong)+'" data-nk-role="'+esc(x.role)+'" data-nk-cn="'+esc(x.cn)+'"><td>'+esc(knTenCn(x.cn))+'</td><td><b>'+esc(x.phong)+'</b></td><td>'+(KN_VAI[x.role]||x.role)+'</td><td style="color:#D6314F;font-weight:700">'+knSo(x.rot)+'</td><td>'+knSo(x.noi)+'</td></tr>'; }).join('') : '<tr><td colspan="5" class="mut">Không có TV / máy tính bảng nào bị rớt. 👍</td></tr>')
+    + '</tbody></table></div></div>';
+  var dl = r.dongLoat || [];
+  h += '<div class="knbox"><h3>Rớt đồng loạt — nhiều phòng mất kết nối trong cùng 10 giây <span class="knsm">— thường do router / đường mạng chi nhánh; bấm để xem ±2 phút</span></h3><div class="tblwrap" style="box-shadow:none;border:0"><table><thead><tr><th>Lúc</th><th>Chi nhánh</th><th>Số phòng</th><th>Số máy</th><th>Thiết bị</th><th>Nhà mạng</th><th>IP</th></tr></thead><tbody>'
+    + (dl.length ? dl.map(function(x){ return '<tr class="kn-tr" data-quanh="'+x.t+'" data-nk-cn="'+esc(x.cn)+'"><td>'+knTg(x.t)+'</td><td>'+esc(knTenCn(x.cn))+'</td><td><b>'+x.so_phong+'</b> <span class="knsm">'+esc(x.phong||'')+'</span></td><td>'+x.so+'</td><td>'+esc(String(x.vai||'').split(',').map(function(v){ return KN_VAI[v]||v; }).join(', '))+'</td><td>'+esc(x.isp||'—')+'</td><td class="knsm">'+esc(x.ip||'')+'</td></tr>'; }).join('') : '<tr><td colspan="7" class="mut">Không có lần rớt đồng loạt nào. 👍</td></tr>')
+    + '</tbody></table></div></div>';
+  var nm = r.nhaMang || [];
+  h += '<div class="knbox"><h3>Theo nhà mạng (TV + máy tính bảng)</h3><div class="tblwrap" style="box-shadow:none;border:0"><table><thead><tr><th>Chi nhánh</th><th>Nhà mạng</th><th>Số IP</th><th>Lần nối</th><th>Lần rớt</th><th>Tỉ lệ rớt</th></tr></thead><tbody>'
+    + (nm.length ? nm.map(function(x){ var tl = x.noi ? Math.round(100*x.rot/x.noi) : 0; return '<tr><td>'+esc(knTenCn(x.cn))+'</td><td><b>'+esc(x.isp)+'</b></td><td>'+x.so_ip+'</td><td>'+knSo(x.noi)+'</td><td>'+knSo(x.rot)+'</td><td'+(tl>=50?' style="color:#D6314F;font-weight:700"':'')+'>'+tl+'%</td></tr>'; }).join('') : '<tr><td colspan="6" class="mut">Chưa có dữ liệu.</td></tr>')
+    + '</tbody></table></div></div>';
+  $('knBody').innerHTML = h;
+}
+function knNhanDinh(r){
+  var out = [], dl = r.dongLoat || [], tp = r.topPhong || [];
+  var dlCn = {}; dl.forEach(function(x){ dlCn[x.cn] = (dlCn[x.cn]||0) + 1; });
+  Object.keys(dlCn).sort(function(a,b){ return dlCn[b]-dlCn[a]; }).slice(0, 3).forEach(function(cn){
+    out.push('<div class="knnote r"><b>'+esc(knTenCn(cn))+'</b>: '+dlCn[cn]+' lần nhiều phòng rớt cùng lúc → nghi <b>router / đường mạng của chi nhánh</b> (không phải từng TV). Xem bảng “Rớt đồng loạt” và “Theo nhà mạng” để biết đường nào.</div>');
+  });
+  var tv = tp.filter(function(x){ return x.role==='tv'; });
+  if(tv.length >= 2){
+    var tb = tv.reduce(function(a,x){ return a + (+x.rot); }, 0) / tv.length;
+    tv.filter(function(x){ return +x.rot >= Math.max(5, tb*2); }).slice(0, 3).forEach(function(x){
+      out.push('<div class="knnote"><b>'+esc(knTenCn(x.cn))+' · '+esc(x.phong)+'</b>: TV rớt '+x.rot+' lần — nhiều gấp ~'+Math.round(x.rot/tb)+' lần mức chung → kiểm tra <b>wifi/dây mạng ở phòng này</b>, nguồn điện, hoặc TV box.</div>');
+    });
+  }
+  if(!out.length && (r.theoCn||[]).length) out.push('<div class="knnote g">Không thấy dấu hiệu bất thường trong khoảng này.</div>');
+  if(!(r.theoCn||[]).length) out.push('<div class="knnote">Chưa có dữ liệu. Số liệu bắt đầu ghi từ khi bản cập nhật này chạy.</div>');
+  return out.join('');
+}
+function knChart(rows){
+  var m = {}, ngs = [];
+  rows.forEach(function(x){ if(!m[x.ngay]){ m[x.ngay] = { tv: 0, tablet: 0, remote: 0 }; ngs.push(x.ngay); } if(m[x.ngay][x.role] != null) m[x.ngay][x.role] += +x.rot || 0; });
+  ngs.sort();
+  if(!ngs.length) return '<div class="mut">Chưa có dữ liệu.</div>';
+  var max = 1; ngs.forEach(function(n){ var o = m[n]; max = Math.max(max, o.tv, o.tablet, o.remote); });
+  var W = Math.max(620, ngs.length*42), H = 170, B = 22, cw = (W-30)/ngs.length, bw = Math.min(10, (cw-6)/3);
+  var s = '<svg class="knchart" style="max-width:'+W+'px" viewBox="0 0 '+W+' '+(H+B)+'" role="img" aria-label="Số lần rớt theo ngày">';
+  [0, .5, 1].forEach(function(f){ var y = H - f*(H-14); s += '<line x1="26" x2="'+W+'" y1="'+y+'" y2="'+y+'" stroke="#EEE6F7"/><text x="0" y="'+(y+4)+'" font-size="10" fill="#7B6A91">'+Math.round(f*max)+'</text>'; });
+  ngs.forEach(function(n, i){
+    var x0 = 30 + i*cw + (cw - bw*3 - 4)/2, o = m[n];
+    [['tv','#D6314F'],['tablet','#8B2FBE'],['remote','#F5B87A']].forEach(function(k, j){
+      var v = o[k[0]], hh = v ? Math.max(2, v/max*(H-14)) : 0;
+      s += '<rect x="'+(x0 + j*(bw+2))+'" y="'+(H-hh)+'" width="'+bw+'" height="'+hh+'" rx="2" fill="'+k[1]+'"><title>'+n+' · '+(KN_VAI[k[0]])+': '+v+'</title></rect>';
+    });
+    if(ngs.length <= 16 || i % 2 === 0) s += '<text x="'+(30 + i*cw + cw/2)+'" y="'+(H+15)+'" font-size="10" text-anchor="middle" fill="#7B6A91">'+n.slice(8,10)+'/'+n.slice(5,7)+'</text>';
+  });
+  return '<div style="overflow-x:auto">'+s+'</svg></div>';
+}
+/* ---------- Thiết bị từng phòng ---------- */
+function knMay(){
+  if(!KN.cn){ $('knBody').innerHTML = '<div class="knnote">Chọn <b>một chi nhánh</b> ở ô phía trên để xem TV / máy tính bảng của từng phòng.</div>'; return; }
+  knGoi('admin.knMay').then(function(r){
+    var ds = r.ds || [];
+    var o1 = ds.filter(function(x){ return x.tvOn; }).length;
+    var h = '<div class="stats"><div class="stat g"><div class="k">TV đang nối</div><div class="v">'+o1+' / '+ds.length+'</div></div>'
+      + '<div class="stat"><div class="k">Máy tính bảng đang nối</div><div class="v">'+ds.filter(function(x){ return x.tbOn; }).length+'</div></div>'
+      + '<div class="stat y"><div class="k">Điện thoại khách đang nối</div><div class="v">'+ds.reduce(function(a,x){ return a + (x.dt||0); }, 0)+'</div></div></div>';
+    function o(m, on, k){
+      if(!m) return '<span class="kndot" style="background:'+(on?'#17935F':'#CDB8E3')+'"></span>'+(on?'đang nối':'<span class="mut">chưa có dữ liệu</span>');
+      return '<span class="kndot" style="background:'+(on?'#17935F':'#D6314F')+'"></span><b>'+(on?'Đang nối':'Không nối')+'</b> · '+esc(m.ua||'')
+        + '<div class="knsm">IP '+esc(m.ip||'—')+(m.isp?' · '+esc(m.isp):'')+'<br>Nối lúc '+knTgN(m.lan_noi)+(m.lan_rot?' · rớt lúc '+knTgN(m.lan_rot)+(m.tuoi_rot!=null?' (sau '+knTuoi(m.tuoi_rot)+')':''):'')+'</div>'
+        + '<div class="knsm">Trong kỳ: <b style="color:'+(k.rot?'#D6314F':'inherit')+'">'+k.rot+' lần rớt</b> / '+k.noi+' lần nối</div>';
+    }
+    h += '<div class="tblwrap"><table><thead><tr><th>Phòng</th><th>TV</th><th>Máy tính bảng</th><th>ĐT</th></tr></thead><tbody>'
+      + ds.map(function(x){ return '<tr><td><b>'+esc(x.ten)+'</b><div class="knsm">'+(x.open?'đang mở':'đóng')+'</div><button class="btn btn-ghost btn-sm" style="margin-top:4px;padding:3px 9px;font-size:11.5px" data-nk-phong="'+esc(x.id)+'" data-nk-ten="'+esc(x.ten)+'" data-nk-cn="'+esc(KN.cn)+'">Nhật ký</button></td><td>'+o(x.tv, x.tvOn, x.tvK)+'</td><td>'+(x.tb||x.tbOn?o(x.tb, x.tbOn, x.tbK):'<span class="mut">không có</span>')+'</td><td>'+(x.dt||0)+'</td></tr>'; }).join('')
+      + '</tbody></table></div>';
+    $('knBody').innerHTML = h;
+  }).catch(knLoi);
+}
+/* ---------- Nhật ký ---------- */
+function knNkLoc(){
+  var L = KN.loc, h = '<div class="knf">'
+    + '<select id="knfRole"><option value="">Mọi thiết bị</option><option value="tv">TV</option><option value="tablet">Máy tính bảng</option><option value="remote">Điện thoại khách</option></select>'
+    + '<select id="knfEv"><option value="">Mọi sự kiện</option><option value="rot">Chỉ RỚT</option><option value="noi">Nối vào</option><option value="cat">Server cắt</option><option value="tuchoi">Bị từ chối</option><option value="mo">Mở phòng</option><option value="dong">Đóng phòng</option></select>'
+    + '<input id="knfIp" placeholder="Lọc IP" style="width:150px" value="'+esc(L.ip)+'">'
+    + (L.phong ? '<span class="knchip">Phòng '+esc(L.phongTen)+'<button data-bo="phong" title="Bỏ lọc">✕</button></span>' : '')
+    + (L.quanh ? '<span class="knchip">±2 phút quanh '+knTg(L.quanh)+'<button data-bo="quanh" title="Bỏ lọc">✕</button></span>' : '')
+    + '<span style="flex:1"></span><button class="btn btn-ghost btn-sm" id="knCsv">⬇ CSV</button></div>';
+  return h;
+}
+function knNk(them){
+  var L = KN.loc, ex = { phong: L.phong, role: L.role, ev: L.ev, ip: L.ip, quanh: L.quanh };
+  if(them && KN.nk.length) ex.truoc = KN.nk[KN.nk.length-1].t;
+  knGoi('admin.knNhatKy', ex).then(function(r){
+    KN.nk = them ? KN.nk.concat(r.log||[]) : (r.log||[]); KN.nkHet = r.het;
+    var h = knNkLoc() + knNkBang(KN.nk, !KN.cn) + (KN.nkHet ? '' : '<div style="text-align:center;margin-top:10px"><button class="btn btn-ghost btn-sm" id="knThem">Tải thêm</button></div>');
+    $('knBody').innerHTML = h;
+    $('knfRole').value = L.role; $('knfEv').value = L.ev;
+  }).catch(knLoi);
+}
+function knNkBang(rows, coCn){
+  if(!rows.length) return '<div class="mut" style="padding:10px">Không có sự kiện nào khớp.</div>';
+  return '<div class="tblwrap"><table><thead><tr><th>Lúc</th>'+(coCn?'<th>Chi nhánh</th>':'')+'<th>Phòng</th><th>Thiết bị</th><th>Sự kiện</th><th>IP · nhà mạng</th><th>Máy</th></tr></thead><tbody>'
+    + rows.map(function(e){ return '<tr><td style="white-space:nowrap">'+knTg(e.t)+'</td>'+(coCn?'<td>'+esc(knTenCn(e.cn))+'</td>':'')+'<td><b>'+esc(e.phong||'')+'</b></td><td>'+(KN_VAI[e.role]||esc(e.role||''))+'</td><td>'+knSuKien(e)+'</td><td>'+(e.ip?'<a href="#" data-ip="'+esc(e.ip)+'" data-ip-cn="'+esc(e.cn)+'">'+esc(e.ip)+'</a>':'')+(e.isp?'<div class="knsm">'+esc(e.isp)+(e.colo?' · '+esc(e.colo):'')+'</div>':'')+'</td><td class="knsm">'+esc(e.ua||'')+(e.dev?' <span title="mã máy">#'+esc(e.dev)+'</span>':'')+'</td></tr>'; }).join('')
+    + '</tbody></table></div>';
+}
+function knCsv(){
+  var rows = KN.nk || [];
+  if(!rows.length){ toast('Chưa có dòng nào để tải.'); return; }
+  var q = function(v){ v = String(v==null?'':v); return /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; };
+  var csv = '﻿Thời gian,Chi nhánh,Phòng,Thiết bị,Sự kiện,Mã,Lý do,Đã nối (giây),Im (giây),IP,Nhà mạng,ASN,Trung tâm CF,Máy,Mã máy\n'
+    + rows.map(function(e){ return [knTg(e.t), knTenCn(e.cn), e.phong, KN_VAI[e.role]||e.role, e.ev, e.code, e.why, e.tuoi, e.im, e.ip, e.isp, e.asn, e.colo, e.ua, e.dev].map(q).join(','); }).join('\n');
+  var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = 'ket-noi-'+(KN.cn||'tat-ca')+'-'+new Date().toISOString().slice(0,10)+'.csv'; document.body.appendChild(a); a.click(); a.remove();
+}
+/* ---------- IP ---------- */
+function knIp(){
+  knGoi('admin.knIp').then(function(r){
+    var ds = r.ds || [];
+    var h = '<div class="hint">Mọi IP công cộng các máy đã dùng khi nối vào. IP có <b>TV / máy tính bảng</b> là đường mạng của quán (chi nhánh 2 đường mạng sẽ có ít nhất 2 IP, IP đổi khi modem khởi động lại). IP chỉ có điện thoại khách có thể là 4G của khách. Bấm một IP để xem lịch sử.</div>'
+      + '<div class="tblwrap"><table><thead><tr>'+(KN.cn?'':'<th>Chi nhánh</th>')+'<th>IP</th><th>Nhà mạng</th><th>Lần nối TV / MTB / ĐT</th><th>Lần rớt</th><th>Số ngày</th><th>Thấy lần đầu</th><th>Lần cuối</th></tr></thead><tbody>'
+      + (ds.length ? ds.map(function(x){ var quan = (+x.tv||0) + (+x.tb||0) > 0;
+          return '<tr class="kn-tr" data-ip="'+esc(x.ip)+'" data-ip-cn="'+esc(x.cn)+'">'+(KN.cn?'':'<td>'+esc(knTenCn(x.cn))+'</td>')+'<td><b>'+esc(x.ip)+'</b>'+(quan?' <span class="tagx" style="background:#EEFAF4;color:#0F7A4D">mạng quán</span>':' <span class="knsm">chỉ ĐT</span>')+'</td><td>'+esc(x.isp||'—')+(x.asn?'<div class="knsm">AS'+x.asn+(x.colo?' · '+esc(x.colo):'')+'</div>':'')+'</td><td>'+knSo(x.tv)+' / '+knSo(x.tb)+' / '+knSo(x.dt)+'</td><td'+(x.rot?' style="color:#D6314F;font-weight:700"':'')+'>'+knSo(x.rot)+'</td><td>'+x.so_ngay+'</td><td>'+knTgN(x.dau)+'</td><td>'+knTgN(x.cuoi)+'</td></tr>'; }).join('')
+        : '<tr><td colspan="8" class="mut">Chưa có dữ liệu trong khoảng này.</td></tr>')
+      + '</tbody></table></div>';
+    $('knBody').innerHTML = h;
+  }).catch(knLoi);
+}
+function knIpLs(ip){
+  KN.ipXem = ip;
+  knGoi('admin.knIpLs', { ip: ip }).then(function(r){
+    var inf = (r.info||[]).map(function(x){ return '<b>'+esc(knTenCn(x.cn))+'</b>: '+esc(x.isp||'—')+(x.asn?' (AS'+x.asn+')':'')+' · thấy từ '+knTgN(x.dau)+' đến '+knTgN(x.cuoi)+' · thiết bị: '+esc(String(x.vai||'').split(',').map(function(v){ return {tv:'TV',tb:'MTB',dt:'ĐT'}[v]||v; }).join(', ')); }).join('<br>');
+    var h = '<div class="knf"><button class="btn btn-ghost btn-sm" id="knIpLai">← Danh sách IP</button><b style="font-size:16px">IP '+esc(ip)+'</b></div>'
+      + '<div class="knbox">'+(inf||'<span class="mut">Không còn thông tin IP này.</span>')+'</div>'
+      + '<div class="knbox"><h3>Theo ngày</h3><div class="tblwrap" style="box-shadow:none;border:0"><table><thead><tr><th>Ngày</th><th>Chi nhánh</th><th>Lần nối TV / MTB / ĐT</th><th>Lần rớt</th></tr></thead><tbody>'
+      + ((r.ngay||[]).length ? r.ngay.map(function(x){ return '<tr><td>'+x.ngay.slice(8,10)+'/'+x.ngay.slice(5,7)+'</td><td>'+esc(knTenCn(x.cn))+'</td><td>'+x.tv+' / '+x.tb+' / '+x.dt+'</td><td'+(x.rot?' style="color:#D6314F;font-weight:700"':'')+'>'+x.rot+'</td></tr>'; }).join('') : '<tr><td colspan="4" class="mut">Không có.</td></tr>')
+      + '</tbody></table></div></div><div class="knbox"><h3>Sự kiện gần nhất (200)</h3>'+knNkBang(r.log||[], !KN.cn)+'</div>';
+    $('knBody').innerHTML = h;
+  }).catch(knLoi);
+}
+/* ---------- Chép báo cáo (dán gửi kỹ thuật) ---------- */
+function knChep(){
+  var r = KN.tq;
+  var lam = r ? Promise.resolve(r) : knGoi('admin.knTongQuan');
+  lam.then(function(r){
+    KN.tq = r;
+    var A = r.theoCn || [], L = [];
+    L.push('BÁO CÁO KẾT NỐI BMBPlayer — '+(r.cn ? knTenCn(r.cn) : 'tất cả chi nhánh')+' — '+(r.ngay===1?'24 giờ':r.ngay+' ngày')+' (lập '+knTgN(Date.now())+')');
+    L.push('Rớt: TV '+knTong(A,'tv','rot')+' · MTB '+knTong(A,'tablet','rot')+' · ĐT '+knTong(A,'remote','rot')+' · lượt mở phòng '+knTong(A,'phong','mo')+' · ĐT bị từ chối '+knTong(A,'remote','tuchoi'));
+    if((r.topPhong||[]).length){ L.push(''); L.push('Phòng rớt nhiều:'); r.topPhong.forEach(function(x){ L.push('- '+knTenCn(x.cn)+' '+x.phong+' '+(KN_VAI[x.role]||x.role)+': rớt '+x.rot+' / nối '+x.noi); }); }
+    if((r.dongLoat||[]).length){ L.push(''); L.push('Rớt đồng loạt (≥2 phòng/10 giây):'); r.dongLoat.slice(0, 25).forEach(function(x){ L.push('- '+knTg(x.t)+' '+knTenCn(x.cn)+': '+x.so_phong+' phòng ('+(x.phong||'')+'), '+x.so+' máy, nhà mạng '+(x.isp||'?')+', IP '+(x.ip||'?')); }); }
+    if((r.nhaMang||[]).length){ L.push(''); L.push('Theo nhà mạng (TV+MTB):'); r.nhaMang.forEach(function(x){ L.push('- '+knTenCn(x.cn)+' '+x.isp+': '+x.so_ip+' IP, nối '+x.noi+', rớt '+x.rot); }); }
+    var tx = L.join('\n');
+    (navigator.clipboard && navigator.clipboard.writeText ? navigator.clipboard.writeText(tx) : Promise.reject()).then(function(){ toast('Đã chép báo cáo — dán vào tin nhắn gửi kỹ thuật.'); })
+      .catch(function(){ var t = document.createElement('textarea'); t.value = tx; document.body.appendChild(t); t.select(); try{ document.execCommand('copy'); toast('Đã chép báo cáo.'); }catch(e){ alert(tx); } t.remove(); });
+  }).catch(function(e){ toast(e.message || 'Không tải được.'); });
+}
+$('knCn').addEventListener('change', function(){ KN.cn = this.value; KN.tq = null; KN.ipXem = ''; KN.loc.phong = ''; KN.loc.quanh = 0; knVe(); });
+$('knNgay').addEventListener('click', function(ev){ var b = ev.target.closest('button'); if(!b) return; KN.ngay = +b.getAttribute('data-n'); KN.tq = null; knVe(); });
+$('knSub').addEventListener('click', function(ev){ var b = ev.target.closest('button'); if(!b) return; KN.sub = b.getAttribute('data-s'); if(KN.sub==='ip') KN.ipXem = ''; knVe(); });
+$('knTai').addEventListener('click', function(){ KN.tq = null; knVe(); });
+$('knChep').addEventListener('click', knChep);
+$('knBody').addEventListener('click', function(ev){
+  var t = ev.target, el;
+  if((el = t.closest('[data-ip]'))){ ev.preventDefault(); KN.sub = 'ip'; Array.prototype.forEach.call($('knSub').children, function(b){ b.className = b.getAttribute('data-s')==='ip' ? 'on' : ''; }); $('knBody').innerHTML = '<div class="mut">Đang tải…</div>'; knIpLs(el.getAttribute('data-ip')); return; }
+  if((el = t.closest('[data-cn]')) && !el.hasAttribute('data-nk-cn')){ KN.cn = el.getAttribute('data-cn'); $('knCn').value = KN.cn; KN.tq = null; knVe(); return; }
+  if((el = t.closest('[data-nk-cn]'))){
+    var cn = el.getAttribute('data-nk-cn');
+    if(cn && KN.cn !== cn){ KN.cn = cn; $('knCn').value = cn; KN.tq = null; }
+    KN.loc = { phong: el.getAttribute('data-nk-phong') || '', phongTen: el.getAttribute('data-nk-ten') || '', role: el.getAttribute('data-nk-role') || '', ev: '', ip: '', quanh: +el.getAttribute('data-quanh') || 0 };
+    if(KN.loc.quanh && KN.ngay < 30 && Date.now() - KN.loc.quanh > KN.ngay*86400000) KN.ngay = 30;
+    KN.sub = 'nk'; knVe(); return;
+  }
+  if((el = t.closest('[data-bo]'))){ var k = el.getAttribute('data-bo'); if(k==='phong'){ KN.loc.phong = ''; KN.loc.phongTen = ''; } else KN.loc[k] = 0; KN.nk = []; knNk(); return; }
+  if(t.id==='knThem'){ t.disabled = true; knNk(true); return; }
+  if(t.id==='knCsv'){ knCsv(); return; }
+  if(t.id==='knIpLai'){ KN.ipXem = ''; knIp(); return; }
+});
+$('knBody').addEventListener('change', function(ev){
+  var id = ev.target.id;
+  if(id==='knfRole'){ KN.loc.role = ev.target.value; KN.nk = []; knNk(); }
+  else if(id==='knfEv'){ KN.loc.ev = ev.target.value; KN.nk = []; knNk(); }
+  else if(id==='knfIp'){ KN.loc.ip = ev.target.value.trim(); KN.nk = []; knNk(); }
+});
+
 Array.prototype.forEach.call(document.querySelectorAll('.tab'), function(t){
   t.addEventListener('click', function(){
     Array.prototype.forEach.call(document.querySelectorAll('.tab'), function(x){ x.className='tab'; });
@@ -2281,6 +2572,7 @@ Array.prototype.forEach.call(document.querySelectorAll('.tab'), function(t){
     if(p==='p5') loadMenuAdmin();
     if(p==='p6') loadAccounts();
     if(p==='p7') cdMo();
+    if(p==='p8') knMo();
     if(p==='p2') datNgayLS(LS.ngay || ngayHomNay());   /* lần đầu: ngày hiện tại; sau đó giữ ngày đang xem */
     if(TV.tm){ clearInterval(TV.tm); TV.tm = null; }
     if(p==='p3'){ loadTv(); TV.tm = setInterval(function(){ if(document.visibilityState==='visible' && !document.getElementById('qsOv')) loadTv(); }, 30000); }   /* 30 giây: mỗi lần hỏi = 1 lượt cho MỖI phòng (23+ phòng) */
