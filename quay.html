@@ -962,10 +962,24 @@ function tgVe(){
   $('tgKn').addEventListener('click', tgBamKetNoi);
   tgTaoLink();
 }
+/* Trong APK (WebView) liên kết t.me mở tab mới bị chặn → không mở được Telegram. Thay bằng: chép liên kết + cách gửi tay "/start <mã>" cho bot. */
+function trongApk(){ return typeof BMBNative !== 'undefined'; }
+function chepVB(tx){
+  var ok = function(){ toast('Đã chép.'); };
+  if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(tx).then(ok).catch(function(){ chepCu(tx); }); } else chepCu(tx);
+}
+function chepCu(tx){ var t = document.createElement('textarea'); t.value = tx; t.style.position = 'fixed'; t.style.opacity = '0'; document.body.appendChild(t); t.select(); try{ document.execCommand('copy'); toast('Đã chép.'); }catch(e){ prompt('Chép đoạn này:', tx); } t.remove(); }
+function tgApkHtml(link){
+  var m = /t\.me\/([\w]+)\?start=([\w-]+)/.exec(link || ''); if(!m) return '';
+  return '<div class="sub" style="line-height:1.7;flex-basis:100%">Trong app không mở thẳng Telegram được. Làm một trong hai cách (mã dùng 1 lần, hết hạn sau 15 phút):<br>'
+    + '<b>Cách 1:</b> bấm <button class="btn btn-y btn-sm" data-chep="'+esc(link)+'">📋 Chép liên kết</button> rồi dán vào Chrome (hoặc vào ô chat Telegram bất kỳ rồi bấm vào liên kết).<br>'
+    + '<b>Cách 2:</b> mở Telegram → tìm <b>@'+esc(m[1])+'</b> → bấm Start rồi gửi tin: <button class="btn btn-ghost btn-sm" data-chep="/start '+esc(m[2])+'">📋 Chép “/start …”</button></div>';
+}
+document.addEventListener('click', function(e){ var b = e.target.closest ? e.target.closest('[data-chep]') : null; if(b){ e.preventDefault(); chepVB(b.getAttribute('data-chep')); } });
 function tgTaoLink(){
   api('tg.taoMa').then(function(r){
     var a = $('tgKn'); if(!a) return;
-    if(r && r.ok && r.link){ a.href = r.link; }
+    if(r && r.ok && r.link){ a.href = r.link; if(trongApk()){ var h = tgApkHtml(r.link); if(h) $('tgNut').innerHTML = h; } }
     else $('tgTt').textContent = (r && r.msg) || 'Chưa tạo được mã kết nối, đóng rồi mở lại.';
   }).catch(function(){ var t = $('tgTt'); if(t) t.textContent = 'Chưa tạo được mã kết nối, đóng rồi mở lại.'; });
 }
@@ -2710,9 +2724,10 @@ function knCbVe(r){
   $('knBody').innerHTML = h;
   var a = $('cbKn');
   if(a){
-    knGoi('admin.knTgMa').then(function(x){ if(x && x.link) a.href = x.link; }).catch(function(){});
-    a.addEventListener('click', function(){ var lan = 0, tm = setInterval(function(){ if(++lan > 60 || KN.sub!=='cb'){ clearInterval(tm); return; }
-      knGoi('admin.knCanhBao').then(function(x){ if(x.ketNoi){ clearInterval(tm); KN.cb = x; knCbVe(x); toast('Đã kết nối Telegram.'); } }).catch(function(){}); }, 3000); });
+    var theoDoi = function(){ clearInterval(KN.cbTm); var lan = 0; KN.cbTm = setInterval(function(){ if(++lan > 60 || KN.sub!=='cb'){ clearInterval(KN.cbTm); return; }
+      knGoi('admin.knCanhBao').then(function(x){ if(x.ketNoi){ clearInterval(KN.cbTm); KN.cb = x; knCbVe(x); toast('Đã kết nối Telegram.'); } }).catch(function(){}); }, 3000); };
+    knGoi('admin.knTgMa').then(function(x){ if(x && x.link){ a.href = x.link; if(trongApk()){ var h = tgApkHtml(x.link); if(h){ a.parentNode.innerHTML = h; theoDoi(); } } } }).catch(function(){});
+    a.addEventListener('click', theoDoi);
   }
 }
 $('knCn').addEventListener('change', function(){ KN.cn = this.value; KN.tq = null; KN.ipXem = ''; KN.loc.phong = ''; KN.loc.quanh = 0; knVe(); });
