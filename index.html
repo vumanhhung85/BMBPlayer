@@ -438,6 +438,54 @@ function paintReady(){
   pill.classList.add('ok'); t.textContent = 'Sẵn sàng' + (connTxt ? ' · ' + connTxt : '');
 }
 
+/* ---------- Giới hạn chất lượng video (admin đặt cho từng TV trong quầy → 🔌 Kết nối → Thiết bị từng phòng) ----------
+   YouTube tự chọn độ phân giải theo KÍCH THƯỚC khung phát. Box yếu + màn to → YouTube chọn 1080p/4K, giải mã không nổi → giật vài bài đầu
+   (tới khi YouTube tự hạ). Đặt khung phát nhỏ đúng cỡ (vd 720 điểm ảnh chiều cao) rồi phóng to bằng CSS → YouTube phát 720p ngay từ bài đầu. */
+let clCap = 0;
+function fitYt(){
+  const el = $('yt'); if(!el) return;
+  const W = innerWidth, H = innerHeight, dpr = devicePixelRatio || 1, k = clCap ? (H * dpr) / clCap : 1;
+  if(k > 1.05){ el.style.width = (W / k) + 'px'; el.style.height = (H / k) + 'px'; el.style.transformOrigin = '0 0'; el.style.transform = 'scale(' + k + ')'; }
+  else { el.style.width = ''; el.style.height = ''; el.style.transform = ''; }
+}
+function applyCl(v){ v = [1080, 720, 480, 360].includes(+v) ? +v : 0; if(v === clCap) return; clCap = v; fitYt(); }
+addEventListener('resize', fitYt);
+
+/* ---------- Đo chất lượng phát từng bài (gửi Worker → tab 🔌 Kết nối của admin) ----------
+   Mỗi bài: mở bài mất bao lâu, đứng hình chờ tải mấy lần, độ phân giải YouTube đang phát, trang/máy bận (long task) bao lâu.
+   Luôn báo 5 bài đầu sau khi mở trang + mọi bài có vấn đề; bài êm còn lại chỉ đếm (sk) và gửi kèm lần báo sau → ít ghi D1. */
+const PQ = { n: 0, sk: 0, c: null }, LT = { n: 0, ms: 0 };
+try{ new PerformanceObserver(l => { for(const e of l.getEntries()){ if(e.duration >= 100){ LT.n++; LT.ms += e.duration; } } }).observe({ type: 'longtask' }); }catch(e){}
+function pqStart(id){
+  pqEnd('next');
+  PQ.n++; PQ.c = { id, n: PQ.n, t0: Date.now(), st: null, bn: 0, bms: 0, bT: 0, q: {}, ltN: LT.n, ltMs: LT.ms, seekT: 0, lock: false };
+}
+function pqState(st){
+  const c = PQ.c; if(!c) return;
+  const now = Date.now();
+  if(st === 1){ if(c.st === null) c.st = now - c.t0; if(c.bT){ c.bms += now - c.bT; c.bT = 0; } pqQ(); }
+  else if(st === 3){ if(c.st !== null && !c.bT && now - c.seekT > 2500){ c.bn++; c.bT = now; } }
+  else if(c.bT){ c.bms += now - c.bT; c.bT = 0; }
+}
+function pqQ(){ const c = PQ.c; if(!c || !ready) return; try{ const q = player.getPlaybackQuality(); if(q && q !== 'unknown') c.q[q] = (c.q[q] || 0) + 1; }catch(e){} }
+setInterval(() => { try{ if(PQ.c && ready && player.getPlayerState() === 1) pqQ(); }catch(e){} }, 5000);
+const PQ_RANK = ['tiny', 'small', 'medium', 'large', 'hd720', 'hd1080', 'hd1440', 'hd2160', 'highres'];
+function pqEnd(why, err){
+  const c = PQ.c; if(!c) return;
+  PQ.c = null;
+  const now = Date.now();
+  if(c.bT) c.bms += now - c.bT;
+  if(c.st === null && !err && now - c.t0 < 4000) return;              // bấm qua bài trước khi kịp phát: không tính
+  const qk = Object.keys(c.q), q = qk.sort((a, b) => c.q[b] - c.q[a])[0] || '', qmx = qk.sort((a, b) => PQ_RANK.indexOf(b) - PQ_RANK.indexOf(a))[0] || '';
+  const ltms = Math.round(LT.ms - c.ltMs), xau = c.bn > 0 || (c.st !== null && c.st > 6000 && !c.lock) || ltms > 3000 || !!err;
+  if(c.n > 5 && !xau){ PQ.sk++; if(PQ.sk < 40) return; }
+  if(!bc.ws) return;
+  let mem; try{ mem = navigator.deviceMemory; }catch(e){}
+  bc.postMessage({ type: 'pq', d: { n: c.n, st: c.lock ? null : c.st, bn: c.bn, bms: Math.round(c.bms), q, qmx, ltn: LT.n - c.ltN, ltms, pl: Math.round((now - c.t0) / 1000),
+    up: Math.round(performance.now() / 1000), sk: PQ.sk, cl: clCap, vw: innerWidth, vh: innerHeight, dpr: devicePixelRatio || 1, hc: navigator.hardwareConcurrency || null, mem, err: err || null, why, id: c.id } });
+  PQ.sk = 0;
+}
+
 /* ---------- Khởi tạo trình phát ---------- */
 /* Nạp YouTube IFrame API SAU khi đã khai báo hàm nhận (tránh API nạp từ bộ nhớ đệm quá nhanh gọi hàm trước khi nó tồn tại) */
 window.onYouTubeIframeAPIReady = () => { apiReady = true; makePlayer(); };
@@ -486,7 +534,7 @@ function makePlayer(){
   });
 }
 function onReady(){
-  ready = true; $('diag').style.display = 'none';
+  ready = true; $('diag').style.display = 'none'; fitYt();
   player.setVolume(NATIVE ? 100 : vol); $('vol').value = vol;
   paintReady();
   if(cur >= 0) load();       // remote đã gửi bài trong lúc YouTube đang khởi động → phát luôn
@@ -505,6 +553,7 @@ function swapOff(){ clearTimeout(swapTimer); document.body.classList.remove('swa
 function ccOff(){ try{ player.unloadModule('captions'); player.unloadModule('cc'); }catch(_){} }
 function onStateChange(e){
   const S = YT.PlayerState;
+  pqState(e.data);
   if(e.data === S.PLAYING){ if(!pStart) pStart = Date.now(); if(scoring) endScoreUi(); } else if(pStart){ playedMs += Date.now() - pStart; pStart = 0; }   // thời gian đã nghe của bài (tua nhảy cóc thì không tính)
   if(e.data === S.PLAYING) ccOff();
   if(e.data === S.ENDED){ if(!startScore()){ swapOn(); next(); } }
@@ -535,6 +584,7 @@ function reportDead(id, done){
 }
 function onError(e){
   swapOff();
+  pqEnd('err', e.data);
   const it = queue[cur];
   if(it && [100, 101, 150].includes(e.data)) reportDead(it.id, () => { bc.postMessage({ type:'dead', id:it.id }); toast('Đã gỡ "' + it.title + '" khỏi kho karaoke (không còn phát được trên YouTube).'); });
   toast('Không phát được "' + (it ? it.title : '') + '"\n' + (ERRMSG[e.data] || ('Mã lỗi ' + e.data)) +
@@ -585,11 +635,12 @@ function load(){
   if(!ready) return;
   clearTimeout(wd); endScoreUi(); playedMs = 0; pStart = 0;
   if(cur < 0 || cur >= queue.length){
-    swapOff(); player.stopVideo(); $('idle').style.display='flex'; setLock(null);
+    pqEnd('stop'); swapOff(); player.stopVideo(); $('idle').style.display='flex'; setLock(null);
     hide('ovTitle'); hide('ovNext'); hide('ovCount'); render(); push(); return;
   }
   $('idle').style.display = 'none';
   swapOn();
+  pqStart(queue[cur].id);
   player.loadVideoById(queue[cur].id);
   if(!userMuted && lock !== 'muted') player.unMute();
   showNowOverlay(); hide('ovNext');
@@ -603,6 +654,7 @@ function guard(id, stage){
   if(!ready || cur < 0 || !queue[cur] || queue[cur].id !== id) return;
   const st = player.getPlayerState();
   if(st !== -1 && st !== 5) return;                      // đang phát / đang tải / đã dừng chủ ý → không can thiệp
+  if(PQ.c) PQ.c.lock = true;                             // bị chặn tự phát: thời gian mở bài không phản ánh tốc độ máy
   if(stage === 1){
     player.mute(); player.playVideo(); setLock('muted');
     wd = setTimeout(() => guard(id, 2), 3500);
@@ -635,7 +687,7 @@ function playPause(){
   const st = player.getPlayerState();
   if(st === YT.PlayerState.PLAYING) player.pauseVideo(); else player.playVideo();
 }
-function replay(){ if(ready && cur>=0){ endScoreUi(); playedMs = 0; pStart = 0; player.seekTo(0,true); player.playVideo(); } }
+function replay(){ if(ready && cur>=0){ if(PQ.c) PQ.c.seekT = Date.now(); endScoreUi(); playedMs = 0; pStart = 0; player.seekTo(0,true); player.playVideo(); } }
 function applyMute(){ $('muteBtn').textContent = (userMuted ? '🔇 Tiếng: Tắt' : '🔊 Tiếng: Bật'); }
 function toggleMute(on){                    // on = true/false: đặt hẳn (remote gửi theo icon đang thấy, không đảo ngược nếu máy đó lệch); không có → đảo như cũ
   if(!ready){ push(); return; }
@@ -746,6 +798,7 @@ function seekCmd(c){
   const d = curDur();
   let t = typeof c.t === 'number' && isFinite(c.t) ? c.t : curT() + (+c.by || 0);
   t = Math.max(0, d > 1 ? Math.min(t, d - 1) : t);
+  if(PQ.c) PQ.c.seekT = Date.now();
   try{ player.seekTo(t, true); }catch(e){ return; }
   $('ovSeek').textContent = (typeof c.by === 'number' ? (c.by < 0 ? '⏪ ' : '⏩ ') : '') + fmtT(t) + (d > 0 ? ' / ' + fmtT(d) : '');
   flash('ovSeek', 1800);
@@ -958,6 +1011,7 @@ if(bc.ws){
     lastSession = m.session; roomOpen = !!m.open; window.__bmbOpen = roomOpen;   /* APK 2.4: chỉ hỏi cập nhật khi phòng đóng */
     if(m.name) roomName = m.name;
     /* mặc định cho tua; chỉ khi admin tắt (Worker báo seek:false) mới không */
+    applyCl(m.cl);
     { const was = seekOn; seekOn = m.seek !== false; nPeers = (m.remotes || 0) + (m.tablets || 0); if(was !== seekOn) setTimeout(push, 0); }
     paintGuestQr(m.open ? m.qr : '', m.name);
     if(!m.open){ resetSession(); roomNote((roomName ? (/^ph[oò]ng\b/i.test(roomName) ? roomName : 'Phòng ' + roomName) : 'Phòng') + ' chưa mở — chờ nhân viên mở phòng'); paintRoomTag(); connTxt = ''; $('hint').textContent = HINT0; }

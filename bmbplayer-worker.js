@@ -393,6 +393,7 @@ async function handleApi(request, env, ctx) {
         case 'admin.knIp':               res = await adminKnIp(env, body); break;
         case 'admin.knIpLs':             res = await adminKnIpLs(env, body); break;
         case 'admin.knMay':              res = await adminKnMay(env, body); break;
+        case 'admin.knCl':               res = await adminKnCl(env, body); break;
         case 'admin.knXuHuong':          res = await adminKnXuHuong(env, body); break;
         case 'admin.knCanhBao':          res = await adminKnCanhBao(env, body); break;
         case 'admin.knCanhBaoLuu':       res = await adminKnCanhBaoLuu(env, body); break;
@@ -1433,6 +1434,7 @@ async function quayNhatKy(env, body) {
 // "Rớt" = máy tự mất kết nối (dut) hoặc server phát hiện máy im lặng quá lâu rồi cắt (cat mã 4007).
 // ============================================================
 const KN_GIU_TB = 30, KN_GIU_DT = 7, KN_GIU_TH = 180;
+const KN_CL = [0, 1080, 720, 480, 360];          // giới hạn chất lượng video trên TV (0 = để YouTube tự chọn)
 let knSan = false, knDonLuc = 0;
 async function knBang(env) {
   if (knSan) return;
@@ -1485,9 +1487,9 @@ async function knGhi(env, c, e) {
   if (!env.DB) return;
   await knBang(env);
   const ngay = ngayKinhDoanh(e.t), cn = c.branch || '', pid = c.rid || '', ph = c.name || '';
-  if (e.ev === 'tai') {                                    // báo cáo từ phía máy: chỉ lưu chi tiết, không cộng vào số đếm
+  if (e.ev === 'tai' || e.ev === 'phat') {                 // báo cáo từ phía máy (nối lại / chất lượng phát 1 bài): chỉ lưu chi tiết, không cộng vào số đếm
     await env.DB.prepare(`INSERT INTO kn_sk (t, cn, phong_id, phong, ev, role, ip, isp, dev, ua, dg) VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
-      .bind(e.t, cn, pid, ph, 'tai', e.role || '', String(e.ip || ''), e.isp || null, e.dev || null, e.ua || null, JSON.stringify(e.dg || {})).run();
+      .bind(e.t, cn, pid, ph, e.ev, e.role || '', String(e.ip || ''), e.isp || null, e.dev || null, e.ua || null, JSON.stringify(e.dg || {})).run();
     return;
   }
   const role = e.role || 'phong', rot = knRot(e) ? 1 : 0, ip = String(e.ip || '');
@@ -1554,7 +1556,7 @@ async function adminKnTongQuan(env, body) {
   const [q, loi] = await knPhien(env, body);
   if (loi) return loi;
   const [w, b] = knCn(q, 'cn'), RT = `(ev = 'dut' OR (ev = 'cat' AND code = 4007))`;
-  const [theoCn, theoNgay, topPhong, dongLoat, nhaMang, ten, taiRows, taiTop, dauDl] = await Promise.all([
+  const [theoCn, theoNgay, topPhong, dongLoat, nhaMang, ten, taiRows, taiTop, dauDl, phatRs] = await Promise.all([
     env.DB.prepare(`SELECT cn, role, SUM(noi) AS noi, SUM(rot) AS rot, SUM(cat) AS cat, SUM(tuchoi) AS tuchoi, SUM(mo) AS mo
       FROM kn_ngay WHERE ngay >= ?${w} GROUP BY cn, role`).bind(q.tuNgay, ...b).all(),
     env.DB.prepare(`SELECT ngay, role, SUM(noi) AS noi, SUM(rot) AS rot FROM kn_ngay WHERE ngay >= ?${w} GROUP BY ngay, role ORDER BY ngay`).bind(q.tuNgay, ...b).all(),
@@ -1570,8 +1572,14 @@ async function adminKnTongQuan(env, body) {
       FROM kn_sk WHERE ev = 'tai' AND t >= ?${w} ORDER BY t DESC LIMIT 4000`).bind(q.tu, ...b).all(),
     env.DB.prepare(`SELECT cn, phong_id, MAX(phong) AS phong, role, COUNT(*) AS n, MAX(json_extract(dg,'$.down')) AS mx, AVG(json_extract(dg,'$.rtt')) AS rtt, MAX(json_extract(dg,'$.rttMax')) AS rttMax
       FROM kn_sk WHERE ev = 'tai' AND role IN ('tv','tablet') AND t >= ?${w} GROUP BY phong_id, role ORDER BY mx DESC LIMIT 10`).bind(q.tu, ...b).all(),
-    env.DB.prepare('SELECT MIN(t) AS t FROM kn_sk').first()
+    env.DB.prepare('SELECT MIN(t) AS t FROM kn_sk').first(),
+    env.DB.prepare(`SELECT cn, phong_id, phong, dg FROM kn_sk WHERE ev = 'phat' AND t >= ?${w} ORDER BY t DESC LIMIT 20000`).bind(q.tu, ...b).all()
   ]);
+  /* Chất lượng phát nhạc: tổng + từng TV (để thấy "giật mấy bài đầu" có thật không, máy nào nặng nhất) */
+  const phatRows = phatRs.results || [], phatTong = knPhatTk(phatRows), theoPh = {};
+  for (const r of phatRows) (theoPh[r.phong_id] = theoPh[r.phong_id] || { cn: r.cn, phong_id: r.phong_id, phong: r.phong, rows: [] }).rows.push(r);
+  const phatTop = Object.values(theoPh).map(x => Object.assign({ cn: x.cn, phong_id: x.phong_id, phong: x.phong }, knPhatTk(x.rows)))
+    .filter(x => x.xau > 0).sort((a, c) => c.xau - a.xau || c.bms - a.bms).slice(0, 12);
   /* Mất kết nối bao lâu + nguyên nhân (máy tự báo): phân loại theo lý do máy ghi nhận lúc mất */
   const mat = {}, nn = { ngu: 0, offline: 0, chet: 0, dut: 0, khac: 0 };
   for (const x of taiRows.results || []) {
@@ -1583,7 +1591,7 @@ async function adminKnTongQuan(env, body) {
   const matTk = {};
   for (const k of Object.keys(mat)) { const a = mat[k].ds.sort((x, y) => x - y); matTk[k] = { n: a.length, p50: pct(a, .5), p90: pct(a, .9), max: a.length ? a[a.length - 1] : null }; }
   return ok({ ngay: q.ngay, cn: q.cn, ten, theoCn: theoCn.results, theoNgay: theoNgay.results, topPhong: topPhong.results,
-    dongLoat: dongLoat.results, nhaMang: nhaMang.results, mat: matTk, matNguyenNhan: nn, matTop: taiTop.results, dauDuLieu: dauDl ? dauDl.t : null,
+    dongLoat: dongLoat.results, nhaMang: nhaMang.results, mat: matTk, matNguyenNhan: nn, matTop: taiTop.results, dauDuLieu: dauDl ? dauDl.t : null, phat: phatTong, phatTop,
     giu: { tb: KN_GIU_TB, dt: KN_GIU_DT, th: KN_GIU_TH }, now: Date.now() });
 }
 async function adminKnNhatKy(env, body) {
@@ -1595,7 +1603,8 @@ async function adminKnNhatKy(env, body) {
   if (pid) { sql += ' AND phong_id = ?'; b.push(pid); }
   if (['tv', 'tablet', 'remote'].includes(role)) { sql += ' AND role = ?'; b.push(role); }
   if (ev === 'rot') sql += ` AND (ev = 'dut' OR (ev = 'cat' AND code = 4007))`;
-  else if (['noi', 'dut', 'cat', 'tuchoi', 'mo', 'dong', 'loi', 'xoa', 'tai'].includes(ev)) { sql += ' AND ev = ?'; b.push(ev); }
+  else if (['noi', 'dut', 'cat', 'tuchoi', 'mo', 'dong', 'loi', 'xoa', 'tai', 'phat'].includes(ev)) { sql += ' AND ev = ?'; b.push(ev); }
+  else sql += ` AND ev <> 'phat'`;                                  // báo cáo từng bài hát nhiều → chỉ hiện khi lọc "Phát nhạc trên TV"
   if (ip) { sql += ' AND ip = ?'; b.push(ip); }
   if (quanh) { sql += ' AND t BETWEEN ? AND ?'; b.push(quanh - 120000, quanh + 120000); }     // ±2 phút quanh 1 sự cố
   if (truoc) { sql += ' AND t < ?'; b.push(truoc); }
@@ -1626,14 +1635,51 @@ async function adminKnIpLs(env, body) {
   ]);
   return ok({ ip, ngay: ngay.results, log: sk.results, info: info.results, ten: await knTenCn(env) });
 }
+/* Chất lượng phát nhạc trên TV (TV tự báo, xem index.html → pq): bài "có vấn đề" = đứng hình chờ tải, mở bài > 6 giây, hoặc máy bận (CPU) > 3 giây.
+   TV luôn báo 5 bài đầu sau khi bật + mọi bài có vấn đề; bài êm từ bài thứ 6 chỉ đếm (sk) và gửi kèm lần báo sau → tỉ lệ vẫn tính đúng. */
+const knPhatXau = g => (g.bn || 0) > 0 || (g.st || 0) > 6000 || (g.ltms || 0) > 3000;
+function knPhatTk(rows) {
+  const o = { n: 0, xau: 0, dau: 0, dauXau: 0, sau: 0, sauXau: 0, bn: 0, bms: 0, st: [], q: {}, lt: 0, man: '', cl: 0 };
+  for (const r of rows) {
+    let g = {}; try { g = JSON.parse(r.dg || '{}'); } catch (e) {}
+    const x = knPhatXau(g) ? 1 : 0, sk = g.sk || 0;
+    o.n += 1 + sk; o.xau += x; o.bn += g.bn || 0; o.bms += g.bms || 0; o.lt += g.ltms || 0;
+    if ((g.n || 0) <= 3) { o.dau++; o.dauXau += x; } else { o.sau += 1; o.sauXau += x; }
+    o.sau += sk;
+    if (g.st != null) o.st.push(g.st);
+    if (g.q) o.q[g.q] = (o.q[g.q] || 0) + 1;
+    if (!o.man && g.vw) { o.man = g.vw + '×' + g.vh + (g.dpr ? '@' + g.dpr + 'x' : '') + (g.hc ? ' · ' + g.hc + ' nhân' : '') + (g.mem ? ' · ' + g.mem + 'GB' : ''); o.cl = g.cl || 0; }
+  }
+  o.st.sort((a, b) => a - b);
+  o.stTv = o.st.length ? o.st[Math.floor(o.st.length / 2)] : null; delete o.st;
+  return o;
+}
+async function adminKnCl(env, body) {
+  const [q, loi] = await knPhien(env, body);
+  if (loi) return loi;
+  const cl = KN_CL.includes(+body.cl) ? +body.cl : 0;
+  let ids;
+  if (body.all) {
+    if (!q.cn) return fail('chua_chon_chi_nhanh', 400, 'Chọn một chi nhánh trước.');
+    ids = ((await env.DB.prepare('SELECT id FROM order_phong WHERE chi_nhanh_id = ?').bind(q.cn).all()).results || []).map(r => r.id);
+  } else {
+    const id = s(body.id, 40);
+    const r = id && await env.DB.prepare('SELECT id FROM order_phong WHERE id = ?').bind(id).first();
+    if (!r) return fail('khong_co_phong', 404, 'Không tìm thấy phòng.');
+    ids = [r.id];
+  }
+  const kq = await Promise.all(ids.map(id => call(roomStub(env, id), '/cl', { id, cl }).then(() => 1).catch(() => 0)));
+  return ok({ cl, so: kq.reduce((a, c) => a + c, 0), tong: ids.length });
+}
 async function adminKnMay(env, body) {
   const [q, loi] = await knPhien(env, body);
   if (loi) return loi;
   if (!q.cn) return fail('chua_chon_chi_nhanh', 400, 'Chọn một chi nhánh để xem thiết bị từng phòng.');
-  const [phong, may, rotK] = await Promise.all([
+  const [phong, may, rotK, phat] = await Promise.all([
     env.DB.prepare('SELECT id, ten_phong, dang_mo, mo_luc FROM order_phong WHERE chi_nhanh_id = ?').bind(q.cn).all(),
     env.DB.prepare('SELECT * FROM kn_may WHERE cn = ?').bind(q.cn).all(),
-    env.DB.prepare(`SELECT phong_id, role, SUM(rot) AS rot, SUM(noi) AS noi FROM kn_ngay WHERE cn = ? AND ngay >= ? AND role IN ('tv','tablet') GROUP BY phong_id, role`).bind(q.cn, q.tuNgay).all()
+    env.DB.prepare(`SELECT phong_id, role, SUM(rot) AS rot, SUM(noi) AS noi FROM kn_ngay WHERE cn = ? AND ngay >= ? AND role IN ('tv','tablet') GROUP BY phong_id, role`).bind(q.cn, q.tuNgay).all(),
+    env.DB.prepare(`SELECT phong_id, dg FROM kn_sk WHERE cn = ? AND ev = 'phat' AND t >= ? ORDER BY t DESC LIMIT 3000`).bind(q.cn, q.tu).all()
   ]);
   const rows = (phong.results || []).sort(sapPhong);
   const ds = await Promise.all(rows.map(async r => {
@@ -1641,8 +1687,8 @@ async function adminKnMay(env, body) {
     try { st = await call(roomStub(env, r.id), '/status', { id: r.id, open: !!r.dang_mo, mo: r.mo_luc || 0 }); } catch (e) { st = { err: 1 }; }
     const m = role => (may.results || []).find(x => x.phong_id === r.id && x.role === role) || null;
     const k = role => (rotK.results || []).find(x => x.phong_id === r.id && x.role === role) || { rot: 0, noi: 0 };
-    return { id: r.id, ten: r.ten_phong, open: !!r.dang_mo, tvOn: !!st.tv, tbOn: st.tablets || 0, dt: st.remotes || 0, err: !!st.err,
-      tv: m('tv'), tb: m('tablet'), tvK: k('tv'), tbK: k('tablet') };
+    return { id: r.id, ten: r.ten_phong, open: !!r.dang_mo, tvOn: !!st.tv, tbOn: st.tablets || 0, dt: st.remotes || 0, err: !!st.err, cl: st.cl || 0,
+      tv: m('tv'), tb: m('tablet'), tvK: k('tv'), tbK: k('tablet'), phat: knPhatTk((phat.results || []).filter(x => x.phong_id === r.id)) };
   }));
   return ok({ ds, now: Date.now() });
 }
@@ -2058,10 +2104,12 @@ export class Room extends DurableObject {
     const e = Object.assign({ t: Date.now(), ev }, o || {});
     try{ console.log('nk', this.nkRid || '', JSON.stringify(e)); }catch(x){}
     this.nkQ = (this.nkQ || Promise.resolve()).then(async () => {          // xếp hàng: nhiều sự kiện cùng lúc không ghi đè nhau
-      let l = (await this.ctx.storage.get('nk')) || [];
-      const e2 = Object.assign({}, e); delete e2.ua; delete e2.asn; delete e2.colo;     // 60 dòng trong phòng: gọn, chi tiết máy nằm ở D1
-      l.push(e2); if(l.length > 60) l = l.slice(-60);
-      await this.ctx.storage.put('nk', l);
+      if(ev !== 'phat'){                                                   // báo cáo phát nhạc từng bài không chiếm chỗ 60 dòng nhật ký của phòng
+        let l = (await this.ctx.storage.get('nk')) || [];
+        const e2 = Object.assign({}, e); delete e2.ua; delete e2.asn; delete e2.colo;     // 60 dòng trong phòng: gọn, chi tiết máy nằm ở D1
+        l.push(e2); if(l.length > 60) l = l.slice(-60);
+        await this.ctx.storage.put('nk', l);
+      }
       if(this.env.DB){                                                     // lưu dài ngày cho tab Kết nối (admin); D1 chậm/lỗi thì bỏ qua sau 4 giây
         const c = await this.cfg();
         if(!c.rid && this.nkRid) c.rid = this.nkRid;
@@ -2074,7 +2122,7 @@ export class Room extends DurableObject {
   async roomMsg(c, extra){
     c = c || await this.cfg();
     return Object.assign({ type: 'room', open: c.open, since: c.since, session: c.session, name: c.name, bname: c.bname, branch: c.branch, tv: this.sockets('tv').length > 0,
-      remotes: this.sockets('remote').length, tablets: this.sockets('tablet').length, seek: await seekOn(this.env) }, extra || {});
+      remotes: this.sockets('remote').length, tablets: this.sockets('tablet').length, seek: await seekOn(this.env), cl: (await this.ctx.storage.get('cl')) || 0 }, extra || {});
   }
   /* Phần riêng từng vai trò: TV nhận mã QR khách để vẽ ở góc màn hình, máy tính bảng nhận vé tìm bài */
   async roleExtra(c, role){
@@ -2173,7 +2221,7 @@ export class Room extends DurableObject {
     let off = 0;
     for(const ws of this.sockets('remote')){ const a = ws.deserializeAttachment() || {}; if(a.off) off++; }
     return { remotes: this.sockets('remote').length, tablets: this.sockets('tablet').length, tv: this.sockets('tv').length > 0, net, offNet: off,
-      open: c.open, since: c.since, genQ: c.genQ, genT: c.genT, tvIp: (await this.ctx.storage.get('tvIp')) || '' };
+      open: c.open, since: c.since, genQ: c.genQ, genT: c.genT, tvIp: (await this.ctx.storage.get('tvIp')) || '', cl: (await this.ctx.storage.get('cl')) || 0 };
   }
 
   async fetch(req){
@@ -2191,6 +2239,12 @@ export class Room extends DurableObject {
     if(u.pathname === '/status') return jres(await this.status(body));
     if(u.pathname === '/sync'){ const c = await this.syncDb(); return jres({ ok: true, open: c.open }); }
     if(u.pathname === '/nhatky') return jres({ nk: (await this.ctx.storage.get('nk')) || [] });
+    if(u.pathname === '/cl'){                            // giới hạn chất lượng video trên TV phòng này (0 = tự động): TV nhận cờ cl trong tin 'room'
+      const cl = KN_CL.includes(+body.cl) ? +body.cl : 0;
+      await this.ctx.storage.put('cl', cl);
+      await this.broadcastRoom();
+      return jres({ ok: true, cl });
+    }
     if(u.pathname === '/svc'){ await this.svcPut(body.don || {}); return jres({ ok: true }); }
     if(u.pathname === '/rotate'){
       const role = body.kind === 'tv' ? 'tv' : body.kind === 'tb' ? 'tablet' : 'remote', c = await this.cfg();
@@ -2297,6 +2351,17 @@ export class Room extends DurableObject {
       const dg = { down: nu(g.down, 7 * 86400000), why: tx(g.why, 16), tries: nu(g.tries, 999), on: g.on === 0 ? 0 : 1, hid: g.hid ? 1 : 0, rtt: nu(g.rtt, 60000), rttMax: nu(g.rttMax, 60000),
         net: tx(g.net, 8), nrtt: nu(g.nrtt, 60000), dl: Number.isFinite(+g.dl) ? Math.round(+g.dl * 10) / 10 : undefined, ty: tx(g.ty, 12) };
       await this.ghi('tai', { role: a.role, ip: netKey(a.ip), isp: a.isp, dev: (a.dev || '').slice(0, 8) || undefined, ua: a.ua, dg });
+      return;
+    }
+
+    if(m.type === 'pq'){                                 // TV báo chất lượng phát 1 bài (mở bài bao lâu, đứng hình, độ phân giải, CPU bận) — xem index.html
+      if(a.role !== 'tv' || now - (a.pqT || 0) < 8000 || data.length > 700) return;
+      a.pqT = now; try{ ws.serializeAttachment(a); }catch(e){}
+      const g = m.d || {}, nu = (v, mx) => Number.isFinite(+v) && v !== '' && v !== null ? Math.max(0, Math.min(mx, Math.round(+v))) : undefined, tx = (v, n) => String(v == null ? '' : v).replace(/[^\w.-]/g, '').slice(0, n) || undefined;
+      const dg = { n: nu(g.n, 9999), st: nu(g.st, 600000), bn: nu(g.bn, 999), bms: nu(g.bms, 3600000), q: tx(g.q, 10), qmx: tx(g.qmx, 10), ltn: nu(g.ltn, 99999), ltms: nu(g.ltms, 3600000),
+        pl: nu(g.pl, 36000), up: nu(g.up, 30 * 86400), sk: nu(g.sk, 999), cl: nu(g.cl, 4320), vw: nu(g.vw, 10000), vh: nu(g.vh, 10000), dpr: Number.isFinite(+g.dpr) ? Math.round(+g.dpr * 100) / 100 : undefined,
+        hc: nu(g.hc, 256), mem: Number.isFinite(+g.mem) ? +g.mem : undefined, err: nu(g.err, 999), why: tx(g.why, 6), id: /^[\w-]{11}$/.test(g.id || '') ? g.id : undefined };
+      await this.ghi('phat', { role: 'tv', ip: netKey(a.ip), isp: a.isp, ua: a.ua, dg });
       return;
     }
 

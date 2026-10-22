@@ -2355,6 +2355,12 @@ function knSuKien(e){
   else if(e.ev==='tai'){ var g = {}; try{ g = JSON.parse(e.dg||'{}'); }catch(x){}
     tx = '🔁 nối lại — <b>mất '+knDown(g.down)+'</b> · '+knLyDo(g)+(g.tries?' · thử '+g.tries+' lần':'')
       + (g.rtt!=null ? '<div class="knsm">ping trước khi rớt: TB '+g.rtt+'ms, cao nhất '+(g.rttMax!=null?g.rttMax:'?')+'ms'+(g.net?' · mạng '+esc(g.net):'')+(g.ty?' ('+esc(g.ty)+')':'')+(g.nrtt!=null?' · RTT '+g.nrtt+'ms':'')+(g.dl!=null?' · '+g.dl+'Mb/s':'')+'</div>' : (g.net?'<div class="knsm">mạng '+esc(g.net)+(g.ty?' ('+esc(g.ty)+')':'')+'</div>':'')); cls = 'kn-ev-noi'; }
+  else if(e.ev==='phat'){ var p = {}; try{ p = JSON.parse(e.dg||'{}'); }catch(x){}
+    var xau = (p.bn||0)>0 || (p.st||0)>6000 || (p.ltms||0)>3000 || p.err;
+    tx = '🎵 bài thứ '+(p.n||'?')+' từ lúc bật'+(p.q?' · <b>'+knQ(p.q)+'</b>':'')+(p.st!=null?' · mở bài '+knDown(p.st):'')
+      + ((p.bn||0)>0?' · <b>đứng hình chờ tải '+p.bn+' lần ('+knDown(p.bms)+')</b>':'')+((p.ltms||0)>=1000?' · <b>máy bận '+knDown(p.ltms)+'</b>':'')+(p.err?' · <b>lỗi '+p.err+'</b>':'')
+      + '<div class="knsm">'+(p.vw?'màn '+p.vw+'×'+p.vh+(p.dpr?' @'+p.dpr+'x':''):'')+(p.cl?' · giới hạn '+p.cl+'p':' · chất lượng tự động')+(p.qmx&&p.qmx!==p.q?' · cao nhất '+knQ(p.qmx):'')+(p.hc?' · '+p.hc+' nhân CPU':'')+(p.mem?' · '+p.mem+'GB':'')+(p.up!=null?' · trang chạy '+knTuoi(p.up):'')+(p.sk?' · +'+p.sk+' bài êm trước đó':'')+'</div>';
+    cls = xau ? 'kn-ev-cat' : 'kn-ev-noi'; }
   else if(e.ev==='mo') tx = '<b>Phòng MỞ</b>';
   else if(e.ev==='dong') tx = '<b>Phòng ĐÓNG</b>';
   else if(e.ev==='xoa'){ tx = 'phòng bị xoá'; cls = 'kn-ev-rot'; }
@@ -2408,6 +2414,7 @@ function knTqVe(r){
     + '</div>';
   h += knNhanDinh(r);
   h += knMatVe(r);
+  h += knPhatVe(r);
   h += '<div class="knbox"><h3>Số lần rớt theo ngày</h3>'+knChart(r.theoNgay||[])+'<div class="knleg"><span><i style="background:#D6314F"></i>TV</span><span><i style="background:#8B2FBE"></i>Máy tính bảng</span><span><i style="background:#F5B87A"></i>Điện thoại khách</span></div></div>';
   if(!r.cn){
     var m = {};
@@ -2432,6 +2439,27 @@ function knTqVe(r){
     + (nm.length ? nm.map(function(x){ var tl = x.noi ? Math.round(100*x.rot/x.noi) : 0; return '<tr><td>'+esc(knTenCn(x.cn))+'</td><td><b>'+esc(x.isp)+'</b></td><td>'+x.so_ip+'</td><td>'+knSo(x.noi)+'</td><td>'+knSo(x.rot)+'</td><td'+(tl>=50?' style="color:#D6314F;font-weight:700"':'')+'>'+tl+'%</td></tr>'; }).join('') : '<tr><td colspan="6" class="mut">Chưa có dữ liệu.</td></tr>')
     + '</tbody></table></div></div>';
   $('knBody').innerHTML = h;
+}
+function knQ(q){ return { tiny:'144p', small:'240p', medium:'360p', large:'480p', hd720:'720p', hd1080:'1080p', hd1440:'1440p', hd2160:'4K', highres:'>4K' }[q] || q || '?'; }
+function knPt(a, b){ return b ? Math.round(100*a/b)+'%' : '—'; }
+function knQTop(o){ var k = Object.keys(o||{}).sort(function(a,b){ return o[b]-o[a]; }); return k.length ? k.slice(0,2).map(function(x){ return knQ(x)+' ('+o[x]+')'; }).join(', ') : '—'; }
+function knPhatVe(r){
+  var P = r.phat || {}, T = r.phatTop || [];
+  var h = '<div class="knbox"><h3>🎵 Phát nhạc trên TV — giật / đứng hình <span class="knsm">— TV tự báo từng bài (5 bài đầu sau khi bật + mọi bài có vấn đề)</span></h3>';
+  if(!P.n){ return h + '<div class="mut">Chưa có dữ liệu. TV cần tải bản trang mới (tự cập nhật khi phòng đóng, hoặc menu ẩn → Tải lại trang).</div></div>'; }
+  h += '<div class="stats">'
+    + '<div class="stat'+(P.dauXau?' r':'')+'"><div class="k">Bài 1–3 sau khi bật TV có vấn đề</div><div class="v">'+knPt(P.dauXau, P.dau)+'</div><div class="knsm">'+P.dauXau+' / '+P.dau+' bài</div></div>'
+    + '<div class="stat"><div class="k">Từ bài thứ 4 trở đi có vấn đề</div><div class="v">'+knPt(P.sauXau, P.sau)+'</div><div class="knsm">'+P.sauXau+' / '+knSo(P.sau)+' bài</div></div>'
+    + '<div class="stat"><div class="k">Đứng hình chờ tải</div><div class="v">'+knSo(P.bn)+' lần</div><div class="knsm">tổng '+knDown(P.bms)+'</div></div>'
+    + '<div class="stat"><div class="k">Độ phân giải hay phát</div><div class="v" style="font-size:18px">'+knQTop(P.q)+'</div></div>'
+    + '</div>';
+  if(P.dau >= 5 && P.dauXau/P.dau > 2*(P.sau ? P.sauXau/P.sau : 0) + .1) h += '<div class="knnote">Đúng là <b>mấy bài đầu sau khi bật TV hay có vấn đề hơn hẳn</b>. Nếu kèm đứng hình chờ tải → mạng; nếu chủ yếu "máy bận" hoặc phát 1080p trở lên → box giải mã không nổi: thử <b>giới hạn 720p</b> ở mục Thiết bị từng phòng.</div>';
+  if(T.length) h += '<div class="tblwrap"><table><thead><tr><th>Chi nhánh</th><th>Phòng</th><th>Bài có vấn đề</th><th>Bài 1–3</th><th>Đứng hình</th><th>Máy bận</th><th>Mở bài (TV)</th><th>Độ phân giải</th><th>Màn hình</th></tr></thead><tbody>'
+    + T.map(function(x){ return '<tr class="kn-tr" data-nk-phong="'+esc(x.phong_id)+'" data-nk-ten="'+esc(x.phong)+'" data-nk-role="tv" data-nk-cn="'+esc(x.cn)+'" data-nk-ev="phat"><td>'+esc(knTenCn(x.cn))+'</td><td><b>'+esc(x.phong)+'</b></td>'
+      + '<td style="color:#B7791F;font-weight:700">'+x.xau+' / '+x.n+'</td><td>'+x.dauXau+' / '+x.dau+'</td><td>'+x.bn+' lần · '+knDown(x.bms)+'</td><td>'+(x.lt>=1000?knDown(x.lt):'—')+'</td><td>'+(x.stTv!=null?knDown(x.stTv):'—')+'</td><td>'+knQTop(x.q)+'</td><td class="knsm">'+esc(x.man||'')+(x.cl?'<br>giới hạn '+x.cl+'p':'')+'</td></tr>'; }).join('')
+    + '</tbody></table></div>';
+  h += '<div class="knsm" style="margin-top:8px;line-height:1.6"><b>Bài có vấn đề</b> = đứng hình chờ tải, mở bài lâu hơn 6 giây, hoặc máy bận quá 3 giây. <b>Đứng hình chờ tải</b> nhiều → do mạng. <b>Máy bận</b> nhiều / phát 1080p–4K trên box yếu → box giải mã không nổi, nên giới hạn 720p. Giật hình mà không đứng hình thì trang không đo trực tiếp được — so sánh trước/sau khi giới hạn 720p.</div></div>';
+  return h;
 }
 function knMatVe(r){
   var M = r.mat || {}, nn = r.matNguyenNhan || {}, tot = 0, k;
@@ -2487,6 +2515,12 @@ function knChart(rows){
   return '<div style="overflow-x:auto">'+s+'</svg></div>';
 }
 /* ---------- Thiết bị từng phòng ---------- */
+function knClOpt(cur){ return (cur<0?'<option value="">— chọn —</option>':'')+[[0,'Tự động (YouTube chọn)'],[1080,'Tối đa 1080p'],[720,'Tối đa 720p'],[480,'Tối đa 480p'],[360,'Tối đa 360p']].map(function(o){ return '<option value="'+o[0]+'"'+(o[0]===cur?' selected':'')+'>'+o[1]+'</option>'; }).join(''); }
+function knMayPhat(x){
+  var p = x.phat || {}, h = '<div class="knsm" style="margin-top:6px">🎞️ <select data-cl-id="'+esc(x.id)+'" style="font-size:12px;padding:3px 6px;border-radius:8px;border:1px solid #CDB8E3">'+knClOpt(x.cl||0)+'</select></div>';
+  if(p.n) h += '<div class="knsm">🎵 '+p.n+' bài'+(p.xau?' · <b style="color:#B7791F">'+p.xau+' có vấn đề</b> (bài 1–3: '+p.dauXau+'/'+p.dau+')':' · êm')+(p.bn?' · đứng hình '+p.bn+' lần':'')+' · hay phát '+knQTop(p.q)+(p.man?'<br>'+esc(p.man):'')+'</div>';
+  return h;
+}
 function knMay(){
   if(!KN.cn){ $('knBody').innerHTML = '<div class="knnote">Chọn <b>một chi nhánh</b> ở ô phía trên để xem TV / máy tính bảng của từng phòng.</div>'; return; }
   knGoi('admin.knMay').then(function(r){
@@ -2495,6 +2529,8 @@ function knMay(){
     var h = '<div class="stats"><div class="stat g"><div class="k">TV đang nối</div><div class="v">'+o1+' / '+ds.length+'</div></div>'
       + '<div class="stat"><div class="k">Máy tính bảng đang nối</div><div class="v">'+ds.filter(function(x){ return x.tbOn; }).length+'</div></div>'
       + '<div class="stat y"><div class="k">Điện thoại khách đang nối</div><div class="v">'+ds.reduce(function(a,x){ return a + (x.dt||0); }, 0)+'</div></div></div>';
+    h += '<div class="knbox"><h3>🎞️ Chất lượng video trên TV</h3><div class="knsm" style="line-height:1.6;margin-bottom:8px">TV nào hay <b>giật mấy bài đầu</b> thì giới hạn <b>720p</b> (karaoke nhìn gần như không khác). Áp dụng ngay, không cần tải lại TV; bài đang hát có thể đến bài sau mới đổi.</div>'
+      + '<div class="knf"><span class="knsm">Đặt cho mọi TV của chi nhánh:</span><select id="knClAll">'+knClOpt(-1)+'</select><button class="btn btn-ghost btn-sm" id="knClAllBtn">Áp dụng</button></div></div>';
     function o(m, on, k, tv){
       if(!m) return '<span class="kndot" style="background:'+(on?'#17935F':'#CDB8E3')+'"></span>'+(on?'đang nối':'<span class="mut">chưa có dữ liệu</span>');
       return '<span class="kndot" style="background:'+(on?'#17935F':tv?'#D6314F':'#CDB8E3')+'"></span><b>'+(on?'Đang nối':'Không nối')+'</b> · '+esc(m.ua||'')
@@ -2502,7 +2538,7 @@ function knMay(){
         + '<div class="knsm">Trong kỳ: <b style="color:'+(k.rot&&tv?'#D6314F':'inherit')+'">'+k.rot+' lần rớt</b> / '+k.noi+' lần nối</div>';
     }
     h += '<div class="tblwrap"><table><thead><tr><th>Phòng</th><th>TV</th><th>Máy tính bảng</th><th>ĐT</th></tr></thead><tbody>'
-      + ds.map(function(x){ return '<tr><td><b>'+esc(x.ten)+'</b><div class="knsm">'+(x.open?'đang mở':'đóng')+'</div><button class="btn btn-ghost btn-sm" style="margin-top:4px;padding:3px 9px;font-size:11.5px" data-nk-phong="'+esc(x.id)+'" data-nk-ten="'+esc(x.ten)+'" data-nk-cn="'+esc(KN.cn)+'">Nhật ký</button></td><td>'+o(x.tv, x.tvOn, x.tvK, true)+'</td><td>'+(x.tb||x.tbOn?o(x.tb, x.tbOn, x.tbK):'<span class="mut">không có</span>')+'</td><td>'+(x.dt||0)+'</td></tr>'; }).join('')
+      + ds.map(function(x){ return '<tr><td><b>'+esc(x.ten)+'</b><div class="knsm">'+(x.open?'đang mở':'đóng')+'</div><button class="btn btn-ghost btn-sm" style="margin-top:4px;padding:3px 9px;font-size:11.5px" data-nk-phong="'+esc(x.id)+'" data-nk-ten="'+esc(x.ten)+'" data-nk-cn="'+esc(KN.cn)+'">Nhật ký</button></td><td>'+o(x.tv, x.tvOn, x.tvK, true)+knMayPhat(x)+'</td><td>'+(x.tb||x.tbOn?o(x.tb, x.tbOn, x.tbK):'<span class="mut">không có</span>')+'</td><td>'+(x.dt||0)+'</td></tr>'; }).join('')
       + '</tbody></table></div>';
     $('knBody').innerHTML = h;
   }).catch(knLoi);
@@ -2511,7 +2547,7 @@ function knMay(){
 function knNkLoc(){
   var L = KN.loc, h = '<div class="knf">'
     + '<select id="knfRole"><option value="">Mọi thiết bị</option><option value="tv">TV</option><option value="tablet">Máy tính bảng</option><option value="remote">Điện thoại khách</option></select>'
-    + '<select id="knfEv"><option value="">Mọi sự kiện</option><option value="rot">Chỉ RỚT</option><option value="noi">Nối vào</option><option value="tai">Nối lại (máy tự báo)</option><option value="cat">Server cắt</option><option value="tuchoi">Bị từ chối</option><option value="mo">Mở phòng</option><option value="dong">Đóng phòng</option></select>'
+    + '<select id="knfEv"><option value="">Mọi sự kiện</option><option value="rot">Chỉ RỚT</option><option value="noi">Nối vào</option><option value="tai">Nối lại (máy tự báo)</option><option value="phat">🎵 Phát nhạc trên TV (giật/đứng hình)</option><option value="cat">Server cắt</option><option value="tuchoi">Bị từ chối</option><option value="mo">Mở phòng</option><option value="dong">Đóng phòng</option></select>'
     + '<input id="knfIp" placeholder="Lọc IP" style="width:150px" value="'+esc(L.ip)+'">'
     + (L.phong ? '<span class="knchip">Phòng '+esc(L.phongTen)+'<button data-bo="phong" title="Bỏ lọc">✕</button></span>' : '')
     + (L.quanh ? '<span class="knchip">±2 phút quanh '+knTg(L.quanh)+'<button data-bo="quanh" title="Bỏ lọc">✕</button></span>' : '')
@@ -2673,7 +2709,7 @@ $('knBody').addEventListener('click', function(ev){
   if((el = t.closest('[data-nk-cn]'))){
     var cn = el.getAttribute('data-nk-cn');
     if(cn && KN.cn !== cn){ KN.cn = cn; $('knCn').value = cn; KN.tq = null; }
-    KN.loc = { phong: el.getAttribute('data-nk-phong') || '', phongTen: el.getAttribute('data-nk-ten') || '', role: el.getAttribute('data-nk-role') || '', ev: '', ip: '', quanh: +el.getAttribute('data-quanh') || 0 };
+    KN.loc = { phong: el.getAttribute('data-nk-phong') || '', phongTen: el.getAttribute('data-nk-ten') || '', role: el.getAttribute('data-nk-role') || '', ev: el.getAttribute('data-nk-ev') || '', ip: '', quanh: +el.getAttribute('data-quanh') || 0 };
     if(KN.loc.quanh && KN.ngay < 30 && Date.now() - KN.loc.quanh > KN.ngay*86400000) KN.ngay = 30;
     KN.sub = 'nk'; knVe(); return;
   }
@@ -2682,12 +2718,17 @@ $('knBody').addEventListener('click', function(ev){
   if(t.id==='cbLuu'){ t.disabled = true; knGoi('admin.knCanhBaoLuu', { bat: $('cbBat').checked?1:0, nguong: +$('cbNguong').value, cuaSo: +$('cbCuaSo').value, imLang: +$('cbIm').value })
     .then(function(x){ KN.cb = x; knCbVe(x); toast('Đã lưu cài đặt cảnh báo.'); }).catch(function(e){ t.disabled = false; toast(e.message||'Không lưu được.'); }); return; }
   if(t.id==='cbThu'){ t.disabled = true; knGoi('admin.knCanhBaoThu').then(function(){ t.disabled = false; toast('Đã gửi tin thử, kiểm tra Telegram.'); }).catch(function(e){ t.disabled = false; toast(e.message||'Không gửi được.'); }); return; }
+  if(t.id==='knClAllBtn'){ var v = $('knClAll').value; if(v===''){ toast('Chọn mức chất lượng trước.'); return; }
+    if(!confirm('Đặt "'+$('knClAll').selectedOptions[0].textContent+'" cho MỌI TV của chi nhánh này?')) return;
+    t.disabled = true; knGoi('admin.knCl', { all: 1, cl: +v }).then(function(x){ toast('Đã đặt cho '+x.so+' / '+x.tong+' phòng.'); knMay(); }).catch(function(e){ t.disabled = false; toast(e.message||'Không đặt được.'); }); return; }
   if(t.id==='knThem'){ t.disabled = true; knNk(true); return; }
   if(t.id==='knCsv'){ knCsv(); return; }
   if(t.id==='knIpLai'){ KN.ipXem = ''; knIp(); return; }
 });
 $('knBody').addEventListener('change', function(ev){
   var id = ev.target.id;
+  if(ev.target.hasAttribute('data-cl-id')){ var se = ev.target; se.disabled = true;
+    knGoi('admin.knCl', { id: se.getAttribute('data-cl-id'), cl: +se.value }).then(function(x){ se.disabled = false; toast(x.so ? 'Đã đặt chất lượng cho TV phòng này.' : 'Chưa gửi được tới phòng, thử lại.'); }).catch(function(e){ se.disabled = false; toast(e.message||'Không đặt được.'); }); return; }
   if(id==='knfRole'){ KN.loc.role = ev.target.value; KN.nk = []; knNk(); }
   else if(id==='knfEv'){ KN.loc.ev = ev.target.value; KN.nk = []; knNk(); }
   else if(id==='knfIp'){ KN.loc.ip = ev.target.value.trim(); KN.nk = []; knNk(); }
