@@ -319,6 +319,9 @@ tbody tr:hover td{background:#FBF8FE}
 @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 /* ---- tab 🔌 Kết nối (admin) ---- */
 .knbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+.kncn{display:inline-flex;align-items:center;gap:8px;background:#FFF4C2;border:2px solid #F5B800;border-radius:12px;padding:5px 6px 5px 11px;box-shadow:0 2px 8px rgba(245,184,0,.25)}
+.kncn span{font-size:12px;font-weight:700;color:#6A4A00;white-space:nowrap}
+.knbar .kncn select{font-weight:800;font-size:14.5px;color:var(--grape);border-color:#F5B800;max-width:100%}
 .knbar select,.knf select,.knf input{background:#fff;border:1px solid #CDB8E3;color:var(--txt);border-radius:10px;padding:7px 10px;font:inherit;font-size:13px}
 .knseg{display:inline-flex;border:1px solid #CDB8E3;border-radius:999px;overflow:hidden;background:#fff}
 .knseg button{border:0;background:transparent;padding:7px 13px;font:inherit;font-size:13px;color:var(--txt-dim);cursor:pointer}
@@ -474,7 +477,7 @@ tbody tr:hover td{background:#FBF8FE}
   <!-- ⚙️ Cài đặt (quản lý chi nhánh + admin): vân tay trên máy này; phát hành APK chỉ dành cho admin cao nhất -->
   <div class="pg" id="p8">
     <div class="knbar">
-      <select id="knCn" aria-label="Chi nhánh"></select>
+      <label class="kncn" title="Ô này của tab Kết nối, tách riêng với ô chi nhánh ở trên cùng"><span>🏢 Đang xem chi nhánh</span><select id="knCn" aria-label="Chi nhánh đang xem"></select></label>
       <span class="knseg" id="knNgay"><button data-n="1">24 giờ</button><button data-n="7" class="on">7 ngày</button><button data-n="15">15 ngày</button><button data-n="30">30 ngày</button></span>
       <button class="btn btn-ghost btn-sm" id="knTai">↻ Tải lại</button>
       <button class="btn btn-ghost btn-sm" id="knChep" title="Chép tóm tắt để gửi kỹ thuật">📋 Chép báo cáo</button>
@@ -2412,8 +2415,11 @@ function knLoi(err){ $('knBody').innerHTML = '<div class="knnote r">'+esc(err &&
 function knMo(){
   if(!$('knCn').options.length){
     $('knCn').innerHTML = '<option value="">🌐 Tất cả chi nhánh</option>' + S.branches.map(function(b){ return '<option value="'+esc(b.id)+'">'+esc(b.ten)+'</option>'; }).join('');
-    $('knCn').value = KN.cn;
   }
+  /* mỗi lần mở tab Kết nối: lấy theo chi nhánh đang chọn ở trên cùng (vẫn đổi được ở ô riêng, kể cả xem tất cả) */
+  var cnTren = S.branch || '';
+  if(KN.cn !== cnTren){ KN.cn = cnTren; KN.tq = null; KN.ipXem = ''; KN.loc.phong = ''; KN.loc.quanh = 0; }
+  $('knCn').value = KN.cn;
   knVe();
 }
 function knVe(){
