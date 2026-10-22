@@ -440,17 +440,36 @@ public class MainActivity extends Activity {
         return "https".equals(u.getScheme()) && h != null && (h.equals("bmb.id.vn") || h.endsWith(".bmb.id.vn") || h.equals("vmh.io.vn") || h.endsWith(".vmh.io.vn") || h.equals("boommusicbox.vn") || h.endsWith(".boommusicbox.vn"));
     }
 
+    /** Nút "Kết nối Telegram" ở quầy (quay.html) là liên kết t.me/<bot>?start=<mã> mở tab mới: WebView không tự mở được → mở bằng app Telegram (hoặc trình duyệt nếu chưa cài).
+     *  Chỉ nhận đúng liên kết Telegram, chỉ khi đang ở trang quầy/quản trị của hệ thống mình, và phải do người dùng bấm. */
+    private void openTelegram(Uri u, boolean gesture) {
+        try {
+            if (u == null || !gesture || !adminPageNow()) return;
+            String sc = u.getScheme(), h = u.getHost();
+            boolean ok = ("https".equals(sc) && h != null && (h.equals("t.me") || h.equals("telegram.me")))
+                    || ("tg".equals(sc));
+            if (!ok) return;
+            Intent i = new Intent(Intent.ACTION_VIEW, u).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            try { startActivity(i); } catch (Exception e) { toast("Không mở được Telegram. Hãy cài Telegram rồi thử lại."); }
+        } catch (Exception ignored) {}
+    }
+
     private class Client extends WebViewClient {
         @Override
         public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest req) {
             if (!req.isForMainFrame()) return false;
-            return !allowed(req.getUrl());                  // chặn mở trang ngoài (vd bấm logo YouTube)
+            if (allowed(req.getUrl())) return false;
+            openTelegram(req.getUrl(), req.hasGesture());   // chỉ liên kết Telegram (nút Kết nối Telegram ở quầy) mới được mở ra ngoài
+            return true;                                    // còn lại vẫn chặn (vd bấm logo YouTube)
         }
 
         @SuppressWarnings("deprecation")
         @Override
         public boolean shouldOverrideUrlLoading(WebView view, String url) {
-            return !allowed(Uri.parse(url));
+            Uri u = Uri.parse(url);
+            if (allowed(u)) return false;
+            openTelegram(u, true);
+            return true;
         }
 
         @Override
