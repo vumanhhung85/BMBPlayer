@@ -337,9 +337,10 @@ tbody tr:hover td{background:#FBF8FE}
 .knnote{border-left:4px solid var(--gold);background:#FFF8E8;border-radius:10px;padding:8px 12px;font-size:13px;margin:0 0 8px;color:var(--txt)}
 .knnote.r{border-color:var(--bad);background:#FFF1F3}.knnote.g{border-color:var(--ok);background:#EEFAF4}
 .kndot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:0}
-.kn-ev-rot{color:var(--bad);font-weight:700}.kn-ev-cat{color:#B7791F;font-weight:700}.kn-ev-noi{color:var(--ok)}
+.kn-ev-rot{color:var(--bad);font-weight:700}.kn-ev-nhe{color:#8a7aa3;font-weight:600}.kn-ev-cat{color:#B7791F;font-weight:700}.kn-ev-noi{color:var(--ok)}
 .knheat{display:inline-block;min-width:26px;text-align:center;border-radius:6px;padding:3px 5px;font-weight:700;font-size:12px;background:#F3EEF9;color:#9a86b3}
 .knheat.h1{background:#FFF1CC;color:#8a5a00}.knheat.h2{background:#FFD9A8;color:#7a3a00}.knheat.h3{background:#F7A9B5;color:#7a0b24}.knheat.h4{background:#D6314F;color:#fff}
+.knheat.m1{background:#EFE6FA;color:#6d4a96}.knheat.m2{background:#E0CCF5;color:#5b3585}.knheat.m3{background:#CDB0EE;color:#4a2272}.knheat.m4{background:#9B6AD0;color:#fff}
 .knbadge{display:inline-block;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;white-space:nowrap}
 .knbadge.xau{background:#FFE3E8;color:#B3203E}.knbadge.keo{background:#FFF1CC;color:#8a5a00}.knbadge.tot{background:#E4F7EE;color:#0F7A4D}.knbadge.on{background:#F3EEF9;color:#7d6b94}
 .knfrm{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:10px 0}
@@ -2058,7 +2059,7 @@ function nkVe(){
   $('nkList').innerHTML = rows.slice(0, 150).map(function(e){
     var ro = e.role ? (ROLE[e.role]||e.role)+' ' : '', tx, mau = '';
     if(e.ev === 'noi') tx = ro+'nối vào'+(e.dev ? ' (máy '+esc(e.dev)+')' : '')+(e.ip ? ' · IP <span class="mut">'+esc(e.ip)+'</span>' : '');
-    else if(e.ev === 'dut'){ tx = ro+'<b>máy rớt</b> mã '+e.code+(e.why ? ' "'+esc(e.why)+'"' : '')+(e.tuoi != null ? ', đã nối '+e.tuoi+'s' : ''); mau = 'color:#D6314F'; }
+    else if(e.ev === 'dut'){ tx = ro+'<b>máy rớt</b> mã '+e.code+(e.why ? ' "'+esc(e.why)+'"' : '')+(e.tuoi != null ? ', đã nối '+e.tuoi+'s' : ''); mau = e.role === 'tv' ? 'color:#D6314F' : 'color:#9a86b3'; }
     else if(e.ev === 'cat'){ tx = ro+'<b>server cắt</b> mã '+e.code+' — '+esc(e.why||'')+(e.n ? ' ('+e.n+' máy)' : '')+(e.im != null && e.im >= 0 ? ', im '+e.im+'s' : ''); mau = 'color:#B7791F'; }
     else if(e.ev === 'tuchoi'){ tx = ro+'bị từ chối mã '+e.code+' "'+esc(e.why||'')+'" (đang '+(e.dem||0)+' máy)'; mau = 'color:#B7791F'; }
     else if(e.ev === 'mo') tx = '<b>phòng MỞ</b>';
@@ -2348,8 +2349,8 @@ function knLyDo(g){
 function knSuKien(e){
   var c = e.code, tx, cls = '';
   if(e.ev==='noi'){ tx = 'nối vào'; cls = 'kn-ev-noi'; }
-  else if(e.ev==='dut'){ tx = 'MÁY RỚT · mã '+c+(e.why?' “'+esc(e.why)+'”':'')+(e.tuoi!=null?' · đã nối '+knTuoi(e.tuoi):''); cls = 'kn-ev-rot'; }
-  else if(e.ev==='cat'){ tx = (c===4007?'MẤT TÍN HIỆU (im lặng, hệ thống ngắt) · mã 4007':'server cắt · mã '+c+' — '+esc(e.why||''))+(e.n?' ('+e.n+' máy)':'')+(e.im!=null&&e.im>=0?' · im '+e.im+'s':''); cls = c===4007?'kn-ev-rot':'kn-ev-cat'; }
+  else if(e.ev==='dut'){ tx = 'MÁY RỚT · mã '+c+(e.why?' “'+esc(e.why)+'”':'')+(e.tuoi!=null?' · đã nối '+knTuoi(e.tuoi):''); cls = e.role==='tv' ? 'kn-ev-rot' : 'kn-ev-nhe'; }
+  else if(e.ev==='cat'){ tx = (c===4007?'MẤT TÍN HIỆU (im lặng, hệ thống ngắt) · mã 4007':'server cắt · mã '+c+' — '+esc(e.why||''))+(e.n?' ('+e.n+' máy)':'')+(e.im!=null&&e.im>=0?' · im '+e.im+'s':''); cls = c===4007 ? (e.role==='tv'?'kn-ev-rot':'kn-ev-nhe') : 'kn-ev-cat'; }
   else if(e.ev==='tuchoi'){ tx = 'bị từ chối · mã '+c+' “'+esc(e.why||'')+'”'; cls = 'kn-ev-cat'; }
   else if(e.ev==='tai'){ var g = {}; try{ g = JSON.parse(e.dg||'{}'); }catch(x){}
     tx = '🔁 nối lại — <b>mất '+knDown(g.down)+'</b> · '+knLyDo(g)+(g.tries?' · thử '+g.tries+' lần':'')
@@ -2399,9 +2400,9 @@ function knTqVe(r){
   var tvR = knTong(A,'tv','rot'), tbR = knTong(A,'tablet','rot'), dtR = knTong(A,'remote','rot'), tvN = knTong(A,'tv','noi'), mo = knTong(A,'phong','mo'), tc = knTong(A,'remote','tuchoi');
   h += '<div class="stats">'
     + '<div class="stat r"><div class="k">TV rớt</div><div class="v">'+knSo(tvR)+'</div></div>'
-    + '<div class="stat r"><div class="k">Máy tính bảng rớt</div><div class="v">'+knSo(tbR)+'</div></div>'
-    + '<div class="stat y"><div class="k">Điện thoại khách rớt</div><div class="v">'+knSo(dtR)+'</div></div>'
-    + '<div class="stat"><div class="k">Rớt đồng loạt (≥2 phòng cùng lúc)</div><div class="v">'+knSo((r.dongLoat||[]).length)+'</div></div>'
+    + '<div class="stat"><div class="k">Máy tính bảng rớt <span class="knsm">(thường do tắt màn hình)</span></div><div class="v">'+knSo(tbR)+'</div></div>'
+    + '<div class="stat"><div class="k">Điện thoại khách rớt <span class="knsm">(khách tắt/quét xong)</span></div><div class="v">'+knSo(dtR)+'</div></div>'
+    + '<div class="stat"><div class="k">TV rớt đồng loạt (≥2 phòng cùng lúc)</div><div class="v">'+knSo((r.dongLoat||[]).length)+'</div></div>'
     + '<div class="stat g"><div class="k">Lượt mở phòng</div><div class="v">'+knSo(mo)+'</div></div>'
     + '<div class="stat"><div class="k">ĐT bị từ chối (đầy/chưa mở)</div><div class="v">'+knSo(tc)+'</div></div>'
     + '</div>';
@@ -2420,10 +2421,10 @@ function knTqVe(r){
   }
   var tp = r.topPhong || [];
   h += '<div class="knbox"><h3>Phòng có TV / máy tính bảng rớt nhiều nhất <span class="knsm">— bấm để xem nhật ký</span></h3><div class="tblwrap" style="box-shadow:none;border:0"><table><thead><tr><th>Chi nhánh</th><th>Phòng</th><th>Thiết bị</th><th>Rớt</th><th>Lần nối</th></tr></thead><tbody>'
-    + (tp.length ? tp.map(function(x){ return '<tr class="kn-tr" data-nk-phong="'+esc(x.phong_id)+'" data-nk-ten="'+esc(x.phong)+'" data-nk-role="'+esc(x.role)+'" data-nk-cn="'+esc(x.cn)+'"><td>'+esc(knTenCn(x.cn))+'</td><td><b>'+esc(x.phong)+'</b></td><td>'+(KN_VAI[x.role]||x.role)+'</td><td style="color:#D6314F;font-weight:700">'+knSo(x.rot)+'</td><td>'+knSo(x.noi)+'</td></tr>'; }).join('') : '<tr><td colspan="5" class="mut">Không có TV / máy tính bảng nào bị rớt. 👍</td></tr>')
+    + (tp.length ? tp.map(function(x){ return '<tr class="kn-tr" data-nk-phong="'+esc(x.phong_id)+'" data-nk-ten="'+esc(x.phong)+'" data-nk-role="'+esc(x.role)+'" data-nk-cn="'+esc(x.cn)+'"><td>'+esc(knTenCn(x.cn))+'</td><td><b>'+esc(x.phong)+'</b></td><td>'+(KN_VAI[x.role]||x.role)+'</td><td style="'+(x.role==='tv'?'color:#D6314F;font-weight:700':'color:#8a7aa3')+'">'+knSo(x.rot)+'</td><td>'+knSo(x.noi)+'</td></tr>'; }).join('') : '<tr><td colspan="5" class="mut">Không có TV / máy tính bảng nào bị rớt. 👍</td></tr>')
     + '</tbody></table></div></div>';
   var dl = r.dongLoat || [];
-  h += '<div class="knbox"><h3>Rớt đồng loạt — nhiều phòng mất kết nối trong cùng 10 giây <span class="knsm">— thường do router / đường mạng chi nhánh; bấm để xem ±2 phút</span></h3><div class="tblwrap" style="box-shadow:none;border:0"><table><thead><tr><th>Lúc</th><th>Chi nhánh</th><th>Số phòng</th><th>Số máy</th><th>Thiết bị</th><th>Nhà mạng</th><th>IP</th></tr></thead><tbody>'
+  h += '<div class="knbox"><h3>Rớt đồng loạt (TV) — nhiều phòng mất kết nối trong cùng 10 giây <span class="knsm">— thường do router / đường mạng chi nhánh; bấm để xem ±2 phút</span></h3><div class="tblwrap" style="box-shadow:none;border:0"><table><thead><tr><th>Lúc</th><th>Chi nhánh</th><th>Số phòng</th><th>Số máy</th><th>Thiết bị</th><th>Nhà mạng</th><th>IP</th></tr></thead><tbody>'
     + (dl.length ? dl.map(function(x){ return '<tr class="kn-tr" data-quanh="'+x.t+'" data-nk-cn="'+esc(x.cn)+'"><td>'+knTg(x.t)+'</td><td>'+esc(knTenCn(x.cn))+'</td><td><b>'+x.so_phong+'</b> <span class="knsm">'+esc(x.phong||'')+'</span></td><td>'+x.so+'</td><td>'+esc(String(x.vai||'').split(',').map(function(v){ return KN_VAI[v]||v; }).join(', '))+'</td><td>'+esc(x.isp||'—')+'</td><td class="knsm">'+esc(x.ip||'')+'</td></tr>'; }).join('') : '<tr><td colspan="7" class="mut">Không có lần rớt đồng loạt nào. 👍</td></tr>')
     + '</tbody></table></div></div>';
   var nm = r.nhaMang || [];
@@ -2438,13 +2439,13 @@ function knMatVe(r){
   var h = '<div class="knbox"><h3>Mất kết nối bao lâu &amp; vì sao <span class="knsm">— do chính TV / máy tính bảng / điện thoại tự báo sau khi nối lại</span></h3>';
   if(!tot){ return h + '<div class="mut">Chưa có báo cáo từ máy' + (r.dauDuLieu ? '' : ' (chưa có dữ liệu)') + '. TV / máy tính bảng cần nhận bản trang mới (tự cập nhật khi phòng đóng, hoặc menu ẩn → Tải lại trang).</div></div>'; }
   h += '<div class="tblwrap" style="box-shadow:none;border:0"><table><thead><tr><th>Thiết bị</th><th>Số lần</th><th>Trung vị</th><th>90% lần ngắn hơn</th><th>Lâu nhất</th></tr></thead><tbody>'
-    + ['tv','tablet','remote'].filter(function(x){ return M[x]; }).map(function(x){ var m = M[x]; return '<tr><td><b>'+KN_VAI[x]+'</b></td><td>'+m.n+'</td><td>'+knDown(m.p50)+'</td><td>'+knDown(m.p90)+'</td><td'+(m.max>600000?' style="color:#D6314F;font-weight:700"':'')+'>'+knDown(m.max)+'</td></tr>'; }).join('')
+    + ['tv','tablet','remote'].filter(function(x){ return M[x]; }).map(function(x){ var m = M[x]; return '<tr><td><b>'+KN_VAI[x]+'</b></td><td>'+m.n+'</td><td>'+knDown(m.p50)+'</td><td>'+knDown(m.p90)+'</td><td'+(m.max>600000&&x==='tv'?' style="color:#D6314F;font-weight:700"':'')+'>'+knDown(m.max)+'</td></tr>'; }).join('')
     + '</tbody></table></div>';
   var L = [['offline','Thiết bị tự báo <b>mất mạng</b> (wifi/dây/nguồn mạng)','#D6314F'],['chet','<b>Socket chết ngầm</b> — sóng/wifi yếu, đổi mạng, router treo','#F5A11B'],['dut','<b>Đường truyền bị ngắt</b> (1006) trong khi máy vẫn báo có mạng','#8B2FBE'],['ngu','Máy/tab <b>ngủ hoặc ẩn</b> (chủ yếu điện thoại) — không phải lỗi mạng','#7B6A91'],['khac','Khác','#CDB8E3']];
   h += '<div style="margin-top:10px">'+L.map(function(x){ var n = nn[x[0]]||0, p = Math.round(100*n/tot); return n ? '<div style="display:flex;align-items:center;gap:8px;font-size:12.8px;margin:3px 0"><span style="width:'+Math.max(4,p*2)+'px;height:10px;border-radius:4px;background:'+x[2]+'"></span><span><b>'+p+'%</b> ('+n+') '+x[1]+'</span></div>' : ''; }).join('')+'</div>';
   var tp = r.matTop || [];
   if(tp.length) h += '<h3 style="margin-top:14px">Phòng mất kết nối lâu nhất</h3><div class="tblwrap" style="box-shadow:none;border:0"><table><thead><tr><th>Chi nhánh</th><th>Phòng</th><th>Thiết bị</th><th>Số lần nối lại</th><th>Lâu nhất</th><th>Ping TB / cao nhất</th></tr></thead><tbody>'
-    + tp.map(function(x){ return '<tr class="kn-tr" data-nk-phong="'+esc(x.phong_id)+'" data-nk-ten="'+esc(x.phong)+'" data-nk-role="'+esc(x.role)+'" data-nk-cn="'+esc(x.cn)+'"><td>'+esc(knTenCn(x.cn))+'</td><td><b>'+esc(x.phong)+'</b></td><td>'+(KN_VAI[x.role]||x.role)+'</td><td>'+x.n+'</td><td'+(x.mx>600000?' style="color:#D6314F;font-weight:700"':'')+'>'+knDown(x.mx)+'</td><td'+(x.rtt>400?' style="color:#D6314F"':'')+'>'+(x.rtt!=null?Math.round(x.rtt):'—')+' / '+(x.rttMax!=null?x.rttMax:'—')+' ms</td></tr>'; }).join('')
+    + tp.map(function(x){ return '<tr class="kn-tr" data-nk-phong="'+esc(x.phong_id)+'" data-nk-ten="'+esc(x.phong)+'" data-nk-role="'+esc(x.role)+'" data-nk-cn="'+esc(x.cn)+'"><td>'+esc(knTenCn(x.cn))+'</td><td><b>'+esc(x.phong)+'</b></td><td>'+(KN_VAI[x.role]||x.role)+'</td><td>'+x.n+'</td><td'+(x.mx>600000&&x.role==='tv'?' style="color:#D6314F;font-weight:700"':'')+'>'+knDown(x.mx)+'</td><td'+(x.rtt>400&&x.role==='tv'?' style="color:#D6314F"':'')+'>'+(x.rtt!=null?Math.round(x.rtt):'—')+' / '+(x.rttMax!=null?x.rttMax:'—')+' ms</td></tr>'; }).join('')
     + '</tbody></table></div>';
   return h + '</div>';
 }
@@ -2494,14 +2495,14 @@ function knMay(){
     var h = '<div class="stats"><div class="stat g"><div class="k">TV đang nối</div><div class="v">'+o1+' / '+ds.length+'</div></div>'
       + '<div class="stat"><div class="k">Máy tính bảng đang nối</div><div class="v">'+ds.filter(function(x){ return x.tbOn; }).length+'</div></div>'
       + '<div class="stat y"><div class="k">Điện thoại khách đang nối</div><div class="v">'+ds.reduce(function(a,x){ return a + (x.dt||0); }, 0)+'</div></div></div>';
-    function o(m, on, k){
+    function o(m, on, k, tv){
       if(!m) return '<span class="kndot" style="background:'+(on?'#17935F':'#CDB8E3')+'"></span>'+(on?'đang nối':'<span class="mut">chưa có dữ liệu</span>');
-      return '<span class="kndot" style="background:'+(on?'#17935F':'#D6314F')+'"></span><b>'+(on?'Đang nối':'Không nối')+'</b> · '+esc(m.ua||'')
+      return '<span class="kndot" style="background:'+(on?'#17935F':tv?'#D6314F':'#CDB8E3')+'"></span><b>'+(on?'Đang nối':'Không nối')+'</b> · '+esc(m.ua||'')
         + '<div class="knsm">IP '+esc(m.ip||'—')+(m.isp?' · '+esc(m.isp):'')+'<br>Nối lúc '+knTgN(m.lan_noi)+(m.lan_rot?' · rớt lúc '+knTgN(m.lan_rot)+(m.tuoi_rot!=null?' (sau '+knTuoi(m.tuoi_rot)+')':''):'')+'</div>'
-        + '<div class="knsm">Trong kỳ: <b style="color:'+(k.rot?'#D6314F':'inherit')+'">'+k.rot+' lần rớt</b> / '+k.noi+' lần nối</div>';
+        + '<div class="knsm">Trong kỳ: <b style="color:'+(k.rot&&tv?'#D6314F':'inherit')+'">'+k.rot+' lần rớt</b> / '+k.noi+' lần nối</div>';
     }
     h += '<div class="tblwrap"><table><thead><tr><th>Phòng</th><th>TV</th><th>Máy tính bảng</th><th>ĐT</th></tr></thead><tbody>'
-      + ds.map(function(x){ return '<tr><td><b>'+esc(x.ten)+'</b><div class="knsm">'+(x.open?'đang mở':'đóng')+'</div><button class="btn btn-ghost btn-sm" style="margin-top:4px;padding:3px 9px;font-size:11.5px" data-nk-phong="'+esc(x.id)+'" data-nk-ten="'+esc(x.ten)+'" data-nk-cn="'+esc(KN.cn)+'">Nhật ký</button></td><td>'+o(x.tv, x.tvOn, x.tvK)+'</td><td>'+(x.tb||x.tbOn?o(x.tb, x.tbOn, x.tbK):'<span class="mut">không có</span>')+'</td><td>'+(x.dt||0)+'</td></tr>'; }).join('')
+      + ds.map(function(x){ return '<tr><td><b>'+esc(x.ten)+'</b><div class="knsm">'+(x.open?'đang mở':'đóng')+'</div><button class="btn btn-ghost btn-sm" style="margin-top:4px;padding:3px 9px;font-size:11.5px" data-nk-phong="'+esc(x.id)+'" data-nk-ten="'+esc(x.ten)+'" data-nk-cn="'+esc(KN.cn)+'">Nhật ký</button></td><td>'+o(x.tv, x.tvOn, x.tvK, true)+'</td><td>'+(x.tb||x.tbOn?o(x.tb, x.tbOn, x.tbK):'<span class="mut">không có</span>')+'</td><td>'+(x.dt||0)+'</td></tr>'; }).join('')
       + '</tbody></table></div>';
     $('knBody').innerHTML = h;
   }).catch(knLoi);
@@ -2585,7 +2586,7 @@ function knChep(){
   }).catch(function(e){ toast(e.message || 'Không tải được.'); });
 }
 /* ---------- Xu hướng chất lượng theo tuần ---------- */
-function knHeat(r){ return r<=0 ? '' : r<.3 ? ' h1' : r<.8 ? ' h2' : r<1.6 ? ' h3' : ' h4'; }
+function knHeat(r, tv){ var k = r<=0 ? 0 : r<.3 ? 1 : r<.8 ? 2 : r<1.6 ? 3 : 4; return k ? ' '+(tv?'h':'m')+k : ''; }
 function knDm(x){ var d = new Date(x+'T00:00:00'); return knZ(d.getDate())+'/'+knZ(d.getMonth()+1); }
 function knXh(){
   knGoi('admin.knXuHuong', { tuan: KN.tuan }).then(function(r){
@@ -2607,9 +2608,9 @@ function knXh(){
     h += '<div class="knbox"><h3>Tổng số lần rớt mỗi tuần <span class="knsm">— tuần tính từ thứ Hai; cột cuối là tuần này (chưa đủ 7 ngày)</span></h3>'+svg
       + '<div class="knleg"><span><i style="background:#D6314F"></i>TV</span><span><i style="background:#8E5BC8"></i>Máy tính bảng</span></div></div>';
     var ds = r.ds || [];
-    var xau = ds.filter(function(x){ return x.xu==='xau'; }).length, keo = ds.filter(function(x){ return x.xu==='keo'; }).length;
-    if(xau) h += '<div class="knnote r"><b>'+xau+' phòng đang xấu đi</b> so với 3 tuần trước — nên kiểm tra sớm (nguồn điện, wifi/dây mạng, TV box).</div>';
-    if(keo) h += '<div class="knnote"><b>'+keo+' phòng hay rớt kéo dài</b> nhiều tuần liền — lỗi cố định ở phòng đó, nên xử lý dứt điểm.</div>';
+    var xau = ds.filter(function(x){ return x.xu==='xau' && x.role==='tv'; }).length, keo = ds.filter(function(x){ return x.xu==='keo' && x.role==='tv'; }).length;
+    if(xau) h += '<div class="knnote r"><b>'+xau+' TV đang xấu đi</b> so với 3 tuần trước — nên kiểm tra sớm (nguồn điện, wifi/dây mạng, TV box).</div>';
+    if(keo) h += '<div class="knnote"><b>'+keo+' TV hay rớt kéo dài</b> nhiều tuần liền — lỗi cố định ở phòng đó, nên xử lý dứt điểm.</div>';
     if(!ds.length) h += '<div class="knnote g">Chưa có phòng nào rớt trong '+n+' tuần qua'+(r.dauNgay?' (dữ liệu bắt đầu ghi từ '+knDm(r.dauNgay)+')':'')+'.</div>';
     else {
       h += '<div class="knbox"><h3>Từng phòng theo tuần <span class="knsm">— số lần rớt; màu càng đỏ càng nhiều (tính theo số lần/ngày). Bấm một dòng để xem nhật ký phòng.</span></h3><div class="tblwrap"><table><thead><tr><th>Phòng</th>'
@@ -2618,12 +2619,12 @@ function knXh(){
           var lb = { xau:'🔺 Xấu đi', keo:'⚠️ Kéo dài', tot:'🔻 Khá hơn', on:'· Lẻ tẻ' }[x.xu];
           return '<tr class="kn-tr" data-nk-cn="'+esc(x.cn)+'" data-nk-phong="'+esc(x.phong_id)+'" data-nk-ten="'+esc(x.phong)+'" data-nk-role="'+esc(x.role)+'"><td><b>'+esc(x.phong)+'</b></td>'
             + (KN.cn?'':'<td>'+esc(x.cnTen)+'</td>') + '<td>'+(x.role==='tv'?'TV':'MTB')+'</td>'
-            + x.rot.map(function(c, i){ return '<td style="text-align:center"><span class="knheat'+knHeat(c/(r.ngayTuan[i]||1))+'">'+(c||'·')+'</span></td>'; }).join('')
-            + '<td><span class="knbadge '+x.xu+'">'+lb+'</span><div class="knsm">tuần này '+x.nay+'/ngày · 3 tuần trước '+x.tb+'/ngày</div></td></tr>'; }).join('')
+            + x.rot.map(function(c, i){ return '<td style="text-align:center"><span class="knheat'+knHeat(c/(r.ngayTuan[i]||1), x.role==='tv')+'">'+(c||'·')+'</span></td>'; }).join('')
+            + '<td><span class="knbadge '+(x.role==='tv'?x.xu:'on')+'">'+lb+'</span><div class="knsm">tuần này '+x.nay+'/ngày · 3 tuần trước '+x.tb+'/ngày</div></td></tr>'; }).join('')
         + '</tbody></table></div></div>';
       if(r.tongPhong > ds.length) h += '<div class="knsm">Chỉ hiện '+ds.length+' / '+r.tongPhong+' dòng nặng nhất.</div>';
     }
-    h += '<div class="knnote">Cách đánh giá: <b>Xấu đi</b> = tuần này ≥ 2 lần mức 3 tuần trước. <b>Kéo dài</b> = từ ~4 lần rớt/tuần trở lên, nhiều tuần liền. <b>Khá hơn</b> = từng rớt nhiều nay giảm hơn một nửa. Chỉ tính TV và máy tính bảng (điện thoại khách tắt/mở màn hình nên không đưa vào).</div>';
+    h += '<div class="knnote">Cách đánh giá: <b>Xấu đi</b> = tuần này ≥ 2 lần mức 3 tuần trước. <b>Kéo dài</b> = từ ~4 lần rớt/tuần trở lên, nhiều tuần liền. <b>Khá hơn</b> = từng rớt nhiều nay giảm hơn một nửa. Màu đỏ và các cảnh báo chỉ dành cho <b>TV</b>. Máy tính bảng hiện màu tím nhạt (thường do tắt màn hình, ít nghiêm trọng); điện thoại khách không đưa vào.</div>';
     $('knBody').innerHTML = h;
   }).catch(knLoi);
 }
@@ -2648,7 +2649,7 @@ function knCbVe(r){
     + '<label>Trong khoảng<select id="cbCuaSo">'+knCbOpt([15,30,60,90,120],c.cuaSo,function(v){ return v+' giây'; })+'</select></label>'
     + '<label>Không báo lại cùng chi nhánh trong<select id="cbIm">'+knCbOpt([5,15,30,60,120,240],c.imLang,function(v){ return v<60?v+' phút':(v/60)+' giờ'; })+'</select></label></div>'
     + '<div class="actions wrap" style="display:flex;gap:8px"><button class="btn btn-y btn-sm" id="cbLuu">💾 Lưu cài đặt</button></div>'
-    + '<div class="knsm" style="margin-top:10px;line-height:1.6">Chỉ tính <b>TV và máy tính bảng</b> của phòng bị mất kết nối (điện thoại khách không tính). Tin gửi tới các tài khoản <b>admin</b> đã kết nối Telegram, nêu chi nhánh, danh sách phòng, IP và nhà mạng. Nhiều phòng cùng rớt thường do <b>router / đường mạng của chi nhánh</b>. TV tắt mạng đột ngột sẽ được xác nhận sau khoảng 2 phút nên tin có thể đến chậm chừng đó.</div></div>';
+    + '<div class="knsm" style="margin-top:10px;line-height:1.6">Chỉ tính <b>TV</b> của phòng bị mất kết nối (máy tính bảng tắt màn hình và điện thoại khách không tính). Tin gửi tới các tài khoản <b>admin</b> đã kết nối Telegram, nêu chi nhánh, danh sách phòng, IP và nhà mạng. Nhiều phòng cùng rớt thường do <b>router / đường mạng của chi nhánh</b>. TV tắt mạng đột ngột sẽ được xác nhận sau khoảng 2 phút nên tin có thể đến chậm chừng đó.</div></div>';
   h += '<div class="knbox"><h3>3. Các lần cảnh báo gần đây</h3>';
   h += (r.gan||[]).length ? '<div class="tblwrap"><table><thead><tr><th>Lúc</th><th>Chi nhánh</th><th>Số phòng</th></tr></thead><tbody>'+r.gan.map(function(x){ return '<tr><td>'+knTg(x.luc)+'</td><td>'+esc(x.ten)+'</td><td><b>'+x.so+'</b></td></tr>'; }).join('')+'</tbody></table></div>' : '<div class="mut">Chưa có cảnh báo nào được gửi.</div>';
   h += '</div>';

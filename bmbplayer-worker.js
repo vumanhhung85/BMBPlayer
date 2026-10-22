@@ -1521,7 +1521,7 @@ async function knGhi(env, c, e) {
         .bind(pid, e.role, cn, ph, e.t, e.tuoi ?? null));
   }
   await env.DB.batch(st);
-  if (rot && cn && pid && (e.role === 'tv' || e.role === 'tablet')) await knCanhBao(env, cn, e.t).catch(err => console.error('knCanhBao', err));
+  if (rot && cn && pid && e.role === 'tv') await knCanhBao(env, cn, e.t).catch(err => console.error('knCanhBao', err));
   if (Date.now() - knDonLuc > 3600000) { knDonLuc = Date.now(); await knDon(env).catch(err => console.error('knDon', err)); }
 }
 /** Dọn dữ liệu quá hạn (tối đa 1 lần/giờ mỗi bản Worker, mỗi lần xoá có giới hạn để không nghẽn D1) */
@@ -1562,7 +1562,7 @@ async function adminKnTongQuan(env, body) {
       WHERE ngay >= ? AND role IN ('tv','tablet')${w} GROUP BY phong_id, role HAVING SUM(rot) > 0 ORDER BY SUM(rot) DESC LIMIT 15`).bind(q.tuNgay, ...b).all(),
     env.DB.prepare(`SELECT cn, t / 10000 AS w, MIN(t) AS t, COUNT(*) AS so, COUNT(DISTINCT phong_id) AS so_phong,
       GROUP_CONCAT(DISTINCT phong) AS phong, GROUP_CONCAT(DISTINCT role) AS vai, GROUP_CONCAT(DISTINCT isp) AS isp, GROUP_CONCAT(DISTINCT ip) AS ip
-      FROM kn_sk WHERE t >= ? AND ${RT}${w} GROUP BY cn, w HAVING COUNT(DISTINCT phong_id) >= 2 ORDER BY w DESC LIMIT 60`).bind(q.tu, ...b).all(),
+      FROM kn_sk WHERE t >= ? AND role = 'tv' AND ${RT}${w} GROUP BY cn, w HAVING COUNT(DISTINCT phong_id) >= 2 ORDER BY w DESC LIMIT 60`).bind(q.tu, ...b).all(),
     env.DB.prepare(`SELECT cn, COALESCE(isp, '?') AS isp, COUNT(DISTINCT ip) AS so_ip, SUM(ev = 'noi') AS noi, SUM(${RT}) AS rot
       FROM kn_sk WHERE t >= ? AND role IN ('tv','tablet')${w} GROUP BY cn, isp ORDER BY rot DESC LIMIT 60`).bind(q.tu, ...b).all(),
     knTenCn(env),
@@ -1673,7 +1673,7 @@ async function knCanhBao(env, cn, t) {
   const cfg = await knCbDoc(env);
   if (!cfg.bat) return;
   const m = await env.DB.prepare(`SELECT COUNT(DISTINCT phong_id) AS n, GROUP_CONCAT(DISTINCT phong) AS ph, GROUP_CONCAT(DISTINCT ip) AS ip, GROUP_CONCAT(DISTINCT isp) AS isp
-    FROM kn_sk WHERE cn = ? AND t >= ? AND role IN ('tv','tablet') AND (ev = 'dut' OR (ev = 'cat' AND code = 4007))`).bind(cn, t - cfg.cuaSo * 1000).first();
+    FROM kn_sk WHERE cn = ? AND t >= ? AND role = 'tv' AND (ev = 'dut' OR (ev = 'cat' AND code = 4007))`).bind(cn, t - cfg.cuaSo * 1000).first();
   if (!m || m.n < cfg.nguong) return;
   const now = Date.now();
   const cl = await env.DB.prepare(`INSERT INTO kn_canhbao (cn, luc, so) VALUES (?,?,?) ON CONFLICT(cn) DO UPDATE SET luc = excluded.luc, so = excluded.so WHERE luc < ?`)
@@ -1684,7 +1684,7 @@ async function knCanhBao(env, cn, t) {
   const ips = String(m.ip || '').split(',').filter(Boolean), isps = String(m.isp || '').split(',').filter(Boolean);
   const gio = new Date(now + VN_MS).toISOString().slice(11, 16);
   const text = ['🚨 <b>Rớt đồng loạt — ' + escHtml(tenCn[cn] || cn) + '</b>',
-    '<b>' + m.n + ' phòng</b> mất kết nối trong ' + cfg.cuaSo + ' giây: ' + escHtml(String(m.ph || '').split(',').sort((a, b) => SAP_PHONG.compare(a, b)).join(', ')),
+    '<b>' + m.n + ' TV</b> mất kết nối trong ' + cfg.cuaSo + ' giây: ' + escHtml(String(m.ph || '').split(',').sort((a, b) => SAP_PHONG.compare(a, b)).join(', ')),
     (ips.length ? 'IP: ' + escHtml(ips.slice(0, 3).join(', ')) + (isps.length ? ' · ' + escHtml(isps.slice(0, 2).join(', ')) : '') : ''),
     '→ Nhiều phòng cùng lúc thường là <b>router / đường mạng của chi nhánh</b>, không phải từng TV.',
     '🕐 ' + gio + ' · xem chi tiết: Quầy → 🔌 Kết nối → Rớt đồng loạt'].filter(Boolean).join('\n');
@@ -1779,7 +1779,7 @@ async function adminKnXuHuong(env, body) {
     ds.push(Object.assign(o, { xu, nay: +nay.toFixed(2), tb: +tb.toFixed(2), tongRot }));
   }
   const ut = { xau: 0, keo: 1, tot: 2, on: 3 };
-  ds.sort((a, c) => ut[a.xu] - ut[c.xu] || c.nay - a.nay || c.tongRot - a.tongRot);
+  ds.sort((a, c) => (a.role === 'tv' ? 0 : 1) - (c.role === 'tv' ? 0 : 1) || ut[a.xu] - ut[c.xu] || c.nay - a.nay || c.tongRot - a.tongRot);
   return ok({ tuan, ngayTuan, tong, ds: ds.slice(0, 80), tongPhong: ds.length, dauNgay, now: Date.now() });
 }
 // ---------- quay.tv: phòng + TV / máy tính bảng / điện thoại đang nối + QR khách của lượt đang mở ----------
