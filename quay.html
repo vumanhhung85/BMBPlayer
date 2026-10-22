@@ -227,6 +227,10 @@ tbody tr:hover td{background:#FBF8FE}
 .lsca b{color:var(--txt-dim)}
 .khoi-mau{margin-top:34px;padding-top:18px;border-top:1px dashed #CDB8E3}
 /* hộp chọn món mẫu + thư viện icon */
+.mdl-top{position:sticky;top:-26px;z-index:2;display:flex;align-items:center;gap:10px;background:#fff;margin:-26px -26px 12px;padding:14px 18px;border-bottom:1px solid var(--line);border-radius:20px 20px 0 0}
+.mdl-top h3{margin:0;flex:1;text-align:center}
+.mdl-back{border:1px solid var(--line);background:#fff;color:var(--grape);font:inherit;font-weight:700;font-size:13px;padding:8px 12px;border-radius:999px;cursor:pointer}
+.mdl-x{border:0;background:#f1ebfa;color:var(--grape);font-size:16px;width:34px;height:34px;border-radius:50%;cursor:pointer}
 .modal-box.rong{max-width:560px;max-height:88vh;overflow-y:auto}
 .mauchon{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;cursor:pointer}
 .mauchon:hover{background:var(--tint)}
@@ -569,7 +573,7 @@ tbody tr:hover td{background:#FBF8FE}
 <!-- Modal nhật ký kết nối -->
 <div class="modal-overlay" id="modalNhatKy">
   <div class="modal-box rong">
-    <h3>Nhật ký kết nối</h3>
+    <div class="mdl-top"><button type="button" class="mdl-back" id="btnNkBack" aria-label="Quay lại">← Quay lại</button><h3>Nhật ký kết nối</h3><button type="button" class="mdl-x" id="btnNkX" aria-label="Đóng">✕</button></div>
     <div class="hint">Mỗi phòng giữ 60 sự kiện gần nhất. <b>Máy rớt</b> = máy tự mất kết nối (mạng/ngủ/đóng app). <b>Server cắt</b> = hệ thống chủ động đóng (kèm lý do). Gặp phòng bị out thì mở bảng này ngay, chụp gửi kỹ thuật.</div>
     <div class="fld" style="display:flex;gap:6px;align-items:center"><select id="nkPhong" style="flex:1"></select><button class="btn btn-ghost btn-sm" id="btnNkTai">Tải lại</button></div>
     <div id="nkList" style="max-height:55vh;overflow:auto;font-size:12px;line-height:1.5"></div>
@@ -2072,7 +2076,15 @@ function nkTai(){
 $('btnNhatKy').addEventListener('click', function(){ $('modalNhatKy').classList.add('show'); nkTai(); });
 $('btnNkTai').addEventListener('click', nkTai);
 $('nkPhong').addEventListener('change', nkVe);
-$('btnNkDong').addEventListener('click', function(){ $('modalNhatKy').classList.remove('show'); });
+function dongNk(){ $('modalNhatKy').classList.remove('show'); }
+$('btnNkDong').addEventListener('click', dongNk);
+$('btnNkBack').addEventListener('click', dongNk);
+$('btnNkX').addEventListener('click', dongNk);
+['modalNhatKy','modalPush','qrKhach'].forEach(function(id){
+  var el=$(id); if(!el) return;
+  el.addEventListener('click', function(e){ if(e.target===el) el.classList.remove('show'); });
+});
+document.addEventListener('keydown', function(e){ if(e.key==='Escape') dongNk(); });
 $('btnChonMau').addEventListener('click', moChonMau);
 $('btnChonMauOk').addEventListener('click', xacNhanChonMau);
 $('btnChonMauHuy').addEventListener('click', function(){ $('modalChonMau').classList.remove('show'); });
