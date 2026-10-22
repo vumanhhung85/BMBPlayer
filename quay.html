@@ -311,11 +311,21 @@ tbody tr:hover td{background:#FBF8FE}
 .tgbox .actions{margin-top:8px}
 .tgbox a.btn{text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
 /* ── app BMBPlayer: quản lý chi nhánh mở Bảo trì / Đặt phòng (admin.html) ── */
-.qlnav{display:none;gap:8px;padding:0 0 12px;flex-wrap:wrap}
+.qlnav{display:none;align-items:center;gap:8px;position:relative}
 .qlnav.show{display:flex}
-.qlnav .btn{flex:1;min-width:0;white-space:nowrap;background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.28);color:#fff}
-.qlnav .btn:hover{background:rgba(255,255,255,.22)}
-.qlnav .qlhint{flex-basis:100%;font-size:12px;color:rgba(255,255,255,.75)}
+.qlnav .btn{white-space:nowrap}
+.qlnav .qlwide{display:none;gap:8px}
+.qlnav .qlmore{display:inline-flex}
+.qlmenu{display:none;position:absolute;right:0;top:calc(100% + 8px);min-width:250px;background:#fff;color:#2a1740;border-radius:14px;box-shadow:0 10px 30px rgba(30,0,60,.35);padding:6px;z-index:60}
+.qlmenu.open{display:block}
+.qlmenu button{display:flex;gap:10px;align-items:center;width:100%;text-align:left;background:none;border:0;padding:11px 12px;border-radius:10px;font:inherit;font-size:14.5px;font-weight:600;color:inherit;cursor:pointer}
+.qlmenu button:hover{background:#f1e9fb}
+.qlmenu small{display:block;font-weight:400;font-size:12px;color:#7a6a90}
+.qlmenu hr{border:0;border-top:1px solid #eee5f7;margin:2px 8px}
+.qlmenu .qlout{color:#B3203E}
+.who.qlon #btnOut{display:none}
+@media(min-width:900px){.qlnav .qlwide{display:flex}.qlnav .qlmore{display:none}.who.qlon #btnOut{display:inline-flex}.qlmenu .qlout,.qlmenu .qlout+hr{display:none}}
+@media(max-width:640px){.qlmenu{position:fixed;left:12px;right:12px;min-width:0}}
 @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 /* ---- tab 🔌 Kết nối (admin) ---- */
 .knbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
@@ -377,7 +387,7 @@ tbody tr:hover td{background:#FBF8FE}
       <div class="topbar">
         <img src="Logo_BoomBox.png" alt="Boom">
         <div class="tt"><b id="hTt">Quầy phục vụ</b><span>BMBPlayer · chọn bài &amp; gọi lễ tân</span></div>
-        <div class="who"><select class="selcn" id="selCN" style="display:none" aria-label="Chọn chi nhánh"></select><span class="rt" id="rtDot" title="Đang hỏi định kỳ"></span><span class="badge" id="whoTx"></span><button class="btn btn-ghost btn-sm" id="btnPush" title="Thông báo trên máy này" aria-label="Thông báo trên máy này">🔔</button><button class="btn btn-ghost btn-sm" id="btnOut">Đăng xuất</button></div>
+        <div class="who"><select class="selcn" id="selCN" style="display:none" aria-label="Chọn chi nhánh"></select><span class="rt" id="rtDot" title="Đang hỏi định kỳ"></span><span class="badge" id="whoTx"></span><div class="qlnav" id="qlNav"><span class="qlwide"><button class="btn btn-ghost btn-sm" id="btnQlBaoTri">🛠️ Bảo trì</button><button class="btn btn-ghost btn-sm" id="btnQlDatPhong">📋 Đặt phòng</button></span><button class="btn btn-ghost btn-sm qlmore" id="btnQlMore" aria-label="Trang quản trị khác" aria-haspopup="true" style="font-size:20px;line-height:1;padding:3px 13px">⋯</button><div class="qlmenu" id="qlMenu" role="menu"><button id="mnBaoTri"><span>🛠️</span><span>Bảo trì<small>Báo hỏng, xử lý sự cố (rời màn Quầy)</small></span></button><hr><button id="mnDatPhong"><span>📋</span><span>Đặt phòng<small>Lịch đặt trước (rời màn Quầy)</small></span></button><hr><button class="qlout" id="mnOut"><span>🚪</span><span>Đăng xuất</span></button></div></div><button class="btn btn-ghost btn-sm" id="btnPush" title="Thông báo trên máy này" aria-label="Thông báo trên máy này">🔔</button><button class="btn btn-ghost btn-sm" id="btnOut">Đăng xuất</button></div>
       </div>
       <div class="tabs">
         <div class="tab on" data-p="p1">📋 Hàng đợi<span class="n zero" id="nMoi"></span></div>
@@ -387,11 +397,6 @@ tbody tr:hover td{background:#FBF8FE}
         <div class="tab" data-p="p6" id="tabTaiKhoan" style="display:none">👥 Tài khoản quầy</div>
         <div class="tab" data-p="p7" id="tabCaiDatApp" style="display:none">⚙️ Cài đặt</div>
         <div class="tab" data-p="p8" id="tabKetNoi" style="display:none">🔌 Kết nối</div>
-      </div>
-      <div class="qlnav" id="qlNav">
-        <div class="qlhint">Chuyển sang trang quản trị khác (rời màn Quầy):</div>
-        <button class="btn btn-ghost btn-sm" id="btnQlBaoTri">🛠️ Bảo trì</button>
-        <button class="btn btn-ghost btn-sm" id="btnQlDatPhong">📋 Đặt phòng</button>
       </div>
     </div>
   </header>
@@ -878,7 +883,7 @@ function appKetNoi(){
     try{ BMBNative.quayBat(r.dk, CFG.API, r.branchName || S.bname || '', S.hoTen || S.user); }catch(e){ APPQ.loi = String(e); }
     /* quản lý chi nhánh + admin đã bật trong Cài đặt của admin.html + app có hỗ trợ (2.1) → hiện nút Bảo trì / Đặt phòng */
     var coNut = !!(r.ql && r.ql.tabs) && typeof BMBNative.quayMoAdmin === 'function';
-    $('qlNav').className = 'qlnav' + (coNut ? ' show' : '');
+    qlHien(coNut);
     puVe();
     if($('modalPush').classList.contains('show')) puCapNhat();
   }).catch(function(){ APPQ.busy = false; APPQ.loi = 'Không kết nối được máy chủ.'; puVe(); });
@@ -1229,7 +1234,7 @@ function start(){
   $('whoTx').textContent = (S.hoTen || S.user) + ' · ' + (VT_TEN[S.vaiTro] || S.vaiTro);
   hienTheoQuyen();
   /* trên web (không phải app): quản lý hiện 2 nút Bảo trì / Đặt phòng, mở app quản trị cùng tab, bên đó có nút ← Quầy để quay lại */
-  if(!appQ() && S.quanLy) $('qlNav').className = 'qlnav show';
+  if(!appQ() && S.quanLy) qlHien(true);
   veChonChiNhanh();
   if(S.vaiTro==='admin' && !S.branch){ alert('Chưa có chi nhánh nào đang hoạt động.'); return; }
   tick();
@@ -2070,6 +2075,13 @@ function moTrangQl(loai, ten){
   if(typeof BMBNative !== 'undefined' && typeof BMBNative.quayMoAdmin === 'function'){ try{ BMBNative.quayMoAdmin(loai); }catch(e){} return; }
   location.href = 'https://boommusicbox.vn/admin.html?tu=quay' + (loai === 'datphong' ? '&tab=dat-phong' : '');
 }
+function qlHien(on){ $('qlNav').className = 'qlnav' + (on ? ' show' : ''); var w = $('qlNav').parentNode; if(w) w.className = 'who' + (on ? ' qlon' : ''); $('qlMenu').classList.remove('open'); }
+$('btnQlMore').addEventListener('click', function(e){ e.stopPropagation(); var mn = $('qlMenu'); mn.classList.toggle('open'); if(mn.classList.contains('open')) mn.style.top = (this.getBoundingClientRect().bottom + 8) + 'px'; });
+document.addEventListener('click', function(e){ if(!e.target.closest || !e.target.closest('#qlMenu')) $('qlMenu').classList.remove('open'); });
+document.addEventListener('keydown', function(e){ if(e.key==='Escape') $('qlMenu').classList.remove('open'); });
+$('mnBaoTri').addEventListener('click', function(){ $('qlMenu').classList.remove('open'); moTrangQl('baotri', 'Bảo trì'); });
+$('mnDatPhong').addEventListener('click', function(){ $('qlMenu').classList.remove('open'); moTrangQl('datphong', 'Đặt phòng'); });
+$('mnOut').addEventListener('click', function(){ $('qlMenu').classList.remove('open'); logout(true); });
 $('btnQlBaoTri').addEventListener('click', function(){ moTrangQl('baotri', 'Bảo trì'); });
 $('btnQlDatPhong').addEventListener('click', function(){ moTrangQl('datphong', 'Đặt phòng'); });
 $('tgNut').addEventListener('click', function(e){ var b = e.target.closest ? e.target.closest('[data-tg]') : null; if(b) tgThaoTac(b.getAttribute('data-tg')); });
