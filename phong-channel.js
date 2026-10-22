@@ -34,6 +34,16 @@
     const persistent = wsRole !== 'remote';               // TV và máy tính bảng: luôn chờ / nối lại, không bỏ cuộc
     const ch = { ws: true, role: wsRole, tablet: wsRole === 'tablet', token, roomId: token.split('.')[0], onmessage: null, onroom: null, onstatus: null, status: 'connecting', last: null };
     let sock = null, tries = 0, timer = null, ping = null, stopped = false, waitedSince = 0, checking = false, lastRx = Date.now();
+    /* Chẩn đoán phía máy: máy tự biết vì sao mất kết nối (thiết bị báo offline? tab ẩn? socket chết ngầm?), mất bao lâu, ping bao nhiêu ms, loại mạng.
+       Lần nối lại thành công kế tiếp, máy gửi 1 tin {type:'dg'} → Worker ghi vào nhật ký (tab 🔌 Kết nối của admin). Không gửi lúc kết nối bình thường. */
+    let loss = null, pingT = 0; const rtts = [];
+    const markLoss = (why, at) => { if(loss) return; loss = { at: at || Date.now(), why, on: navigator.onLine !== false, hid: !!document.hidden, tries: 0 }; };
+    const netInfo = () => { const c = navigator.connection || {}; return { net: c.effectiveType || '', nrtt: c.rtt, dl: c.downlink, ty: c.type || '' }; };
+    const sendDiag = () => {
+      if(!loss) return; const l = loss; loss = null;
+      const a = rtts.length ? Math.round(rtts.reduce((x, y) => x + y, 0) / rtts.length) : undefined, mx = rtts.length ? Math.max.apply(null, rtts) : undefined;
+      try{ sock.send(JSON.stringify({ type: 'dg', d: Object.assign({ down: Date.now() - l.at, why: l.why, tries: l.tries, on: l.on ? 1 : 0, hid: l.hid ? 1 : 0, rtt: a, rttMax: mx }, netInfo()) })); }catch(e){}
+    };
     const setStatus = (s, info) => { ch.status = s; if(ch.onstatus) ch.onstatus(s, info); };
     function schedule(ms){ clearTimeout(timer); timer = setTimeout(connect, ms); }
     function dead(){                                     // mã bị đổi (gán TV/máy tính bảng khác): quên mã, báo trang
@@ -58,14 +68,14 @@
       if(stopped) return;
       setStatus('connecting');
       try{ sock = new WebSocket(url); }catch(e){ return schedule(5000); }
-      sock.onopen = () => { tries = 0; lastRx = Date.now(); try{ sock.send('sync'); }catch(e){} clearInterval(ping);
+      sock.onopen = () => { if(loss) loss.tries = tries; tries = 0; lastRx = Date.now(); try{ sock.send('sync'); }catch(e){} sendDiag(); clearInterval(ping);
         ping = setInterval(() => {
           if(Date.now() - lastRx > 100000) return recycle();             // 100 giây không nhận được gì (kể cả 'pong' 25 giây/lần): socket đã chết ngầm → nối lại
-          try{ sock.send('ping'); }catch(e){}
+          pingT = Date.now(); try{ sock.send('ping'); }catch(e){}
         }, 25000); };
       sock.onmessage = ev => {
         lastRx = Date.now();
-        if(ev.data === 'pong') return;
+        if(ev.data === 'pong'){ if(pingT){ rtts.push(Date.now() - pingT); if(rtts.length > 12) rtts.shift(); pingT = 0; } return; }
         let m; try{ m = JSON.parse(ev.data); }catch(e){ return; }
         if(m.type === 'room'){
           ch.last = m; setStatus(m.open ? 'open' : 'closed', m);
@@ -88,6 +98,7 @@
           stopped = true; setStatus(c === 4001 ? 'ended' : c === 4002 ? 'rotated' : c === 4004 ? 'network' : c === 4005 ? 'full' : c === 4000 ? 'replaced' : 'expired');
           return;
         }
+        markLoss('close:' + c);
         setStatus('offline'); tries++;
         if(tries === 3 || tries % 10 === 0) checkToken();
         schedule(Math.min(15000, 800 * Math.pow(1.7, tries)));
@@ -96,13 +107,13 @@
     }
     /* Socket chết ngầm (điện thoại ngủ máy / đổi mạng: trình duyệt vẫn báo 'đang nối' nhưng không còn tin nào tới): bỏ và nối lại.
        Máy khác đổi trạng thái (tắt tiếng, dừng nhạc...) mà máy này không nhận được thì icon bị lệch thực tế. */
-    function recycle(){ clearInterval(ping); const s = sock; try{ s.onclose = null; s.close(); }catch(e){} setStatus('offline'); schedule(200); }
+    function recycle(){ markLoss('silent', lastRx); clearInterval(ping); const s = sock; try{ s.onclose = null; s.close(); }catch(e){} setStatus('offline'); schedule(200); }
     function probe(){
       if(stopped) return;
       if(!sock || sock.readyState > 1){ schedule(100); return; }
       if(sock.readyState !== 1) return;
       const s0 = sock, t0 = Date.now();
-      try{ s0.send('sync'); s0.send('ping'); }catch(e){}                   // xin lại trạng thái mới nhất + thử xem còn sống không
+      pingT = Date.now(); try{ s0.send('sync'); s0.send('ping'); }catch(e){}                   // xin lại trạng thái mới nhất + thử xem còn sống không
       setTimeout(() => { if(!stopped && sock === s0 && lastRx < t0) recycle(); }, 4000);
     }
     window.addEventListener('online', probe);

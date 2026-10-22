@@ -2318,12 +2318,23 @@ function knTgN(t){ if(!t) return '—'; var d = new Date(t); return knZ(d.getDat
 function knTenCn(id){ return KN.ten[id] || (S.branches.filter(function(b){ return b.id===id; })[0] || {}).ten || id || '—'; }
 function knSo(n){ return (+n||0).toLocaleString('vi-VN'); }
 function knTuoi(s){ if(s==null) return ''; s=+s; if(s<90) return s+' giây'; if(s<5400) return Math.round(s/60)+' phút'; return (s/3600).toFixed(1)+' giờ'; }
+function knDown(ms){ if(ms==null) return '?'; var s = ms/1000; if(s<60) return Math.round(s)+' giây'; if(s<3600) return Math.floor(s/60)+' phút '+Math.round(s%60)+'s'; return (s/3600).toFixed(1)+' giờ'; }
+function knLyDo(g){
+  if(g.hid) return '<b>máy/tab đang ngủ hoặc ẩn</b>';
+  if(g.on===0) return '<b>máy tự báo mất mạng (offline)</b>';
+  if(g.why==='silent') return '<b>socket chết ngầm</b> (sóng/wifi yếu hoặc đổi mạng)';
+  if(g.why==='close:1006') return '<b>đường truyền bị ngắt</b> (mã 1006)';
+  return esc(g.why||'không rõ');
+}
 function knSuKien(e){
   var c = e.code, tx, cls = '';
   if(e.ev==='noi'){ tx = 'nối vào'; cls = 'kn-ev-noi'; }
   else if(e.ev==='dut'){ tx = 'MÁY RỚT · mã '+c+(e.why?' “'+esc(e.why)+'”':'')+(e.tuoi!=null?' · đã nối '+knTuoi(e.tuoi):''); cls = 'kn-ev-rot'; }
   else if(e.ev==='cat'){ tx = (c===4007?'MẤT TÍN HIỆU (im lặng, hệ thống ngắt) · mã 4007':'server cắt · mã '+c+' — '+esc(e.why||''))+(e.n?' ('+e.n+' máy)':'')+(e.im!=null&&e.im>=0?' · im '+e.im+'s':''); cls = c===4007?'kn-ev-rot':'kn-ev-cat'; }
   else if(e.ev==='tuchoi'){ tx = 'bị từ chối · mã '+c+' “'+esc(e.why||'')+'”'; cls = 'kn-ev-cat'; }
+  else if(e.ev==='tai'){ var g = {}; try{ g = JSON.parse(e.dg||'{}'); }catch(x){}
+    tx = '🔁 nối lại — <b>mất '+knDown(g.down)+'</b> · '+knLyDo(g)+(g.tries?' · thử '+g.tries+' lần':'')
+      + (g.rtt!=null ? '<div class="knsm">ping trước khi rớt: TB '+g.rtt+'ms, cao nhất '+(g.rttMax!=null?g.rttMax:'?')+'ms'+(g.net?' · mạng '+esc(g.net):'')+(g.ty?' ('+esc(g.ty)+')':'')+(g.nrtt!=null?' · RTT '+g.nrtt+'ms':'')+(g.dl!=null?' · '+g.dl+'Mb/s':'')+'</div>' : (g.net?'<div class="knsm">mạng '+esc(g.net)+(g.ty?' ('+esc(g.ty)+')':'')+'</div>':'')); cls = 'kn-ev-noi'; }
   else if(e.ev==='mo') tx = '<b>Phòng MỞ</b>';
   else if(e.ev==='dong') tx = '<b>Phòng ĐÓNG</b>';
   else if(e.ev==='xoa'){ tx = 'phòng bị xoá'; cls = 'kn-ev-rot'; }
@@ -2374,6 +2385,7 @@ function knTqVe(r){
     + '<div class="stat"><div class="k">ĐT bị từ chối (đầy/chưa mở)</div><div class="v">'+knSo(tc)+'</div></div>'
     + '</div>';
   h += knNhanDinh(r);
+  h += knMatVe(r);
   h += '<div class="knbox"><h3>Số lần rớt theo ngày</h3>'+knChart(r.theoNgay||[])+'<div class="knleg"><span><i style="background:#D6314F"></i>TV</span><span><i style="background:#8B2FBE"></i>Máy tính bảng</span><span><i style="background:#F5B87A"></i>Điện thoại khách</span></div></div>';
   if(!r.cn){
     var m = {};
@@ -2399,6 +2411,22 @@ function knTqVe(r){
     + '</tbody></table></div></div>';
   $('knBody').innerHTML = h;
 }
+function knMatVe(r){
+  var M = r.mat || {}, nn = r.matNguyenNhan || {}, tot = 0, k;
+  for(k in nn) tot += nn[k];
+  var h = '<div class="knbox"><h3>Mất kết nối bao lâu &amp; vì sao <span class="knsm">— do chính TV / máy tính bảng / điện thoại tự báo sau khi nối lại</span></h3>';
+  if(!tot){ return h + '<div class="mut">Chưa có báo cáo từ máy' + (r.dauDuLieu ? '' : ' (chưa có dữ liệu)') + '. TV / máy tính bảng cần nhận bản trang mới (tự cập nhật khi phòng đóng, hoặc menu ẩn → Tải lại trang).</div></div>'; }
+  h += '<div class="tblwrap" style="box-shadow:none;border:0"><table><thead><tr><th>Thiết bị</th><th>Số lần</th><th>Trung vị</th><th>90% lần ngắn hơn</th><th>Lâu nhất</th></tr></thead><tbody>'
+    + ['tv','tablet','remote'].filter(function(x){ return M[x]; }).map(function(x){ var m = M[x]; return '<tr><td><b>'+KN_VAI[x]+'</b></td><td>'+m.n+'</td><td>'+knDown(m.p50)+'</td><td>'+knDown(m.p90)+'</td><td'+(m.max>600000?' style="color:#D6314F;font-weight:700"':'')+'>'+knDown(m.max)+'</td></tr>'; }).join('')
+    + '</tbody></table></div>';
+  var L = [['offline','Thiết bị tự báo <b>mất mạng</b> (wifi/dây/nguồn mạng)','#D6314F'],['chet','<b>Socket chết ngầm</b> — sóng/wifi yếu, đổi mạng, router treo','#F5A11B'],['dut','<b>Đường truyền bị ngắt</b> (1006) trong khi máy vẫn báo có mạng','#8B2FBE'],['ngu','Máy/tab <b>ngủ hoặc ẩn</b> (chủ yếu điện thoại) — không phải lỗi mạng','#7B6A91'],['khac','Khác','#CDB8E3']];
+  h += '<div style="margin-top:10px">'+L.map(function(x){ var n = nn[x[0]]||0, p = Math.round(100*n/tot); return n ? '<div style="display:flex;align-items:center;gap:8px;font-size:12.8px;margin:3px 0"><span style="width:'+Math.max(4,p*2)+'px;height:10px;border-radius:4px;background:'+x[2]+'"></span><span><b>'+p+'%</b> ('+n+') '+x[1]+'</span></div>' : ''; }).join('')+'</div>';
+  var tp = r.matTop || [];
+  if(tp.length) h += '<h3 style="margin-top:14px">Phòng mất kết nối lâu nhất</h3><div class="tblwrap" style="box-shadow:none;border:0"><table><thead><tr><th>Chi nhánh</th><th>Phòng</th><th>Thiết bị</th><th>Số lần nối lại</th><th>Lâu nhất</th><th>Ping TB / cao nhất</th></tr></thead><tbody>'
+    + tp.map(function(x){ return '<tr class="kn-tr" data-nk-phong="'+esc(x.phong_id)+'" data-nk-ten="'+esc(x.phong)+'" data-nk-role="'+esc(x.role)+'" data-nk-cn="'+esc(x.cn)+'"><td>'+esc(knTenCn(x.cn))+'</td><td><b>'+esc(x.phong)+'</b></td><td>'+(KN_VAI[x.role]||x.role)+'</td><td>'+x.n+'</td><td'+(x.mx>600000?' style="color:#D6314F;font-weight:700"':'')+'>'+knDown(x.mx)+'</td><td'+(x.rtt>400?' style="color:#D6314F"':'')+'>'+(x.rtt!=null?Math.round(x.rtt):'—')+' / '+(x.rttMax!=null?x.rttMax:'—')+' ms</td></tr>'; }).join('')
+    + '</tbody></table></div>';
+  return h + '</div>';
+}
 function knNhanDinh(r){
   var out = [], dl = r.dongLoat || [], tp = r.topPhong || [];
   var dlCn = {}; dl.forEach(function(x){ dlCn[x.cn] = (dlCn[x.cn]||0) + 1; });
@@ -2413,6 +2441,7 @@ function knNhanDinh(r){
     });
   }
   if(!out.length && (r.theoCn||[]).length) out.push('<div class="knnote g">Không thấy dấu hiệu bất thường trong khoảng này.</div>');
+  if(r.dauDuLieu) out.push('<div class="knnote" style="background:#F4EEFA;border-color:#CDB8E3">Dữ liệu bắt đầu ghi từ <b>'+knTgN(r.dauDuLieu)+'</b>'+(Date.now()-r.dauDuLieu < r.ngay*86400000 ? ' — chưa đủ '+(r.ngay===1?'24 giờ':r.ngay+' ngày')+' nên số liệu còn ít.' : '.')+'</div>');
   if(!(r.theoCn||[]).length) out.push('<div class="knnote">Chưa có dữ liệu. Số liệu bắt đầu ghi từ khi bản cập nhật này chạy.</div>');
   return out.join('');
 }
@@ -2460,7 +2489,7 @@ function knMay(){
 function knNkLoc(){
   var L = KN.loc, h = '<div class="knf">'
     + '<select id="knfRole"><option value="">Mọi thiết bị</option><option value="tv">TV</option><option value="tablet">Máy tính bảng</option><option value="remote">Điện thoại khách</option></select>'
-    + '<select id="knfEv"><option value="">Mọi sự kiện</option><option value="rot">Chỉ RỚT</option><option value="noi">Nối vào</option><option value="cat">Server cắt</option><option value="tuchoi">Bị từ chối</option><option value="mo">Mở phòng</option><option value="dong">Đóng phòng</option></select>'
+    + '<select id="knfEv"><option value="">Mọi sự kiện</option><option value="rot">Chỉ RỚT</option><option value="noi">Nối vào</option><option value="tai">Nối lại (máy tự báo)</option><option value="cat">Server cắt</option><option value="tuchoi">Bị từ chối</option><option value="mo">Mở phòng</option><option value="dong">Đóng phòng</option></select>'
     + '<input id="knfIp" placeholder="Lọc IP" style="width:150px" value="'+esc(L.ip)+'">'
     + (L.phong ? '<span class="knchip">Phòng '+esc(L.phongTen)+'<button data-bo="phong" title="Bỏ lọc">✕</button></span>' : '')
     + (L.quanh ? '<span class="knchip">±2 phút quanh '+knTg(L.quanh)+'<button data-bo="quanh" title="Bỏ lọc">✕</button></span>' : '')
