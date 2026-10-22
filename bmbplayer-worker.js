@@ -1687,7 +1687,7 @@ async function adminKnMay(env, body) {
     try { st = await call(roomStub(env, r.id), '/status', { id: r.id, open: !!r.dang_mo, mo: r.mo_luc || 0 }); } catch (e) { st = { err: 1 }; }
     const m = role => (may.results || []).find(x => x.phong_id === r.id && x.role === role) || null;
     const k = role => (rotK.results || []).find(x => x.phong_id === r.id && x.role === role) || { rot: 0, noi: 0 };
-    return { id: r.id, ten: r.ten_phong, open: !!r.dang_mo, tvOn: !!st.tv, tbOn: st.tablets || 0, dt: st.remotes || 0, err: !!st.err, cl: st.cl || 0,
+    return { id: r.id, ten: r.ten_phong, open: !!r.dang_mo, tvOn: !!st.tv, tbOn: st.tablets || 0, dt: st.remotes || 0, err: !!st.err, cl: st.cl || 0, ph: st.ph || null,
       tv: m('tv'), tb: m('tablet'), tvK: k('tv'), tbK: k('tablet'), phat: knPhatTk((phat.results || []).filter(x => x.phong_id === r.id)) };
   }));
   return ok({ ds, now: Date.now() });
@@ -1842,7 +1842,7 @@ async function quayTv(env, body) {
     let st = {};
     try { st = await call(roomStub(env, r.id), '/status', { id: r.id, open: !!r.dang_mo, mo: r.mo_luc || 0 }); } catch (e) { console.error('quayTv status', r.id, e); st = { err: 1 }; }
     const x = { roomId: r.id, roomName: r.ten_phong, open: !!r.dang_mo, since: r.mo_luc || 0,
-      tv: !!st.tv, tablets: st.tablets || 0, remotes: st.remotes || 0, offNet: st.offNet || 0 };
+      tv: !!st.tv, tablets: st.tablets || 0, remotes: st.remotes || 0, offNet: st.offNet || 0, ph: st.ph || null };
     if (st.open) x.tokQr = await mkToken(env, r.id, 'qr', st.genQ);
     if (ss.r === 'admin') x.tokTv = await mkToken(env, r.id, 'tv', st.genT);
     return x;
@@ -2221,7 +2221,17 @@ export class Room extends DurableObject {
     let off = 0;
     for(const ws of this.sockets('remote')){ const a = ws.deserializeAttachment() || {}; if(a.off) off++; }
     return { remotes: this.sockets('remote').length, tablets: this.sockets('tablet').length, tv: this.sockets('tv').length > 0, net, offNet: off,
-      open: c.open, since: c.since, genQ: c.genQ, genT: c.genT, tvIp: (await this.ctx.storage.get('tvIp')) || '', cl: (await this.ctx.storage.get('cl')) || 0 };
+      open: c.open, since: c.since, genQ: c.genQ, genT: c.genT, tvIp: (await this.ctx.storage.get('tvIp')) || '', cl: (await this.ctx.storage.get('cl')) || 0,
+      ph: c.open && this.sockets('tv').length ? await this.phatTt() : null };
+  }
+  /* TV đang làm gì (quầy xem): lấy từ bản trạng thái TV báo gần nhất (TV báo mỗi khi đổi bài / dừng / phát / khoá tiếng…). Không thêm tin nhắn nào. */
+  async phatTt(){
+    const m = await this.ctx.storage.get(['last', 'lastAt']), raw = m.get('last');
+    if(!raw) return { st: 'chua' };
+    let p; try{ p = (JSON.parse(raw) || {}).state || {}; }catch(e){ return { st: 'chua' }; }
+    const q = Array.isArray(p.queue) ? p.queue.length : 0, cur = typeof p.cur === 'number' ? p.cur : -1;
+    const st = p.apiFailed ? 'loi' : p.scoring ? 'diem' : p.needStart || p.soundLocked ? 'cho' : cur < 0 || !q ? 'chua' : p.playing ? 'phat' : 'dung';
+    return { st, title: p.nowTitle ? String(p.nowTitle).slice(0, 80) : '', left: cur >= 0 ? Math.max(0, q - 1 - cur) : q, muted: p.muted ? 1 : 0, vol: p.volume, at: m.get('lastAt') || 0 };
   }
 
   async fetch(req){
@@ -2390,7 +2400,7 @@ export class Room extends DurableObject {
     /* từ TV */
     if(m.type === 'state'){
       const c = await this.cfg(); if(!c.open) return;
-      await this.ctx.storage.put('last', data);
+      await this.ctx.storage.put({ last: data, lastAt: now });
       for(const r of this.listeners()){ try{ r.send(data); }catch(e){} }
     }else if(m.type === 'dead' || m.type === 'pos'){          // 'pos' = giây đang phát (nhẹ, không lưu): remote vẽ thanh tua
       if(m.type === 'pos' && data.length > 512) return;

@@ -346,6 +346,7 @@ tbody tr:hover td{background:#FBF8FE}
 .knfrm{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:10px 0}
 .knfrm label{font-size:12.5px;color:var(--txt-mute);display:flex;flex-direction:column;gap:4px}
 .knfrm select{background:#fff;border:1px solid #CDB8E3;border-radius:10px;padding:8px 10px;font:inherit;font-size:13.5px;color:var(--txt)}
+.chip.ph{flex-basis:100%;max-width:100%;white-space:normal;line-height:1.35;border-radius:12px;padding-top:5px;padding-bottom:5px}
 .knsm{font-size:11.5px;color:var(--txt-mute)}
 .knchip{display:inline-flex;align-items:center;gap:6px;background:var(--tint);border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-size:12.5px}
 .knchip button{border:0;background:transparent;cursor:pointer;color:var(--bad);font-weight:700}
@@ -1277,6 +1278,17 @@ function loadTv(){
     drawTv();
   }).catch(function(){});
 }
+/* TV đang làm gì: đang phát bài nào / đang dừng / chờ chạm (trình duyệt chặn) / chưa có bài — lấy từ trạng thái TV báo về phòng */
+function tvPhat(x){
+  var p = x.ph; if(!x.open || !x.tv || !p) return '';
+  var t = esc(p.title || ''), left = p.left ? ' · còn '+p.left+' bài chờ' : '', cu = p.st==='phat' && p.at && Date.now()-p.at > 12*60000;
+  if(p.st==='phat') return '<span class="chip ph on" title="'+t+'">🎵 Đang phát: '+(t.length>34?t.slice(0,34)+'…':t)+left+(p.muted?' · 🔇 tắt tiếng':'')+'</span>'+(cu?'<span class="chip ph warn">chưa cập nhật >12 phút, TV có thể treo</span>':'');
+  if(p.st==='dung') return '<span class="chip ph warn">⏸ Đang dừng: '+(t.length>30?t.slice(0,30)+'…':t)+left+'</span>';
+  if(p.st==='cho') return '<span class="chip ph warn">👆 Có bài nhưng chưa phát được — cần chạm / bấm OK trên TV</span>';
+  if(p.st==='diem') return '<span class="chip ph on">🏆 Đang hiện điểm</span>';
+  if(p.st==='loi') return '<span class="chip ph warn">⚠️ Trình phát YouTube lỗi</span>';
+  return '<span class="chip ph">Chưa có bài (chờ khách chọn)</span>';
+}
 function drawTv(){
   kiemMang();
   veGanBar();
@@ -1290,6 +1302,7 @@ function drawTv(){
       + '<span class="chip '+(x.tv?'on':'warn')+'">'+(x.tv?'TV đã nối':'TV chưa nối')+'</span>'
       + '<span class="chip'+(x.tablets?' on':'')+'">'+(x.tablets?'Có máy tính bảng':'Chưa có máy tính bảng')+'</span>'
       + '<span class="chip">'+x.remotes+' điện thoại</span>'
+      + tvPhat(x)
       + (x.offNet ? '<span class="chip warn">'+x.offNet+' máy ngoài mạng quán</span>' : '')
       + '</div><div class="ac">';
     if(canGan) h += b('gan', GANNET.same === false ? 'btn-bad' : 'btn-y', GANNET.same === false ? 'Vẫn gán (chắc chắn '+tenMay().toLowerCase()+' ở đây)' : 'Gán '+tenMay().toLowerCase()+' này vào đây');
@@ -2516,6 +2529,11 @@ function knChart(rows){
 }
 /* ---------- Thiết bị từng phòng ---------- */
 function knClOpt(cur){ return (cur<0?'<option value="">— chọn —</option>':'')+[[0,'Tự động (YouTube chọn)'],[1080,'Tối đa 1080p'],[720,'Tối đa 720p'],[480,'Tối đa 480p'],[360,'Tối đa 360p']].map(function(o){ return '<option value="'+o[0]+'"'+(o[0]===cur?' selected':'')+'>'+o[1]+'</option>'; }).join(''); }
+function knMayDang(x){
+  var p = x.ph; if(!x.open || !x.tvOn || !p) return '';
+  var t = esc(p.title||''), tx = { phat:'🎵 Đang phát: '+t+(p.left?' · còn '+p.left+' bài':''), dung:'⏸ Đang dừng: '+t, cho:'👆 Chờ chạm / bấm OK để phát', diem:'🏆 Đang hiện điểm', loi:'⚠️ Trình phát YouTube lỗi', chua:'Chưa có bài' }[p.st] || '';
+  return '<div class="knsm" style="margin-top:6px;color:'+(p.st==='phat'||p.st==='diem'?'#0F7A4D':p.st==='chua'?'inherit':'#B7791F')+'"><b>'+tx+'</b></div>';
+}
 function knMayPhat(x){
   var p = x.phat || {}, h = '<div class="knsm" style="margin-top:6px">🎞️ <select data-cl-id="'+esc(x.id)+'" style="font-size:12px;padding:3px 6px;border-radius:8px;border:1px solid #CDB8E3">'+knClOpt(x.cl||0)+'</select></div>';
   if(p.n) h += '<div class="knsm">🎵 '+p.n+' bài'+(p.xau?' · <b style="color:#B7791F">'+p.xau+' có vấn đề</b> (bài 1–3: '+p.dauXau+'/'+p.dau+')':' · êm')+(p.bn?' · đứng hình '+p.bn+' lần':'')+' · hay phát '+knQTop(p.q)+(p.man?'<br>'+esc(p.man):'')+'</div>';
@@ -2538,7 +2556,7 @@ function knMay(){
         + '<div class="knsm">Trong kỳ: <b style="color:'+(k.rot&&tv?'#D6314F':'inherit')+'">'+k.rot+' lần rớt</b> / '+k.noi+' lần nối</div>';
     }
     h += '<div class="tblwrap"><table><thead><tr><th>Phòng</th><th>TV</th><th>Máy tính bảng</th><th>ĐT</th></tr></thead><tbody>'
-      + ds.map(function(x){ return '<tr><td><b>'+esc(x.ten)+'</b><div class="knsm">'+(x.open?'đang mở':'đóng')+'</div><button class="btn btn-ghost btn-sm" style="margin-top:4px;padding:3px 9px;font-size:11.5px" data-nk-phong="'+esc(x.id)+'" data-nk-ten="'+esc(x.ten)+'" data-nk-cn="'+esc(KN.cn)+'">Nhật ký</button></td><td>'+o(x.tv, x.tvOn, x.tvK, true)+knMayPhat(x)+'</td><td>'+(x.tb||x.tbOn?o(x.tb, x.tbOn, x.tbK):'<span class="mut">không có</span>')+'</td><td>'+(x.dt||0)+'</td></tr>'; }).join('')
+      + ds.map(function(x){ return '<tr><td><b>'+esc(x.ten)+'</b><div class="knsm">'+(x.open?'đang mở':'đóng')+'</div><button class="btn btn-ghost btn-sm" style="margin-top:4px;padding:3px 9px;font-size:11.5px" data-nk-phong="'+esc(x.id)+'" data-nk-ten="'+esc(x.ten)+'" data-nk-cn="'+esc(KN.cn)+'">Nhật ký</button></td><td>'+o(x.tv, x.tvOn, x.tvK, true)+knMayDang(x)+knMayPhat(x)+'</td><td>'+(x.tb||x.tbOn?o(x.tb, x.tbOn, x.tbK):'<span class="mut">không có</span>')+'</td><td>'+(x.dt||0)+'</td></tr>'; }).join('')
       + '</tbody></table></div>';
     $('knBody').innerHTML = h;
   }).catch(knLoi);
