@@ -962,8 +962,12 @@ function tgVe(){
   $('tgKn').addEventListener('click', tgBamKetNoi);
   tgTaoLink();
 }
-/* Trong APK (WebView) liên kết t.me mở tab mới bị chặn → không mở được Telegram. Thay bằng: chép liên kết + cách gửi tay "/start <mã>" cho bot. */
-function trongApk(){ return typeof BMBNative !== 'undefined'; }
+/* APK cũ (WebView < 2.8) chặn liên kết t.me mở tab mới → không mở được Telegram. Thay bằng: chép liên kết + cách gửi tay "/start <mã>" cho bot. */
+function trongApk(){            /* chỉ APK cũ (< 2.8) cần cách chép liên kết; từ 2.8 APK tự mở Telegram khi bấm nút như trên Chrome */
+  if(typeof BMBNative === 'undefined') return false;
+  var m = /BMBPlayerApp\/(\d+)\.(\d+)/.exec(navigator.userAgent);
+  return !(m && (+m[1] > 2 || (+m[1] === 2 && +m[2] >= 8)));
+}
 function chepVB(tx){
   var ok = function(){ toast('Đã chép.'); };
   if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(tx).then(ok).catch(function(){ chepCu(tx); }); } else chepCu(tx);
