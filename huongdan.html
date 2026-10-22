@@ -274,7 +274,11 @@ tbody tr:nth-child(even) td{background:#FBF8FE}
   #ql2 header{margin-bottom:10px}#ql2 .qrstep{padding:12px 16px;margin-bottom:12px}
   .tvauto .figs .dlg{max-width:230px!important}
   #khach #kh5 .card{padding:11px 14px}#khach #kh5 .card .ic{font-size:22px;margin-bottom:3px}
-  #khach .faq details{padding:7px 13px;margin-bottom:5px}
+  #khach .faq details{padding:5px 12px;margin-bottom:4px;font-size:12.6px}
+  #khach .faq details[open] summary{margin-bottom:2px}
+  #khach #kh5 .card{padding:10px 14px}
+  #quan-ly #ql9 table td,#quan-ly #ql9 table th{padding-top:5px;padding-bottom:5px}
+  #quan-ly .foot{margin-top:6mm}
   #khach .faq.mt{margin-top:10px}
   #khach .foot{margin-top:6mm;padding:14px 18px 16px}
   #khach #kh5 .chap-h{}
@@ -327,7 +331,7 @@ tbody tr:nth-child(even) td{background:#FBF8FE}
     <li><a href="#ql2">Cài ứng dụng (Android, iPhone, iPad) &amp; đăng nhập</a></li>
     <li><a href="#ql3">Hàng đợi — trái tim của quầy</a></li>
     <li><a href="#ql4">Lịch sử đơn &amp; đối soát</a></li>
-    <li><a href="#ql5">TV, máy tính bảng &amp; phòng</a></li>
+    <li><a href="#ql5">TV, máy tính bảng, phòng &amp; cài đặt tivi</a></li>
     <li><a href="#ql6">Menu nước &amp; dịch vụ</a></li>
     <li><a href="#ql7">Tài khoản &amp; vân tay</a></li>
     <li><a href="#ql8">Cập nhật BMBPlayer</a></li>
@@ -360,6 +364,8 @@ tbody tr:nth-child(even) td{background:#FBF8FE}
       <tr><td>Sửa menu: thêm, ẩn, bỏ, sắp xếp món</td><td class="c">khi được cấp quyền</td><td class="c y">✔</td><td class="c y">✔</td><td class="c y">✔</td></tr>
       <tr><td>Tài khoản quầy, gỡ / thu hồi máy tính bảng, vân tay</td><td class="c n">—</td><td class="c y">✔</td><td class="c y">✔</td><td class="c y">✔</td></tr>
       <tr><td>Chọn chi nhánh, thêm / xoá phòng, menu mẫu toàn chuỗi</td><td class="c n">—</td><td class="c n">—</td><td class="c y">✔</td><td class="c y">✔</td></tr>
+      <tr><td>Nhật ký kết nối, nối Telegram riêng</td><td class="c">Telegram: ✔</td><td class="c y">✔</td><td class="c y">✔</td><td class="c y">✔</td></tr>
+      <tr><td>Cài đặt tivi: thanh tua, trang trí lễ, điểm vui cuối bài</td><td class="c n">—</td><td class="c n">—</td><td class="c y">✔</td><td class="c y">✔</td></tr>
       <tr><td>Phát hành bản ứng dụng mới</td><td class="c n">—</td><td class="c n">—</td><td class="c n">—</td><td class="c y">✔</td></tr>
     </tbody>
   </table>
@@ -518,7 +524,7 @@ tbody tr:nth-child(even) td{background:#FBF8FE}
 
 <!-- 5 -->
 <section class="chap pb" id="ql5"><div class="wrap">
-  <header><span class="num">05</span><div><h2>TV, máy tính bảng &amp; phòng</h2><p class="lead">Mỗi phòng có 1 TV và có thể có 1 máy tính bảng.</p></div></header>
+  <header><span class="num">05</span><div><h2>TV, máy tính bảng &amp; phòng</h2><p class="lead">Mỗi phòng có 1 TV và có thể có 1 máy tính bảng; cài đặt tivi và nhật ký kết nối.</p></div></header>
 
   <div class="step">
     <div>
@@ -559,6 +565,37 @@ tbody tr:nth-child(even) td{background:#FBF8FE}
     </div>
     <div class="figs"><figure class="photo" style="max-width:250px"><div class="fig"><img src="huongdan/img/tvqr.jpg" alt=""></div><figcaption>Góc trái TV khi phòng đang mở</figcaption></figure></div>
   </div>
+
+  <div class="step wide">
+    <div>
+      <span class="badge"><b>4</b> Phòng bị rớt kết nối?</span>
+      <h3>🧾 Nhật ký kết nối — xem ngay nguyên nhân</h3>
+      <ul class="tick">
+        <li>Ở tab <b>📺 TV &amp; MTB</b> bấm <span class="k">🧾 Nhật ký kết nối</span>, chọn phòng (hoặc xem chung) — mỗi phòng giữ <b>60 sự kiện gần nhất</b>, có giờ và địa chỉ mạng (IP) mỗi lần máy nối vào.</li>
+        <li><b>Máy rớt</b> = máy tự mất kết nối (mạng chập chờn, máy ngủ, đóng app). <b>Server cắt</b> = hệ thống chủ động ngắt, kèm lý do.</li>
+        <li>TV <b>và</b> điện thoại cùng rớt trong <b>cùng một giây</b>, rồi tự nối lại sau vài giây ⇒ thường là <b>đường mạng/router/wifi của phòng đó</b>, không phải lỗi phần mềm.</li>
+        <li>Khi TV mất kết nối, điện thoại khách hiện dòng <b>“TV của phòng đang mất kết nối… trang tự chạy tiếp khi TV về”</b>; TV nối lại là dùng tiếp, hàng chờ vẫn còn, bài đang phát không bị dừng.</li>
+      </ul>
+      <div class="note tip"><b>Mẹo:</b> phòng nào hay rớt, mở bảng này <b>ngay lúc đó</b>, chụp màn hình gửi bộ phận kỹ thuật kèm tên phòng và giờ.</div>
+    </div>
+  </div>
+
+  <div class="step wide">
+    <div>
+      <span class="badge"><b>5</b> Cài đặt tivi — chỉ admin</span>
+      <h3>⚙️ Cài đặt: tua bài, trang trí lễ, điểm vui cuối bài</h3>
+      <p>Ba mục này áp dụng cho <b>mọi chi nhánh</b>; phòng đang mở nhận thay đổi khi thiết bị nối lại hoặc sau tối đa khoảng 10 phút.</p>
+      <table>
+        <thead><tr><th style="width:30%">Mục</th><th>Tác dụng</th></tr></thead>
+        <tbody>
+          <tr><td><b>⏩ Thanh tua bài</b></td><td><span class="k y">Bật/Tắt thanh tua</span>. Bật: điện thoại và máy tính bảng có thanh trượt và nút tua ±10 giây cho bài đang hát.</td></tr>
+          <tr><td><b>🎉 Trang trí tivi theo dịp lễ</b></td><td>Hoa, tim, pháo hoa, bí ngô, tuyết… rơi ở màn hình chờ và vài hình nhỏ ở góc khi đang hát (không che lời). Chọn <b>Tự động theo ngày lễ</b> (mặc định), <b>Tắt</b>, hoặc ép một chủ đề cho chương trình riêng.</td></tr>
+          <tr><td><b>🎤 Điểm vui cuối mỗi bài</b></td><td>Hết bài, tivi hiện màn <b>chấm điểm</b> (số chạy, sao, pháo giấy) khoảng 8 giây rồi mới sang bài kế. Chọn <b>Tắt</b> · <b>Bật — có tiếng trống và vỗ tay</b> · <b>Bật — im lặng</b>.</td></tr>
+        </tbody>
+      </table>
+      <div class="note warn"><b>Điểm là giải trí ngẫu nhiên</b>, không đo giọng hát thật — đừng quảng cáo là chấm điểm chính xác. Chỉ hiện khi bài được hát gần hết (tua nhảy tới cuối thì không có điểm). Trong lúc chấm điểm, nút tua bị bỏ qua; qua bài, đóng phòng hoặc hát lại sẽ tắt màn điểm ngay.</div>
+    </div>
+  </div>
 </div></section>
 
 <!-- 6 -->
@@ -595,6 +632,9 @@ tbody tr:nth-child(even) td{background:#FBF8FE}
       <p>Có trong <b>app BMBPlayer Android bản 2.4 trở lên</b> (không có khi mở bằng Chrome hay iPhone).</p>
       <ol class="no" style="font-size:14px"><li>Vào tab <b>⚙️ Cài đặt</b> → <span class="k y">Bật vân tay</span>.</li><li>Làm theo hướng dẫn trên màn hình để xác nhận tài khoản rồi quét vân tay.</li><li>Lần sau chạm <span class="k">Đăng nhập bằng vân tay</span> ở màn đăng nhập.</li></ol>
       <p style="font-size:14px">Máy cần đã đặt <b>khoá màn hình + vân tay</b> (Android 9 trở lên). Thêm vân tay mới trong máy thì bật lại. <span class="k">Tắt vân tay</span> bất cứ lúc nào.</p></div>
+    <div class="card"><div class="ic">✈️</div><h4>Nhận đơn qua Telegram riêng</h4>
+      <p>Quản lý và nhân viên quầy tự nối Telegram của mình ngay trong quầy: <b>⚙️ Cài đặt</b> → <span class="k y">✈️ Kết nối Telegram</span> → trong Telegram bấm <b>Start / Bắt đầu</b>. Trang tự báo “Đã kết nối”.</p>
+      <ul class="tick" style="font-size:14px"><li>Tin đơn mới có sẵn nút <span class="k y">Tiếp nhận</span> / <span class="k">Huỷ</span>, rồi <span class="k g">Đã xong</span> và <span class="k y">Đã nhập POS</span> — bấm ngay trên tin nhắn, tin được cập nhật tại chỗ và hiện tên người thao tác.</li><li>Nút chỉ bấm được trong <b>chat riêng với bot</b> (trong nhóm không bấm được) và đúng chi nhánh của tài khoản.</li><li><span class="k">Tạm dừng</span> / <span class="k r">Ngắt kết nối</span> bất cứ lúc nào.</li></ul></div>
   </div>
 </div></section>
 
@@ -671,6 +711,8 @@ tbody tr:nth-child(even) td{background:#FBF8FE}
       <tr><td><b>Mất máy tính bảng</b></td><td><span class="k r">Thu hồi mọi máy tính bảng</span>, sau đó gán lại những máy còn dùng.</td></tr>
       <tr><td>Không nghe chuông khi có đơn</td><td>Kiểm tra app đang chạy chế độ Quầy (có dòng “BMB Quầy đang nhận đơn”), cho phép thông báo và chạy nền. Dùng web thì bấm 🔔.</td></tr>
       <tr><td>TV đứng hình, trắng màn hình</td><td>Mở menu ẩn → <b>Tải lại trang</b>. Vẫn lỗi: <b>Xoá dữ liệu trang</b> rồi gán lại phòng.</td></tr>
+      <tr><td>Phòng <b>bị rớt</b> giữa lúc hát, khách báo “TV mất kết nối”</td><td>Chờ vài giây — thiết bị tự nối lại, bài vẫn phát và hàng chờ còn nguyên. Rớt lặp lại thì mở <span class="k">🧾 Nhật ký kết nối</span> (chương 5) và chụp gửi kỹ thuật.</td></tr>
+      <tr><td>Hết bài mà TV đứng ~8 giây rồi mới sang bài</td><td>Đó là màn <b>điểm vui</b>. Muốn bỏ: admin vào Cài đặt → <b>Điểm vui cuối mỗi bài hát</b> → Tắt.</td></tr>
       <tr><td>Cài / cập nhật bị <b>Play Protect chặn</b></td><td>Bấm <b>Chi tiết khác</b> → <b>Tiếp tục cài đặt</b> (chương 2).</td></tr>
       <tr><td>Báo <b>“Cần cập nhật trình hiển thị web”</b></td><td>Vào CH Play cập nhật <b>Android System WebView</b> (hoặc Google Chrome) rồi mở lại BMBPlayer.</td></tr>
     </tbody>
@@ -744,6 +786,7 @@ tbody tr:nth-child(even) td{background:#FBF8FE}
       <ul class="tick"><li><b>Ưu tiên</b> — hát ngay sau bài này.</li><li><b>Đẩy lên</b> — dịch lên một bậc.</li><li><b>Xoá</b> — bỏ khỏi hàng chờ.</li></ul>
       <p>Hàng nút phía dưới điều khiển TV:</p>
       <div class="keys"><div><b>↺</b>Hát lại</div><div><b>▶ / ⏸</b>Phát / Dừng</div><div><b>⏭</b>Qua bài</div><div><b>🔇</b>Tắt tiếng</div><div><b>🔉 🔊</b>Giảm / tăng âm</div></div>
+      <ul class="tick" style="margin-top:8px"><li>Nhiều người cùng điều khiển: <b>ai bấm gì, mọi điện thoại trong phòng cùng thấy ngay</b> (thêm bài, ưu tiên, phát/dừng, tắt tiếng).</li><li>Một số phòng có <b>thanh tua</b> và nút ±10 giây để nhảy tới đoạn bạn muốn.</li><li>Hết bài, TV có thể hiện <b>màn điểm vui</b> vài giây rồi tự sang bài kế — điểm mang tính giải trí.</li></ul>
     </div>
     <div class="figs"><figure class="phone"><div class="fig"><img src="huongdan/img/g_ph_queue.jpg" alt=""></div></figure></div>
   </div>
@@ -781,6 +824,8 @@ tbody tr:nth-child(even) td{background:#FBF8FE}
     <details open><summary>Bạn bè trong phòng cũng chọn bài được chứ?</summary><p>Được. Mỗi người quét QR trên điện thoại của mình, mọi bài sẽ xếp chung vào một hàng chờ.</p></details>
     <details open><summary>Chọn nhầm bài thì sao?</summary><p>Vào tab Hàng chờ, chạm vào bài đó rồi chọn <b>Xoá</b>. Nếu bài đang phát, chọn <b>Qua bài</b>.</p></details>
     <details open><summary>Tôi gọi nước rồi, bao giờ có?</summary><p>Lễ tân nhận yêu cầu ngay và lên phòng trong ít phút. Trong “Đơn đã gọi”, trạng thái sẽ đổi sang <b>Đã xác nhận</b> khi lễ tân nhận đơn của bạn.</p></details>
+    <details open><summary>Điện thoại báo “TV của phòng đang mất kết nối”?</summary><p>Mạng của phòng chập chờn vài giây. Bạn cứ đợi — TV nối lại là điện thoại tự chạy tiếp, danh sách bài không mất. Quá lâu thì nhờ nhân viên kiểm tra.</p></details>
+    <details open><summary>Điểm cuối bài có chính xác không?</summary><p>Đó là điểm vui để tăng không khí, không đo giọng hát thật. Hát tiếp bình thường — TV tự sang bài kế sau vài giây.</p></details>
     <details open><summary>Hết giờ hát thì điện thoại có tự thoát không?</summary><p>Có. Khi phòng đóng, điện thoại của bạn tự ngắt. Muốn hát tiếp, nhờ nhân viên mở phòng và quét mã QR mới trên TV.</p></details>
   </div>
 </div></section>
