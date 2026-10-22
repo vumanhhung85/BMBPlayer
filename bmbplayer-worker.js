@@ -393,6 +393,11 @@ async function handleApi(request, env, ctx) {
         case 'admin.knIp':               res = await adminKnIp(env, body); break;
         case 'admin.knIpLs':             res = await adminKnIpLs(env, body); break;
         case 'admin.knMay':              res = await adminKnMay(env, body); break;
+        case 'admin.knXuHuong':          res = await adminKnXuHuong(env, body); break;
+        case 'admin.knCanhBao':          res = await adminKnCanhBao(env, body); break;
+        case 'admin.knCanhBaoLuu':       res = await adminKnCanhBaoLuu(env, body); break;
+        case 'admin.knCanhBaoThu':       res = await adminKnCanhBaoThu(env, body); break;
+        case 'admin.knTgMa':             res = await adminKnTgMa(env, body); break;
         case 'quay.ganTv':               res = await quayGanTv(env, body, ip); break;
         case 'quay.tvCheck':             res = await quayTvCheck(env, body, ip); break;
         case 'quay.doiQr':               res = await quayDoiQr(env, body); break;
@@ -1448,7 +1453,9 @@ async function knBang(env) {
       rot INTEGER NOT NULL DEFAULT 0, tv INTEGER NOT NULL DEFAULT 0, tb INTEGER NOT NULL DEFAULT 0, dt INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (ngay, cn, ip))`),
     env.DB.prepare(`CREATE TABLE IF NOT EXISTS kn_may (phong_id TEXT NOT NULL, role TEXT NOT NULL, cn TEXT NOT NULL DEFAULT '', phong TEXT NOT NULL DEFAULT '',
       ip TEXT, isp TEXT, ua TEXT, lan_noi INTEGER, lan_rot INTEGER, tuoi_rot INTEGER, noi INTEGER NOT NULL DEFAULT 0, rot INTEGER NOT NULL DEFAULT 0,
-      PRIMARY KEY (phong_id, role))`)
+      PRIMARY KEY (phong_id, role))`),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS kn_cfg (khoa TEXT PRIMARY KEY, gia_tri TEXT NOT NULL DEFAULT '')`),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS kn_canhbao (cn TEXT PRIMARY KEY, luc INTEGER NOT NULL DEFAULT 0, so INTEGER NOT NULL DEFAULT 0)`)
   ]);
   await env.DB.prepare('ALTER TABLE kn_sk ADD COLUMN dg TEXT').run().catch(() => {});      // bảng tạo từ bản đầu chưa có cột dg (báo cáo từ phía máy)
   knSan = true;
@@ -1514,6 +1521,7 @@ async function knGhi(env, c, e) {
         .bind(pid, e.role, cn, ph, e.t, e.tuoi ?? null));
   }
   await env.DB.batch(st);
+  if (rot && cn && pid && (e.role === 'tv' || e.role === 'tablet')) await knCanhBao(env, cn, e.t).catch(err => console.error('knCanhBao', err));
   if (Date.now() - knDonLuc > 3600000) { knDonLuc = Date.now(); await knDon(env).catch(err => console.error('knDon', err)); }
 }
 /** Dọn dữ liệu quá hạn (tối đa 1 lần/giờ mỗi bản Worker, mỗi lần xoá có giới hạn để không nghẽn D1) */
@@ -1637,6 +1645,142 @@ async function adminKnMay(env, body) {
       tv: m('tv'), tb: m('tablet'), tvK: k('tv'), tbK: k('tablet') };
   }));
   return ok({ ds, now: Date.now() });
+}
+
+/* ---------- Cảnh báo Telegram khi NHIỀU PHÒNG CÙNG RỚT (chỉ tab Kết nối của quầy; không đụng app bảo trì) ----------
+   Cấu hình lưu ở bảng riêng kn_cfg (khoa 'canhbao'): bat, nguong (số phòng), cuaSo (giây), imLang (phút giữa 2 cảnh báo cùng chi nhánh).
+   Người nhận = tài khoản admin đang hoạt động đã kết nối Telegram (tg_chat_id) và không tạm dừng. Token bot dùng chung (cai_dat.tg_bot_token), chỉ ĐỌC.
+   Tắt hẳn: đặt biến TG_KETNOI = "0". Lỗi Telegram/D1 không bao giờ ảnh hưởng kết nối phòng. */
+const KN_CB_MAC_DINH = { bat: 1, nguong: 3, cuaSo: 30, imLang: 15 };
+let knCbCache = null, knCbCacheLuc = 0;
+async function knCbDoc(env, ep = false) {
+  if (!ep && knCbCache && Date.now() - knCbCacheLuc < 60000) return knCbCache;
+  const r = await env.DB.prepare(`SELECT gia_tri FROM kn_cfg WHERE khoa = 'canhbao'`).first();
+  let j = {}; try { j = JSON.parse((r && r.gia_tri) || '{}'); } catch (e) {}
+  const n = (v, a, b, d) => { v = +v; return Number.isFinite(v) ? Math.min(b, Math.max(a, Math.round(v))) : d; };
+  const M = KN_CB_MAC_DINH;
+  knCbCache = { bat: j.bat === 0 || j.bat === false ? 0 : 1, nguong: n(j.nguong, 2, 20, M.nguong), cuaSo: n(j.cuaSo, 10, 120, M.cuaSo), imLang: n(j.imLang, 5, 240, M.imLang) };
+  knCbCacheLuc = Date.now();
+  return knCbCache;
+}
+async function knCbNguoiNhan(env) {
+  const { results } = await env.DB.prepare(
+    `SELECT DISTINCT tg_chat_id FROM tai_khoan WHERE vai_tro = 'admin' AND hoat_dong = 1 AND tg_chat_id <> '' AND tg_tam_dung = 0`).all();
+  return [...new Set((results || []).map(r => String(r.tg_chat_id).trim()).filter(Boolean))];
+}
+async function knCanhBao(env, cn, t) {
+  if (String(env.TG_KETNOI || '1') === '0') return;
+  const cfg = await knCbDoc(env);
+  if (!cfg.bat) return;
+  const m = await env.DB.prepare(`SELECT COUNT(DISTINCT phong_id) AS n, GROUP_CONCAT(DISTINCT phong) AS ph, GROUP_CONCAT(DISTINCT ip) AS ip, GROUP_CONCAT(DISTINCT isp) AS isp
+    FROM kn_sk WHERE cn = ? AND t >= ? AND role IN ('tv','tablet') AND (ev = 'dut' OR (ev = 'cat' AND code = 4007))`).bind(cn, t - cfg.cuaSo * 1000).first();
+  if (!m || m.n < cfg.nguong) return;
+  const now = Date.now();
+  const cl = await env.DB.prepare(`INSERT INTO kn_canhbao (cn, luc, so) VALUES (?,?,?) ON CONFLICT(cn) DO UPDATE SET luc = excluded.luc, so = excluded.so WHERE luc < ?`)
+    .bind(cn, now, m.n, now - cfg.imLang * 60000).run();
+  if (!cl.meta || !cl.meta.changes) return;                 // vừa cảnh báo chi nhánh này rồi → im lặng
+  const [token, chats, tenCn] = await Promise.all([tgToken(env), knCbNguoiNhan(env), knTenCn(env)]);
+  if (!token || !chats.length) return;
+  const ips = String(m.ip || '').split(',').filter(Boolean), isps = String(m.isp || '').split(',').filter(Boolean);
+  const gio = new Date(now + VN_MS).toISOString().slice(11, 16);
+  const text = ['🚨 <b>Rớt đồng loạt — ' + escHtml(tenCn[cn] || cn) + '</b>',
+    '<b>' + m.n + ' phòng</b> mất kết nối trong ' + cfg.cuaSo + ' giây: ' + escHtml(String(m.ph || '').split(',').sort((a, b) => SAP_PHONG.compare(a, b)).join(', ')),
+    (ips.length ? 'IP: ' + escHtml(ips.slice(0, 3).join(', ')) + (isps.length ? ' · ' + escHtml(isps.slice(0, 2).join(', ')) : '') : ''),
+    '→ Nhiều phòng cùng lúc thường là <b>router / đường mạng của chi nhánh</b>, không phải từng TV.',
+    '🕐 ' + gio + ' · xem chi tiết: Quầy → 🔌 Kết nối → Rớt đồng loạt'].filter(Boolean).join('\n');
+  await Promise.all(chats.map(c => tgGoi(token, 'sendMessage', { chat_id: c, text, parse_mode: 'HTML', disable_web_page_preview: true }).catch(() => {})));
+}
+async function adminKnCanhBao(env, body) {
+  const [q, loi] = await knPhien(env, body);
+  if (loi) return loi;
+  await tgRiengBangSan(env);
+  const [cfg, tg, bot, nn, ls, ten] = await Promise.all([
+    knCbDoc(env, true),
+    env.DB.prepare('SELECT tg_chat_id, tg_ten, tg_tam_dung, tg_ket_noi_luc FROM tai_khoan WHERE username = ?').bind(q.ss.u).first(),
+    tgRiengBot(env), knCbNguoiNhan(env),
+    env.DB.prepare('SELECT cn, luc, so FROM kn_canhbao ORDER BY luc DESC LIMIT 10').all(),
+    knTenCn(env)
+  ]);
+  return ok({ cfg, coBot: bot.coBot, bot: bot.bot, ketNoi: !!(tg && tg.tg_chat_id && tg.tg_ket_noi_luc), ten: (tg && tg.tg_ten) || '', tamDung: !!(tg && tg.tg_tam_dung),
+    soNguoiNhan: nn.length, gan: (ls.results || []).map(r => ({ cn: r.cn, ten: ten[r.cn] || r.cn, luc: r.luc, so: r.so })),
+    tatHe: String(env.TG_KETNOI || '1') === '0' });
+}
+async function adminKnCanhBaoLuu(env, body) {
+  const [q, loi] = await knPhien(env, body);
+  if (loi) return loi;
+  const v = { bat: body.bat ? 1 : 0, nguong: body.nguong, cuaSo: body.cuaSo, imLang: body.imLang };
+  await env.DB.prepare(`INSERT INTO kn_cfg (khoa, gia_tri) VALUES ('canhbao', ?) ON CONFLICT(khoa) DO UPDATE SET gia_tri = excluded.gia_tri`).bind(JSON.stringify(v)).run();
+  knCbCache = null;
+  return adminKnCanhBao(env, body);
+}
+async function adminKnCanhBaoThu(env, body) {
+  const [q, loi] = await knPhien(env, body);
+  if (loi) return loi;
+  const [token, tg] = await Promise.all([tgToken(env), env.DB.prepare('SELECT tg_chat_id FROM tai_khoan WHERE username = ?').bind(q.ss.u).first()]);
+  if (!token) return fail('chua_co_bot', 400, 'Hệ thống chưa cài bot Telegram.');
+  if (!tg || !tg.tg_chat_id) return fail('chua_ket_noi', 400, 'Tài khoản admin này chưa kết nối Telegram.');
+  const r = await tgGoi(token, 'sendMessage', { chat_id: tg.tg_chat_id, parse_mode: 'HTML',
+    text: '✅ <b>Thử cảnh báo kết nối</b>\nNếu thấy tin này là Telegram đã nối đúng. Khi có nhiều phòng cùng rớt, tin sẽ có dạng “🚨 Rớt đồng loạt — tên chi nhánh”.' }).catch(() => null);
+  return r && r.ok ? ok({ guiDuoc: true }) : fail('gui_loi', 502, 'Telegram không nhận tin (đã chặn bot hoặc ngắt kết nối?).');
+}
+async function adminKnTgMa(env, body) {
+  const [q, loi] = await knPhien(env, body);
+  if (loi) return loi;
+  await tgRiengBangSan(env);
+  const b = await tgRiengBot(env);
+  if (!b.bot) return fail('chua_co_bot', 400, 'Hệ thống chưa cài bot Telegram.');
+  const A = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+  const ma = [...crypto.getRandomValues(new Uint8Array(20))].map(x => A[x % A.length]).join('');
+  const now = Date.now();
+  await env.DB.batch([
+    env.DB.prepare('DELETE FROM tg_ma_ket_noi WHERE het_han < ?').bind(now),
+    env.DB.prepare('INSERT INTO tg_ma_ket_noi (ma, username, het_han) VALUES (?,?,?)').bind(ma, q.ss.u, now + 15 * 60000)
+  ]);
+  return ok({ link: 'https://t.me/' + b.bot + '?start=' + ma });
+}
+/* ---------- Xu hướng chất lượng từng phòng theo tuần (tuần = thứ Hai → Chủ nhật, tính theo ngày kinh doanh) ---------- */
+const thuHai = ng => { const d = new Date(ng + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7)); return d.toISOString().slice(0, 10); };
+const congNgay = (ng, n) => { const d = new Date(ng + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+async function adminKnXuHuong(env, body) {
+  const [q, loi] = await knPhien(env, body);
+  if (loi) return loi;
+  const soTuan = [4, 8, 12, 24].includes(+body.tuan) ? +body.tuan : 8, homNay = ngayKinhDoanh();
+  const tuanNay = thuHai(homNay), tuan = []; for (let i = soTuan - 1; i >= 0; i--) tuan.push(congNgay(tuanNay, -7 * i));
+  const [w, b] = knCn(q, 'cn');
+  const [rs, dau, ten] = await Promise.all([
+    env.DB.prepare(`SELECT date(ngay, '-6 days', 'weekday 1') AS w, cn, phong_id, MAX(phong) AS phong, role, SUM(noi) AS noi, SUM(rot) AS rot
+      FROM kn_ngay WHERE ngay >= ? AND role IN ('tv','tablet')${w} GROUP BY w, phong_id, role`).bind(tuan[0], ...b).all(),
+    env.DB.prepare('SELECT MIN(ngay) AS n FROM kn_ngay').first(), knTenCn(env)
+  ]);
+  const dauNgay = (dau && dau.n) || homNay;
+  const soNgay = wk => Math.max(1, Math.round((Date.parse(( congNgay(wk, 6) < homNay ? congNgay(wk, 6) : homNay) + 'T00:00:00Z') - Date.parse((wk > dauNgay ? wk : dauNgay) + 'T00:00:00Z')) / 86400000) + 1);
+  const ngayTuan = tuan.map(soNgay), idx = {}; tuan.forEach((x, i) => { idx[x] = i; });
+  const phong = {}, tong = tuan.map(() => ({ tv: 0, tablet: 0, noi: 0 }));
+  for (const r of rs.results || []) {
+    const i = idx[r.w]; if (i == null) continue;
+    const k = r.phong_id + '|' + r.role;
+    const o = phong[k] = phong[k] || { cn: r.cn, cnTen: ten[r.cn] || r.cn, phong_id: r.phong_id, phong: r.phong, role: r.role, rot: tuan.map(() => 0), noi: tuan.map(() => 0) };
+    o.rot[i] = r.rot; o.noi[i] = r.noi; o.phong = r.phong || o.phong;
+    tong[i][r.role] += r.rot; tong[i].noi += r.noi;
+  }
+  const ds = [];
+  let on = 0;
+  for (const o of Object.values(phong)) {
+    const rate = o.rot.map((x, i) => x / ngayTuan[i]), n = rate.length, nay = rate[n - 1];
+    const truoc = rate.slice(Math.max(0, n - 4), n - 1).filter((_, i, a) => true);
+    const tb = truoc.length ? truoc.reduce((a, c) => a + c, 0) / truoc.length : 0;
+    const tongRot = o.rot.reduce((a, c) => a + c, 0);
+    if (!tongRot) continue;
+    let xu = 'on';
+    if (nay >= .5 && o.rot[n - 1] >= 3 && nay >= 2 * tb) xu = 'xau';
+    else if (tb >= .5 && nay <= .5 * tb) xu = 'tot';
+    else if (tb >= .5 && nay >= .5) xu = 'keo';
+    if (xu === 'on') on++;
+    ds.push(Object.assign(o, { xu, nay: +nay.toFixed(2), tb: +tb.toFixed(2), tongRot }));
+  }
+  const ut = { xau: 0, keo: 1, tot: 2, on: 3 };
+  ds.sort((a, c) => ut[a.xu] - ut[c.xu] || c.nay - a.nay || c.tongRot - a.tongRot);
+  return ok({ tuan, ngayTuan, tong, ds: ds.slice(0, 80), tongPhong: ds.length, dauNgay, now: Date.now() });
 }
 // ---------- quay.tv: phòng + TV / máy tính bảng / điện thoại đang nối + QR khách của lượt đang mở ----------
 async function quayTv(env, body) {

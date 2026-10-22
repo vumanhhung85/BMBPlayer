@@ -338,6 +338,13 @@ tbody tr:hover td{background:#FBF8FE}
 .knnote.r{border-color:var(--bad);background:#FFF1F3}.knnote.g{border-color:var(--ok);background:#EEFAF4}
 .kndot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:0}
 .kn-ev-rot{color:var(--bad);font-weight:700}.kn-ev-cat{color:#B7791F;font-weight:700}.kn-ev-noi{color:var(--ok)}
+.knheat{display:inline-block;min-width:26px;text-align:center;border-radius:6px;padding:3px 5px;font-weight:700;font-size:12px;background:#F3EEF9;color:#9a86b3}
+.knheat.h1{background:#FFF1CC;color:#8a5a00}.knheat.h2{background:#FFD9A8;color:#7a3a00}.knheat.h3{background:#F7A9B5;color:#7a0b24}.knheat.h4{background:#D6314F;color:#fff}
+.knbadge{display:inline-block;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;white-space:nowrap}
+.knbadge.xau{background:#FFE3E8;color:#B3203E}.knbadge.keo{background:#FFF1CC;color:#8a5a00}.knbadge.tot{background:#E4F7EE;color:#0F7A4D}.knbadge.on{background:#F3EEF9;color:#7d6b94}
+.knfrm{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:10px 0}
+.knfrm label{font-size:12.5px;color:var(--txt-mute);display:flex;flex-direction:column;gap:4px}
+.knfrm select{background:#fff;border:1px solid #CDB8E3;border-radius:10px;padding:8px 10px;font:inherit;font-size:13.5px;color:var(--txt)}
 .knsm{font-size:11.5px;color:var(--txt-mute)}
 .knchip{display:inline-flex;align-items:center;gap:6px;background:var(--tint);border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-size:12.5px}
 .knchip button{border:0;background:transparent;cursor:pointer;color:var(--bad);font-weight:700}
@@ -470,7 +477,7 @@ tbody tr:hover td{background:#FBF8FE}
       <button class="btn btn-ghost btn-sm" id="knTai">↻ Tải lại</button>
       <button class="btn btn-ghost btn-sm" id="knChep" title="Chép tóm tắt để gửi kỹ thuật">📋 Chép báo cáo</button>
     </div>
-    <div class="knsub" id="knSub"><button data-s="tq" class="on">📊 Tổng quan</button><button data-s="may">📺 Thiết bị từng phòng</button><button data-s="nk">🧾 Nhật ký</button><button data-s="ip">🌐 IP &amp; nhà mạng</button></div>
+    <div class="knsub" id="knSub"><button data-s="tq" class="on">📊 Tổng quan</button><button data-s="may">📺 Thiết bị từng phòng</button><button data-s="nk">🧾 Nhật ký</button><button data-s="ip">🌐 IP &amp; nhà mạng</button><button data-s="xh">📈 Xu hướng tuần</button><button data-s="cb">🔔 Cảnh báo Telegram</button></div>
     <div id="knBody"><div class="mut">Đang tải…</div></div>
     <div class="hint" style="margin-top:14px">Lưu trữ: <b>chi tiết từng sự kiện</b> của TV / máy tính bảng / mở-đóng phòng giữ <b>30 ngày</b>, của điện thoại khách giữ <b>7 ngày</b> (theo dõi nhanh); <b>số liệu tổng hợp theo ngày</b> và <b>danh sách IP</b> giữ <b>180 ngày</b> (theo dõi lâu). “Rớt” = máy tự mất kết nối hoặc im lặng quá lâu bị hệ thống ngắt. Một ngày tính từ 06:00 sáng.</div>
   </div>
@@ -2322,7 +2329,7 @@ $('apkUp').addEventListener('click', apkLen);
 vtNutDangNhap();
 
 /* =================== Tab 🔌 Kết nối (chỉ admin) =================== */
-var KN = { ngay: 7, cn: '', sub: 'tq', nk: [], nkHet: false, loc: { phong: '', phongTen: '', role: '', ev: '', ip: '', quanh: 0 }, ten: {}, tq: null, ipXem: '' };
+var KN = { ngay: 7, cn: '', sub: 'tq', nk: [], nkHet: false, loc: { phong: '', phongTen: '', role: '', ev: '', ip: '', quanh: 0 }, ten: {}, tq: null, ipXem: '', tuan: 8, cb: null };
 var KN_VAI = { tv: 'TV', tablet: 'MTB', remote: 'ĐT', phong: 'Phòng' };
 function knZ(n){ return (n<10?'0':'')+n; }
 function knTg(t){ var d = new Date(t); return knZ(d.getDate())+'/'+knZ(d.getMonth()+1)+' '+knZ(d.getHours())+':'+knZ(d.getMinutes())+':'+knZ(d.getSeconds()); }
@@ -2379,6 +2386,8 @@ function knVe(){
   else if(KN.sub==='may') knMay();
   else if(KN.sub==='nk'){ KN.nk = []; knNk(); }
   else if(KN.sub==='ip'){ if(KN.ipXem) knIpLs(KN.ipXem); else knIp(); }
+  else if(KN.sub==='xh') knXh();
+  else if(KN.sub==='cb') knCb();
 }
 /* ---------- Tổng quan ---------- */
 function knTq(){
@@ -2575,6 +2584,82 @@ function knChep(){
       .catch(function(){ var t = document.createElement('textarea'); t.value = tx; document.body.appendChild(t); t.select(); try{ document.execCommand('copy'); toast('Đã chép báo cáo.'); }catch(e){ alert(tx); } t.remove(); });
   }).catch(function(e){ toast(e.message || 'Không tải được.'); });
 }
+/* ---------- Xu hướng chất lượng theo tuần ---------- */
+function knHeat(r){ return r<=0 ? '' : r<.3 ? ' h1' : r<.8 ? ' h2' : r<1.6 ? ' h3' : ' h4'; }
+function knDm(x){ var d = new Date(x+'T00:00:00'); return knZ(d.getDate())+'/'+knZ(d.getMonth()+1); }
+function knXh(){
+  knGoi('admin.knXuHuong', { tuan: KN.tuan }).then(function(r){
+    var T = r.tuan || [], n = T.length, h = '';
+    var bar = '<div class="knf"><span class="knsm">Xem</span><div class="knseg" id="knTuanSeg">'
+      + [4,8,12,24].map(function(k){ return '<button data-tuan="'+k+'" class="'+(k===KN.tuan?'on':'')+'">'+k+' tuần</button>'; }).join('') + '</div></div>';
+    h += bar;
+    var mx = 1; (r.tong||[]).forEach(function(x){ mx = Math.max(mx, x.tv + x.tablet); });
+    var W = Math.max(n*34, 300), H = 110, bw = Math.min(22, (W/n)-8);
+    var svg = '<svg class="knchart" viewBox="0 0 '+W+' '+(H+20)+'" style="max-width:'+Math.max(W,420)+'px">';
+    (r.tong||[]).forEach(function(x, i){
+      var th = (x.tv + x.tablet)/mx*(H-18), tvh = x.tv/mx*(H-18), cx = i*(W/n) + (W/n)/2 - bw/2;
+      svg += '<rect x="'+cx+'" y="'+(H-th)+'" width="'+bw+'" height="'+th+'" rx="3" fill="#8E5BC8"/>'
+        + '<rect x="'+cx+'" y="'+(H-tvh)+'" width="'+bw+'" height="'+tvh+'" rx="3" fill="#D6314F"/>'
+        + '<text x="'+(cx+bw/2)+'" y="'+(H-th-3)+'" font-size="9" text-anchor="middle" fill="#6b5a82">'+(x.tv+x.tablet)+'</text>'
+        + '<text x="'+(cx+bw/2)+'" y="'+(H+13)+'" font-size="9" text-anchor="middle" fill="#9a86b3">'+knDm(T[i])+'</text>';
+    });
+    svg += '</svg>';
+    h += '<div class="knbox"><h3>Tổng số lần rớt mỗi tuần <span class="knsm">— tuần tính từ thứ Hai; cột cuối là tuần này (chưa đủ 7 ngày)</span></h3>'+svg
+      + '<div class="knleg"><span><i style="background:#D6314F"></i>TV</span><span><i style="background:#8E5BC8"></i>Máy tính bảng</span></div></div>';
+    var ds = r.ds || [];
+    var xau = ds.filter(function(x){ return x.xu==='xau'; }).length, keo = ds.filter(function(x){ return x.xu==='keo'; }).length;
+    if(xau) h += '<div class="knnote r"><b>'+xau+' phòng đang xấu đi</b> so với 3 tuần trước — nên kiểm tra sớm (nguồn điện, wifi/dây mạng, TV box).</div>';
+    if(keo) h += '<div class="knnote"><b>'+keo+' phòng hay rớt kéo dài</b> nhiều tuần liền — lỗi cố định ở phòng đó, nên xử lý dứt điểm.</div>';
+    if(!ds.length) h += '<div class="knnote g">Chưa có phòng nào rớt trong '+n+' tuần qua'+(r.dauNgay?' (dữ liệu bắt đầu ghi từ '+knDm(r.dauNgay)+')':'')+'.</div>';
+    else {
+      h += '<div class="knbox"><h3>Từng phòng theo tuần <span class="knsm">— số lần rớt; màu càng đỏ càng nhiều (tính theo số lần/ngày). Bấm một dòng để xem nhật ký phòng.</span></h3><div class="tblwrap"><table><thead><tr><th>Phòng</th>'
+        + (KN.cn?'':'<th>Chi nhánh</th>') + '<th>Máy</th>' + T.map(function(x, i){ return '<th style="text-align:center">'+knDm(x)+(i===n-1?'<div class="knsm">nay</div>':'')+'</th>'; }).join('') + '<th>Xu hướng</th></tr></thead><tbody>'
+        + ds.map(function(x){
+          var lb = { xau:'🔺 Xấu đi', keo:'⚠️ Kéo dài', tot:'🔻 Khá hơn', on:'· Lẻ tẻ' }[x.xu];
+          return '<tr class="kn-tr" data-nk-cn="'+esc(x.cn)+'" data-nk-phong="'+esc(x.phong_id)+'" data-nk-ten="'+esc(x.phong)+'" data-nk-role="'+esc(x.role)+'"><td><b>'+esc(x.phong)+'</b></td>'
+            + (KN.cn?'':'<td>'+esc(x.cnTen)+'</td>') + '<td>'+(x.role==='tv'?'TV':'MTB')+'</td>'
+            + x.rot.map(function(c, i){ return '<td style="text-align:center"><span class="knheat'+knHeat(c/(r.ngayTuan[i]||1))+'">'+(c||'·')+'</span></td>'; }).join('')
+            + '<td><span class="knbadge '+x.xu+'">'+lb+'</span><div class="knsm">tuần này '+x.nay+'/ngày · 3 tuần trước '+x.tb+'/ngày</div></td></tr>'; }).join('')
+        + '</tbody></table></div></div>';
+      if(r.tongPhong > ds.length) h += '<div class="knsm">Chỉ hiện '+ds.length+' / '+r.tongPhong+' dòng nặng nhất.</div>';
+    }
+    h += '<div class="knnote">Cách đánh giá: <b>Xấu đi</b> = tuần này ≥ 2 lần mức 3 tuần trước. <b>Kéo dài</b> = từ ~4 lần rớt/tuần trở lên, nhiều tuần liền. <b>Khá hơn</b> = từng rớt nhiều nay giảm hơn một nửa. Chỉ tính TV và máy tính bảng (điện thoại khách tắt/mở màn hình nên không đưa vào).</div>';
+    $('knBody').innerHTML = h;
+  }).catch(knLoi);
+}
+/* ---------- Cảnh báo Telegram khi nhiều phòng cùng rớt ---------- */
+function knCb(){
+  knGoi('admin.knCanhBao').then(function(r){ KN.cb = r; knCbVe(r); }).catch(knLoi);
+}
+function knCbOpt(arr, cur, fmt){ return arr.map(function(v){ return '<option value="'+v+'"'+(+v===+cur?' selected':'')+'>'+fmt(v)+'</option>'; }).join(''); }
+function knCbVe(r){
+  var c = r.cfg || {}, h = '';
+  if(r.tatHe) h += '<div class="knnote r">Tính năng đang bị <b>tắt ở hệ thống</b> (biến TG_KETNOI = 0). Cấu hình dưới đây chưa có tác dụng.</div>';
+  if(!r.coBot) h += '<div class="knnote r">Hệ thống chưa cài bot Telegram (dùng chung bot của app quản lý).</div>';
+  h += '<div class="knbox"><h3>1. Telegram của bạn</h3>';
+  if(r.ketNoi) h += '<div class="knnote '+(r.tamDung?'':'g')+'">'+(r.tamDung?'⏸️ Đã kết nối nhưng đang <b>tạm dừng thông báo</b> (đặt ở app quản lý) — sẽ không nhận cảnh báo.':'✅ Đã kết nối'+(r.ten?' với <b>'+esc(r.ten)+'</b>':'')+'.')+' Số admin đang nhận cảnh báo: <b>'+(r.soNguoiNhan||0)+'</b>.</div>'
+    + '<div class="actions wrap" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-ghost btn-sm" id="cbThu">📨 Gửi tin thử</button></div>';
+  else h += '<div class="knnote">Tài khoản admin này <b>chưa kết nối Telegram</b>. Bấm nút, mở Telegram, bấm <b>Start / Bắt đầu</b> (dùng chung kết nối với app quản lý).</div>'
+    + '<div class="actions wrap" style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn btn-y btn-sm" id="cbKn" href="#" target="_blank" rel="noopener">✈️ Kết nối Telegram</a></div>';
+  h += '</div><div class="knbox"><h3>2. Khi nào gửi cảnh báo</h3>'
+    + '<label class="chk" style="display:flex;gap:8px;align-items:center;font-size:14px;margin-bottom:6px"><input type="checkbox" id="cbBat"'+(c.bat?' checked':'')+' style="width:18px;height:18px"> Bật cảnh báo rớt đồng loạt</label>'
+    + '<div class="knfrm">'
+    + '<label>Số phòng rớt cùng lúc<select id="cbNguong">'+knCbOpt([2,3,4,5,6,8,10],c.nguong,function(v){ return '≥ '+v+' phòng'; })+'</select></label>'
+    + '<label>Trong khoảng<select id="cbCuaSo">'+knCbOpt([15,30,60,90,120],c.cuaSo,function(v){ return v+' giây'; })+'</select></label>'
+    + '<label>Không báo lại cùng chi nhánh trong<select id="cbIm">'+knCbOpt([5,15,30,60,120,240],c.imLang,function(v){ return v<60?v+' phút':(v/60)+' giờ'; })+'</select></label></div>'
+    + '<div class="actions wrap" style="display:flex;gap:8px"><button class="btn btn-y btn-sm" id="cbLuu">💾 Lưu cài đặt</button></div>'
+    + '<div class="knsm" style="margin-top:10px;line-height:1.6">Chỉ tính <b>TV và máy tính bảng</b> của phòng bị mất kết nối (điện thoại khách không tính). Tin gửi tới các tài khoản <b>admin</b> đã kết nối Telegram, nêu chi nhánh, danh sách phòng, IP và nhà mạng. Nhiều phòng cùng rớt thường do <b>router / đường mạng của chi nhánh</b>. TV tắt mạng đột ngột sẽ được xác nhận sau khoảng 2 phút nên tin có thể đến chậm chừng đó.</div></div>';
+  h += '<div class="knbox"><h3>3. Các lần cảnh báo gần đây</h3>';
+  h += (r.gan||[]).length ? '<div class="tblwrap"><table><thead><tr><th>Lúc</th><th>Chi nhánh</th><th>Số phòng</th></tr></thead><tbody>'+r.gan.map(function(x){ return '<tr><td>'+knTg(x.luc)+'</td><td>'+esc(x.ten)+'</td><td><b>'+x.so+'</b></td></tr>'; }).join('')+'</tbody></table></div>' : '<div class="mut">Chưa có cảnh báo nào được gửi.</div>';
+  h += '</div>';
+  $('knBody').innerHTML = h;
+  var a = $('cbKn');
+  if(a){
+    knGoi('admin.knTgMa').then(function(x){ if(x && x.link) a.href = x.link; }).catch(function(){});
+    a.addEventListener('click', function(){ var lan = 0, tm = setInterval(function(){ if(++lan > 60 || KN.sub!=='cb'){ clearInterval(tm); return; }
+      knGoi('admin.knCanhBao').then(function(x){ if(x.ketNoi){ clearInterval(tm); KN.cb = x; knCbVe(x); toast('Đã kết nối Telegram.'); } }).catch(function(){}); }, 3000); });
+  }
+}
 $('knCn').addEventListener('change', function(){ KN.cn = this.value; KN.tq = null; KN.ipXem = ''; KN.loc.phong = ''; KN.loc.quanh = 0; knVe(); });
 $('knNgay').addEventListener('click', function(ev){ var b = ev.target.closest('button'); if(!b) return; KN.ngay = +b.getAttribute('data-n'); KN.tq = null; knVe(); });
 $('knSub').addEventListener('click', function(ev){ var b = ev.target.closest('button'); if(!b) return; KN.sub = b.getAttribute('data-s'); if(KN.sub==='ip') KN.ipXem = ''; knVe(); });
@@ -2592,6 +2677,10 @@ $('knBody').addEventListener('click', function(ev){
     KN.sub = 'nk'; knVe(); return;
   }
   if((el = t.closest('[data-bo]'))){ var k = el.getAttribute('data-bo'); if(k==='phong'){ KN.loc.phong = ''; KN.loc.phongTen = ''; } else KN.loc[k] = 0; KN.nk = []; knNk(); return; }
+  if((el = t.closest('[data-tuan]'))){ KN.tuan = +el.getAttribute('data-tuan'); knVe(); return; }
+  if(t.id==='cbLuu'){ t.disabled = true; knGoi('admin.knCanhBaoLuu', { bat: $('cbBat').checked?1:0, nguong: +$('cbNguong').value, cuaSo: +$('cbCuaSo').value, imLang: +$('cbIm').value })
+    .then(function(x){ KN.cb = x; knCbVe(x); toast('Đã lưu cài đặt cảnh báo.'); }).catch(function(e){ t.disabled = false; toast(e.message||'Không lưu được.'); }); return; }
+  if(t.id==='cbThu'){ t.disabled = true; knGoi('admin.knCanhBaoThu').then(function(){ t.disabled = false; toast('Đã gửi tin thử, kiểm tra Telegram.'); }).catch(function(e){ t.disabled = false; toast(e.message||'Không gửi được.'); }); return; }
   if(t.id==='knThem'){ t.disabled = true; knNk(true); return; }
   if(t.id==='knCsv'){ knCsv(); return; }
   if(t.id==='knIpLai'){ KN.ipXem = ''; knIp(); return; }
