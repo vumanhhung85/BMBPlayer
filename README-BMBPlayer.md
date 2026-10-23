@@ -1,5 +1,7 @@
 # BMBPlayer — chọn bài hát + gọi lễ tân (một hệ thống)
 
+> **Sửa lỗi ở đây thì xem [DONG-BO.md](DONG-BO.md)**: sổ đồng bộ với MHPlayer (hai app chung nhiều cơ chế). Bản sao giống hệt có ở repo MHPlayer.
+
 **BMBPlayer = BMBPlayer + BMB Order cũ.** Một Worker, một repo, một tên miền: `https://bmb.id.vn`.
 
 | Trang | Ai dùng | Làm gì |
