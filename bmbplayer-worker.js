@@ -3234,9 +3234,10 @@ async function bcBmb(env, now, ten) {
   const t24 = now - 86400000, t8 = now - 8 * 86400000, t14 = now - 14 * 86400000;
   const thieu = [];
   const Q = async (nhan, sql, ...b) => { try { return ((await env.DB.prepare(sql).bind(...b).all()).results) || []; } catch (e) { thieu.push(nhan); return []; } };
-  const [cfg, rot, phat, loiPh, moQua, may, treo, cb] = await Promise.all([
+  const [cfg, rot, minT, phat, loiPh, moQua, may, treo, cb] = await Promise.all([
     knCbDoc(env, true).catch(() => KN_CB_MAC_DINH),
     Q('rớt TV', `SELECT cn, phong_id, phong, t FROM kn_sk WHERE role = 'tv' AND t >= ? AND (ev = 'dut' OR (ev = 'cat' AND code = 4007)) ORDER BY t LIMIT 20000`, t8),
+    Q('lịch sử', `SELECT MIN(t) AS m FROM kn_sk WHERE t >= ?`, t8),
     Q('chất lượng phát', `SELECT cn, phong_id, phong, dg FROM kn_sk WHERE ev = 'phat' AND t >= ? LIMIT 8000`, t24),
     Q('lỗi phòng', `SELECT cn, phong, COUNT(*) AS n FROM kn_sk WHERE ev = 'loi' AND t >= ? GROUP BY phong_id ORDER BY n DESC LIMIT 5`, t24),
     Q('phòng mở lâu', `SELECT ten_phong, chi_nhanh_id AS cn, mo_luc FROM order_phong WHERE dang_mo = 1 AND mo_luc IS NOT NULL AND mo_luc < ? ORDER BY mo_luc LIMIT 30`, t24),
@@ -3245,6 +3246,9 @@ async function bcBmb(env, now, ten) {
     Q('cảnh báo đã gửi', `SELECT cn, luc, so FROM kn_canhbao WHERE luc >= ?`, t24)
   ]);
   const tn = cn => ten[cn] || 'chi nhánh khác';
+  const mT = minT[0] && minT[0].m ? minT[0].m : now;
+  const nenNgay = Math.min(7, Math.max(0, (t24 - Math.max(mT, t8)) / 86400000)), chia = Math.max(1, Math.round(nenNgay));    // số ngày LỊCH SỬ thật để so sánh (mới bật thì chưa đủ 7 ngày)
+  const nen = nenNgay >= 2;
   const o = { mau: 0, viec: [], dong: [] };
   const nang = (m, v) => { o.mau = Math.max(o.mau, m); if (v) o.viec.push([m, v]); };
 
@@ -3257,13 +3261,13 @@ async function bcBmb(env, now, ten) {
     let c = cnS.get(r.cn); if (!c) cnS.set(r.cn, c = { h: 0, b: 0, ph: new Set() });
     if (h) { p.h++; c.h++; c.ph.add(r.phong_id); } else { p.b++; c.b++; }
   }
-  const tongH = [...cnS.values()].reduce((a, c) => a + c.h, 0), tongB = [...cnS.values()].reduce((a, c) => a + c.b, 0) / 7;
-  o.dong.push('• TV rớt: <b>' + tongH + '</b> lần trong 24 giờ (trung bình 7 ngày trước: ' + (Math.round(tongB * 10) / 10) + '/ngày)');
+  const tongH = [...cnS.values()].reduce((a, c) => a + c.h, 0), tongB = [...cnS.values()].reduce((a, c) => a + c.b, 0) / chia;
+  o.dong.push('• TV rớt: <b>' + tongH + '</b> lần trong 24 giờ ' + (nen ? '(trung bình ' + chia + ' ngày trước: ' + (Math.round(tongB * 10) / 10) + '/ngày)' : '(chưa đủ lịch sử để so sánh: mới có ' + (Math.round(nenNgay * 10) / 10) + ' ngày dữ liệu trước đó)'));
   const cnRot = [...cnS.entries()].filter(([, c]) => c.h > 0).sort((a, b) => b[1].h - a[1].h);
-  if (cnRot.length) o.dong.push('• Theo chi nhánh: ' + cnRot.map(([cn, c]) => escHtml(tn(cn)) + ' ' + c.h + ' lần/' + c.ph.size + ' phòng (TB ' + (Math.round(c.b / 7 * 10) / 10) + ')').join(' · '));
-  const bat = [...ph.values()].filter(p => p.h >= 4 && p.h >= 2 * Math.max(1, p.b / 7)).sort((a, b) => b.h - a.h);
+  if (cnRot.length) o.dong.push('• Theo chi nhánh: ' + cnRot.map(([cn, c]) => escHtml(tn(cn)) + ' ' + c.h + ' lần/' + c.ph.size + ' phòng (TB ' + (Math.round(c.b / chia * 10) / 10) + ')').join(' · '));
+  const bat = [...ph.values()].filter(p => p.h >= (nen ? 4 : 6) && p.h >= 2 * Math.max(1, p.b / chia)).sort((a, b) => b.h - a.h);
   if (bat.length) {
-    o.dong.push('• Phòng rớt nhiều bất thường: ' + bat.slice(0, 5).map(p => '<b>' + escHtml(p.phong) + '</b> (' + escHtml(tn(p.cn)) + ') ' + p.h + ' lần, TB ' + (Math.round(p.b / 7 * 10) / 10)).join(' · '));
+    o.dong.push('• Phòng rớt nhiều bất thường: ' + bat.slice(0, 5).map(p => '<b>' + escHtml(p.phong) + '</b> (' + escHtml(tn(p.cn)) + ') ' + p.h + ' lần, TB ' + (Math.round(p.b / chia * 10) / 10)).join(' · '));
     nang(bat.length >= 3 ? 2 : 1, bat.slice(0, 3).map(p => escHtml(p.phong) + ' ' + escHtml(tn(p.cn))).join(', ') + ': TV rớt nhiều bất thường → xem Quầy → Kết nối → Máy / IP; chỉ một phòng rớt riêng thường là nguồn, dây LAN hoặc wifi của TV');
   }
   const dl = bcDongLoat(r24, cfg);
@@ -3318,12 +3322,20 @@ async function bcBmb(env, now, ten) {
 
 /* Kho: đọc 3 API của Worker kho; lỗi thì báo thẳng trong báo cáo (kho im lặng là một sự cố) */
 async function bcKhoDoc(env, k, nhan) {
+  /* Ưu tiên Service Binding (env.KHO_VI / env.KHO_EN, khai báo ở wrangler.toml [[services]]): Worker gọi Worker qua địa chỉ workers.dev thường bị Cloudflare chặn (404, "error code: 1042"). Không có binding thì mới gọi bằng URL. */
+  const bind = env['KHO_' + k] && typeof env['KHO_' + k].fetch === 'function' ? env['KHO_' + k] : null;
   const url = String(env['KHO_' + k + '_URL'] || '').replace(/\/+$/, ''), pass = String(env['KHO_' + k + '_PASS'] || '');
-  if (!url || !pass) return { nhan, mau: 1, loi: 'chưa cấu hình (thiếu KHO_' + k + '_URL / KHO_' + k + '_PASS trong Worker bmbplayer)' };
+  if ((!url && !bind) || !pass) return { nhan, mau: 1, loi: 'chưa cấu hình (thiếu KHO_' + k + '_PASS' + (bind ? '' : ' hoặc KHO_' + k + '_URL') + ' trong Worker bmbplayer)' };
   const h = { 'x-pass': pass, 'Origin': 'https://bmb.id.vn' };
   const get = async p => {
-    const r = await fetch(url + p, { headers: h, signal: AbortSignal.timeout(8000) });
-    if (!r.ok) { let d = {}; try { d = await r.json(); } catch (e) {} throw new Error(r.status === 401 ? 'sai mật khẩu kho' : d.reason === 'origin' ? 'kho chưa cho phép địa chỉ https://bmb.id.vn (ALLOWED_ORIGINS của kho)' : 'lỗi ' + r.status); }
+    const init = { headers: h, signal: AbortSignal.timeout(8000) };
+    const r = bind ? await bind.fetch('https://kho.internal' + p, init) : await fetch(url + p, init);
+    if (!r.ok) {
+      const tx = await r.text().catch(() => '');
+      let d = {}; try { d = JSON.parse(tx); } catch (e) {}
+      throw new Error(r.status === 401 ? 'sai mật khẩu kho' : d.reason === 'origin' ? 'kho chưa cho phép địa chỉ https://bmb.id.vn (ALLOWED_ORIGINS của kho)'
+        : 'lỗi ' + r.status + (/1042/.test(tx) ? ' (error 1042: Worker không gọi được Worker qua địa chỉ workers.dev, cần Service Binding)' : tx && !d.error ? ' — ' + tx.replace(/\s+/g, ' ').slice(0, 80) : d.error ? ' — ' + String(d.error).slice(0, 80) : ''));
+    }
     return r.json();
   };
   let s;
@@ -3397,7 +3409,7 @@ async function bcLap(env, opt = {}) {
   L.push('', '<b>📺 BMBPlayer — 24 giờ qua</b>', ...bmb.dong);
   L.push('', '<b>🎵 ' + vi.nhan + '</b>', ...vi.dong);
   L.push('', '<b>🌐 ' + en.nhan + '</b>', ...en.dong);
-  L.push('', '<i>Chi tiết: Quầy → 🔌 Kết nối · kho.html. Chỉ nêu điều bất thường so với trung bình 7 ngày; màu đỏ chỉ dành cho TV rớt.</i>');
+  L.push('', '<i>Chi tiết: Quầy → 🔌 Kết nối · kho.html. Chỉ nêu điều bất thường so với những ngày trước (tối đa 7 ngày); màu đỏ chỉ dành cho TV rớt.</i>');
   return { text: L.join('\n'), ngay, snap: { vi: vi.snap || truoc.vi || null, en: en.snap || truoc.en || null }, mau };
 }
 

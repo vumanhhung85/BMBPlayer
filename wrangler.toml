@@ -17,6 +17,14 @@ TV_NET = "on"              # on = TV chờ gán khác mạng chi nhánh thì h�
 KHO_VI_URL = "https://kho-karaoke.vumanhhung85.workers.dev"
 KHO_EN_URL = "https://kho-karaoke-en.vumanhhung85.workers.dev"
 # BAO_CAO_SANG = "0"       # bỏ dấu # và đặt "0" để TẮT báo cáo sáng
+# Service Binding tới hai Worker kho (Worker gọi Worker qua workers.dev bị Cloudflare chặn → 404). Tên Worker phải ĐÚNG như trong Dash, sai tên thì deploy lỗi.
+[[services]]
+binding = "KHO_VI"
+service = "kho-karaoke"
+
+[[services]]
+binding = "KHO_EN"
+service = "kho-karaoke-en"
 
 # Cron Trigger: 00:55 UTC = 07:55 giờ Việt Nam → báo cáo sáng (hàm scheduled)
 [triggers]
