@@ -13,6 +13,14 @@ ALLOWED_ORIGINS = "https://bmb.id.vn,https://bmbplayer.vmh.io.vn,https://bmbplay
 NET_CHECK = "off"          # off = không kiểm mạng | warn = cho vào nhưng đánh dấu máy ngoài mạng quán | on = chặn điện thoại khách ngoài mạng quán
 TB_NET = "off"             # on = máy tính bảng phải cùng mạng chi nhánh lúc gán (chi nhánh có 2 đường mạng thì nên để off) | off = bỏ kiểm
 TV_NET = "on"              # on = TV chờ gán khác mạng chi nhánh thì hỏi xác nhận (chống gán nhầm TV chi nhánh khác) | off = bỏ kiểm
+# Báo cáo sáng (Telegram, 07:55 mỗi ngày): đọc thống kê của hai Worker kho. Mật khẩu kho đặt trong Dash loại SECRET: KHO_VI_PASS, KHO_EN_PASS (cùng mật khẩu anh nhập ở kho.html).
+KHO_VI_URL = "https://kho-karaoke.vumanhhung85.workers.dev"
+KHO_EN_URL = "https://kho-karaoke-en.vumanhhung85.workers.dev"
+# BAO_CAO_SANG = "0"       # bỏ dấu # và đặt "0" để TẮT báo cáo sáng
+
+# Cron Trigger: 00:55 UTC = 07:55 giờ Việt Nam → báo cáo sáng (hàm scheduled)
+[triggers]
+crons = ["55 0 * * *"]
 
 # Trang HTML/ảnh/js ở thư mục gốc repo được phục vụ như file tĩnh (miễn phí, không giới hạn lượt).
 # Những file KHÔNG được công khai (code Worker, cấu hình, ghi chú) liệt kê trong .assetsignore.

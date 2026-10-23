@@ -398,6 +398,7 @@ async function handleApi(request, env, ctx) {
         case 'admin.knCanhBao':          res = await adminKnCanhBao(env, body); break;
         case 'admin.knCanhBaoLuu':       res = await adminKnCanhBaoLuu(env, body); break;
         case 'admin.knCanhBaoThu':       res = await adminKnCanhBaoThu(env, body); break;
+        case 'admin.baoCaoThu':          res = await adminBaoCaoThu(env, body); break;
         case 'admin.knTgMa':             res = await adminKnTgMa(env, body); break;
         case 'quay.ganTv':               res = await quayGanTv(env, body, ip); break;
         case 'quay.tvCheck':             res = await quayTvCheck(env, body, ip); break;
@@ -3184,7 +3185,264 @@ async function apkPhatHanh(req, env, u, ch) {
   return jres({ ok: true, vc, vn }, 200, ch);
 }
 
+/* ---------- Báo cáo sáng (7h55 mỗi ngày, gửi Telegram cho admin) ----------
+   Gộp: sức khoẻ BMBPlayer 24 giờ qua + kho Việt + kho quốc tế. Chạy bằng Cron Trigger "55 0 * * *" (UTC) = 07:55 giờ Việt Nam (wrangler.toml → [triggers]).
+   • BMBPlayer: đọc thẳng D1 (kn_sk, order_phong, order_don, kn_may, kn_canhbao). Chỉ nêu điều BẤT THƯỜNG so với trung bình 7 ngày trước; TV rớt mới tính là xấu (khớp tab Kết nối).
+   • Kho: gọi /api/kho/stats, /grow, /channels của hai Worker kho bằng header x-pass. Cần KHO_VI_URL, KHO_EN_URL (biến) và KHO_VI_PASS, KHO_EN_PASS (Secret) — không sửa kho-worker.js.
+   • Luôn ghi TÊN chi nhánh (knTenCn), không ghi mã.
+   • bc_ngay: giữ bản chụp mỗi ngày (để so kho hôm nay với hôm qua) + dấu "đã gửi hôm nay" chống gửi đôi.
+   • Tắt hẳn: đặt biến BAO_CAO_SANG = "0". Nút "Gửi thử báo cáo" ở quầy → Kết nối → Cảnh báo (admin.baoCaoThu) gửi cho riêng tài khoản bấm, không ghi dấu "đã gửi". */
+async function bcBang(env) {
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS bc_ngay (ngay TEXT PRIMARY KEY, gia_tri TEXT NOT NULL DEFAULT '', luc INTEGER NOT NULL DEFAULT 0)`).run();
+}
+const bcSo = v => (Number.isFinite(+v) ? String(Math.round(+v)) : '—').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+const bcGio = t => new Date(t + VN_MS).toISOString().slice(11, 16);
+const bcTruoc = ms => { const p = Math.max(0, Math.round((Date.now() - ms) / 60000)); return p < 90 ? p + ' phút' : p < 2880 ? Math.round(p / 60) + ' giờ' : Math.round(p / 1440) + ' ngày'; };
+const bcSoPhong = (a, b) => SAP_PHONG.compare(String(a), String(b));
+const bcVer = v => String(v || '').split('.').map(x => parseInt(x, 10) || 0);
+function bcSoVer(a, b) { const x = bcVer(a), y = bcVer(b); for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; }
+function bcTrongTin(text) {                       // Telegram tối đa 4096 ký tự/tin: cắt theo dòng
+  const out = []; let cur = '';
+  for (const ln of text.split('\n')) {
+    if (cur && cur.length + ln.length + 1 > 3800) { out.push(cur); cur = ''; }
+    cur += (cur ? '\n' : '') + ln;
+  }
+  if (cur) out.push(cur);
+  return out;
+}
+
+/* Rớt đồng loạt trong 24 giờ: nhiều TV KHÁC PHÒNG của cùng chi nhánh rớt trong cuaSo giây (cùng ngưỡng với cảnh báo Telegram) */
+function bcDongLoat(rows, cfg) {
+  const byCn = {};
+  for (const r of rows) (byCn[r.cn] = byCn[r.cn] || []).push(r);
+  const ev = [];
+  for (const cn of Object.keys(byCn)) {
+    const a = byCn[cn]; let i = 0, bo = 0;
+    for (let j = 0; j < a.length; j++) {
+      if (a[j].t < bo) continue;
+      while (a[i].t < a[j].t - cfg.cuaSo * 1000) i++;
+      const ph = new Map();
+      for (let k = i; k <= j; k++) ph.set(a[k].phong_id, a[k].phong);
+      if (ph.size >= cfg.nguong) { ev.push({ cn, t: a[j].t, n: ph.size, ph: [...ph.values()].sort(bcSoPhong) }); bo = a[j].t + 10 * 60000; }
+    }
+  }
+  return ev.sort((x, y) => x.t - y.t);
+}
+
+async function bcBmb(env, now, ten) {
+  await knBang(env);
+  const t24 = now - 86400000, t8 = now - 8 * 86400000, t14 = now - 14 * 86400000;
+  const thieu = [];
+  const Q = async (nhan, sql, ...b) => { try { return ((await env.DB.prepare(sql).bind(...b).all()).results) || []; } catch (e) { thieu.push(nhan); return []; } };
+  const [cfg, rot, phat, loiPh, moQua, may, treo, cb] = await Promise.all([
+    knCbDoc(env, true).catch(() => KN_CB_MAC_DINH),
+    Q('rớt TV', `SELECT cn, phong_id, phong, t FROM kn_sk WHERE role = 'tv' AND t >= ? AND (ev = 'dut' OR (ev = 'cat' AND code = 4007)) ORDER BY t LIMIT 20000`, t8),
+    Q('chất lượng phát', `SELECT cn, phong_id, phong, dg FROM kn_sk WHERE ev = 'phat' AND t >= ? LIMIT 8000`, t24),
+    Q('lỗi phòng', `SELECT cn, phong, COUNT(*) AS n FROM kn_sk WHERE ev = 'loi' AND t >= ? GROUP BY phong_id ORDER BY n DESC LIMIT 5`, t24),
+    Q('phòng mở lâu', `SELECT ten_phong, chi_nhanh_id AS cn, mo_luc FROM order_phong WHERE dang_mo = 1 AND mo_luc IS NOT NULL AND mo_luc < ? ORDER BY mo_luc LIMIT 30`, t24),
+    Q('phiên bản app', `SELECT cn, phong, role, ua FROM kn_may WHERE role IN ('tv','tablet') AND ua LIKE '%BMBPlayerApp/%' AND lan_noi >= ?`, t14),
+    Q('đơn treo', `SELECT chi_nhanh_id AS cn, COUNT(*) AS n, MIN(tao_luc) AS cu FROM order_don WHERE trang_thai = 'MOI' AND tao_luc >= ? AND tao_luc < ? GROUP BY chi_nhanh_id`, t24, now - 30 * 60000),
+    Q('cảnh báo đã gửi', `SELECT cn, luc, so FROM kn_canhbao WHERE luc >= ?`, t24)
+  ]);
+  const tn = cn => ten[cn] || 'chi nhánh khác';
+  const o = { mau: 0, viec: [], dong: [] };
+  const nang = (m, v) => { o.mau = Math.max(o.mau, m); if (v) o.viec.push([m, v]); };
+
+  /* TV rớt: theo chi nhánh / phòng, so với trung bình 7 ngày trước (b/7) */
+  const ph = new Map(), cnS = new Map(), r24 = [];
+  for (const r of rot) {
+    const h = r.t >= t24;
+    if (h) r24.push(r);
+    let p = ph.get(r.phong_id); if (!p) ph.set(r.phong_id, p = { cn: r.cn, phong: r.phong, h: 0, b: 0 });
+    let c = cnS.get(r.cn); if (!c) cnS.set(r.cn, c = { h: 0, b: 0, ph: new Set() });
+    if (h) { p.h++; c.h++; c.ph.add(r.phong_id); } else { p.b++; c.b++; }
+  }
+  const tongH = [...cnS.values()].reduce((a, c) => a + c.h, 0), tongB = [...cnS.values()].reduce((a, c) => a + c.b, 0) / 7;
+  o.dong.push('• TV rớt: <b>' + tongH + '</b> lần trong 24 giờ (trung bình 7 ngày trước: ' + (Math.round(tongB * 10) / 10) + '/ngày)');
+  const cnRot = [...cnS.entries()].filter(([, c]) => c.h > 0).sort((a, b) => b[1].h - a[1].h);
+  if (cnRot.length) o.dong.push('• Theo chi nhánh: ' + cnRot.map(([cn, c]) => escHtml(tn(cn)) + ' ' + c.h + ' lần/' + c.ph.size + ' phòng (TB ' + (Math.round(c.b / 7 * 10) / 10) + ')').join(' · '));
+  const bat = [...ph.values()].filter(p => p.h >= 4 && p.h >= 2 * Math.max(1, p.b / 7)).sort((a, b) => b.h - a.h);
+  if (bat.length) {
+    o.dong.push('• Phòng rớt nhiều bất thường: ' + bat.slice(0, 5).map(p => '<b>' + escHtml(p.phong) + '</b> (' + escHtml(tn(p.cn)) + ') ' + p.h + ' lần, TB ' + (Math.round(p.b / 7 * 10) / 10)).join(' · '));
+    nang(bat.length >= 3 ? 2 : 1, bat.slice(0, 3).map(p => escHtml(p.phong) + ' ' + escHtml(tn(p.cn))).join(', ') + ': TV rớt nhiều bất thường → xem Quầy → Kết nối → Máy / IP; chỉ một phòng rớt riêng thường là nguồn, dây LAN hoặc wifi của TV');
+  }
+  const dl = bcDongLoat(r24, cfg);
+  if (dl.length) {
+    o.dong.push('• Rớt đồng loạt: <b>' + dl.length + '</b> lần — ' + dl.slice(0, 4).map(e => bcGio(e.t) + ' ' + escHtml(tn(e.cn)) + ' (' + e.n + ' TV: ' + escHtml(e.ph.slice(0, 6).join(', ')) + (e.ph.length > 6 ? '…' : '') + ')').join('; '));
+    nang(dl.length >= 3 ? 2 : 1, 'Rớt đồng loạt ' + dl.length + ' lần ở ' + [...new Set(dl.map(e => escHtml(tn(e.cn))))].join(', ') + ' → nhiều phòng cùng lúc thường là router/đường mạng: xem Kết nối → Rớt đồng loạt, hỏi nhà mạng nếu lặp lại');
+  } else o.dong.push('• Rớt đồng loạt: không có');
+  if (cb.length) o.dong.push('• Đã gửi cảnh báo Telegram: ' + cb.length + ' chi nhánh (' + cb.map(x => escHtml(tn(x.cn)) + ' lúc ' + bcGio(x.luc)).join(', ') + ')');
+
+  /* Phòng mở quá 24 giờ */
+  if (moQua.length) {
+    o.dong.push('• Phòng đang mở quá 24 giờ: ' + moQua.slice(0, 6).map(r => '<b>' + escHtml(r.ten_phong) + '</b> (' + escHtml(tn(r.cn)) + ') ' + bcTruoc(r.mo_luc)).join(' · ') + (moQua.length > 6 ? ' … +' + (moQua.length - 6) : ''));
+    nang(1, 'Phòng mở quá 24 giờ: ' + moQua.slice(0, 4).map(r => escHtml(r.ten_phong) + ' ' + escHtml(tn(r.cn))).join(', ') + ' → hỏi quầy có quên đóng phòng không');
+  }
+
+  /* Chất lượng phát */
+  if (phat.length) {
+    const nhom = new Map();
+    for (const r of phat) { let a = nhom.get(r.cn); if (!a) nhom.set(r.cn, a = []); a.push(r); }
+    const xau = [];
+    for (const [cn, a] of nhom) { const k = knPhatTk(a); if (k.n >= 30 && k.xau / k.n >= 0.15) xau.push(escHtml(tn(cn)) + ' ' + Math.round(k.xau * 100 / k.n) + '% bài giật/đứng hình (' + k.xau + '/' + k.n + ')'); }
+    const yeu = [], nhomP = new Map();
+    for (const r of phat) { let a = nhomP.get(r.phong_id); if (!a) nhomP.set(r.phong_id, a = { cn: r.cn, phong: r.phong, rows: [] }); a.rows.push(r); }
+    for (const a of nhomP.values()) { const k = knPhatTk(a.rows); if (k.xau >= 5 && k.xau / k.n >= 0.3) yeu.push({ a, k }); }
+    if (xau.length) { o.dong.push('• Chất lượng phát kém: ' + xau.join(' · ')); nang(1, 'Chất lượng phát kém ở ' + xau.length + ' chi nhánh → đặt giới hạn 720p cho box yếu (Kết nối → Máy)'); }
+    if (yeu.length) o.dong.push('• Box có vẻ yếu: ' + yeu.sort((x, y) => y.k.xau - x.k.xau).slice(0, 4).map(({ a, k }) => '<b>' + escHtml(a.phong) + '</b> (' + escHtml(tn(a.cn)) + ') ' + k.xau + '/' + k.n).join(' · '));
+  }
+
+  /* Lỗi phòng (sự kiện 'loi') */
+  const nLoi = loiPh.reduce((a, r) => a + r.n, 0);
+  if (nLoi >= 20) { o.dong.push('• Lỗi phòng: ' + nLoi + ' — nhiều nhất ' + loiPh.slice(0, 3).map(r => escHtml(r.phong) + ' (' + escHtml(tn(r.cn)) + ') ' + r.n).join(', ')); nang(1, 'Có ' + nLoi + ' sự kiện lỗi phòng trong 24 giờ → xem Kết nối → Nhật ký, lọc "loi"'); }
+
+  /* Đơn gọi phục vụ treo ở trạng thái mới > 30 phút */
+  if (treo.length) {
+    const n = treo.reduce((a, r) => a + r.n, 0);
+    o.dong.push('• Đơn chưa ai tiếp nhận quá 30 phút: <b>' + n + '</b> (' + treo.map(r => escHtml(tn(r.cn)) + ' ' + r.n + ', cũ nhất ' + bcTruoc(r.cu)).join('; ') + ')');
+    nang(n >= 3 ? 2 : 1, n + ' đơn gọi phục vụ treo ở trạng thái mới → nhắc quầy ' + treo.map(r => escHtml(tn(r.cn))).join(', '));
+  }
+
+  /* Máy còn app cũ (so với bản cao nhất đang thấy) */
+  const dsApp = [];
+  let cao = '';
+  for (const r of may) { const m = /BMBPlayerApp\/([\d.]+)/.exec(r.ua || ''); if (!m) continue; dsApp.push({ r, v: m[1] }); if (!cao || bcSoVer(m[1], cao) > 0) cao = m[1]; }
+  const cu = dsApp.filter(x => bcSoVer(x.v, cao) < 0);
+  if (cu.length) o.dong.push('• Máy chưa lên app ' + cao + ': ' + cu.length + ' — ' + cu.slice(0, 6).map(x => '<b>' + escHtml(x.r.phong) + '</b> ' + (x.r.role === 'tv' ? 'TV' : 'MTB') + ' ' + x.v + ' (' + escHtml(tn(x.r.cn)) + ')').join(', ') + (cu.length > 6 ? ' …' : ''));
+
+  const v = env.CF_VERSION_METADATA && env.CF_VERSION_METADATA.timestamp ? Date.parse(env.CF_VERSION_METADATA.timestamp) : 0;
+  if (v && now - v < 86400000) o.dong.push('• Worker vừa được deploy lúc ' + bcGio(v) + ' ' + new Date(v + VN_MS).toISOString().slice(8, 10) + '/' + new Date(v + VN_MS).toISOString().slice(5, 7) + ' (các phòng rớt WebSocket vài giây là bình thường)');
+  if (thieu.length) { o.dong.push('• ⚠ Không đọc được: ' + escHtml(thieu.join(', ')) + ' — số liệu mục này có thể thiếu'); nang(1, 'Báo cáo không đọc được dữ liệu: ' + escHtml(thieu.join(', '))); }
+  return o;
+}
+
+/* Kho: đọc 3 API của Worker kho; lỗi thì báo thẳng trong báo cáo (kho im lặng là một sự cố) */
+async function bcKhoDoc(env, k, nhan) {
+  const url = String(env['KHO_' + k + '_URL'] || '').replace(/\/+$/, ''), pass = String(env['KHO_' + k + '_PASS'] || '');
+  if (!url || !pass) return { nhan, mau: 1, loi: 'chưa cấu hình (thiếu KHO_' + k + '_URL / KHO_' + k + '_PASS trong Worker bmbplayer)' };
+  const h = { 'x-pass': pass, 'Origin': 'https://bmb.id.vn' };
+  const get = async p => {
+    const r = await fetch(url + p, { headers: h, signal: AbortSignal.timeout(8000) });
+    if (!r.ok) { let d = {}; try { d = await r.json(); } catch (e) {} throw new Error(r.status === 401 ? 'sai mật khẩu kho' : d.reason === 'origin' ? 'kho chưa cho phép địa chỉ https://bmb.id.vn (ALLOWED_ORIGINS của kho)' : 'lỗi ' + r.status); }
+    return r.json();
+  };
+  let s;
+  try { s = await get('/api/kho/stats'); } catch (e) { return { nhan, mau: 2, loi: 'không đọc được kho — ' + (e && e.message ? e.message : 'không kết nối được') }; }
+  const [g, c] = await Promise.all([get('/api/kho/grow').catch(() => null), get('/api/kho/channels').catch(() => null)]);
+  return { nhan, s, g, c };
+}
+function bcKhoPhanTich(d, truoc, now, workerTen) {
+  const o = { nhan: d.nhan, mau: 0, viec: [], dong: [], snap: null };
+  const nang = (m, v) => { o.mau = Math.max(o.mau, m); if (v) o.viec.push([m, v]); };
+  if (d.loi) { o.dong.push('• ⚠ ' + escHtml(d.loi)); nang(d.mau, d.nhan + ': ' + escHtml(d.loi)); return o; }
+  const s = d.s, g = d.g, c = d.c;
+  o.snap = { videos: s.videos || 0, songs: s.songs || 0 };
+  const dv = truoc && truoc.videos != null ? s.videos - truoc.videos : null;
+  o.dong.push('• ' + bcSo(s.videos) + ' bản · ' + bcSo(s.songs) + ' bài' + (dv != null ? ' (' + (dv >= 0 ? '+' : '') + bcSo(dv) + ' bản so với hôm qua)' : '') + ' · nguồn bật ' + (s.channelsOn || 0) + '/' + (s.channels || 0));
+  o.dong.push('• 7 ngày: +' + bcSo(s.newSongs7 || 0) + ' bài / +' + bcSo(s.newVersions7 || 0) + ' bản · khách chọn 30 ngày: ' + bcSo(s.picks30 || 0));
+  if (s.q7) o.dong.push('• Tìm hụt 7 ngày: ' + (s.miss7 || 0) + '/' + s.q7 + ' (' + Math.round((s.miss7 || 0) * 100 / s.q7) + '%)');
+
+  if (!s.last) nang(1, d.nhan + ': kho chưa có lượt chạy nào → bấm ⚡ Quét nhanh trong kho.html và kiểm Cron Trigger');
+  else if (now - s.last.at > 30 * 60000) { o.dong.push('• 🔴 Cron kho im ' + bcTruoc(s.last.at)); nang(2, d.nhan + ': lịch tự chạy (cron) im ' + bcTruoc(s.last.at) + ' → Cloudflare → Worker ' + workerTen + ' → Settings → Triggers: xoá rồi thêm lại */10 * * * *'); }
+  else o.dong.push('• Cron kho chạy lúc ' + bcGio(s.last.at) + ' (cách ' + bcTruoc(s.last.at) + ')');
+
+  const keys = (s.keys || []).filter(k => k.set), hong = keys.filter(k => k.bad);
+  if (hong.length) {
+    const het = hong.length >= keys.length;
+    o.dong.push('• ' + (het ? '🔴' : '🟡') + ' Khoá YouTube hỏng: ' + hong.map(k => escHtml(k.name) + ' (' + escHtml((k.bad && k.bad.reason) || '') + ')').join(', '));
+    nang(het ? 2 : 1, d.nhan + ': ' + (het ? 'MỌI khoá YouTube hỏng, kho không gọi được YouTube → tạo khoá mới cùng project Google và cập nhật secret' : 'một khoá YouTube hỏng, kho đang chạy bằng khoá dự phòng → thay khoá khi tiện'));
+  } else if (s.keys && s.keys[1] && !s.keys[1].set) o.viec.push([0, d.nhan + ': chưa có khoá dự phòng → thêm secret YT_KEY_2 (khoá thứ hai trong CÙNG project Google)']);
+
+  if (s.writeLimit && s.writesToday >= s.writeLimit * 0.8) { const het = s.writesToday >= s.writeLimit; o.dong.push('• ' + (het ? '🔴' : '🟡') + ' Ghi D1 hôm nay ' + bcSo(s.writesToday) + '/' + bcSo(s.writeLimit)); nang(het ? 2 : 1, d.nhan + ': ' + (het ? 'chạm trần ghi D1, kho tự dừng ghi tới ngày mới' : 'sắp chạm trần ghi D1') + ' → nếu không đang quét kênh lớn thì có thể Worker kho ghi lặp, cần kiểm tra'); }
+  if (s.budget && s.unitsToday >= s.budget * 0.9) { o.dong.push('• 🟡 Đơn vị YouTube hôm nay ' + bcSo(s.unitsToday) + '/' + bcSo(s.budget)); nang(1, d.nhan + ': gần hết đơn vị YouTube trong ngày → tạm ngưng quét tay, đợi reset 14–15h'); }
+  if (s.late > 0) { o.dong.push('• 🟡 ' + s.late + ' nguồn trễ hạn kiểm bài mới > 3 ngày' + (s.oldestDue ? ' (trễ nhất ' + bcTruoc(s.oldestDue) + ')' : '')); nang(1, d.nhan + ': ' + s.late + ' nguồn trễ hạn → bấm ⚡ Quét nhanh; nếu lặp lại thì tắt bớt nguồn có "bài riêng" thấp'); }
+  if (s.refreshOldest && now - s.refreshOldest > 3 * 86400000) { o.dong.push('• 🟡 Làm mới tồn đọng: ' + bcSo(s.refreshDue || 0) + ' bản, cũ nhất ' + bcTruoc(s.refreshOldest)); nang(1, d.nhan + ': bản chờ làm mới tồn đọng ' + bcTruoc(s.refreshOldest)); }
+  if (s.hotAt && now - s.hotAt > 3 * 86400000) { o.dong.push('• 🟡 Bài hot cập nhật lần cuối ' + bcTruoc(s.hotAt)); nang(1, d.nhan + ': danh sách bài hot đã ' + bcTruoc(s.hotAt) + ' chưa cập nhật → nếu dùng danh sách tay (hết hạn sau 30 ngày) thì dán lại, KHÔNG tick "Thay toàn bộ"'); }
+
+  if (s.q7 >= 20 && (s.miss7 || 0) / s.q7 >= 0.15) {
+    const top = ((g && g.misses) || []).filter(m => !m.searched || !m.added).slice(0, 5).map(m => escHtml(m.label || m.q) + ' (' + m.n + ')');
+    nang(1, d.nhan + ': tìm hụt ' + Math.round((s.miss7 || 0) * 100 / s.q7) + '% trong 7 ngày' + (top.length ? ', nhiều nhất: ' + top.join(', ') : '') + ' → thêm kênh/ca sĩ phù hợp hoặc dán bài vào ô Bài hot');
+  }
+  if (!(s.newSongs7 > 0) && !(s.pendingFull > 0) && !(s.dueNow > 0)) { o.dong.push('• 🟡 Kho không tăng thêm trong 7 ngày'); nang(1, d.nhan + ': 7 ngày không có bài mới và đã quét xong mọi nguồn → thêm 2–3 kênh karaoke mới để kho lớn thêm'); }
+  if (s.maxVideos && s.videos >= s.maxVideos * 0.9) { o.dong.push('• 🟡 Gần trần số bản: ' + bcSo(s.videos) + '/' + bcSo(s.maxVideos)); nang(1, d.nhan + ': gần trần ' + bcSo(s.maxVideos) + ' bản → tăng MAX_VIDEOS hoặc dọn bản ít dùng'); }
+  const kem = ((c && c.channels) || []).filter(x => x.enabled !== false && x.rej && x.rej.seen >= 50 && (x.rej.ok || 0) * 100 / x.rej.seen < 20);
+  if (kem.length) { o.dong.push('• 🟡 Kênh nhận dưới 20%: ' + kem.slice(0, 3).map(x => escHtml(x.title) + ' ' + Math.round((x.rej.ok || 0) * 100 / x.rej.seen) + '%').join(', ')); nang(1, d.nhan + ': ' + kem.length + ' kênh bị loại gần hết (thường tắt nhúng/thiếu chữ karaoke) → thay bằng kênh khác'); }
+  return o;
+}
+
+async function bcLap(env, opt = {}) {
+  const now = Date.now();
+  await bcBang(env);
+  const ten = await knTenCn(env).catch(() => ({}));
+  const ngay = new Date(now + VN_MS).toISOString().slice(0, 10), hom = new Date(now + VN_MS - 86400000).toISOString().slice(0, 10);
+  const truocRow = await env.DB.prepare('SELECT gia_tri FROM bc_ngay WHERE ngay = ?').bind(hom).first().catch(() => null);
+  let truoc = {}; try { truoc = JSON.parse((truocRow && truocRow.gia_tri) || '{}'); } catch (e) {}
+  const [bmb, dvi, den] = await Promise.all([
+    bcBmb(env, now, ten).catch(e => ({ mau: 1, viec: [[1, 'BMBPlayer: không lập được mục này (' + escHtml(e && e.message) + ')']], dong: ['• ⚠ Lỗi khi đọc dữ liệu BMBPlayer'] })),
+    bcKhoDoc(env, 'VI', 'Kho Việt'), bcKhoDoc(env, 'EN', 'Kho quốc tế')
+  ]);
+  const vi = bcKhoPhanTich(dvi, truoc.vi, now, 'kho-karaoke'), en = bcKhoPhanTich(den, truoc.en, now, 'kho-karaoke-en');
+  const mau = Math.max(bmb.mau, vi.mau, en.mau);
+  const viec = [...bmb.viec, ...vi.viec, ...en.viec].sort((a, b) => b[0] - a[0]);
+  const viecCan = viec.filter(v => v[0] >= 1), viecGoiY = viec.filter(v => v[0] === 0);
+  const dm = new Date(now + VN_MS).toISOString(), nhan = dm.slice(8, 10) + '/' + dm.slice(5, 7);
+  const L = [];
+  L.push((mau >= 2 ? '🔴' : mau === 1 ? '🟡' : '🟢') + ' <b>BMB sáng ' + nhan + ' — ' + (mau === 0 ? 'mọi thứ ổn' : viecCan.length + ' việc cần để ý') + '</b>');
+  if (viecCan.length) {
+    L.push('', '<b>Cần làm hôm nay</b>');
+    viecCan.slice(0, 8).forEach((v, i) => L.push((i + 1) + '. ' + (v[0] >= 2 ? '🔴 ' : '') + v[1]));
+    if (viecCan.length > 8) L.push('Còn ' + (viecCan.length - 8) + ' việc nhẹ hơn: ' + viecCan.slice(8).map(v => v[1].split(' → ')[0]).join('; ').slice(0, 700));
+  }
+  if (viecGoiY.length) { L.push('', '<i>Gợi ý:</i>'); viecGoiY.slice(0, 3).forEach(v => L.push('• ' + v[1])); }
+  L.push('', '<b>📺 BMBPlayer — 24 giờ qua</b>', ...bmb.dong);
+  L.push('', '<b>🎵 ' + vi.nhan + '</b>', ...vi.dong);
+  L.push('', '<b>🌐 ' + en.nhan + '</b>', ...en.dong);
+  L.push('', '<i>Chi tiết: Quầy → 🔌 Kết nối · kho.html. Chỉ nêu điều bất thường so với trung bình 7 ngày; màu đỏ chỉ dành cho TV rớt.</i>');
+  return { text: L.join('\n'), ngay, snap: { vi: vi.snap || truoc.vi || null, en: en.snap || truoc.en || null }, mau };
+}
+
+async function baoCaoSang(env, opt = {}) {
+  if (!opt.thu && String(env.BAO_CAO_SANG || '1') === '0') return { gui: 0, lyDo: 'tat' };
+  const [token, chats] = await Promise.all([tgToken(env), opt.chat ? Promise.resolve([String(opt.chat)]) : knCbNguoiNhan(env)]);
+  if (!token || !chats.length) return { gui: 0, lyDo: !token ? 'chua_co_bot' : 'chua_co_nguoi_nhan' };
+  await bcBang(env);
+  const ngay = new Date(Date.now() + VN_MS).toISOString().slice(0, 10);
+  if (!opt.thu) {                                  // chống gửi đôi nếu Cron chạy lặp
+    const r = await env.DB.prepare(`INSERT OR IGNORE INTO bc_ngay (ngay, gia_tri, luc) VALUES (?, '', ?)`).bind('gui-' + ngay, Date.now()).run();
+    if (!r.meta || !r.meta.changes) return { gui: 0, lyDo: 'da_gui' };
+  }
+  let bc;
+  try { bc = await bcLap(env, opt); }
+  catch (e) { if (!opt.thu) await env.DB.prepare('DELETE FROM bc_ngay WHERE ngay = ?').bind('gui-' + ngay).run().catch(() => {}); throw e; }
+  const tin = bcTrongTin(bc.text);
+  let guiDuoc = 0;
+  for (const c of chats) {
+    for (const t of tin) {
+      const r = await tgGoi(token, 'sendMessage', { chat_id: c, text: (opt.thu ? '🧪 <i>Bản gửi thử</i>\n' : '') + t, parse_mode: 'HTML', disable_web_page_preview: true }).catch(() => null);
+      if (r && r.ok) guiDuoc++;
+    }
+  }
+  if (!opt.thu) {
+    if (guiDuoc) await env.DB.prepare(`INSERT INTO bc_ngay (ngay, gia_tri, luc) VALUES (?,?,?) ON CONFLICT(ngay) DO UPDATE SET gia_tri = excluded.gia_tri, luc = excluded.luc`).bind(bc.ngay, JSON.stringify(bc.snap), Date.now()).run().catch(() => {});
+    else await env.DB.prepare('DELETE FROM bc_ngay WHERE ngay = ?').bind('gui-' + ngay).run().catch(() => {});     // gửi hụt hết → cho phép thử lại
+    await env.DB.prepare('DELETE FROM bc_ngay WHERE ngay < ? AND ngay NOT LIKE ?').bind(new Date(Date.now() + VN_MS - 40 * 86400000).toISOString().slice(0, 10), 'gui-%').run().catch(() => {});
+  }
+  return { gui: guiDuoc, mau: bc.mau };
+}
+async function adminBaoCaoThu(env, body) {
+  const [q, loi] = await knPhien(env, body);
+  if (loi) return loi;
+  const [token, tg] = await Promise.all([tgToken(env), env.DB.prepare('SELECT tg_chat_id FROM tai_khoan WHERE username = ?').bind(q.ss.u).first()]);
+  if (!token) return fail('chua_co_bot', 400, 'Hệ thống chưa cài bot Telegram.');
+  if (!tg || !tg.tg_chat_id) return fail('chua_ket_noi', 400, 'Tài khoản admin này chưa kết nối Telegram.');
+  const r = await baoCaoSang(env, { thu: true, chat: tg.tg_chat_id });
+  return r.gui ? ok({ guiDuoc: true }) : fail('gui_loi', 502, 'Telegram không nhận tin (đã chặn bot hoặc ngắt kết nối?).');
+}
+
 export default {
+  async scheduled(event, env, ctx){      // Cron Trigger (wrangler.toml → [triggers]): báo cáo sáng 07:55 giờ Việt Nam
+    ctx.waitUntil(baoCaoSang(env).catch(e => console.error('baoCaoSang', e)));
+  },
   async fetch(req, env, ctx){
     const u = new URL(req.url);
     if(!env.SECRET) return jres({ error: 'Worker chưa đặt secret SECRET' }, 500);

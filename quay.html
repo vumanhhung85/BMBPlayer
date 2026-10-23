@@ -2729,7 +2729,8 @@ function knCbVe(r){
   if(!r.coBot) h += '<div class="knnote r">Hệ thống chưa cài bot Telegram (dùng chung bot của app quản lý).</div>';
   h += '<div class="knbox"><h3>1. Telegram của bạn</h3>';
   if(r.ketNoi) h += '<div class="knnote '+(r.tamDung?'':'g')+'">'+(r.tamDung?'⏸️ Đã kết nối nhưng đang <b>tạm dừng thông báo</b> (đặt ở app quản lý) — sẽ không nhận cảnh báo.':'✅ Đã kết nối'+(r.ten?' với <b>'+esc(r.ten)+'</b>':'')+'.')+' Số admin đang nhận cảnh báo: <b>'+(r.soNguoiNhan||0)+'</b>.</div>'
-    + '<div class="actions wrap" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-ghost btn-sm" id="cbThu">📨 Gửi tin thử</button></div>';
+    + '<div class="actions wrap" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-ghost btn-sm" id="cbThu">📨 Gửi tin thử</button><button class="btn btn-ghost btn-sm" id="bcThu">📰 Gửi thử báo cáo sáng</button></div>'
+    + '<div class="knnote">Báo cáo sáng tự gửi lúc <b>7h55</b> mỗi ngày cho các admin đã kết nối Telegram: sức khoẻ BMBPlayer 24 giờ qua, kho Việt, kho quốc tế. Nút trên chỉ gửi bản thử cho riêng bạn.</div>';
   else h += '<div class="knnote">Tài khoản admin này <b>chưa kết nối Telegram</b>. Bấm nút, mở Telegram, bấm <b>Start / Bắt đầu</b> (dùng chung kết nối với app quản lý).</div>'
     + '<div class="actions wrap" style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn btn-y btn-sm" id="cbKn" href="#" target="_blank" rel="noopener">✈️ Kết nối Telegram</a></div>';
   h += '</div><div class="knbox"><h3>2. Khi nào gửi cảnh báo</h3>'
@@ -2773,6 +2774,7 @@ $('knBody').addEventListener('click', function(ev){
   if(t.id==='cbLuu'){ t.disabled = true; knGoi('admin.knCanhBaoLuu', { bat: $('cbBat').checked?1:0, nguong: +$('cbNguong').value, cuaSo: +$('cbCuaSo').value, imLang: +$('cbIm').value })
     .then(function(x){ KN.cb = x; knCbVe(x); toast('Đã lưu cài đặt cảnh báo.'); }).catch(function(e){ t.disabled = false; toast(e.message||'Không lưu được.'); }); return; }
   if(t.id==='cbThu'){ t.disabled = true; knGoi('admin.knCanhBaoThu').then(function(){ t.disabled = false; toast('Đã gửi tin thử, kiểm tra Telegram.'); }).catch(function(e){ t.disabled = false; toast(e.message||'Không gửi được.'); }); return; }
+  if(t.id==='bcThu'){ t.disabled = true; toast('Đang lập báo cáo, chờ vài giây…'); knGoi('admin.baoCaoThu').then(function(){ t.disabled = false; toast('Đã gửi báo cáo thử, kiểm tra Telegram.'); }).catch(function(e){ t.disabled = false; toast(e.message||'Không gửi được.'); }); return; }
   if(t.id==='knClAllBtn'){ var v = $('knClAll').value; if(v===''){ toast('Chọn mức chất lượng trước.'); return; }
     if(!confirm('Đặt "'+$('knClAll').selectedOptions[0].textContent+'" cho MỌI TV của chi nhánh này?')) return;
     t.disabled = true; knGoi('admin.knCl', { all: 1, cl: +v }).then(function(x){ toast('Đã đặt cho '+x.so+' / '+x.tong+' phòng.'); knMay(); }).catch(function(e){ t.disabled = false; toast(e.message||'Không đặt được.'); }); return; }

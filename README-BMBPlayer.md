@@ -119,6 +119,17 @@ if (cq && /^od:/.test(String(cq.data || ''))) {
 
 Tắt cả tin nhắn lẫn nút: biến `TG_LETAN = 0` (như cũ).
 
+## Báo cáo sáng 7h55 (Telegram, từ 10/2026)
+
+Mỗi ngày 07:55 giờ Việt Nam Worker `bmbplayer` tự gửi **một tin Telegram** cho các admin đã kết nối Telegram (cùng danh sách nhận cảnh báo rớt đồng loạt): dòng kết luận 🟢/🟡/🔴, mục **Cần làm hôm nay** (tối đa 5 việc), rồi ba khối số liệu: BMBPlayer 24 giờ qua, Kho Việt, Kho quốc tế. Chi nhánh luôn ghi bằng **tên**, không ghi mã.
+
+- BMBPlayer: TV rớt theo chi nhánh/phòng so với trung bình 7 ngày trước, rớt đồng loạt, phòng mở quá 24 giờ, chất lượng phát, lỗi phòng, đơn gọi phục vụ chưa ai tiếp nhận quá 30 phút, máy còn app cũ. Chỉ TV rớt mới tính là xấu.
+- Kho: cron còn chạy không, khoá YouTube, trần ghi D1, đơn vị trong ngày, nguồn trễ hạn, tìm hụt + các cụm hụt nhiều nhất, kho có còn tăng không, kênh quốc tế nhận dưới 20%, so với hôm qua (bảng `bc_ngay`, tự tạo).
+
+**Cài đặt (một lần):** Worker `bmbplayer` → Settings → Variables and Secrets → thêm **Secret** `KHO_VI_PASS` và `KHO_EN_PASS` (mật khẩu kho, cùng mật khẩu nhập ở kho.html). Địa chỉ kho là hai biến `KHO_VI_URL`, `KHO_EN_URL` trong `wrangler.toml`. Cron `55 0 * * *` nằm ở `[triggers]` trong `wrangler.toml` (deploy từ GitHub tự áp dụng; nếu Dash không hiện Cron thì xem Settings → Triggers). Kho phải cho phép `https://bmb.id.vn` trong `ALLOWED_ORIGINS` (đã có vì kho.html chạy ở đây). Không sửa `kho-worker.js`.
+
+Thử ngay: Quầy → 🔌 Kết nối → Cảnh báo → **📰 Gửi thử báo cáo sáng** (chỉ gửi cho tài khoản bấm). Tắt hẳn: biến `BAO_CAO_SANG = "0"`.
+
 ## nhac.html — tài khoản từng người
 
 - `nhac-playlist-worker.js`: mã nguồn Worker `nhac-playlist` (dán thủ công vào Cloudflare). Quản trị = secret `APP_PASS` (không giới hạn tìm); mỗi người trong nhà có 1 mã riêng, chỉ thấy playlist của mình, tìm YouTube tối đa `USER_SEARCH_PER_WEEK` (mặc định 5) lượt/tuần, tự đổi mã được.
