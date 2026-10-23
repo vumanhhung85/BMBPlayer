@@ -394,6 +394,7 @@ async function handleApi(request, env, ctx) {
         case 'admin.knIpLs':             res = await adminKnIpLs(env, body); break;
         case 'admin.knMay':              res = await adminKnMay(env, body); break;
         case 'admin.knCl':               res = await adminKnCl(env, body); break;
+        case 'admin.baiChon':            res = await adminBaiChon(env, body); break;
         case 'admin.knXuHuong':          res = await adminKnXuHuong(env, body); break;
         case 'admin.knCanhBao':          res = await adminKnCanhBao(env, body); break;
         case 'admin.knCanhBaoLuu':       res = await adminKnCanhBaoLuu(env, body); break;
@@ -1458,7 +1459,11 @@ async function knBang(env) {
       ip TEXT, isp TEXT, ua TEXT, lan_noi INTEGER, lan_rot INTEGER, tuoi_rot INTEGER, noi INTEGER NOT NULL DEFAULT 0, rot INTEGER NOT NULL DEFAULT 0,
       PRIMARY KEY (phong_id, role))`),
     env.DB.prepare(`CREATE TABLE IF NOT EXISTS kn_cfg (khoa TEXT PRIMARY KEY, gia_tri TEXT NOT NULL DEFAULT '')`),
-    env.DB.prepare(`CREATE TABLE IF NOT EXISTS kn_canhbao (cn TEXT PRIMARY KEY, luc INTEGER NOT NULL DEFAULT 0, so INTEGER NOT NULL DEFAULT 0)`)
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS kn_canhbao (cn TEXT PRIMARY KEY, luc INTEGER NOT NULL DEFAULT 0, so INTEGER NOT NULL DEFAULT 0)`),
+    // Đếm lượt chọn bài (KHÔNG bao giờ dọn): mỗi dòng = 1 bản video (id) / 1 chi nhánh / 1 ngày kinh doanh. Dùng để chọn ra top bài hay được hát nhất.
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS bai_chon (ngay TEXT NOT NULL, cn TEXT NOT NULL DEFAULT '', id TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 0, ten TEXT,
+      PRIMARY KEY (ngay, cn, id))`),
+    env.DB.prepare('CREATE INDEX IF NOT EXISTS bai_chon_id ON bai_chon (id)')
   ]);
   await env.DB.prepare('ALTER TABLE kn_sk ADD COLUMN dg TEXT').run().catch(() => {});      // bảng tạo từ bản đầu chưa có cột dg (báo cáo từ phía máy)
   knSan = true;
@@ -1526,6 +1531,18 @@ async function knGhi(env, c, e) {
   await env.DB.batch(st);
   if (rot && cn && pid && e.role === 'tv') await knCanhBao(env, cn, e.t).catch(err => console.error('knCanhBao', err));
   if (Date.now() - knDonLuc > 3600000) { knDonLuc = Date.now(); await knDon(env).catch(err => console.error('knDon', err)); }
+}
+/* ---------- Đếm lượt chọn bài ----------
+   Gọi từ Room khi lệnh 'add' của điện thoại / máy tính bảng được nhận (phòng đang mở). Cộng 1 vào (ngày kinh doanh, chi nhánh, id bài).
+   Tên bài chỉ lưu khi là tên thật (không lưu tên tạm "Bài từ link YouTube"). Bảng bai_chon không nằm trong knDon nên giữ vĩnh viễn. */
+const BAI_TEN_TAM = new Set(['Bài từ link YouTube', 'Bài không tên']);
+async function baiChonGhi(env, cn, id, ten) {
+  if (!env.DB || !/^[\w-]{11}$/.test(id || '')) return;
+  await knBang(env);
+  const t = String(ten || '').slice(0, 200);
+  await env.DB.prepare(`INSERT INTO bai_chon (ngay, cn, id, n, ten) VALUES (?,?,?,1,?)
+    ON CONFLICT(ngay, cn, id) DO UPDATE SET n = n + 1, ten = COALESCE(excluded.ten, ten)`)
+    .bind(ngayKinhDoanh(), String(cn || '').slice(0, 40), id, t && !BAI_TEN_TAM.has(t) ? t : null).run();
 }
 /** Dọn dữ liệu quá hạn (tối đa 1 lần/giờ mỗi bản Worker, mỗi lần xoá có giới hạn để không nghẽn D1) */
 async function knDon(env) {
@@ -1671,6 +1688,24 @@ async function adminKnCl(env, body) {
   }
   const kq = await Promise.all(ids.map(id => call(roomStub(env, id), '/cl', { id, cl }).then(() => 1).catch(() => 0)));
   return ok({ cl, so: kq.reduce((a, c) => a + c, 0), tong: ids.length });
+}
+/** Top bài được chọn nhiều nhất (chỉ admin). ky = số ngày gần nhất (0 = từ lúc bắt đầu đếm), top tối đa 5000. cn rỗng = mọi chi nhánh. */
+async function adminBaiChon(env, body) {
+  const [q, loi] = await knPhien(env, body);
+  if (loi) return loi;
+  const ky = [30, 90, 365].includes(+body.ky) ? +body.ky : 0;
+  const top = Math.max(1, Math.min(5000, Math.round(+body.top) || 50));
+  const tu = ky ? ngayKinhDoanh(Date.now() - (ky - 1) * 86400000) : '0000-00-00';
+  const [w, b] = knCn(q, 'cn');
+  const [ds, tong, dau] = await Promise.all([
+    env.DB.prepare(`SELECT id, MAX(ten) AS ten, SUM(n) AS n, COUNT(DISTINCT cn) AS soCn, MIN(ngay) AS dau, MAX(ngay) AS cuoi
+      FROM bai_chon WHERE ngay >= ?${w} GROUP BY id ORDER BY SUM(n) DESC, MAX(ngay) DESC, id LIMIT ?`).bind(tu, ...b, top).all(),
+    env.DB.prepare(`SELECT COALESCE(SUM(n), 0) AS luot, COUNT(DISTINCT id) AS bai FROM bai_chon WHERE ngay >= ?${w}`).bind(tu, ...b).first(),
+    env.DB.prepare('SELECT MIN(ngay) AS dau FROM bai_chon').first()
+  ]);
+  const rows = (ds.results || []).map(r => ({ id: r.id, ten: r.ten || '', n: +r.n || 0, soCn: +r.soCn || 0, dau: r.dau, cuoi: r.cuoi }));
+  const phu = rows.reduce((a, r) => a + r.n, 0);
+  return ok({ ds: rows, luot: +tong.luot || 0, bai: +tong.bai || 0, phu, tuNgay: (dau && dau.dau) || '', ky, top });
 }
 async function adminKnMay(env, body) {
   const [q, loi] = await knPhien(env, body);
@@ -2385,6 +2420,10 @@ export class Room extends DurableObject {
         if(!/^[\w-]{11}$/.test(p.id || '')) return;
         out.id = p.id; out.title = String(p.title || 'Bài không tên').slice(0, 200);
         if(p.prio === true) out.prio = true;
+        if(p.pl !== true && this.env.DB){                              // pl:true = "Thêm tất cả" cả playlist: không phải khách chọn từng bài → không đếm
+          const pr = baiChonGhi(this.env, c.branch || '', out.id, out.title).catch(err => console.error('baiChonGhi', err));
+          try{ this.ctx.waitUntil(pr); }catch(e){}
+        }
       }else if(p.action === 'vol'){ out.value = Math.max(0, Math.min(100, +p.value || 0));
       }else if(p.action === 'prio' || p.action === 'up' || p.action === 'remove'){ out.index = Math.max(0, Math.min(500, +p.index | 0)); if(/^[\w-]{11}$/.test(p.id || '')) out.id = p.id;   // id bài: TV đối chiếu, hàng chờ đã đổi thì bỏ lệnh
       }else if(p.action === 'play' || p.action === 'mute'){ if(typeof p.on === 'boolean') out.on = p.on;                       // đặt hẳn phát/dừng, bật/tắt tiếng (không đảo)

@@ -487,9 +487,9 @@ tbody tr:hover td{background:#FBF8FE}
       <button class="btn btn-ghost btn-sm" id="knTai">↻ Tải lại</button>
       <button class="btn btn-ghost btn-sm" id="knChep" title="Chép tóm tắt để gửi kỹ thuật">📋 Chép báo cáo</button>
     </div>
-    <div class="knsub" id="knSub"><button data-s="tq" class="on">📊 Tổng quan</button><button data-s="may">📺 Thiết bị từng phòng</button><button data-s="nk">🧾 Nhật ký</button><button data-s="ip">🌐 IP &amp; nhà mạng</button><button data-s="xh">📈 Xu hướng tuần</button><button data-s="cb">🔔 Cảnh báo Telegram</button></div>
+    <div class="knsub" id="knSub"><button data-s="tq" class="on">📊 Tổng quan</button><button data-s="may">📺 Thiết bị từng phòng</button><button data-s="nk">🧾 Nhật ký</button><button data-s="ip">🌐 IP &amp; nhà mạng</button><button data-s="xh">📈 Xu hướng tuần</button><button data-s="cb">🔔 Cảnh báo Telegram</button><button data-s="bh">🎤 Bài hay chọn</button></div>
     <div id="knBody"><div class="mut">Đang tải…</div></div>
-    <div class="hint" style="margin-top:14px">Lưu trữ: <b>chi tiết từng sự kiện</b> của TV / máy tính bảng / mở-đóng phòng giữ <b>30 ngày</b>, của điện thoại khách giữ <b>7 ngày</b> (theo dõi nhanh); <b>số liệu tổng hợp theo ngày</b> và <b>danh sách IP</b> giữ <b>180 ngày</b> (theo dõi lâu). “Rớt” = máy tự mất kết nối hoặc im lặng quá lâu bị hệ thống ngắt. Một ngày tính từ 06:00 sáng.</div>
+    <div class="hint" style="margin-top:14px">Lưu trữ: <b>chi tiết từng sự kiện</b> của TV / máy tính bảng / mở-đóng phòng giữ <b>30 ngày</b>, của điện thoại khách giữ <b>7 ngày</b> (theo dõi nhanh); <b>số liệu tổng hợp theo ngày</b> và <b>danh sách IP</b> giữ <b>180 ngày</b> (theo dõi lâu). “Rớt” = máy tự mất kết nối hoặc im lặng quá lâu bị hệ thống ngắt. Một ngày tính từ 06:00 sáng. <b>Đếm lượt chọn bài</b> (tab Bài hay chọn) giữ vĩnh viễn.</div>
   </div>
 
   <div class="pg" id="p7">
@@ -2444,6 +2444,7 @@ function knVe(){
   else if(KN.sub==='ip'){ if(KN.ipXem) knIpLs(KN.ipXem); else knIp(); }
   else if(KN.sub==='xh') knXh();
   else if(KN.sub==='cb') knCb();
+  else if(KN.sub==='bh') knBh();
 }
 /* ---------- Tổng quan ---------- */
 function knTq(){
@@ -2633,6 +2634,39 @@ function knCsv(){
   var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
   a.download = 'ket-noi-'+(KN.cn||'tat-ca')+'-'+new Date().toISOString().slice(0,10)+'.csv'; document.body.appendChild(a); a.click(); a.remove();
 }
+/* ---------- Bài hay chọn (đếm lượt bấm Chọn / Ưu tiên trên điện thoại và máy tính bảng, giữ vĩnh viễn) ---------- */
+function knBhNgay(d){ return d ? d.slice(8,10)+'/'+d.slice(5,7)+'/'+d.slice(0,4) : '—'; }
+function knBh(){
+  var ky = KN.bhKy || 0;
+  knGoi('admin.baiChon', { ky: ky, top: 50 }).then(function(r){
+    var ds = r.ds || [], pct = r.luot ? Math.round(r.phu * 100 / r.luot) : 0;
+    var seg = '<div class="knseg" id="knBhKy">'+[[30,'30 ngày'],[90,'90 ngày'],[365,'1 năm'],[0,'Tất cả']].map(function(o){ return '<button data-ky="'+o[0]+'"'+(o[0]===ky?' class="on"':'')+'>'+o[1]+'</button>'; }).join('')+'</div>';
+    var h = '<div class="knf"><span class="knsm">Xem</span>'+seg+'<span style="flex:1"></span><button class="btn btn-ghost btn-sm" id="knBhCsv">⬇ Tải top 5000 (CSV)</button></div>'
+      + '<div class="stats"><div class="stat g"><div class="k">Lượt chọn</div><div class="v">'+knSo(r.luot)+'</div></div>'
+      + '<div class="stat"><div class="k">Số bản video khác nhau</div><div class="v">'+knSo(r.bai)+'</div></div>'
+      + '<div class="stat y"><div class="k">Đã đếm từ</div><div class="v" style="font-size:18px">'+knBhNgay(r.tuNgay)+'</div></div></div>'
+      + '<div class="hint">Mỗi lần khách bấm <b>Chọn</b> hoặc <b>Ưu tiên</b> trên điện thoại / máy tính bảng là 1 lượt (tính theo ngày kinh doanh, chi nhánh đang xem ở ô phía trên). <b>Thêm cả playlist</b> không tính. Bộ đếm <b>giữ vĩnh viễn</b>, không tự xoá. Một bài có nhiều bản karaoke thì mỗi bản đếm riêng (xem ghi chú dưới bảng).</div>';
+    h += '<div class="tblwrap"><table><thead><tr><th>#</th><th>Bài</th><th>Lượt chọn</th><th>Chi nhánh</th><th>Lần cuối</th></tr></thead><tbody>'
+      + (ds.length ? ds.map(function(x, i){ return '<tr><td>'+(i+1)+'</td><td><b>'+esc(x.ten||'(chưa có tên)')+'</b><div class="knsm"><a href="https://www.youtube.com/watch?v='+esc(x.id)+'" target="_blank" rel="noopener">'+esc(x.id)+'</a></div></td><td><b>'+knSo(x.n)+'</b></td><td>'+x.soCn+'</td><td>'+knBhNgay(x.cuoi)+'</td></tr>'; }).join('')
+        : '<tr><td colspan="5" class="mut">Chưa có lượt chọn nào trong khoảng này. Bộ đếm bắt đầu tính từ khi bản Worker này được cập nhật.</td></tr>')
+      + '</tbody></table></div>'
+      + (ds.length ? '<div class="knsm" style="margin-top:8px;line-height:1.6">Bảng chỉ hiện 50 bài đầu (chiếm '+pct+'% lượt chọn). Nút CSV tải tối đa 5000 bản video, kèm mã YouTube và đường link. <b>Lưu ý:</b> cùng một bài hát có thể xuất hiện nhiều dòng vì mỗi kênh karaoke là một bản riêng; muốn gộp theo bài phải ghép với khoá bài (song_key) trong kho.</div>' : '');
+    $('knBody').innerHTML = h;
+  }).catch(knLoi);
+}
+function knBhCsv(btn){
+  var ky = KN.bhKy || 0; btn.disabled = true;
+  knGoi('admin.baiChon', { ky: ky, top: 5000 }).then(function(r){
+    btn.disabled = false;
+    var ds = r.ds || []; if(!ds.length){ toast('Chưa có dữ liệu để tải.'); return; }
+    var q = function(v){ v = String(v==null?'':v); return /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; };
+    var csv = '﻿Hạng,Mã YouTube,Tên bài,Lượt chọn,Số chi nhánh,Lần đầu,Lần cuối,Link\n'
+      + ds.map(function(x, i){ return [i+1, x.id, x.ten, x.n, x.soCn, x.dau, x.cuoi, 'https://www.youtube.com/watch?v='+x.id].map(q).join(','); }).join('\n');
+    var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    a.download = 'bai-hay-chon-'+(KN.cn||'tat-ca')+'-'+(ky?ky+'ngay':'tat-ca')+'-'+new Date().toISOString().slice(0,10)+'.csv'; document.body.appendChild(a); a.click(); a.remove();
+    toast('Đã tải '+ds.length+' bản video.');
+  }).catch(function(e){ btn.disabled = false; toast(e.message || 'Không tải được.'); });
+}
 /* ---------- IP ---------- */
 function knIp(){
   knGoi('admin.knIp').then(function(r){
@@ -2780,6 +2814,8 @@ $('knBody').addEventListener('click', function(ev){
     t.disabled = true; knGoi('admin.knCl', { all: 1, cl: +v }).then(function(x){ toast('Đã đặt cho '+x.so+' / '+x.tong+' phòng.'); knMay(); }).catch(function(e){ t.disabled = false; toast(e.message||'Không đặt được.'); }); return; }
   if(t.id==='knThem'){ t.disabled = true; knNk(true); return; }
   if(t.id==='knCsv'){ knCsv(); return; }
+  if(t.id==='knBhCsv'){ knBhCsv(t); return; }
+  if((el = t.closest('#knBhKy button'))){ KN.bhKy = +el.getAttribute('data-ky') || 0; knBh(); return; }
   if(t.id==='knIpLai'){ KN.ipXem = ''; knIp(); return; }
 });
 $('knBody').addEventListener('change', function(ev){

@@ -731,7 +731,7 @@ async function loadPlaylist(list){
     const items = (d.items || []).map(norm);
     const addAll = btn('＋ Thêm tất cả', null, () => {
       if(items.length > 50 && !confirm('Thêm ' + items.length + ' bài vào hàng chờ?')) return;
-      items.forEach(it => send('add', { id:it.id, title:it.title }));
+      items.forEach(it => send('add', { id:it.id, title:it.title, pl:true }));            // pl: thêm cả playlist, không tính là khách chọn từng bài
       msg('Đã thêm ' + items.length + ' bài vào hàng chờ.');
     });
     renderResults(items, 'Playlist: ' + items.length + ' bài phát nhúng được' + (d.skipped ? ' (bỏ ' + d.skipped + ' bài không phát được)' : ''), addAll);

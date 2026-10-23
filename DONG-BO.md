@@ -66,10 +66,12 @@ Chú ý: **mã 4007 khác nghĩa** ở hai app. Chuyển mã đóng giữa hai a
 | 10 | Worker gọi Worker qua `*.workers.dev` bị Cloudflare chặn (404, "error code: 1042") → dùng Service Binding | ✅ `wrangler.toml` `[[services]]` | ➖ MH không gọi Worker khác | Bài học chung cho app mới. |
 | 11 | `kho-worker.js`: bản vá quét bị bỏ đói (scan starvation) + bộ đếm lý do loại (`rej_stat`). **Hai kho độc lập**, chỉ chung mã nguồn | ✅ (anh dán tay vào cả hai Worker kho, 22/10/2026) | ❓ `src/kho.js` có `rej_stat`; **chưa rõ có bản vá quét bỏ đói**. Có chuyển sang kho MH hay không là anh quyết | Nếu anh muốn: xin `kho-worker.js` mới nhất, chạy `python3 -I tools/build-kho.py <kho-worker.js> src/kho.js`, xem `git diff src/kho.js` trước khi commit. Dữ liệu và cài đặt kho MH không bị đụng (nằm trong D1 riêng). |
 | 12 | Chấm điểm giả lập cuối bài (mặc định tắt) | ✅ | ➖ Chưa có; đây là tính năng, không phải lỗi | Tuỳ anh có muốn bán cho khách MH không. |
+| 13 | **Đếm lượt chọn bài** để sau này lấy top ~5000 bài hay hát nhất: bảng đếm vĩnh viễn theo (ngày, chi nhánh, mã video), cộng khi lệnh `add` của điện thoại/máy tính bảng được nhận; "Thêm cả playlist" gửi `pl:true` nên không tính; quầy có tab 🎤 Bài hay chọn + tải CSV | ✅ 24/10/2026 bảng `bai_chon` (D1 `bmb_data`, không nằm trong `knDon`), `baiChonGhi` gọi từ `Room`, API `admin.baiChon`, `quay.html`, `remote.html` (`pl:true`). Kho BMB còn `pick_log` riêng (`reportPick`), không đụng | ⏳ Chưa có. MH chỉ có `reportPick` gửi vào kho riêng của MH (chưa rõ giữ bao lâu) | Làm ở `Tivi` (`src/index.js`) khi nhận `add`, bảng riêng trong D1 `mhplayer_data`, khoá theo MÃ BẢN QUYỀN thay cho chi nhánh; xem tại `public/admin.html`. Anh quyết có làm không. Dữ liệu hai app không trộn. |
 
 ## Việc đang chờ (⏳ / ❓)
 
 - #11 Hỏi anh có muốn đưa bản vá quét bỏ đói sang kho MHPlayer không (kho độc lập, không mặc định).
+- #13 Hỏi anh có muốn thêm bộ đếm lượt chọn bài cho MHPlayer không.
 
 ## Mẫu dòng mới
 
