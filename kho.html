@@ -182,6 +182,14 @@
   <h2>Bài hot <button class="ghost sp" id="reloadHot">↻</button></h2>
   <div class="hint">Điểm = thịnh hành (hạng 1 → 100 điểm) + tốc độ tăng lượt xem của bản karaoke + số lần anh chọn trong 30 ngày. Mỗi bài dùng bản được chọn nhiều nhất (hoà thì bản nhiều lượt xem hơn).</div>
   <div style="overflow:auto"><table id="hotTable"></table></div>
+  <h2 style="margin-top:14px">Bài được chọn nhiều nhất <button class="ghost sp" id="reloadTop">↻</button></h2>
+  <div class="hint">Đếm mỗi lần khách bấm Chọn hoặc Ưu tiên trên điện thoại / máy tính bảng. <b>Các bản karaoke của cùng một bài được gộp</b>, mỗi bài hiện bản được chọn nhiều nhất (hoà thì bản của nguồn ⭐, rồi bản nhiều lượt xem). Kho chỉ giữ lịch sử <b>365 ngày</b> nên cần tải danh sách trước khi quá hạn. Lượt chọn của bản đã bị xoá khỏi kho không gộp được (có ghi số lượt ở dưới bảng). Bảng chỉ hiện 50 bài đầu; bấm ↻ để xem, không tự tải để đỡ tốn lượt đọc D1.</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:6px 0">
+    <select id="topDays" class="sp"><option value="30">30 ngày</option><option value="90" selected>90 ngày</option><option value="365">1 năm (tối đa kho giữ)</option></select>
+    <button class="ghost" id="topCsv">⬇ Tải top 5000 (CSV)</button>
+  </div>
+  <div class="hint" id="topNote"></div>
+  <div style="overflow:auto"><table id="topTable"></table></div>
   <h2 style="margin-top:14px">Nguồn thịnh hành &amp; danh sách tay</h2>
   <div class="hint">Dán danh sách bài từ bảng xếp hạng bất kỳ (Zing, Spotify, TikTok…), mỗi dòng một bài, ví dụ “Hãy Trao Cho Anh – Sơn Tùng M-TP”. Bài chưa có trong kho sẽ được tự tìm bản karaoke dần dần (tối đa số lượt tìm tự động mỗi ngày).</div>
   <textarea id="manual" placeholder="1. Tên bài – Ca sĩ&#10;2. Tên bài – Ca sĩ"></textarea>
@@ -212,7 +220,8 @@ function paintKho(){
 document.querySelectorAll('#khoSeg button').forEach(b => b.onclick = () => {
   if(b.dataset.k === CUR) return;
   CUR = b.dataset.k; lsSet('kho_cur', CUR); paintKho();
-  ['stats', 'channels', 'discover', 'hotTable', 'rawTable', 'growStats', 'missTable', 'artTable', 'candTable', 'nearBox', 'preview', 'suggest'].forEach(id => { const e = $(id); if(e) e.replaceChildren(); });
+  ['stats', 'channels', 'discover', 'hotTable', 'rawTable', 'growStats', 'missTable', 'artTable', 'candTable', 'nearBox', 'preview', 'suggest', 'topTable'].forEach(id => { const e = $(id); if(e) e.replaceChildren(); });
+  $('topNote').textContent = '';
   $('last').textContent = '—'; $('clOut').textContent = 'Chưa xem trước.'; $('clGo').disabled = true; $('langNote').style.display = 'none';
   loadAll();
 });
@@ -618,6 +627,41 @@ async function loadHot(){
   }catch(e){ fail('hotTable', e); }
 }
 $('reloadHot').onclick = loadHot;
+/* ---------- Bài được chọn nhiều nhất (đọc pick_log của kho, gộp theo bài) ---------- */
+const dmy = ms => { if(!ms) return ''; const d = new Date(ms); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+async function loadTop(){
+  const days = +$('topDays').value || 90, b = $('reloadTop'); b.disabled = true; $('topNote').textContent = 'Đang đọc…';
+  try{
+    const d = await api('/api/kho/top?days=' + days + '&limit=50');
+    const t = $('topTable'); t.replaceChildren();
+    const head = el('tr'); ['#', 'Bài (bản được chọn nhiều nhất)', 'Lượt chọn', 'Số bản', 'Lần cuối'].forEach((x, i) => head.append(el('th', i > 1 ? 'n' : '', x))); t.append(head);
+    if(!d.items.length){ const tr = el('tr'), td = el('td', 'hint', 'Chưa có lượt chọn nào trong khoảng này.'); td.colSpan = 5; tr.append(td); t.append(tr); }
+    d.items.forEach((x, i) => {
+      const tr = el('tr'), name = el('td');
+      const a = el('a', null, x.title || x.id); a.href = 'https://www.youtube.com/watch?v=' + x.id; a.target = '_blank'; a.rel = 'noopener'; a.style.color = 'inherit';
+      name.append(a, el('div', 'hint', x.channel));
+      tr.append(el('td', null, String(i + 1)), name, el('td', 'n', fmt(x.picks)), el('td', 'n', String(x.versions)), el('td', 'n', dmy(x.last)));
+      t.append(tr);
+    });
+    $('topNote').textContent = fmt(d.picks) + ' lượt chọn trong ' + d.days + ' ngày, gộp được ' + fmt(d.matched) + ' lượt thành ' + fmt(d.songs) + ' bài' + (d.lost ? ' · ' + fmt(d.lost) + ' lượt không gộp được (bản đã xoá khỏi kho hoặc chưa có khoá bài)' : '') + '.';
+  }catch(e){ if(e && e.switched) return; $('topNote').textContent = ''; fail('topTable', e); }
+  b.disabled = false;
+}
+async function topCsv(){
+  const days = +$('topDays').value || 90, b = $('topCsv'); b.disabled = true;
+  try{
+    const d = await api('/api/kho/top?days=' + days + '&limit=5000');
+    if(!d.items.length){ alert('Chưa có lượt chọn nào để tải.'); b.disabled = false; return; }
+    const q = v => { v = String(v == null ? '' : v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+    const csv = '\ufeffHạng,Mã YouTube,Tên bài (bản tốt nhất),Kênh,Lượt chọn,Số bản đã được chọn,Lần đầu,Lần cuối,Khoá bài,Link\n'
+      + d.items.map((x, i) => [i + 1, x.id, x.title, x.channel, x.picks, x.versions, dmy(x.first), dmy(x.last), x.key, 'https://www.youtube.com/watch?v=' + x.id].map(q).join(',')).join('\n');
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    a.download = 'bai-hay-chon-kho-' + CUR + '-' + days + 'ngay-' + dmy(Date.now()) + '.csv'; document.body.appendChild(a); a.click(); a.remove();
+    $('topNote').textContent = 'Đã tải ' + fmt(d.items.length) + ' bài (' + fmt(d.picks) + ' lượt chọn trong ' + d.days + ' ngày, ' + fmt(d.lost || 0) + ' lượt không gộp được).';
+  }catch(e){ if(!(e && e.switched)) alert(e.message || String(e)); }
+  b.disabled = false;
+}
+$('reloadTop').onclick = loadTop; $('topDays').onchange = loadTop; $('topCsv').onclick = topCsv;
 $('manualSave').onclick = async () => {
   const text = $('manual').value.trim(); if(!text) return;
   try{ const d = await api('/api/kho/hot/manual', { text, replace:$('manualReplace').checked }); alert('Đã lưu ' + d.added + ' bài, ghép ngay được ' + d.matched + ' bài. Bài còn thiếu sẽ được tự tìm bản karaoke dần.'); $('manual').value = ''; loadHot(); loadStats(); }
