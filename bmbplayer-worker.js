@@ -20,6 +20,8 @@
      POST /api/tablet/claim  — máy tính bảng ĐÃ có quyền thiết bị quét QR trên TV để vào/đổi phòng (cùng chi nhánh).
      POST /api/tokcheck      — TV / máy tính bảng hỏi mã còn dùng được không.
      /nhac/ws, /api/nhac/*   — kênh tức thì của nhac.html (nghe nhạc trên TV).
+     GET  /api/lib/src       — TV hỏi bài có trong thư viện video lưu sẵn không (R2 "taivideo-files", binding LIB; cần vé TV).
+     GET  /lib/<thư mục>/<mã>.mp4 — phát file thư viện (link ký riêng 6 giờ, hỗ trợ tua). Bật theo chi nhánh ở quay.html → Cài đặt.
 
    DỮ LIỆU: D1 `bmb_data` dùng chung với app quản lý BMB (chi_nhanh, tai_khoan, nhat_ky, luu_luong_truy_cap)
    + bảng riêng order_phong, order_mon_mau, order_menu, order_don, order_chan_tb, order_gioi_han
@@ -426,6 +428,8 @@ async function handleApi(request, env, ctx) {
         case 'admin.decoSet':            res = await adminDecoSet(env, body); break;
         case 'admin.scoreGet':           res = await adminScoreGet(env, body); break;
         case 'admin.scoreSet':           res = await adminScoreSet(env, body); break;
+        case 'admin.libGet':             res = await adminLibGet(env, body); break;
+        case 'admin.libSet':             res = await adminLibSet(env, body); break;
         case 'admin.phongThem':          res = await adminPhongThem(env, body); break;
         case 'admin.phongXoa':           res = await adminPhongXoa(env, body); break;
         case 'admin.taiKhoan.danhSach':  res = await tkDanhSach(env, body); break;
@@ -1094,6 +1098,135 @@ async function adminScoreSet(env, body) {
   await env.DB.prepare(`INSERT INTO order_meta (k, v) VALUES ('score', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v`).bind(v).run();
   scoreCache = { v, at: Date.now() };
   return ok({ score: v });
+}
+/* ---------- Thư viện video lưu sẵn: phát file của mình trước, không có thì YouTube nhúng (từ 10/2026) ----------
+   File do app Tải Video tải về bucket R2 "taivideo-files" (binding LIB, CHỈ ĐỌC ở Worker này): videos/<thư mục>/<mã YouTube>.mp4,
+   thư mục theo kho: vn (kho Việt), en (kho quốc tế), '.' = thẳng trong videos/ (bài dán tay không đặt thư mục con) — biến LIB_DIRS. Sau này mỗi quán có thể có NAS cùng cấu trúc <địa chỉ NAS>/<thư mục>/<mã>.mp4.
+   Mỗi chi nhánh một công tắc (admin bật ở quay.html → Cài đặt): BẬT → TV hỏi /api/lib/src trước mỗi bài; có file thì phát NAS của quán
+   (nếu đã khai báo) → R2, không có hoặc lỗi thì phát YouTube như cũ. TẮT = y như trước, TV không hỏi gì thêm.
+   Lưu ở order_meta khoá 'lib' (JSON {<mã chi nhánh>: {on:1, nas:'https://…'}}). Chưa lưu lần nào thì dùng LIB_DEFAULT (CN03 Tây Hòa bật để chạy thử).
+   Vé của TV (lib.t trong tin 'room'): <chi nhánh b64u>.<hết hạn>.<chữ ký> — chỉ dùng hỏi /api/lib/src; link phát /lib/… ký riêng từng file, hết hạn sau 6 giờ. */
+const LIB_DEFAULT = { CN03: { on: 1, nas: '' } };
+const LIB_TICKET_MS = 7 * 86400000, LIB_URL_MS = 6 * 3600000;
+const LIB_NAS_RE = /^https?:\/\/[A-Za-z0-9.-]{1,120}(:\d{1,5})?(\/[A-Za-z0-9._~%-]{1,80}){0,6}\/?$/;
+const LIB_REL_RE = /^(?:[a-z0-9_-]{1,20}\/)?[\w-]{11}\.mp4$/i;           // <thư mục>/<mã>.mp4, hoặc <mã>.mp4 nằm thẳng trong videos/ (bài dán tay không đặt thư mục con)
+const LIB_SRC = ['nas', 'r2', 'yt', 'loi', 'nasloi'];        // nas/r2 = phát từ thư viện; yt = bài chưa có trong thư viện; loi = có file nhưng lỗi → YouTube; nasloi = NAS lỗi → R2
+let libCache = { v: null, at: 0 };
+async function libCfg(env) {
+  if (libCache.v && Date.now() - libCache.at < 30000) return libCache.v;
+  let v = null;
+  try { const r = await env.DB.prepare(`SELECT v FROM order_meta WHERE k = 'lib'`).first(); if (r && r.v) v = JSON.parse(r.v); } catch (e) { /* chưa có bảng / hỏng → mặc định */ }
+  if (!v || typeof v !== 'object' || Array.isArray(v)) v = JSON.parse(JSON.stringify(LIB_DEFAULT));
+  libCache = { v, at: Date.now() };
+  return v;
+}
+function libCn(cfg, cn) {
+  const c = (cfg && cn && cfg[cn]) || {};
+  return { on: !!c.on, nas: typeof c.nas === 'string' && LIB_NAS_RE.test(c.nas) ? c.nas.replace(/\/+$/, '') : '' };
+}
+const libDirs = env => String(env.LIB_DIRS || 'vn,en,.').split(',').map(x => x.trim().toLowerCase()).filter(x => x === '.' || /^[a-z0-9_-]{1,20}$/.test(x)).slice(0, 6);   // '.' = thẳng trong thư mục gốc
+const libPrefix = env => String(env.LIB_PREFIX == null ? 'videos' : env.LIB_PREFIX).replace(/^\/+|\/+$/g, '');
+const libKey = (env, rel) => (libPrefix(env) ? libPrefix(env) + '/' : '') + rel;
+async function libTicket(env, cn) {
+  const exp = Date.now() + LIB_TICKET_MS, b = b64uS(cn);
+  return b + '.' + exp + '.' + await hmac(env.SECRET, 'lib|' + cn + '|' + exp);
+}
+async function libTicketOk(env, t) {
+  const m = /^([A-Za-z0-9_-]{1,80})\.(\d{13})\.([\w-]{22})$/.exec(String(t || ''));
+  if (!m || !env.SECRET || +m[2] < Date.now()) return '';
+  const cn = unb64uS(m[1]);
+  return cn && same(m[3], await hmac(env.SECRET, 'lib|' + cn + '|' + m[2])) ? cn : '';
+}
+/* Phần 'lib' trong tin 'room' gửi TV: luôn kèm vé (để TV tự hỏi lại cài đặt mỗi 10 phút qua /api/deco), on/nas theo chi nhánh */
+async function libTv(env, cn) {
+  if (!env.LIB || !env.SECRET || !cn) return { on: false };
+  const c = libCn(await libCfg(env), cn);
+  return { on: c.on, nas: c.nas, t: await libTicket(env, cn) };
+}
+/* GET /api/lib/src?id=<mã YouTube>&t=<vé TV> → {rel, url (link R2 đã ký), nas (link NAS nếu chi nhánh có)} hoặc {rel:''} */
+async function libSrc(env, u) {
+  const cn = await libTicketOk(env, u.searchParams.get('t'));
+  if (!cn) return [403, { rel: '', error: 'ticket' }];
+  if (!env.LIB) return [200, { rel: '', error: 'no_lib' }];
+  const c = libCn(await libCfg(env), cn);
+  if (!c.on) return [200, { rel: '', off: true }];
+  const id = u.searchParams.get('id') || '';
+  if (!/^[\w-]{11}$/.test(id)) return [400, { rel: '', error: 'id' }];
+  for (const d of libDirs(env)) {
+    const rel = (d === '.' ? '' : d + '/') + id + '.mp4';
+    const h = await env.LIB.head(libKey(env, rel));
+    if (!h) continue;
+    const exp = Date.now() + LIB_URL_MS, sig = await hmac(env.SECRET, 'libf|' + rel + '|' + exp);
+    return [200, { rel, size: h.size, url: u.origin + '/lib/' + rel + '?e=' + exp + '&s=' + sig, nas: c.nas ? c.nas + '/' + rel : '' }];
+  }
+  return [200, { rel: '' }];
+}
+/* GET|HEAD /lib/<thư mục>/<mã>.mp4?e=&s= — phát file R2, hỗ trợ tua (Range → 206) */
+async function libServe(req, env, u) {
+  const rel = u.pathname.slice(5), m = LIB_REL_RE.exec(rel), exp = +u.searchParams.get('e') || 0, s = u.searchParams.get('s') || '';
+  if (!m || !exp || exp < Date.now() || !env.SECRET || !same(s, await hmac(env.SECRET, 'libf|' + rel + '|' + exp)))
+    return new Response('Link hết hạn hoặc không hợp lệ', { status: 403, headers: { 'content-type': 'text/plain; charset=utf-8' } });
+  if (!env.LIB) return new Response('Chưa gắn thư viện (binding LIB)', { status: 503 });
+  const key = libKey(env, rel), hasRange = req.headers.has('range');
+  const obj = req.method === 'HEAD' ? await env.LIB.head(key) : await env.LIB.get(key, { range: hasRange ? req.headers : undefined, onlyIf: req.headers });
+  if (!obj) return new Response('Không có file', { status: 404 });
+  const h = new Headers();
+  obj.writeHttpMetadata(h);
+  if (!h.get('content-type')) h.set('content-type', 'video/mp4');
+  h.set('etag', obj.httpEtag); h.set('accept-ranges', 'bytes'); h.set('cache-control', 'private, max-age=21600');
+  if (req.method === 'HEAD') { h.set('content-length', String(obj.size)); return new Response(null, { headers: h }); }
+  if (!('body' in obj) || !obj.body) return new Response(null, { status: 304, headers: h });
+  if (hasRange && obj.range) {
+    let off = obj.range.offset, len = obj.range.length;
+    if (obj.range.suffix != null) { len = Math.min(obj.range.suffix, obj.size); off = obj.size - len; }
+    if (off == null) off = 0;
+    if (len == null) len = obj.size - off;
+    h.set('content-range', 'bytes ' + off + '-' + (off + len - 1) + '/' + obj.size); h.set('content-length', String(len));
+    return new Response(obj.body, { status: 206, headers: h });
+  }
+  h.set('content-length', String(obj.size));
+  return new Response(obj.body, { headers: h });
+}
+/* Đếm nguồn phát theo ngày/chi nhánh (TV gửi theo lô, tin 'ls'): biết bao nhiêu bài phát từ thư viện, bao nhiêu còn phải YouTube, bao nhiêu lỗi */
+let libBangOk = false;
+async function libBang(env) {
+  if (libBangOk) return;
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS lib_dem (ngay TEXT NOT NULL, cn TEXT NOT NULL DEFAULT '', src TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (ngay, cn, src))`).run();
+  libBangOk = true;
+}
+async function libDemGhi(env, cn, d) {
+  if (!env.DB) return;
+  const rows = LIB_SRC.map(k => [k, Math.max(0, Math.min(500, Math.floor(+(d || {})[k] || 0)))]).filter(x => x[1] > 0);
+  if (!rows.length) return;
+  await libBang(env);
+  const ngay = ngayKinhDoanh();
+  await env.DB.batch(rows.map(([k, n]) => env.DB.prepare(`INSERT INTO lib_dem (ngay, cn, src, n) VALUES (?,?,?,?) ON CONFLICT(ngay, cn, src) DO UPDATE SET n = n + excluded.n`)
+    .bind(ngay, String(cn || '').slice(0, 40), k, n)));
+}
+async function adminLibGet(env, body) {
+  const [, loi] = await canPhien(env, body, 'admin');
+  if (loi) return loi;
+  libCache.at = 0;
+  const cfg = await libCfg(env), ra = {};
+  for (const k of Object.keys(cfg)) ra[k] = libCn(cfg, k);
+  let dem = [];
+  try { await libBang(env); dem = (await env.DB.prepare(`SELECT cn, src, SUM(n) n FROM lib_dem WHERE ngay >= ? GROUP BY cn, src`).bind(ngayKinhDoanh(Date.now() - 6 * 86400000)).all()).results || []; } catch (e) {}
+  return ok({ cfg: ra, dem, r2: !!env.LIB, dirs: libDirs(env) });
+}
+async function adminLibSet(env, body) {
+  const [, loi] = await canPhien(env, body, 'admin');
+  if (loi) return loi;
+  const cn = String(body.cn || '').slice(0, 40);
+  if (!cn || !(await env.DB.prepare('SELECT 1 FROM chi_nhanh WHERE id = ?').bind(cn).first())) return fail('bad_cn', 400, 'Chi nhánh không tồn tại.');
+  const nas = String(body.nas || '').trim().replace(/\/+$/, '');
+  if (nas && !LIB_NAS_RE.test(nas)) return fail('bad_nas', 400, 'Địa chỉ NAS không hợp lệ. Dạng đúng: https://nas-cn03.bmb.id.vn/karaoke hoặc http://192.168.1.10:8080/karaoke (không có ? hay khoảng trắng).');
+  libCache.at = 0;
+  const cfg = await libCfg(env);
+  cfg[cn] = { on: body.on === true || body.on === 1 || body.on === '1' ? 1 : 0, nas };
+  await pushBangSan(env);
+  await env.DB.prepare(`INSERT INTO order_meta (k, v) VALUES ('lib', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v`).bind(JSON.stringify(cfg)).run();
+  libCache = { v: cfg, at: Date.now() };
+  return ok({ cn, ...libCn(cfg, cn) });
 }
 async function adminPhongThem(env, body) {
   const [ss, loi] = await canPhien(env, body, 'admin');
@@ -2163,7 +2296,7 @@ export class Room extends DurableObject {
   /* Phần riêng từng vai trò: TV nhận mã QR khách để vẽ ở góc màn hình, máy tính bảng nhận vé tìm bài */
   async roleExtra(c, role){
     if(!c.open || !c.rid) return {};
-    if(role === 'tv') return { qr: await mkToken(this.env, c.rid, 'qr', c.genQ) };
+    if(role === 'tv') return { qr: await mkToken(this.env, c.rid, 'qr', c.genQ), lib: await libTv(this.env, c.branch) };
     if(role === 'tablet') return { gt: await guestTicket(this.env, c.rid) };
     return {};
   }
@@ -2267,7 +2400,8 @@ export class Room extends DurableObject {
     let p; try{ p = (JSON.parse(raw) || {}).state || {}; }catch(e){ return { st: 'chua' }; }
     const q = Array.isArray(p.queue) ? p.queue.length : 0, cur = typeof p.cur === 'number' ? p.cur : -1;
     const st = p.apiFailed ? 'loi' : p.scoring ? 'diem' : p.needStart || p.soundLocked ? 'cho' : cur < 0 || !q ? 'chua' : p.playing ? 'phat' : 'dung';
-    return { st, title: p.nowTitle ? String(p.nowTitle).slice(0, 80) : '', left: cur >= 0 ? Math.max(0, q - 1 - cur) : q, muted: p.muted ? 1 : 0, vol: p.volume, at: m.get('lastAt') || 0 };
+    return { st, title: p.nowTitle ? String(p.nowTitle).slice(0, 80) : '', left: cur >= 0 ? Math.max(0, q - 1 - cur) : q, muted: p.muted ? 1 : 0, vol: p.volume, at: m.get('lastAt') || 0,
+      src: p.src === 'r2' || p.src === 'nas' ? p.src : undefined };   // bài đang phát từ thư viện lưu sẵn (R2 / NAS của quán)
   }
 
   async fetch(req){
@@ -2406,8 +2540,18 @@ export class Room extends DurableObject {
       const g = m.d || {}, nu = (v, mx) => Number.isFinite(+v) && v !== '' && v !== null ? Math.max(0, Math.min(mx, Math.round(+v))) : undefined, tx = (v, n) => String(v == null ? '' : v).replace(/[^\w.-]/g, '').slice(0, n) || undefined;
       const dg = { n: nu(g.n, 9999), st: nu(g.st, 600000), bn: nu(g.bn, 999), bms: nu(g.bms, 3600000), q: tx(g.q, 10), qmx: tx(g.qmx, 10), ltn: nu(g.ltn, 99999), ltms: nu(g.ltms, 3600000),
         pl: nu(g.pl, 36000), up: nu(g.up, 30 * 86400), sk: nu(g.sk, 999), cl: nu(g.cl, 4320), vw: nu(g.vw, 10000), vh: nu(g.vh, 10000), dpr: Number.isFinite(+g.dpr) ? Math.round(+g.dpr * 100) / 100 : undefined,
-        hc: nu(g.hc, 256), mem: Number.isFinite(+g.mem) ? +g.mem : undefined, err: nu(g.err, 999), why: tx(g.why, 6), id: /^[\w-]{11}$/.test(g.id || '') ? g.id : undefined };
+        hc: nu(g.hc, 256), mem: Number.isFinite(+g.mem) ? +g.mem : undefined, err: nu(g.err, 999), why: tx(g.why, 6), id: /^[\w-]{11}$/.test(g.id || '') ? g.id : undefined,
+        src: ['yt', 'r2', 'nas'].includes(g.src) ? g.src : undefined, fb: tx(g.fb, 12) };
       await this.ghi('phat', { role: 'tv', ip: netKey(a.ip), isp: a.isp, ua: a.ua, dg });
+      return;
+    }
+
+    if(m.type === 'ls'){                                 // TV báo số bài theo nguồn phát (thư viện NAS/R2, YouTube, lỗi → YouTube), gửi theo lô
+      if(a.role !== 'tv' || now - (a.lsT || 0) < 30000 || data.length > 300) return;
+      a.lsT = now; try{ ws.serializeAttachment(a); }catch(e){}
+      const c = await this.cfg();
+      const pr = libDemGhi(this.env, c.branch || '', m.d || {}).catch(err => console.error('libDemGhi', err));
+      try{ this.ctx.waitUntil(pr); }catch(e){}
       return;
     }
 
@@ -3573,10 +3717,19 @@ export default {
       return jres({ id: v.id || '', tag: v.tag || '', at: v.timestamp || '' }, 200, originOk ? { 'Access-Control-Allow-Origin': origin, 'Vary': 'Origin' } : {});
     }
 
-    // Chủ đề trang trí tivi đang chọn (công khai, chỉ một chuỗi ngắn)
+    // Chủ đề trang trí tivi đang chọn (công khai, chỉ một chuỗi ngắn). TV gửi kèm vé thư viện (?t=) thì trả thêm công tắc thư viện của chi nhánh.
     if(u.pathname === '/api/deco' && req.method === 'GET'){
-      return jres({ deco: await decoGet(env), score: await scoreGet(env) }, 200, Object.assign({ 'Cache-Control': 'no-store' }, originOk ? { 'Access-Control-Allow-Origin': origin, 'Vary': 'Origin' } : {}));
+      const out = { deco: await decoGet(env), score: await scoreGet(env) };
+      const lcn = u.searchParams.get('t') ? await libTicketOk(env, u.searchParams.get('t')) : '';
+      if(lcn && env.LIB){ const c = libCn(await libCfg(env), lcn); out.lib = { on: c.on, nas: c.nas }; }
+      return jres(out, 200, Object.assign({ 'Cache-Control': 'no-store' }, originOk ? { 'Access-Control-Allow-Origin': origin, 'Vary': 'Origin' } : {}));
     }
+    // Thư viện video lưu sẵn: TV hỏi bài có file không (cần vé TV) + phát file (link ký riêng, có tua)
+    if(u.pathname === '/api/lib/src' && req.method === 'GET'){
+      const [st, d] = await libSrc(env, u);
+      return jres(d, st, originOk ? { 'Access-Control-Allow-Origin': origin, 'Vary': 'Origin' } : {});
+    }
+    if(u.pathname.startsWith('/lib/') && (req.method === 'GET' || req.method === 'HEAD')) return libServe(req, env, u);
 
     /* Màn quầy (quay.html): WebSocket "cái chuông" của chi nhánh — có đơn / đổi trạng thái thì quầy tự tải lại hàng đợi */
     if(u.pathname === '/quay/ws'){

@@ -13,6 +13,8 @@ ALLOWED_ORIGINS = "https://bmb.id.vn,https://bmbplayer.vmh.io.vn,https://bmbplay
 NET_CHECK = "off"          # off = không kiểm mạng | warn = cho vào nhưng đánh dấu máy ngoài mạng quán | on = chặn điện thoại khách ngoài mạng quán
 TB_NET = "off"             # on = máy tính bảng phải cùng mạng chi nhánh lúc gán (chi nhánh có 2 đường mạng thì nên để off) | off = bỏ kiểm
 TV_NET = "on"              # on = TV chờ gán khác mạng chi nhánh thì hỏi xác nhận (chống gán nhầm TV chi nhánh khác) | off = bỏ kiểm
+LIB_PREFIX = "videos"      # thư mục gốc của thư viện trong bucket taivideo-files (trùng R2_PREFIX của app Tải Video)
+LIB_DIRS = "vn,en,."       # thư mục con tìm lần lượt: vn = kho Việt, en = kho quốc tế, . = thẳng trong videos/ (bài dán tay); sau này thêm "1080" lên đầu nếu có bản nét hơn
 # Báo cáo sáng (Telegram, 07:55 mỗi ngày): đọc thống kê của hai Worker kho. Mật khẩu kho đặt trong Dash loại SECRET: KHO_VI_PASS, KHO_EN_PASS (cùng mật khẩu anh nhập ở kho.html).
 KHO_VI_URL = "https://kho-karaoke.vumanhhung85.workers.dev"
 KHO_EN_URL = "https://kho-karaoke-en.vumanhhung85.workers.dev"
@@ -56,6 +58,13 @@ database_id = "fecac75f-35ab-47df-85c4-caca0e3ca409"
 [[r2_buckets]]
 binding = "FILES"
 bucket_name = "bmbplayer-files"
+
+# Thư viện video lưu sẵn (10/2026): bucket của app Tải Video, Worker này CHỈ ĐỌC (tìm file + phát có tua cho TV).
+# File: videos/<thư mục>/<mã YouTube>.mp4 — thư mục theo kho (vn = kho Việt, en = kho quốc tế). Bật/tắt theo chi nhánh ở quay.html → Cài đặt.
+# Bucket phải nằm CÙNG tài khoản Cloudflare với Worker này (đã có sẵn, Worker taivideo đang ghi vào).
+[[r2_buckets]]
+binding = "LIB"
+bucket_name = "taivideo-files"
 
 [[durable_objects.bindings]]
 name = "ROOM"

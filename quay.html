@@ -360,6 +360,13 @@ tbody tr:hover td{background:#FBF8FE}
 .knfrm label{font-size:12.5px;color:var(--txt-mute);display:flex;flex-direction:column;gap:4px}
 .knfrm select{background:#fff;border:1px solid #CDB8E3;border-radius:10px;padding:8px 10px;font:inherit;font-size:13.5px;color:var(--txt)}
 .chip.ph{flex-basis:100%;max-width:100%;white-space:normal;line-height:1.35;border-radius:12px;padding-top:5px;padding-bottom:5px}
+/* Cài đặt → thư viện video lưu sẵn: mỗi chi nhánh một dòng */
+.librow{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px;background:var(--plum)}
+.librow .libst{font-size:11px;font-weight:800;padding:1px 8px;border-radius:999px;background:var(--tint);color:var(--txt-mute);margin-left:6px}
+.librow .libst.on{background:#DDF5EA;color:var(--ok)}
+.libctl{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
+.libctl .libnas{flex:1 1 240px;min-width:0;padding:8px 10px;border-radius:10px;background:var(--field);border:1px solid var(--line);font-size:13.5px}
+.libctl .libnas:focus{border-color:var(--purple);outline:none;background:#fff}
 .knsm{font-size:11.5px;color:var(--txt-mute)}
 .knchip{display:inline-flex;align-items:center;gap:6px;background:var(--tint);border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-size:12.5px}
 .knchip button{border:0;background:transparent;cursor:pointer;color:var(--bad);font-weight:700}
@@ -538,6 +545,14 @@ tbody tr:hover td{background:#FBF8FE}
         <option value="mute">Bật — im lặng (chỉ hình)</option>
       </select></div>
       <div class="hint" id="scoreMsg" style="margin-bottom:22px"></div>
+    </div>
+
+    <div id="libSec" style="display:none">
+      <div class="sect-lbl">📀 Phát từ thư viện video lưu sẵn (R2 / NAS của quán) <span class="tagx">chỉ admin</span></div>
+      <div class="hint">Bật cho chi nhánh nào thì tivi ở đó phát những bài <b>đã có trong thư viện</b> (app Tải Video tải về) bằng file của mình; bài chưa có, file lỗi hoặc đứng hình lâu thì <b>tự phát YouTube như cũ</b> (tiếp đúng đoạn đang hát). <b>Tắt</b> = y như hiện nay. Tivi nhận thay đổi khi mở phòng hoặc sau tối đa 10 phút.</div>
+      <div id="libBox" style="margin-bottom:10px"><div class="hint">Đang tải…</div></div>
+      <div class="hint" id="libMsg" style="display:none"></div>
+      <div class="hint" style="margin-bottom:22px"><b>NAS của quán</b> (để trống nếu chưa có): địa chỉ thư mục trên NAS có cùng cấu trúc với R2, ví dụ <code>…/vn/&lt;mã bài&gt;.mp4</code>. Tivi thử NAS trước, NAS không mở được thì dùng R2. Nên dùng địa chỉ <b>https://</b> có chứng chỉ (ví dụ <code>https://nas-cn03.bmb.id.vn/karaoke</code> trỏ về IP trong quán). Địa chỉ <b>http://</b> bị trình duyệt và app hiện tại chặn (trang chạy https), tivi sẽ bỏ qua NAS cho tới khi có bản app cho phép.</div>
     </div>
 
     <div id="apkSec" style="display:none">
@@ -1194,6 +1209,7 @@ function hienTheoQuyen(){
   $('apkSec').style.display = S.sieuAdmin ? '' : 'none';
   $('seekSec').style.display = S.vaiTro === 'admin' ? '' : 'none';
   $('decoSec').style.display = S.vaiTro === 'admin' ? '' : 'none';
+  $('libSec').style.display = S.vaiTro === 'admin' ? '' : 'none';
   $('phongAdmin').style.display  = S.vaiTro==='admin' ? '' : 'none';   /* phòng cố định — chỉ admin thêm/xoá */
   $('btnThuHoiMtb').style.display = S.quanLy ? '' : 'none';
   $('btnNhatKy').style.display = S.quanLy ? '' : 'none';
@@ -1308,7 +1324,7 @@ function loadTv(){
 function tvPhat(x){
   var p = x.ph; if(!x.open || !x.tv || !p) return '';
   var t = esc(p.title || ''), left = p.left ? ' · còn '+p.left+' bài chờ' : '', cu = p.st==='phat' && p.at && Date.now()-p.at > 12*60000;
-  if(p.st==='phat') return '<span class="chip ph on" title="'+t+'">🎵 Đang phát: '+(t.length>34?t.slice(0,34)+'…':t)+left+(p.muted?' · 🔇 tắt tiếng':'')+'</span>'+(cu?'<span class="chip ph warn">chưa cập nhật >12 phút, TV có thể treo</span>':'');
+  if(p.st==='phat') return '<span class="chip ph on" title="'+t+'">🎵 Đang phát: '+(t.length>34?t.slice(0,34)+'…':t)+left+(p.muted?' · 🔇 tắt tiếng':'')+(p.src?' · 📀 '+(p.src==='nas'?'NAS quán':'thư viện R2'):'')+'</span>'+(cu?'<span class="chip ph warn">chưa cập nhật >12 phút, TV có thể treo</span>':'');
   if(p.st==='dung') return '<span class="chip ph warn">⏸ Đang dừng: '+(t.length>30?t.slice(0,30)+'…':t)+left+'</span>';
   if(p.st==='cho') return '<span class="chip ph warn">👆 Có bài nhưng chưa phát được — cần chạm / bấm OK trên TV</span>';
   if(p.st==='diem') return '<span class="chip ph on">🏆 Đang hiện điểm</span>';
@@ -2366,7 +2382,44 @@ $('scoreSel').onchange = function(){
     $('scoreMsg').textContent = 'Đã lưu. Tivi sẽ đổi trong vòng 10 phút.';
   }).catch(function(){ sel.disabled = false; alert('Không kết nối được máy chủ.'); });
 };
-function cdMo(){ vtVe(); if(S.vaiTro === 'admin'){ seekVe(); decoVe(); scoreVe(); } if(S.sieuAdmin) apkVe();
+/* ---- Thư viện video lưu sẵn: công tắc + NAS theo chi nhánh, số bài phát theo nguồn 7 ngày ---- */
+var LIBQ = null;
+function libVe(){
+  api('admin.libGet', {}).then(function(r){
+    if(!r || !r.ok){ $('libBox').innerHTML = '<div class="hint">' + esc((r && r.msg) || 'Không hỏi được cài đặt.') + '</div>'; return; }
+    LIBQ = r; libVe2();
+  }).catch(function(){ $('libBox').innerHTML = '<div class="hint">Không kết nối được máy chủ.</div>'; });
+}
+function libVe2(){
+  var r = LIBQ, dem = {}; if(!r) return;
+  (r.dem || []).forEach(function(d){ (dem[d.cn] = dem[d.cn] || {})[d.src] = d.n; });
+  var h = r.r2 ? '' : '<div class="hint" style="color:var(--bad)"><b>Worker chưa gắn thư viện</b> (binding LIB → bucket taivideo-files): bật cũng chưa có tác dụng cho tới khi deploy bản có binding này.</div>';
+  h += (S.branches || []).map(function(b){
+    var c = r.cfg[b.id] || { on:false, nas:'' }, d = dem[b.id] || {}, lib = (d.nas || 0) + (d.r2 || 0), tong = lib + (d.yt || 0);
+    var tk = tong ? '<div class="knsm" style="margin-top:6px">7 ngày: <b>' + lib + '/' + tong + ' bài (' + Math.round(lib * 100 / tong) + '%) phát từ thư viện</b>'
+      + ((d.nas || 0) ? ' · NAS ' + d.nas : '') + ((d.r2 || 0) ? ' · R2 ' + d.r2 : '') + ' · YouTube (chưa có file) ' + (d.yt || 0)
+      + ((d.loi || 0) ? ' · <b style="color:var(--warn)">file lỗi → YouTube ' + d.loi + '</b>' : '') + ((d.nasloi || 0) ? ' · <b style="color:var(--warn)">NAS lỗi → R2 ' + d.nasloi + '</b>' : '') + '</div>' : '';
+    return '<div class="librow" data-cn="' + esc(b.id) + '"><div><b>' + esc(b.ten) + '</b><span class="libst' + (c.on ? ' on' : '') + '">' + (c.on ? 'ĐANG BẬT' : 'tắt') + '</span></div>'
+      + '<div class="libctl"><button type="button" class="btn btn-sm ' + (c.on ? 'btn-ghost' : 'btn-y') + '" data-libon="' + (c.on ? '0' : '1') + '">' + (c.on ? 'Tắt' : 'Bật') + '</button>'
+      + '<input type="url" class="libnas" placeholder="NAS của quán (tuỳ chọn), vd https://nas-cn03.bmb.id.vn/karaoke" value="' + esc(c.nas || '') + '" autocomplete="off">'
+      + '<button type="button" class="btn btn-ghost btn-sm" data-libluu="1">Lưu NAS</button></div>' + tk + '</div>';
+  }).join('');
+  $('libBox').innerHTML = h || '<div class="hint">Chưa có chi nhánh nào.</div>';
+}
+$('libBox').addEventListener('click', function(e){
+  var bt = e.target.closest('button[data-libon],button[data-libluu]'); if(!bt || !LIBQ) return;
+  var row = bt.closest('.librow'), cn = row.getAttribute('data-cn'), c = LIBQ.cfg[cn] || { on:false, nas:'' };
+  var on = bt.hasAttribute('data-libon') ? bt.getAttribute('data-libon') === '1' : !!c.on, nas = row.querySelector('.libnas').value.trim();
+  var ten = ((S.branches || []).filter(function(b){ return b.id === cn; })[0] || {}).ten || cn;
+  bt.disabled = true;
+  api('admin.libSet', { cn:cn, on:on, nas:nas }).then(function(r){
+    bt.disabled = false;
+    if(!r || !r.ok){ alert((r && r.msg) || 'Không lưu được.'); return; }
+    LIBQ.cfg[cn] = { on:r.on, nas:r.nas }; libVe2();
+    $('libMsg').style.display = ''; $('libMsg').textContent = 'Đã lưu ' + ten + ': ' + (r.on ? 'BẬT' : 'TẮT') + (r.nas ? ' · NAS ' + r.nas : '') + '. Tivi nhận khi mở phòng hoặc sau tối đa 10 phút.';
+  }).catch(function(){ bt.disabled = false; alert('Không kết nối được máy chủ.'); });
+});
+function cdMo(){ vtVe(); if(S.vaiTro === 'admin'){ seekVe(); decoVe(); scoreVe(); libVe(); } if(S.sieuAdmin) apkVe();
   var tg = tgDuocNhan(); $('tgSecCd').style.display = tg ? '' : 'none'; if(tg) tgTai($('tgHostCd')); else clearInterval(TG.timer); }
 $('lgVt').addEventListener('click', vtDangNhap);
 $('vtBat').addEventListener('click', vtBat);
@@ -2402,8 +2455,8 @@ function knSuKien(e){
     tx = '🔁 nối lại — <b>mất '+knDown(g.down)+'</b> · '+knLyDo(g)+(g.tries?' · thử '+g.tries+' lần':'')
       + (g.rtt!=null ? '<div class="knsm">ping trước khi rớt: TB '+g.rtt+'ms, cao nhất '+(g.rttMax!=null?g.rttMax:'?')+'ms'+(g.net?' · mạng '+esc(g.net):'')+(g.ty?' ('+esc(g.ty)+')':'')+(g.nrtt!=null?' · RTT '+g.nrtt+'ms':'')+(g.dl!=null?' · '+g.dl+'Mb/s':'')+'</div>' : (g.net?'<div class="knsm">mạng '+esc(g.net)+(g.ty?' ('+esc(g.ty)+')':'')+'</div>':'')); cls = 'kn-ev-noi'; }
   else if(e.ev==='phat'){ var p = {}; try{ p = JSON.parse(e.dg||'{}'); }catch(x){}
-    var xau = (p.bn||0)>0 || (p.st||0)>6000 || (p.ltms||0)>3000 || p.err;
-    tx = '🎵 bài thứ '+(p.n||'?')+' từ lúc bật'+(p.q?' · <b>'+knQ(p.q)+'</b>':'')+(p.st!=null?' · mở bài '+knDown(p.st):'')
+    var xau = (p.bn||0)>0 || (p.st||0)>6000 || (p.ltms||0)>3000 || p.err || p.fb;
+    tx = '🎵 bài thứ '+(p.n||'?')+' từ lúc bật'+(p.src&&p.src!=='yt'?' · 📀 '+(p.src==='nas'?'NAS quán':'thư viện R2'):'')+(p.fb?' · <b>'+knFb(p.fb)+'</b>':'')+(p.q?' · <b>'+knQ(p.q)+'</b>':'')+(p.st!=null?' · mở bài '+knDown(p.st):'')
       + ((p.bn||0)>0?' · <b>đứng hình chờ tải '+p.bn+' lần ('+knDown(p.bms)+')</b>':'')+((p.ltms||0)>=1000?' · <b>máy bận '+knDown(p.ltms)+'</b>':'')+(p.err?' · <b>lỗi '+p.err+'</b>':'')
       + '<div class="knsm">'+(p.vw?'màn '+p.vw+'×'+p.vh+(p.dpr?' @'+p.dpr+'x':''):'')+(p.cl?' · giới hạn '+p.cl+'p':' · chất lượng tự động')+(p.qmx&&p.qmx!==p.q?' · cao nhất '+knQ(p.qmx):'')+(p.hc?' · '+p.hc+' nhân CPU':'')+(p.mem?' · '+p.mem+'GB':'')+(p.up!=null?' · trang chạy '+knTuoi(p.up):'')+(p.sk?' · +'+p.sk+' bài êm trước đó':'')+'</div>';
     cls = xau ? 'kn-ev-cat' : 'kn-ev-noi'; }
@@ -2490,6 +2543,9 @@ function knTqVe(r){
     + '</tbody></table></div></div>';
   $('knBody').innerHTML = h;
 }
+/* Lý do TV đổi nguồn giữa bài (thư viện video lưu sẵn): 'r2-loi' → file R2 lỗi nên phát YouTube… */
+function knFb(fb){ var m = /^(nas|r2)-(\w+)$/.exec(fb || ''); if(!m) return 'đổi nguồn'; var ly = { loi:'lỗi', cham:'mở chậm', dung:'đứng hình lâu' }[m[2]] || m[2];
+  return m[1] === 'nas' ? 'NAS quán ' + ly + ' → chuyển R2' : 'file thư viện ' + ly + ' → chuyển YouTube'; }
 function knQ(q){ return { tiny:'144p', small:'240p', medium:'360p', large:'480p', hd720:'720p', hd1080:'1080p', hd1440:'1440p', hd2160:'4K', highres:'>4K' }[q] || q || '?'; }
 function knPt(a, b){ return b ? Math.round(100*a/b)+'%' : '—'; }
 function knQTop(o){ var k = Object.keys(o||{}).sort(function(a,b){ return o[b]-o[a]; }); return k.length ? k.slice(0,2).map(function(x){ return knQ(x)+' ('+o[x]+')'; }).join(', ') : '—'; }
@@ -2568,7 +2624,7 @@ function knChart(rows){
 function knClOpt(cur){ return (cur<0?'<option value="">— chọn —</option>':'')+[[0,'Tự động (YouTube chọn)'],[1080,'Tối đa 1080p'],[720,'Tối đa 720p'],[480,'Tối đa 480p'],[360,'Tối đa 360p']].map(function(o){ return '<option value="'+o[0]+'"'+(o[0]===cur?' selected':'')+'>'+o[1]+'</option>'; }).join(''); }
 function knMayDang(x){
   var p = x.ph; if(!x.open || !x.tvOn || !p) return '';
-  var t = esc(p.title||''), tx = { phat:'🎵 Đang phát: '+t+(p.left?' · còn '+p.left+' bài':''), dung:'⏸ Đang dừng: '+t, cho:'👆 Chờ chạm / bấm OK để phát', diem:'🏆 Đang hiện điểm', loi:'⚠️ Trình phát YouTube lỗi', chua:'Chưa có bài' }[p.st] || '';
+  var t = esc(p.title||''), tx = { phat:'🎵 Đang phát: '+t+(p.left?' · còn '+p.left+' bài':'')+(p.src?' · 📀 '+(p.src==='nas'?'NAS quán':'thư viện R2'):''), dung:'⏸ Đang dừng: '+t, cho:'👆 Chờ chạm / bấm OK để phát', diem:'🏆 Đang hiện điểm', loi:'⚠️ Trình phát YouTube lỗi', chua:'Chưa có bài' }[p.st] || '';
   return '<div class="knsm" style="margin-top:6px;color:'+(p.st==='phat'||p.st==='diem'?'#0F7A4D':p.st==='chua'?'inherit':'#B7791F')+'"><b>'+tx+'</b></div>';
 }
 function knMayPhat(x){

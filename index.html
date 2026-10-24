@@ -19,6 +19,10 @@
   /* ===== Màn hình phát: video tràn viền, không thanh tiêu đề ===== */
   #stage{position:fixed; inset:0; background:#000}
   #yt, #stage iframe{position:absolute; inset:0; width:100%; height:100%; border:0}
+  /* Bài phát từ thư viện lưu sẵn (NAS của quán / R2): thẻ <video> thay chỗ khung YouTube */
+  #vid{position:absolute; inset:0; width:100%; height:100%; background:#000; object-fit:contain; display:none}
+  body.vsrc #vid{display:block}
+  body.vsrc #yt, body.vsrc #stage iframe{visibility:hidden}
   /* Màn chuyển bài: hết bài / đang nạp bài mới thì ẨN trình phát (không phủ lên video đang phát) để không lộ ô gợi ý video của YouTube */
   #swap{position:absolute; inset:0; z-index:3; display:none; flex-direction:column; align-items:center; justify-content:center; gap:2.4vh; padding:4vw; text-align:center;
     background:radial-gradient(1300px 700px at 50% 38%, #2a1f4a 0%, #120d22 45%, var(--bg) 78%)}
@@ -26,7 +30,7 @@
   #score{position:absolute; inset:0; z-index:10; display:none; align-items:center; justify-content:center; overflow:hidden; text-align:center;
     background:radial-gradient(ellipse at 50% 38%, #4a1d96 0%, #1c0c40 52%, #07030f 100%)}
   body.scoring #score{display:flex}
-  body.scoring #yt, body.scoring #stage iframe{visibility:hidden}
+  body.scoring #yt, body.scoring #stage iframe, body.scoring #vid{visibility:hidden}
   body.scoring #cornerLogo, body.scoring #swap{display:none}
   #score .rays{position:absolute; left:50%; top:40%; width:230vmax; height:230vmax; margin:-115vmax 0 0 -115vmax; will-change:transform; opacity:0; transition:opacity 1s;
     background:repeating-conic-gradient(from 0deg, rgba(255,214,102,.13) 0 5deg, transparent 5deg 12deg); animation:scSpin 28s linear infinite}
@@ -61,7 +65,7 @@
   #swap .s1{font-size:clamp(14px,2.2vw,30px); font-weight:800; letter-spacing:4px; color:var(--accent2)}
   #swap .s2{font-size:clamp(22px,4.2vw,58px); font-weight:800; max-width:86vw; line-height:1.25; text-shadow:0 4px 30px rgba(139,92,246,.6)}
   body.swap #swap{display:flex}
-  body.swap #yt, body.swap #stage iframe{visibility:hidden}
+  body.swap #yt, body.swap #stage iframe, body.swap #vid{visibility:hidden}
   body.swap #cornerLogo{display:none}
 
   /* ===== Màn hình chờ (giống màn hình chờ của SK Player: logo, giờ, trạng thái sẵn sàng) ===== */
@@ -216,6 +220,7 @@
 <script src="./qrcode.js"></script>
 <div id="stage">
   <div id="yt"></div>
+  <video id="vid" playsinline preload="auto" disablepictureinpicture disableremoteplayback></video>
   <div id="swap"><img class="logo" src="Logo_BoomBox.png" alt=""><div class="s1">SẮP HÁT</div><div class="s2" id="swapT"></div></div>
   <div id="score"><div class="rays"></div><canvas id="scConf"></canvas>
     <div class="box"><div class="head" id="scHead">ĐANG CHẤM ĐIỂM…</div><div class="song" id="scSong"></div>
@@ -458,7 +463,7 @@ const PQ = { n: 0, sk: 0, c: null }, LT = { n: 0, ms: 0 };
 try{ new PerformanceObserver(l => { for(const e of l.getEntries()){ if(e.duration >= 100){ LT.n++; LT.ms += e.duration; } } }).observe({ type: 'longtask' }); }catch(e){}
 function pqStart(id){
   pqEnd('next');
-  PQ.n++; PQ.c = { id, n: PQ.n, t0: Date.now(), st: null, bn: 0, bms: 0, bT: 0, q: {}, ltN: LT.n, ltMs: LT.ms, seekT: 0, lock: false };
+  PQ.n++; PQ.c = { id, n: PQ.n, t0: Date.now(), st: null, bn: 0, bms: 0, bT: 0, q: {}, ltN: LT.n, ltMs: LT.ms, seekT: 0, lock: false, src: 'yt', fb: '' };
 }
 function pqState(st){
   const c = PQ.c; if(!c) return;
@@ -467,8 +472,8 @@ function pqState(st){
   else if(st === 3){ if(c.st !== null && !c.bT && now - c.seekT > 2500){ c.bn++; c.bT = now; } }
   else if(c.bT){ c.bms += now - c.bT; c.bT = 0; }
 }
-function pqQ(){ const c = PQ.c; if(!c || !ready) return; try{ const q = player.getPlaybackQuality(); if(q && q !== 'unknown') c.q[q] = (c.q[q] || 0) + 1; }catch(e){} }
-setInterval(() => { try{ if(PQ.c && ready && player.getPlayerState() === 1) pqQ(); }catch(e){} }, 5000);
+function pqQ(){ const c = PQ.c; if(!c || !ready) return; try{ const q = P().getPlaybackQuality(); if(q && q !== 'unknown') c.q[q] = (c.q[q] || 0) + 1; }catch(e){} }
+setInterval(() => { try{ if(PQ.c && ready && P().getPlayerState() === 1) pqQ(); }catch(e){} }, 5000);
 const PQ_RANK = ['tiny', 'small', 'medium', 'large', 'hd720', 'hd1080', 'hd1440', 'hd2160', 'highres'];
 function pqEnd(why, err){
   const c = PQ.c; if(!c) return;
@@ -477,12 +482,12 @@ function pqEnd(why, err){
   if(c.bT) c.bms += now - c.bT;
   if(c.st === null && !err && now - c.t0 < 4000) return;              // bấm qua bài trước khi kịp phát: không tính
   const qk = Object.keys(c.q), q = qk.sort((a, b) => c.q[b] - c.q[a])[0] || '', qmx = qk.sort((a, b) => PQ_RANK.indexOf(b) - PQ_RANK.indexOf(a))[0] || '';
-  const ltms = Math.round(LT.ms - c.ltMs), xau = c.bn > 0 || (c.st !== null && c.st > 6000 && !c.lock) || ltms > 3000 || !!err;
+  const ltms = Math.round(LT.ms - c.ltMs), xau = c.bn > 0 || (c.st !== null && c.st > 6000 && !c.lock) || ltms > 3000 || !!err || !!c.fb;
   if(c.n > 5 && !xau){ PQ.sk++; if(PQ.sk < 40) return; }
   if(!bc.ws) return;
   let mem; try{ mem = navigator.deviceMemory; }catch(e){}
   bc.postMessage({ type: 'pq', d: { n: c.n, st: c.lock ? null : c.st, bn: c.bn, bms: Math.round(c.bms), q, qmx, ltn: LT.n - c.ltN, ltms, pl: Math.round((now - c.t0) / 1000),
-    up: Math.round(performance.now() / 1000), sk: PQ.sk, cl: clCap, vw: innerWidth, vh: innerHeight, dpr: devicePixelRatio || 1, hc: navigator.hardwareConcurrency || null, mem, err: err || null, why, id: c.id } });
+    up: Math.round(performance.now() / 1000), sk: PQ.sk, cl: clCap, vw: innerWidth, vh: innerHeight, dpr: devicePixelRatio || 1, hc: navigator.hardwareConcurrency || null, mem, err: err || null, why, id: c.id, src: c.src || 'yt', fb: c.fb || null } });
   PQ.sk = 0;
 }
 
@@ -530,15 +535,135 @@ function makePlayer(){
   if(location.protocol.startsWith('http')) vars.origin = location.origin;
   player = new YT.Player('yt', {
     width:'100%', height:'100%', playerVars: vars,
-    events:{ onReady, onStateChange, onError }
+    events:{ onReady, onStateChange: e => { if(src === 'yt') onStateChange(e); }, onError: e => { if(src === 'yt') onError(e); } }
   });
 }
 function onReady(){
   ready = true; $('diag').style.display = 'none'; fitYt();
-  player.setVolume(NATIVE ? 100 : vol); $('vol').value = vol;
+  player.setVolume(NATIVE ? 100 : vol); VP.setVolume(NATIVE ? 100 : vol); $('vol').value = vol;
   paintReady();
   if(cur >= 0) load();       // remote đã gửi bài trong lúc YouTube đang khởi động → phát luôn
   push();
+}
+/* ---------- Thư viện video lưu sẵn: NAS của quán → R2 → YouTube nhúng (từ 10/2026) ----------
+   Admin bật theo chi nhánh ở quầy → Cài đặt. Worker gửi lib:{on, nas, t} trong tin 'room' (t = vé của TV); TV hỏi lại công tắc mỗi 10 phút qua /api/deco.
+   BẬT: trước mỗi bài hỏi /api/lib/src (chờ tối đa 2,5 giây). Có file → phát bằng thẻ <video>: NAS của quán (nếu admin khai báo và máy mở được),
+   không thì R2. Không có file / file lỗi / đứng hình lâu → phát YouTube như cũ, tiếp từ đúng giây đang hát. TẮT: y như trước, không hỏi gì thêm.
+   Mọi chỗ điều khiển bài đang phát gọi P() = trình phát của nguồn hiện tại (YouTube hoặc <video>), cùng tên lệnh như YouTube.
+   NAS dạng http:// trong khi trang là https:// bị trình duyệt chặn (nội dung hỗn hợp): chỉ thử khi app Android báo cho phép (BMBNative.mixedOk()),
+   còn lại bỏ qua NAS, đi thẳng R2. NAS lỗi 3 lần liền → tạm bỏ NAS 10 phút. */
+const PS = { UNSTARTED:-1, ENDED:0, PLAYING:1, PAUSED:2, BUFFERING:3, CUED:5 };
+const LIB_ASK_MS = 2500, NAS_TRY_MS = 5000, R2_TRY_MS = 9000, STALL_MS = 12000;
+let LIB = { on:false, nas:'', t:'' }, src = 'yt', loadSeq = 0, nasBad = 0, nasOffUntil = 0;
+const libMemo = new Map();                        // mã bài → { at, r } (r = null: không có trong thư viện)
+const P = () => (src === 'yt' && player) ? player : VP;
+const both = f => { if(ready && player){ try{ f(player); }catch(e){} } try{ f(VP); }catch(e){} };   // âm lượng / tắt tiếng: giữ hai trình phát giống nhau
+const VP = (() => {
+  const v = $('vid');
+  let st = PS.UNSTARTED, quiet = true, tFail = null, tStall = null, onFail = null;
+  const clr = () => { clearTimeout(tFail); clearTimeout(tStall); tFail = tStall = null; };
+  const emit = s => { if(quiet || st === s) return; st = s; if(src !== 'yt') onStateChange({ data:s }); };
+  function fail(why){ if(quiet) return; const f = onFail; clr(); onFail = null; if(f) f(why, v.currentTime || 0); }
+  v.addEventListener('loadeddata', () => { clearTimeout(tFail); tFail = null; });
+  v.addEventListener('playing', () => { clearTimeout(tStall); tStall = null; if(src === 'nas') nasBad = 0; emit(PS.PLAYING); });
+  v.addEventListener('pause', () => { if(!v.ended && st === PS.PLAYING) emit(PS.PAUSED); });
+  v.addEventListener('waiting', () => { if(quiet) return; emit(PS.BUFFERING); clearTimeout(tStall); tStall = setTimeout(() => { if(v.readyState < 3) fail('dung'); }, STALL_MS); });
+  v.addEventListener('ended', () => { clr(); emit(PS.ENDED); });
+  v.addEventListener('error', () => fail('loi'));
+  return {
+    el: v,
+    open(url, t, failMs, cb){
+      clr(); quiet = false; onFail = cb; st = PS.BUFFERING;
+      v.src = url + (t > 1 ? '#t=' + Math.floor(t) : '');
+      tFail = setTimeout(() => { if(v.readyState < 2) fail('cham'); }, failMs);
+      try{ const pr = v.play(); if(pr && pr.catch) pr.catch(e => { if(!quiet && e && e.name === 'NotAllowedError') st = PS.UNSTARTED; }); }catch(e){}   // bị chặn tự phát có tiếng → guard() phát im lặng / chờ chạm
+    },
+    stopVideo(){ clr(); quiet = true; onFail = null; st = PS.UNSTARTED; try{ v.pause(); }catch(e){} if(v.getAttribute('src')){ v.removeAttribute('src'); try{ v.load(); }catch(e){} } },
+    getPlayerState: () => st,
+    getCurrentTime: () => v.currentTime || 0,
+    getDuration: () => (isFinite(v.duration) ? v.duration : 0),
+    seekTo(t){ try{ v.currentTime = Math.max(0, +t || 0); }catch(e){} },
+    playVideo(){ try{ const pr = v.play(); if(pr && pr.catch) pr.catch(() => {}); }catch(e){} },
+    pauseVideo(){ try{ v.pause(); }catch(e){} },
+    mute(){ v.muted = true; }, unMute(){ v.muted = false; },
+    setVolume(x){ v.volume = Math.max(0, Math.min(1, (+x || 0) / 100)); },
+    getPlaybackQuality(){ const h = v.videoHeight || 0; return h >= 2160 ? 'hd2160' : h >= 1440 ? 'hd1440' : h >= 1080 ? 'hd1080' : h >= 720 ? 'hd720' : h >= 480 ? 'large' : h >= 360 ? 'medium' : h ? 'small' : 'unknown'; },
+  };
+})();
+function libSet(o){
+  if(!o || typeof o !== 'object') return;
+  if(typeof o.t === 'string' && o.t) LIB.t = o.t;
+  LIB.nas = typeof o.nas === 'string' && /^https?:\/\//i.test(o.nas) ? o.nas.replace(/\/+$/, '') : '';
+  const on = !!o.on && !!LIB.t && !!bc.ws;
+  if(on !== LIB.on){ LIB.on = on; libMemo.clear(); }
+}
+/* Đếm bài theo nguồn (nas, r2, yt = chưa có trong thư viện, loi = file lỗi → YouTube, nasloi = NAS lỗi → R2): gửi Worker theo lô 10 bài / 15 phút */
+const LS = { nas:0, r2:0, yt:0, loi:0, nasloi:0, at:Date.now() };
+function lsBump(k){ if(!LIB.on) return; LS[k]++; lsFlush(false); }
+function lsFlush(force){
+  const n = LS.nas + LS.r2 + LS.yt + LS.loi + LS.nasloi;
+  if(!n || !bc.ws) return;
+  if(!force && n < 10 && Date.now() - LS.at < 15 * 60000) return;
+  bc.postMessage({ type:'ls', d:{ nas:LS.nas, r2:LS.r2, yt:LS.yt, loi:LS.loi, nasloi:LS.nasloi } });
+  LS.nas = LS.r2 = LS.yt = LS.loi = LS.nasloi = 0; LS.at = Date.now();
+}
+setInterval(() => lsFlush(false), 5 * 60000);
+addEventListener('pagehide', () => lsFlush(true));
+function libFind(id){
+  if(!LIB.on || !LIB.t || !bc.ws) return Promise.resolve(null);
+  const m = libMemo.get(id);
+  if(m && Date.now() - m.at < (m.r ? 20 : 5) * 60000) return Promise.resolve(m.r);
+  let ctl = null; try{ ctl = new AbortController(); }catch(e){}
+  const to = setTimeout(() => { try{ if(ctl) ctl.abort(); }catch(e){} }, LIB_ASK_MS);
+  return fetch(phongApi() + '/api/lib/src?id=' + encodeURIComponent(id) + '&t=' + encodeURIComponent(LIB.t), { cache:'no-store', signal: ctl ? ctl.signal : undefined })
+    .then(r => r.json().catch(() => ({})).then(d => { if(r.status === 403){ LIB.on = false; libMemo.clear(); } return r.ok ? d : null; }))   // vé hết hạn/sai: dùng YouTube tới khi TV nhận vé mới
+    .then(d => {
+      clearTimeout(to);
+      if(!d) return null;
+      if(d.off){ LIB.on = false; libMemo.clear(); return null; }
+      const r = d.rel && d.url ? { rel:d.rel, url:d.url, nas:d.nas || '' } : null;
+      if(typeof d.rel === 'string') libMemo.set(id, { at:Date.now(), r });
+      return r;
+    })
+    .catch(() => { clearTimeout(to); return null; });
+}
+function nasUsable(u){
+  if(!u || Date.now() < nasOffUntil) return false;
+  if(location.protocol === 'https:' && /^http:/i.test(u)){
+    try{ return !!(window.BMBNative && typeof BMBNative.mixedOk === 'function' && BMBNative.mixedOk()); }catch(e){ return false; }
+  }
+  return true;
+}
+function stopAll(){ src = 'none'; try{ if(ready && player) player.stopVideo(); }catch(e){} VP.stopVideo(); document.body.classList.remove('vsrc'); }
+function playYt(id, t){
+  src = 'yt'; VP.stopVideo(); document.body.classList.remove('vsrc');
+  if(PQ.c) PQ.c.src = 'yt';
+  player.loadVideoById(t > 1 ? { videoId:id, startSeconds:Math.floor(t) } : id);
+  if(!userMuted && lock !== 'muted') player.unMute();
+  clearTimeout(wd); wd = setTimeout(() => guard(id, 1), 3500);
+}
+function playFile(kind, r, t){
+  const id = queue[cur].id;
+  src = kind;
+  try{ if(player) player.stopVideo(); }catch(e){}
+  document.body.classList.add('vsrc');
+  if(PQ.c) PQ.c.src = kind;
+  VP.setVolume(NATIVE ? 100 : vol);
+  if(userMuted || lock === 'muted') VP.mute(); else VP.unMute();
+  VP.open(kind === 'nas' ? r.nas : r.url, t, kind === 'nas' ? NAS_TRY_MS : R2_TRY_MS, (why, at) => libFail(kind, r, id, why, at));
+  clearTimeout(wd); wd = setTimeout(() => guard(id, 1), 3500);
+}
+/* File thư viện không mở được / lỗi / đứng hình lâu: NAS → R2 → YouTube, tiếp từ giây đang hát */
+function libFail(kind, r, id, why, at){
+  if(cur < 0 || !queue[cur] || queue[cur].id !== id || src !== kind) return;
+  if(kind === 'nas'){
+    lsBump('nasloi'); if(++nasBad >= 3){ nasOffUntil = Date.now() + 10 * 60000; nasBad = 0; }
+    if(PQ.c) PQ.c.fb = 'nas-' + why;
+    playFile('r2', r, at); return;
+  }
+  lsBump('loi'); libMemo.delete(id);
+  if(PQ.c) PQ.c.fb = 'r2-' + why;
+  playYt(id, at);
 }
 /* Hết bài → YouTube hiện lưới video gợi ý. Không có tham số nào tắt được lưới này (rel=0 chỉ giới hạn cùng kênh),
    nên lúc video KHÔNG phát (hết bài, đang nạp bài sau) trang ẩn hẳn trình phát và hiện màn "Sắp hát" của BMB;
@@ -552,7 +677,7 @@ function swapOn(){
 function swapOff(){ clearTimeout(swapTimer); document.body.classList.remove('swap'); }
 function ccOff(){ try{ player.unloadModule('captions'); player.unloadModule('cc'); }catch(_){} }
 function onStateChange(e){
-  const S = YT.PlayerState;
+  const S = PS;
   pqState(e.data);
   if(e.data === S.PLAYING){ if(!pStart) pStart = Date.now(); if(scoring) endScoreUi(); } else if(pStart){ playedMs += Date.now() - pStart; pStart = 0; }   // thời gian đã nghe của bài (tua nhảy cóc thì không tính)
   if(e.data === S.PLAYING) ccOff();
@@ -634,29 +759,35 @@ let wd = null;
 function load(){
   if(!ready) return;
   clearTimeout(wd); endScoreUi(); playedMs = 0; pStart = 0;
+  const seq = ++loadSeq;
   if(cur < 0 || cur >= queue.length){
-    pqEnd('stop'); swapOff(); player.stopVideo(); $('idle').style.display='flex'; setLock(null);
+    pqEnd('stop'); swapOff(); stopAll(); src = 'yt'; $('idle').style.display='flex'; setLock(null);
     hide('ovTitle'); hide('ovNext'); hide('ovCount'); render(); push(); return;
   }
   $('idle').style.display = 'none';
   swapOn();
-  pqStart(queue[cur].id);
-  player.loadVideoById(queue[cur].id);
-  if(!userMuted && lock !== 'muted') player.unMute();
-  showNowOverlay(); hide('ovNext');
-  render(); push();
   const id = queue[cur].id;
-  wd = setTimeout(() => guard(id, 1), 3500);
+  pqStart(id);
+  if(!LIB.on){ playYt(id, 0); showNowOverlay(); hide('ovNext'); render(); push(); return; }     // thư viện TẮT: y như trước
+  stopAll();                                                       // đang hỏi thư viện: hai trình phát đều im, màn "Sắp hát" đang hiện
+  showNowOverlay(); hide('ovNext'); render(); push();
+  libFind(id).then(r => {
+    if(seq !== loadSeq || cur < 0 || !queue[cur] || queue[cur].id !== id) return;   // đã sang bài khác trong lúc chờ
+    if(!r){ lsBump('yt'); playYt(id, 0); }
+    else if(r.nas && nasUsable(r.nas)){ lsBump('nas'); playFile('nas', r, 0); }
+    else { lsBump('r2'); playFile('r2', r, 0); }
+    push();
+  });
 }
 /* Giữ bài phát được dù trình duyệt chặn tự phát có tiếng:
    bước 1 → thử phát im lặng (trình duyệt cho phép); bước 2 → nếu vẫn không chạy, chờ một lần chạm. */
 function guard(id, stage){
   if(!ready || cur < 0 || !queue[cur] || queue[cur].id !== id) return;
-  const st = player.getPlayerState();
+  const st = P().getPlayerState();
   if(st !== -1 && st !== 5) return;                      // đang phát / đang tải / đã dừng chủ ý → không can thiệp
   if(PQ.c) PQ.c.lock = true;                             // bị chặn tự phát: thời gian mở bài không phản ánh tốc độ máy
   if(stage === 1){
-    player.mute(); player.playVideo(); setLock('muted');
+    P().mute(); P().playVideo(); setLock('muted');
     wd = setTimeout(() => guard(id, 2), 3500);
   } else {
     setLock('tap');
@@ -684,16 +815,16 @@ function playPause(){
   if(scoring){ finishScore(); return; }                  // đang hiện điểm: nút Phát/OK = qua màn điểm
   if(cur < 0 && queue.length){ cur = 0; load(); return; }
   if(Date.now() - unlockAt < 800) return;
-  const st = player.getPlayerState();
-  if(st === YT.PlayerState.PLAYING) player.pauseVideo(); else player.playVideo();
+  const st = P().getPlayerState();
+  if(st === PS.PLAYING) P().pauseVideo(); else P().playVideo();
 }
-function replay(){ if(ready && cur>=0){ if(PQ.c) PQ.c.seekT = Date.now(); endScoreUi(); playedMs = 0; pStart = 0; player.seekTo(0,true); player.playVideo(); } }
+function replay(){ if(ready && cur>=0){ if(PQ.c) PQ.c.seekT = Date.now(); endScoreUi(); playedMs = 0; pStart = 0; P().seekTo(0,true); P().playVideo(); } }
 function applyMute(){ $('muteBtn').textContent = (userMuted ? '🔇 Tiếng: Tắt' : '🔊 Tiếng: Bật'); }
 function toggleMute(on){                    // on = true/false: đặt hẳn (remote gửi theo icon đang thấy, không đảo ngược nếu máy đó lệch); không có → đảo như cũ
   if(!ready){ push(); return; }
   if(typeof on === 'boolean' && on === userMuted){ push(); return; }
   userMuted = !userMuted;
-  if(userMuted) player.mute(); else if(lock !== 'muted') player.unMute();
+  if(userMuted) both(p => p.mute()); else if(lock !== 'muted') both(p => p.unMute());
   applyMute(); volOsd(); if(userMuted && typeof scoreAudioStop === 'function') scoreAudioStop(); push();
 }
 const VIC = {
@@ -712,10 +843,10 @@ function setVol(v){
   v = Math.max(0, Math.min(100, Math.round(v)));
   if(v === vol && $('vol').value == v) return;
   vol = v; $('vol').value = v;
-  if(NATIVE){ try{ NATIVE.setVolume(v); }catch(e){} if(ready) player.setVolume(100); }
-  else if(ready) player.setVolume(v);
+  if(NATIVE){ try{ NATIVE.setVolume(v); }catch(e){} both(p => p.setVolume(100)); }
+  else both(p => p.setVolume(v));
   if(v > 0){ try{ localStorage.setItem('bmb_vol', String(v)); }catch(e){} }
-  if(userMuted && v > 0){ userMuted = false; if(ready && lock !== 'muted') player.unMute(); applyMute(); }   // kéo âm lượng lên = bật tiếng lại
+  if(userMuted && v > 0){ userMuted = false; if(lock !== 'muted') both(p => p.unMute()); applyMute(); }   // kéo âm lượng lên = bật tiếng lại
   volOsd(); push();
 }
 /* App Android báo khi âm lượng hệ thống đổi (nút trên điều khiển TV) */
@@ -747,8 +878,8 @@ function onGesture(){
   if(!fsTried && !params.has('nofs')){ fsTried = true; try{ const p = document.documentElement.requestFullscreen(); if(p && p.catch) p.catch(sleepless); }catch(e){} }
   keepAwake();
   if(!ready) return;
-  if(lock === 'muted'){ if(!userMuted) player.unMute(); setLock(null); }
-  else if(lock === 'tap'){ player.playVideo(); if(!userMuted) player.unMute(); setLock(null); unlockAt = Date.now(); }
+  if(lock === 'muted'){ if(!userMuted) P().unMute(); setLock(null); }
+  else if(lock === 'tap'){ P().playVideo(); if(!userMuted) P().unMute(); setLock(null); unlockAt = Date.now(); }
 }
 ['pointerdown','touchstart','keydown'].forEach(ev => window.addEventListener(ev, onGesture, { passive:true }));
 
@@ -780,18 +911,18 @@ document.addEventListener('visibilitychange', keepAwake); keepAwake();
 /* Thanh tiến độ + biểu ngữ "Tiếp theo" trong ~20 giây cuối */
 setInterval(()=>{
   if(!ready || cur<0 || !queue[cur]){ $('bar').style.width='0'; return; }
-  const d = player.getDuration(), t = player.getCurrentTime();
+  const d = P().getDuration(), t = P().getCurrentTime();
   if(d > 0){
     $('bar').style.width = (t/d*100) + '%';
     const nx = queue[cur+1];
-    if(nx && d - t <= 20 && d - t > 0.5 && player.getPlayerState() === 1){ $('ovNextT').textContent = nx.title; flash('ovNext'); }
+    if(nx && d - t <= 20 && d - t > 0.5 && P().getPlayerState() === 1){ $('ovNextT').textContent = nx.title; flash('ovNext'); }
     else hide('ovNext');
   }
 }, 500);
 
 /* ---------- Tua bài (thanh trượt + ±10 giây trên remote), chỉ khi admin bật ---------- */
-function curT(){ try{ return ready && cur >= 0 ? Math.max(0, +player.getCurrentTime() || 0) : 0; }catch(e){ return 0; } }
-function curDur(){ try{ return ready && cur >= 0 ? Math.max(0, +player.getDuration() || 0) : 0; }catch(e){ return 0; } }
+function curT(){ try{ return ready && cur >= 0 ? Math.max(0, +P().getCurrentTime() || 0) : 0; }catch(e){ return 0; } }
+function curDur(){ try{ return ready && cur >= 0 ? Math.max(0, +P().getDuration() || 0) : 0; }catch(e){ return 0; } }
 function fmtT(s){ s = Math.max(0, Math.floor(s || 0)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60; return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(x).padStart(2, '0'); }
 function seekCmd(c){
   if(scoring || !seekOn || !ready || cur < 0 || !queue[cur]) return;
@@ -799,14 +930,14 @@ function seekCmd(c){
   let t = typeof c.t === 'number' && isFinite(c.t) ? c.t : curT() + (+c.by || 0);
   t = Math.max(0, d > 1 ? Math.min(t, d - 1) : t);
   if(PQ.c) PQ.c.seekT = Date.now();
-  try{ player.seekTo(t, true); }catch(e){ return; }
+  try{ P().seekTo(t, true); }catch(e){ return; }
   $('ovSeek').textContent = (typeof c.by === 'number' ? (c.by < 0 ? '⏪ ' : '⏩ ') : '') + fmtT(t) + (d > 0 ? ' / ' + fmtT(d) : '');
   flash('ovSeek', 1800);
   setTimeout(pushPos, 250);
 }
 function pushPos(){
   if(!seekOn || !nPeers || !ready || cur < 0) return;
-  let playing = false; try{ playing = player.getPlayerState() === 1; }catch(e){}
+  let playing = false; try{ playing = P().getPlayerState() === 1; }catch(e){}
   if(!playing) return;                     // dừng/đổi bài đã có tin 'state' kèm giây; remote tự chạy đồng hồ giữa hai lần báo
   bc.postMessage({ type:'pos', payload:{ cur, t: curT(), dur: curDur(), playing } });
 }
@@ -929,8 +1060,8 @@ function finishScore(){ if(!scoring) return; endScoreUi(); swapOn(); next(); }
 function push(){
   bc.postMessage({ type:'state', payload:{
     room:ROOM, ready, needStart: lock !== null && queue.length > 0, soundLocked: lock !== null, apiFailed: apiFailed || $('diag').style.display === 'block',
-    playing: ready && player.getPlayerState && player.getPlayerState()===1,
-    muted: userMuted, scoring,
+    playing: ready && P().getPlayerState()===1,
+    muted: userMuted, scoring, src: (src === 'r2' || src === 'nas') ? src : 'yt',
     volume: vol,
     seek: seekOn, t: curT(), dur: curDur(),
     nowTitle: cur>=0 ? queue[cur].title : null,
@@ -950,7 +1081,7 @@ bc.onmessage = ev => {
     case 'play':{
       if(scoring){ finishScore(); break; }                          // đang hiện điểm: Phát/OK = qua màn điểm
       // on = true/false: muốn phát / muốn dừng; đã đúng sẵn thì chỉ báo lại trạng thái
-      if(typeof c.on === 'boolean'){ let pl = false; try{ pl = ready && player.getPlayerState() === 1; }catch(e){} if(c.on === pl){ push(); break; } }
+      if(typeof c.on === 'boolean'){ let pl = false; try{ pl = ready && P().getPlayerState() === 1; }catch(e){} if(c.on === pl){ push(); break; } }
       playPause(); break; }
     case 'next': next(); break;
     case 'replay': replay(); break;
@@ -1001,7 +1132,7 @@ setInterval(svcPaint, 1000);
 function roomNote(t){ const n = $('roomNote'); n.textContent = t || ''; n.style.display = t ? 'block' : 'none'; }
 function resetSession(){
   endScoreUi(); scoreBest = 0; scoreN = 0; queue = []; cur = -1; setLock(null); svcSet([]);
-  if(ready){ try{ player.stopVideo(); }catch(e){} }
+  loadSeq++; stopAll(); src = 'yt';
   $('idle').style.display = 'flex'; hide('ovTitle'); hide('ovNext'); hide('ovCount'); render();
 }
 if(bc.ws){
@@ -1012,6 +1143,7 @@ if(bc.ws){
     if(m.name) roomName = m.name;
     /* mặc định cho tua; chỉ khi admin tắt (Worker báo seek:false) mới không */
     applyCl(m.cl);
+    if(m.lib) libSet(m.lib);                                 // thư viện video lưu sẵn của chi nhánh (công tắc + NAS + vé)
     { const was = seekOn; seekOn = m.seek !== false; nPeers = (m.remotes || 0) + (m.tablets || 0); if(was !== seekOn) setTimeout(push, 0); }
     paintGuestQr(m.open ? m.qr : '', m.name);
     if(!m.open){ resetSession(); roomNote((roomName ? (/^ph[oò]ng\b/i.test(roomName) ? roomName : 'Phòng ' + roomName) : 'Phòng') + ' chưa mở — chờ nhân viên mở phòng'); paintRoomTag(); connTxt = ''; $('hint').textContent = HINT0; }
@@ -1048,7 +1180,7 @@ if(bc.ws){
     }
     return parts.join('|');
   }
-  const idle = () => cur < 0 && (!ready || !player.getPlayerState || player.getPlayerState() !== 1);
+  const idle = () => cur < 0 && (!ready || P().getPlayerState() !== 1);
   let base = null;
   async function check(){
     try{
@@ -1057,7 +1189,7 @@ if(bc.ws){
       const changed = now !== base;
       const h = new Date().getHours();
       const morning = h >= 4 && h < 5 && Date.now() - BOOT > 6 * 3600 * 1000;
-      if((changed || morning) && idle()){ try{ sessionStorage.setItem('bmb_reload', '0'); }catch(e){} location.reload(); }
+      if((changed || morning) && idle()){ try{ sessionStorage.setItem('bmb_reload', '0'); }catch(e){} lsFlush(true); location.reload(); }
     }catch(e){ /* mất mạng / máy chủ bận: bỏ qua, lần sau kiểm lại */ }
   }
   check();
@@ -1144,7 +1276,7 @@ if(bc.ws){
   function fetchSetting(){
     if(q.get('deco')) return;
     if(!(location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) return;
-    fetch('/api/deco', { cache:'no-store' }).then(r => r.ok ? r.json() : null).then(v => { if(v){ if(typeof v.score === 'string') window.__scoreMode = v.score; if(typeof v.deco === 'string'){ setting = v.deco; apply(); } } }).catch(() => {});
+    fetch('/api/deco' + (LIB.t ? '?t=' + encodeURIComponent(LIB.t) : ''), { cache:'no-store' }).then(r => r.ok ? r.json() : null).then(v => { if(v){ if(typeof v.score === 'string') window.__scoreMode = v.score; if(v.lib) libSet(v.lib); if(typeof v.deco === 'string'){ setting = v.deco; apply(); } } }).catch(() => {});
   }
   apply(); fetchSetting();
   setInterval(fetchSetting, 10 * 60 * 1000);
