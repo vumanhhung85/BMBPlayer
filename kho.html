@@ -58,6 +58,9 @@
   .card .samples{background:#15151f}
   details{margin-top:12px} summary{cursor:pointer; color:var(--quiet); font-size:13px}
   button.star{background:#20202e; border:1px solid var(--line); color:var(--quiet)} button.star.on{background:#3a2f12; border-color:#6b5520; color:var(--warn)}
+  button.dl{background:#20202e; border:1px solid var(--line); color:var(--quiet)} button.dl.on{background:#12332a; border-color:#1f6b52; color:#6ee7b7}
+  .pill.dl{background:#12332a; color:#6ee7b7}
+  #exTable td,#exTable th{font-size:12.5px}
   .chk{display:inline-flex; align-items:center; gap:5px; font-size:13px; color:var(--ink)}
   .seg{display:inline-flex; background:#0e0e16; border:1px solid var(--line); border-radius:12px; padding:3px; gap:3px}
   .seg button{background:transparent; color:var(--quiet); padding:6px 12px; border-radius:9px}
@@ -168,10 +171,11 @@
 
   <h3>Nguồn đang dùng <select id="chSort" class="sp">
     <option value="added">Thứ tự thêm</option><option value="uniq">Bài riêng: ít → nhiều</option>
-    <option value="picks">Lượt chọn: nhiều → ít</option><option value="star">⭐ trước</option><option value="auto">Tự thêm trước</option></select></h3>
+    <option value="picks">Lượt chọn: nhiều → ít</option><option value="star">⭐ trước</option><option value="auto">Tự thêm trước</option><option value="dl">⬇ Được phép tải trước</option></select></h3>
   <div id="channels"><div class="hint">Đang tải…</div></div>
   <div class="hint" style="margin-top:8px">
     <b>Bài riêng</b> = số bài kho CHỈ có từ nguồn đó. Nguồn đã quét hết mà bài riêng gần 0 thì chỉ thêm bản trùng, có thể tắt để đỡ lượt quét.
+    <b>⬇ Được phép tải</b>: nguồn anh đã có thoả thuận cho tải bản sao. App Tải Video chỉ lấy bài do kênh có cờ này đăng (cờ đặt ở playlist thì tính cho kênh chủ playlist).
     <b>⭐ Tin dùng</b>: khi các bản của cùng một bài hoà lượt chọn, bản của nguồn ⭐ được đưa lên trước (kênh nhỏ ít lượt xem không bị chìm).
     <b>Nhịp kiểm</b>: nguồn đã quét hết được kiểm bài mới mỗi ngày nếu vừa đăng trong 14 ngày, 3 ngày nếu trong 60 ngày, 7 ngày nếu lâu hơn; playlist 3 ngày.
     <b>Kiểu tiêu đề</b>: hầu hết kênh đặt “Karaoke <i>Tên bài</i> – Ca sĩ”. Nếu kênh đặt “Ca sĩ – <i>Tên bài</i>”, bấm <b>Xem mẫu</b> rồi đổi sang <b>Ca sĩ trước</b>.
@@ -195,6 +199,21 @@
   <textarea id="manual" placeholder="1. Tên bài – Ca sĩ&#10;2. Tên bài – Ca sĩ"></textarea>
   <div class="line"><label class="hint"><input type="checkbox" id="manualReplace"> Thay toàn bộ danh sách tay cũ</label><button id="manualSave" class="sp">Lưu danh sách</button></div>
   <div style="overflow:auto"><table id="rawTable"></table></div>
+</section>
+
+<section>
+  <h2>Xuất danh sách cho app Tải Video</h2>
+  <div class="hint">Danh sách bài nên tải về R2, xếp theo <b>lượt khách chọn</b> (toàn chuỗi) và <b>điểm hot</b>; bài chưa ai chọn xếp sau theo lượt xem.
+    Mỗi bài lấy tối đa N bản: bản <b>nam</b> tốt nhất, bản <b>nữ</b> tốt nhất, bản <b>song ca</b>, rồi các bản được chọn nhiều tiếp theo.
+    App Tải Video tự lấy danh sách này mỗi đêm (nếu anh bật tự đồng bộ ở app đó); ở đây chỉ để xem trước hoặc tải file CSV.
+    <span id="exDl"></span></div>
+  <div class="line"><label class="chk">Top <input id="exTop" type="number" min="1" max="10000" value="2000" style="width:90px"> bài</label>
+    <label class="chk">tối đa <input id="exPer" type="number" min="1" max="8" value="4" style="width:56px"> bản/bài</label>
+    <label class="chk">lượt chọn trong <input id="exDays" type="number" min="1" max="3650" value="90" style="width:72px"> ngày</label>
+    <label class="chk"><input type="checkbox" id="exOnlyDl" checked> Chỉ nguồn được phép tải</label></div>
+  <div class="line"><button class="ghost" id="exPrev">Xem trước</button> <button id="exCsv">⬇ Tải CSV</button></div>
+  <div id="exOut" class="hint"></div>
+  <div style="overflow:auto"><table id="exTable"></table></div>
 </section>
 </main>
 
@@ -360,7 +379,7 @@ const ytLink = c => c.kind === 'playlist' ? 'https://www.youtube.com/playlist?li
 async function loadChannels(){
   try{
     const d = await api('/api/kho/channels');
-    chData = d.channels; renderChannels(); renderDiscover(d.discover || []);
+    chData = d.channels; renderChannels(); renderDiscover(d.discover || []); exDlCount();
   }catch(e){ fail('channels', e); }
 }
 function renderChannels(){
@@ -371,6 +390,7 @@ function renderChannels(){
   else if(chSort === 'picks') list.sort((a, b) => (b.picks30 || 0) - (a.picks30 || 0) || (b.uniq || 0) - (a.uniq || 0));
   else if(chSort === 'star') list.sort((a, b) => (b.star ? 1 : 0) - (a.star ? 1 : 0) || (a.addedAt || 0) - (b.addedAt || 0));
   else if(chSort === 'auto') list.sort((a, b) => (b.auto ? 1 : 0) - (a.auto ? 1 : 0) || (b.addedAt || 0) - (a.addedAt || 0));
+  else if(chSort === 'dl') list.sort((a, b) => (b.dl ? 1 : 0) - (a.dl ? 1 : 0) || (a.addedAt || 0) - (b.addedAt || 0));
   list.forEach(c => {
     const row = el('div', 'row'), meta = el('div', 'meta');
     const name = el('div', 'name'), a = el('a', null, (c.star ? '⭐ ' : '') + c.title);
@@ -380,6 +400,7 @@ function renderChannels(){
     st.append(el('span', 'pill ' + (c.enabled ? 'on' : 'off'), c.enabled ? 'Bật' : 'Tắt'));
     if(c.kind === 'playlist') st.append(el('span', 'pill pl', 'Playlist'));
     if(c.auto) st.append(el('span', 'pill auto', 'Tự thêm'));
+    if(c.dl) st.append(el('span', 'pill dl', '⬇ Được phép tải'));
     st.append(el('span', 'pill ' + (c.fullDone ? '' : 'run'), c.fullDone ? 'Đã quét hết' : 'Đang quét toàn bộ'));
     const l1 = el('div', 'sub');
     l1.append(document.createTextNode(fmt(c.videos) + ' bản · ' + fmt(c.songs) + ' bài · '), el('b', null, fmt(c.uniq) + ' bài riêng'),
@@ -400,6 +421,11 @@ function renderChannels(){
       sb.disabled = true;
       try{ await api('/api/kho/channel/update', { id:c.id, star:!c.star }); c.star = !c.star; renderChannels(); }catch(e){ alert(e.message); sb.disabled = false; }
     });
+    const db = btn(c.dl ? '⬇ Được phép tải' : '⬇ Chưa cho tải', 'dl' + (c.dl ? ' on' : ''), async () => {
+      if(!c.dl && !confirm('Đánh dấu “' + c.title + '” là nguồn ĐƯỢC PHÉP TẢI bản sao?\nChỉ bật khi anh đã có thoả thuận với chủ kênh/nhà sản xuất.')) return;
+      db.disabled = true;
+      try{ await api('/api/kho/channel/update', { id:c.id, dl:!c.dl }); c.dl = !c.dl; renderChannels(); exDlCount(); }catch(e){ alert(e.message); db.disabled = false; }
+    });
     const sel = document.createElement('select');
     [['song', 'Tên bài trước'], ['artist', 'Ca sĩ trước']].forEach(([v, t]) => { const o = document.createElement('option'); o.value = v; o.textContent = t; sel.append(o); });
     sel.value = c.order;
@@ -414,7 +440,7 @@ function renderChannels(){
         r.items.forEach(x => { const d2 = el('div'); d2.append(document.createTextNode(x.title + '  →  '), el('b', null, x.song_key)); s.append(d2); });
       }catch(e){ s.replaceChildren(el('div', 'err', e.message)); }
     };
-    acts.append(sb, sel,
+    acts.append(sb, db, sel,
       btn('Xem mẫu', 'ghost', showSamples),
       btn(c.enabled ? 'Tắt' : 'Bật', 'ghost', async () => { try{ await api('/api/kho/channel/update', { id:c.id, enabled:!c.enabled }); loadChannels(); loadStats(); }catch(e){ alert(e.message); } }),
       btn('Quét lại', 'ghost', async () => { if(!confirm('Quét lại toàn bộ “' + c.title + '”? Chỉ tốn khoảng 1 đơn vị cho mỗi 50 video.')) return; try{ await api('/api/kho/channel/update', { id:c.id, rescan:true }); loadChannels(); }catch(e){ alert(e.message); } }),
@@ -755,6 +781,41 @@ $('clGo').onclick = async () => {
   }
 };
 
+/* ---------- Xuất danh sách cho app Tải Video ---------- */
+const TONE_VN = { 'nam':'Nam', 'nu':'Nữ', 'song-ca':'Song ca', 'thieu-nam':'Thiếu nam', 'thieu-nu':'Thiếu nữ', '':'—' };
+function exDlCount(){
+  const n = chData.filter(c => c.dl).length;
+  $('exDl').textContent = n ? ' Đang có ' + n + ' nguồn được phép tải.' : ' Chưa có nguồn nào bật “⬇ Được phép tải” (bật ở danh sách Nguồn đang dùng).';
+  $('exDl').className = n ? '' : 'warn';
+}
+function exParams(){ return { top: +$('exTop').value || 2000, per: +$('exPer').value || 4, days: +$('exDays').value || 90, onlyDl: $('exOnlyDl').checked }; }
+$('exPrev').onclick = async () => {
+  const b = $('exPrev'); b.disabled = true; $('exOut').textContent = 'Đang tính…'; $('exTable').replaceChildren();
+  try{
+    const d = await api('/api/kho/export', exParams());
+    const tones = {}; d.items.forEach(x => { tones[x.tone] = (tones[x.tone] || 0) + 1; });
+    $('exOut').textContent = d.note ? d.note : (fmt(d.songs) + ' bài · ' + fmt(d.items.length) + ' bản (' + Object.entries(tones).map(([t, n]) => (TONE_VN[t] || t) + ' ' + fmt(n)).join(', ') + ')' +
+      (d.songs < d.top ? ' — chưa đủ ' + fmt(d.top) + ' bài vì các bài còn lại không có bản của nguồn được phép tải' : '') + '. Bảng dưới hiện 60 bản đầu.');
+    const t = $('exTable'), hr = el('tr');
+    ['Hạng', 'Giọng', 'Tiêu đề', 'Kênh', 'Chọn (bản/bài)', 'ID'].forEach(x => hr.append(el('th', null, x))); t.append(hr);
+    d.items.slice(0, 60).forEach(x => { const r = el('tr');
+      [x.rank + '.' + x.slot, TONE_VN[x.tone] || x.tone, x.title, x.channel, x.picks + ' / ' + x.songPicks, x.id].forEach(v => r.append(el('td', null, String(v)))); t.append(r); });
+  }catch(e){ $('exOut').textContent = e.message; }
+  finally{ b.disabled = false; }
+};
+$('exCsv').onclick = async () => {
+  const b = $('exCsv'); b.disabled = true;
+  try{
+    if(!cfg.kho || !cfg.pass) throw new Error('Chưa nhập địa chỉ Worker kho và mật khẩu');
+    const q = exParams();
+    const res = await fetch(cfg.kho + '/api/kho/export?format=csv&top=' + q.top + '&per=' + q.per + '&days=' + q.days + '&dl=' + (q.onlyDl ? 1 : 0), { headers:{ 'x-pass':cfg.pass } });
+    if(!res.ok){ let d = {}; try{ d = await res.json(); }catch(e){} throw new Error(d.error || 'Lỗi ' + res.status); }
+    const blob = await res.blob(), a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = 'kho-' + CUR + '-top' + q.top + 'x' + q.per + '.csv';
+    document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  }catch(e){ alert(e.message); }
+  finally{ b.disabled = false; }
+};
 function loadAll(){ loadStats(); loadGrow(); loadChannels(); loadHot(); }
 fillCfg(); paintKho();     // địa chỉ Worker điền sẵn, chỉ cần nhập mật khẩu
 if(!cfg.pass) $('settings').style.display = '';
