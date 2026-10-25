@@ -2397,7 +2397,7 @@ export class Room extends DurableObject {
   async phatTt(){
     const m = await this.ctx.storage.get(['last', 'lastAt']), raw = m.get('last');
     if(!raw) return { st: 'chua' };
-    let p; try{ p = (JSON.parse(raw) || {}).state || {}; }catch(e){ return { st: 'chua' }; }
+    let p; try{ const j = JSON.parse(raw) || {}; p = j.payload || j.state || {}; }catch(e){ return { st: 'chua' }; }   // TV gửi {type:'state', payload:{…}} (remote cũng đọc payload); .state chỉ là dạng của NhacRoom
     const q = Array.isArray(p.queue) ? p.queue.length : 0, cur = typeof p.cur === 'number' ? p.cur : -1;
     const st = p.apiFailed ? 'loi' : p.scoring ? 'diem' : p.needStart || p.soundLocked ? 'cho' : cur < 0 || !q ? 'chua' : p.playing ? 'phat' : 'dung';
     return { st, title: p.nowTitle ? String(p.nowTitle).slice(0, 80) : '', left: cur >= 0 ? Math.max(0, q - 1 - cur) : q, muted: p.muted ? 1 : 0, vol: p.volume, at: m.get('lastAt') || 0,
