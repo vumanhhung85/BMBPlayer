@@ -70,6 +70,8 @@
   button.dl{background:#fff; border:1px solid var(--line); color:var(--quiet); font-weight:500} button.dl.on{background:var(--goodbg); border-color:#9fd8bf; color:var(--good)}
   .pill.dl{background:var(--goodbg); color:var(--good)}
   #exTable td,#exTable th{font-size:12.5px}
+  #exBy{max-width:100%;min-width:0}
+  label.chk:has(#exBy){max-width:100%;flex-wrap:wrap}
   .chk{display:inline-flex; align-items:center; gap:5px; font-size:13px; color:var(--ink)}
   .seg{display:inline-flex; background:#fff; border:1px solid var(--line); border-radius:10px; overflow:hidden}
   .seg button{background:#fff; color:var(--ink); padding:7px 14px; border-radius:0; font-weight:500; min-height:38px}
@@ -165,6 +167,7 @@
     <label class="chk">luôn giữ <input id="clTone" type="number" min="1" max="5" value="2" style="width:56px"> bản mỗi giọng</label></div>
   <div class="line"><label class="chk">Bản dưới <input id="clViews" type="number" min="0" value="500" style="width:90px"> lượt xem coi là ít xem</label>
     <label class="chk">(luôn giữ ít nhất <input id="clMin" type="number" min="1" max="5" value="2" style="width:56px"> bản/bài)</label></div>
+  <div class="line"><button class="ghost" id="dumpBtn">⬇ Tải toàn bộ kho (CSV)</button> <span class="hint" id="dumpOut">Nên tải trước khi dọn thật (dọn xong không hoàn tác được). Tải lại sau khi dọn để so trước/sau.</span></div>
   <div class="line"><button class="ghost" id="clPrev">Xem trước</button> <button class="danger" id="clGo" disabled>Dọn thật…</button> <button class="ghost" id="clStop" style="display:none">⏹ Dừng</button></div>
   <pre id="clOut">Chưa xem trước.</pre>
 </section>
@@ -218,10 +221,15 @@
 
 <section>
   <h2>Xuất danh sách cho app Tải Video</h2>
-  <div class="hint">Danh sách bài nên tải về R2, xếp theo <b>lượt khách chọn</b> (toàn chuỗi) và <b>điểm hot</b>; bài chưa ai chọn xếp sau theo lượt xem.
-    Mỗi bài lấy tối đa N bản: bản <b>nam</b> tốt nhất, bản <b>nữ</b> tốt nhất, bản <b>song ca</b>, rồi các bản được chọn nhiều tiếp theo.
+  <div class="hint">Danh sách bài nên tải về R2. Chọn <b>cách xếp hạng</b>: <b>Theo lượt xem YouTube</b> dùng khi các quán mới chạy thử (lượt chọn lúc này chỉ là bài bấm thử, chưa phản ánh khách);
+    <b>Trộn</b> khi đã có khách thật: bài được chọn từ k lượt trở lên xếp trước, còn lại theo lượt xem; <b>Lượt chọn + hot</b> khi quán chạy đông.
+    Điểm của bài = lượt xem của bản nhiều xem nhất; một phần số chỗ (mặc định 20%) dành cho bài <b>đang lên</b> (tốc độ tăng lượt xem) để không bỏ sót bài mới.
+    Mỗi bài lấy tối đa N bản: bản <b>nam</b> tốt nhất, bản <b>nữ</b> tốt nhất, bản <b>song ca</b>, rồi các bản tiếp theo.
     App Tải Video tự lấy danh sách này mỗi đêm (nếu anh bật tự đồng bộ ở app đó); ở đây chỉ để xem trước hoặc tải file CSV.
     <span id="exDl"></span></div>
+  <div class="line"><label class="chk">Cách xếp <select id="exBy"><option value="views">Theo lượt xem YouTube (đang thử)</option><option value="mix">Trộn: bài khách chọn trước, còn lại theo lượt xem</option><option value="pick">Lượt chọn + hot (quán đông)</option></select></label>
+    <label class="chk" id="exRiseL">dành <input id="exRise" type="number" min="0" max="50" value="20" style="width:64px">% chỗ cho bài đang lên</label>
+    <label class="chk" id="exMinL">bài được chọn từ <input id="exMin" type="number" min="1" max="1000" value="3" style="width:64px"> lượt</label></div>
   <div class="line"><label class="chk">Top <input id="exTop" type="number" min="1" max="10000" value="2000" style="width:90px"> bài</label>
     <label class="chk">tối đa <input id="exPer" type="number" min="1" max="8" value="4" style="width:56px"> bản/bài</label>
     <label class="chk">lượt chọn trong <input id="exDays" type="number" min="1" max="3650" value="90" style="width:72px"> ngày</label>
@@ -803,18 +811,22 @@ function exDlCount(){
   $('exDl').textContent = n ? ' Đang có ' + n + ' nguồn được phép tải.' : ' Chưa có nguồn nào bật “⬇ Được phép tải” (bật ở danh sách Nguồn đang dùng).';
   $('exDl').className = n ? '' : 'warn';
 }
-function exParams(){ return { top: +$('exTop').value || 2000, per: +$('exPer').value || 4, days: +$('exDays').value || 90, onlyDl: $('exOnlyDl').checked }; }
+function exParams(){ return { top: +$('exTop').value || 2000, per: +$('exPer').value || 4, days: +$('exDays').value || 90, onlyDl: $('exOnlyDl').checked,
+  by: $('exBy').value, rising: Math.max(0, Math.min(50, +$('exRise').value || 0)), minPicks: Math.max(1, +$('exMin').value || 3) }; }
+const EX_WHY = { views:'Lượt xem', rising:'Đang lên', picks:'Lượt chọn', hot:'Hot' };
+function exModeUi(){ const m = $('exBy').value; $('exRiseL').style.display = m === 'pick' ? 'none' : ''; $('exMinL').style.display = m === 'mix' ? '' : 'none'; }
+$('exBy').onchange = exModeUi; exModeUi();
 $('exPrev').onclick = async () => {
   const b = $('exPrev'); b.disabled = true; $('exOut').textContent = 'Đang tính…'; $('exTable').replaceChildren();
   try{
     const d = await api('/api/kho/export', exParams());
     const tones = {}; d.items.forEach(x => { tones[x.tone] = (tones[x.tone] || 0) + 1; });
-    $('exOut').textContent = d.note ? d.note : (fmt(d.songs) + ' bài · ' + fmt(d.items.length) + ' bản (' + Object.entries(tones).map(([t, n]) => (TONE_VN[t] || t) + ' ' + fmt(n)).join(', ') + ')' +
+    $('exOut').textContent = d.note ? d.note : ('Lượt chọn của khách trong ' + d.days + ' ngày: ' + fmt(d.picksTotal) + ' lượt, ' + fmt(d.songsPicked) + ' bài. ' + fmt(d.songs) + ' bài · ' + fmt(d.items.length) + ' bản (' + Object.entries(tones).map(([t, n]) => (TONE_VN[t] || t) + ' ' + fmt(n)).join(', ') + ')' +
       (d.songs < d.top ? ' — chưa đủ ' + fmt(d.top) + ' bài vì các bài còn lại không có bản của nguồn được phép tải' : '') + '. Bảng dưới hiện 60 bản đầu.');
     const t = $('exTable'), hr = el('tr');
-    ['Hạng', 'Giọng', 'Tiêu đề', 'Kênh', 'Chọn (bản/bài)', 'ID'].forEach(x => hr.append(el('th', null, x))); t.append(hr);
+    ['Hạng', 'Giọng', 'Tiêu đề', 'Kênh', 'Lượt xem', 'Chọn (bản/bài)', 'Lý do', 'ID'].forEach(x => hr.append(el('th', null, x))); t.append(hr);
     d.items.slice(0, 60).forEach(x => { const r = el('tr');
-      [x.rank + '.' + x.slot, TONE_VN[x.tone] || x.tone, x.title, x.channel, x.picks + ' / ' + x.songPicks, x.id].forEach(v => r.append(el('td', null, String(v)))); t.append(r); });
+      [x.rank + '.' + x.slot, TONE_VN[x.tone] || x.tone, x.title, x.channel, fmt(x.views), x.picks + ' / ' + x.songPicks, EX_WHY[x.why] || '', x.id].forEach(v => r.append(el('td', null, String(v)))); t.append(r); });
   }catch(e){ $('exOut').textContent = e.message; }
   finally{ b.disabled = false; }
 };
@@ -823,12 +835,32 @@ $('exCsv').onclick = async () => {
   try{
     if(!cfg.kho || !cfg.pass) throw new Error('Chưa nhập địa chỉ Worker kho và mật khẩu');
     const q = exParams();
-    const res = await fetch(cfg.kho + '/api/kho/export?format=csv&top=' + q.top + '&per=' + q.per + '&days=' + q.days + '&dl=' + (q.onlyDl ? 1 : 0), { headers:{ 'x-pass':cfg.pass } });
+    const res = await fetch(cfg.kho + '/api/kho/export?format=csv&top=' + q.top + '&per=' + q.per + '&days=' + q.days + '&dl=' + (q.onlyDl ? 1 : 0) + '&by=' + q.by + '&rising=' + q.rising + '&minPicks=' + q.minPicks, { headers:{ 'x-pass':cfg.pass } });
     if(!res.ok){ let d = {}; try{ d = await res.json(); }catch(e){} throw new Error(d.error || 'Lỗi ' + res.status); }
     const blob = await res.blob(), a = document.createElement('a');
-    a.href = URL.createObjectURL(blob); a.download = 'kho-' + CUR + '-top' + q.top + 'x' + q.per + '.csv';
+    a.href = URL.createObjectURL(blob); a.download = 'kho-' + CUR + '-' + q.by + '-top' + q.top + 'x' + q.per + '.csv';
     document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
   }catch(e){ alert(e.message); }
+  finally{ b.disabled = false; }
+};
+$('dumpBtn').onclick = async () => {
+  const b = $('dumpBtn'), out = $('dumpOut'); b.disabled = true; out.className = 'hint';
+  const esc = v => { v = String(v == null ? '' : v); return /[",\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+  const parts = ['\ufeff'], at = CUR; let after = 0, total = 0, got = 0, cols = null;
+  try{
+    for(let guard = 0; guard < 400; guard++){
+      const d = await api('/api/kho/dump?limit=5000&after=' + after);
+      if(at !== CUR) throw new Error('Đã chuyển kho giữa chừng, bấm tải lại');
+      if(!cols){ cols = d.cols; parts.push(cols.join(',') + '\r\n'); }
+      if(d.total != null) total = d.total;
+      parts.push(d.rows.map(r => r.map(esc).join(',')).join('\r\n') + (d.rows.length ? '\r\n' : ''));
+      got += d.rows.length; out.textContent = 'Đang tải… ' + fmt(got) + (total ? '/' + fmt(total) : '') + ' bản';
+      if(d.next == null) break; after = d.next;
+    }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(parts, { type:'text/csv;charset=utf-8' }));
+    a.download = 'kho-' + CUR + '-toan-bo-' + dmy(Date.now()) + '-' + got + 'ban.csv'; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+    out.className = 'hint ok'; out.textContent = 'Đã tải ' + fmt(got) + ' bản' + (total && total !== got ? ' (kho báo ' + fmt(total) + ', chênh do kho đang quét thêm)' : '') + '.';
+  }catch(e){ out.className = 'hint err'; out.textContent = 'Lỗi: ' + e.message + (got ? ' (đã đọc ' + fmt(got) + ' bản, chưa lưu file)' : ''); }
   finally{ b.disabled = false; }
 };
 function loadAll(){ loadStats(); loadGrow(); loadChannels(); loadHot(); }
