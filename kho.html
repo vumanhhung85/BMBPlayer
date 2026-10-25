@@ -12,7 +12,7 @@
   *{box-sizing:border-box;margin:0;padding:0}
   body{background:var(--bg); color:var(--ink); font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; min-height:100vh; font-size:14px; line-height:1.45}
   header{padding:12px 16px; background:linear-gradient(135deg,var(--navy),var(--navy2)); color:#fff; display:flex; align-items:center; gap:12px; flex-wrap:wrap; position:sticky; top:0; z-index:10}
-  .logo{width:40px;height:40px;border-radius:11px;background:linear-gradient(180deg,var(--accent),var(--accent2)); display:flex;align-items:center;justify-content:center;font-weight:800;font-size:20px;color:#fff;flex:none}
+  .logo{width:46px;height:46px;border-radius:12px;background:linear-gradient(180deg,var(--accent),var(--accent2)); display:flex;align-items:center;justify-content:center;font-size:28px;line-height:1;flex:none;box-shadow:0 1px 3px rgba(0,0,0,.25)}
   header .ttl{font-size:26px; line-height:1.2; font-weight:800; letter-spacing:.3px}
   header .sub{color:rgba(255,255,255,.7); font-size:12px}
   header .sp{margin-left:auto}
@@ -84,12 +84,12 @@
   body.en header .seg button.on{background:#fff; color:var(--teal)}
   .langNote{margin-top:8px; padding:8px 12px; border-radius:10px; background:#e3f4f8; border:1px solid #9fd3df; color:#0b5566; font-size:13px}
   body.en .vi-only{display:none}
-  @media (max-width:560px){ header .ttl{font-size:21px} .row{flex-wrap:wrap} .row .acts{max-width:100%; justify-content:flex-start} .hide-sm{display:none} }
+  @media (max-width:560px){ header .ttl{font-size:21px} .logo{width:40px;height:40px;font-size:24px} .row{flex-wrap:wrap} .row .acts{max-width:100%; justify-content:flex-start} .hide-sm{display:none} }
 </style>
 </head>
 <body>
 <header>
-  <div class="logo">K</div><b class="ttl">Kho BMB Karaoke</b> <span class="hide-sm sub">quản trị</span>
+  <div class="logo" aria-hidden="true">🗄️</div><b class="ttl">Kho BMB Karaoke</b> <span class="hide-sm sub">quản trị</span>
   <span class="seg" id="khoSeg" title="Chọn kho đang quản trị — hai kho chạy riêng, cài đặt chung một trang"><button data-k="vi">Kho Việt</button><button data-k="en">Kho quốc tế</button></span>
   <button class="ghost sp" id="gear">⚙ Kết nối</button>
 </header>
