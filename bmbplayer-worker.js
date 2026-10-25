@@ -430,6 +430,7 @@ async function handleApi(request, env, ctx) {
         case 'admin.scoreSet':           res = await adminScoreSet(env, body); break;
         case 'admin.libGet':             res = await adminLibGet(env, body); break;
         case 'admin.libSet':             res = await adminLibSet(env, body); break;
+        case 'admin.nasTt':              res = await adminNasTt(env, body); break;
         case 'admin.phongThem':          res = await adminPhongThem(env, body); break;
         case 'admin.phongXoa':           res = await adminPhongXoa(env, body); break;
         case 'admin.taiKhoan.danhSach':  res = await tkDanhSach(env, body); break;
@@ -1211,7 +1212,9 @@ async function adminLibGet(env, body) {
   for (const k of Object.keys(cfg)) ra[k] = libCn(cfg, k);
   let dem = [];
   try { await libBang(env); dem = (await env.DB.prepare(`SELECT cn, src, SUM(n) n FROM lib_dem WHERE ngay >= ? GROUP BY cn, src`).bind(ngayKinhDoanh(Date.now() - 6 * 86400000)).all()).results || []; } catch (e) {}
-  return ok({ cfg: ra, dem, r2: !!env.LIB, dirs: libDirs(env) });
+  let nas = {};
+  try { nas = await nasTomTat(env, cfg); } catch (e) { console.error('nasTomTat', e); }
+  return ok({ cfg: ra, dem, r2: !!env.LIB, dirs: libDirs(env), nas });
 }
 async function adminLibSet(env, body) {
   const [, loi] = await canPhien(env, body, 'admin');
@@ -1227,6 +1230,225 @@ async function adminLibSet(env, body) {
   await env.DB.prepare(`INSERT INTO order_meta (k, v) VALUES ('lib', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v`).bind(JSON.stringify(cfg)).run();
   libCache = { v: cfg, at: Date.now() };
   return ok({ cn, ...libCn(cfg, cn) });
+}
+
+/* ---------- Sức khoẻ NAS của quán (quầy: Cài đặt → thư viện + Kết nối → 📀 NAS; Telegram; báo cáo sáng) ----------
+   Worker trên Cloudflare KHÔNG gọi được NAS (NAS nằm trong mạng quán) → TV của chi nhánh tự kiểm tra 5 phút/lần (index.html nhCheck) và gửi tin 'nh':
+   {ok:1|0, f:1|0 (mở được ảnh _bmb/ping.png), ms, a (bài thử phát từ NAS từ lần báo trước), e (lần NAS lỗi khi phát), off (TV đang tạm bỏ NAS 10 phút),
+    na:'app' (TV này không mở được NAS http vì app cũ ≤ 2.8 / trình duyệt)}.
+   Bảng: nas_tv (lần báo mới nhất của từng TV, giữ 30 ngày), nas_gio (cộng dồn theo giờ VN, 30 ngày), nas_su (lần đổi trạng thái, 90 ngày),
+   nas_cb (trạng thái hiện tại + lần gửi Telegram) — chỉ ghi khi chi nhánh BẬT thư viện và CÓ NAS.
+   Trạng thái (nasTinh): trang = chưa có NAS / thư viện tắt · den = không TV nào báo trong 20 phút (quán đóng cửa / TV tắt) — KHÔNG báo đỏ ·
+   do = TV có báo nhưng không TV nào mở được NAS ≥ 10 phút · vang = chậm / thiếu ảnh kiểm tra / một số TV lỗi / lỗi phát ≥ 10% / TV app cũ / mới lỗi < 10 phút · xanh = ổn.
+   Telegram (cùng công tắc + người nhận với cảnh báo rớt TV): khi chuyển sang đỏ (tối đa 1 tin/60 phút mỗi chi nhánh) và khi hết đỏ. */
+const NAS_TUOI = 20 * 60000, NAS_DO_MS = 10 * 60000, NAS_CHAM_MS = 1500, NAS_CB_IM = 60 * 60000;
+const NAS_THU_TU = { do: 0, vang: 1, xanh: 2, den: 3, trang: 4 };
+let nasSan = false, nasDonLuc = 0;
+async function nasBang(env) {
+  if (nasSan) return;
+  await env.DB.batch([
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS nas_tv (phong_id TEXT PRIMARY KEY, cn TEXT NOT NULL DEFAULT '', phong TEXT NOT NULL DEFAULT '', t INTEGER NOT NULL,
+      ok INTEGER, f INTEGER, ms INTEGER, na TEXT, off INTEGER NOT NULL DEFAULT 0, a INTEGER NOT NULL DEFAULT 0, e INTEGER NOT NULL DEFAULT 0,
+      loi_tu INTEGER, ok_luc INTEGER, nas TEXT, ua TEXT)`),
+    env.DB.prepare('CREATE INDEX IF NOT EXISTS nas_tv_cn ON nas_tv (cn, t)'),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS nas_gio (cn TEXT NOT NULL, gio TEXT NOT NULL, lan INTEGER NOT NULL DEFAULT 0, hong INTEGER NOT NULL DEFAULT 0,
+      ms INTEGER NOT NULL DEFAULT 0, nms INTEGER NOT NULL DEFAULT 0, a INTEGER NOT NULL DEFAULT 0, e INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (cn, gio))`),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS nas_su (id INTEGER PRIMARY KEY AUTOINCREMENT, t INTEGER NOT NULL, cn TEXT NOT NULL, tt TEXT NOT NULL, ly TEXT)`),
+    env.DB.prepare('CREATE INDEX IF NOT EXISTS nas_su_cn ON nas_su (cn, t)'),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS nas_cb (cn TEXT PRIMARY KEY, tt TEXT NOT NULL DEFAULT '', luc INTEGER NOT NULL DEFAULT 0,
+      gui_do INTEGER NOT NULL DEFAULT 0, gui_tt TEXT NOT NULL DEFAULT '')`)
+  ]);
+  nasSan = true;
+}
+const nasGio = t => new Date(t + VN_MS).toISOString().slice(0, 13);          // '2026-10-25T14' = giờ Việt Nam
+function nasDg(d) {
+  d = d && typeof d === 'object' ? d : {};
+  const n = (v, mx) => Number.isFinite(+v) ? Math.max(0, Math.min(mx, Math.round(+v))) : 0;
+  const chung = { a: n(d.a, 500), e: n(d.e, 500), off: d.off ? 1 : 0 };
+  if (d.na === 'app') return { ok: null, f: null, ms: null, na: 'app', ...chung };
+  const ok = d.ok === 1 || d.ok === true ? 1 : 0;
+  return { ok, f: ok ? (d.f === 0 ? 0 : 1) : null, ms: n(d.ms, 60000), na: null, ...chung };
+}
+/** Trạng thái NAS của 1 chi nhánh. c = {on, nas}; tvs = các dòng nas_tv của chi nhánh; g1 = {a, e} lượt phát từ NAS / lỗi trong ~1–2 giờ gần nhất. */
+function nasTinh(c, tvs, g1, now) {
+  if (!c || !c.nas) return { tt: 'trang', ly: 'Chưa nhập địa chỉ NAS' };
+  if (!c.on) return { tt: 'trang', ly: 'Thư viện đang tắt ở chi nhánh này' };
+  const all = (tvs || []).filter(r => !r.nas || r.nas === c.nas);            // bỏ lần báo về địa chỉ NAS cũ
+  const okLuc = Math.max(0, ...all.map(r => r.ok_luc || 0));
+  const moi = all.filter(r => now - r.t <= NAS_TUOI);
+  const tk = { soTv: moi.length, okLuc };
+  if (!moi.length) return { tt: 'den', ly: 'Không TV nào báo trong 20 phút (quán đóng cửa hoặc TV tắt) — chưa biết NAS ra sao', ...tk };
+  const thu = moi.filter(r => r.na !== 'app'), app = moi.length - thu.length;
+  if (!thu.length) return { tt: 'vang', ly: app + ' TV đang bật nhưng dùng app cũ (≤ 2.8) nên không mở được NAS http → cài APK 2.9', ...tk, app };
+  const hong = thu.filter(r => r.ok === 0), tot = thu.filter(r => r.ok === 1);
+  const loiTu = hong.length ? Math.min(...hong.map(r => r.loi_tu || r.t)) : 0;
+  Object.assign(tk, { hong: hong.length, tot: tot.length, app, loiTu });
+  const tenP = l => l.map(r => r.phong || '?').sort((a, b) => SAP_PHONG.compare(a, b)).slice(0, 8).join(', ') + (l.length > 8 ? '…' : '');
+  if (!tot.length) {
+    if (now - loiTu >= NAS_DO_MS && now - okLuc >= NAS_DO_MS)
+      return { tt: 'do', ly: 'Không TV nào mở được NAS (' + hong.length + ' TV đang bật: ' + tenP(hong) + ') — TV đang tự phát R2/YouTube thay', ...tk };
+    return { tt: 'vang', ly: hong.length + ' TV không mở được NAS (' + tenP(hong) + ') — đang theo dõi, chuyển đỏ nếu kéo dài 10 phút', ...tk };
+  }
+  const v = [], tb = Math.round(tot.reduce((s, r) => s + (r.ms || 0), 0) / tot.length);
+  tk.ms = tb;
+  if (hong.length) v.push(hong.length + '/' + thu.length + ' TV không mở được NAS (' + tenP(hong) + ')');
+  if (tb > NAS_CHAM_MS) v.push('NAS trả lời chậm (trung bình ' + tb + ' ms)');
+  if (tot.some(r => r.f === 0)) v.push('NAS trả lời nhưng thiếu file _bmb/ping.png (ổ dữ liệu chưa gắn, sai thư mục, hoặc chưa chép file kiểm tra)');
+  const A = +(g1 && g1.a) || 0, E = +(g1 && g1.e) || 0;
+  if (A >= 5 && E / A >= 0.1) v.push('lỗi khi phát từ NAS ' + Math.round(E * 100 / A) + '% gần đây (' + E + '/' + A + ' bài)');
+  const off = thu.filter(r => r.off).length;
+  if (off) v.push(off + ' TV đang tạm bỏ qua NAS 10 phút vì lỗi liên tiếp');
+  if (app) v.push(app + ' TV dùng app cũ (≤ 2.8) không mở được NAS http');
+  if (v.length) return { tt: 'vang', ly: v.join(' · '), ...tk };
+  return { tt: 'xanh', ly: 'Ổn — ' + tot.length + ' TV mở được NAS, trung bình ' + tb + ' ms', ...tk };
+}
+async function nasDoc(env, cn, now) {
+  const [tvs, g] = await Promise.all([
+    env.DB.prepare('SELECT * FROM nas_tv WHERE cn = ? AND t > ?').bind(cn, now - 7 * 86400000).all(),
+    env.DB.prepare('SELECT SUM(a) AS a, SUM(e) AS e FROM nas_gio WHERE cn = ? AND gio >= ?').bind(cn, nasGio(now - 3600000)).first()
+  ]);
+  return { tvs: tvs.results || [], g1: g || {} };
+}
+/** Tin 'nh' của 1 TV (gọi từ Room, đã giới hạn ≥ 45 giây/lần mỗi TV). Chi nhánh không bật thư viện / không có NAS → bỏ qua. */
+async function nasGhi(env, c, a, raw, now = Date.now()) {
+  if (!env.DB || !c || !c.branch || !c.rid) return;
+  const cn = c.branch, cfg = libCn(await libCfg(env), cn);
+  if (!cfg.on || !cfg.nas) return;
+  await nasBang(env);
+  const d = nasDg(raw), ua = a && a.ua ? String(a.ua).slice(0, 80) : null;          // a.ua đã được rút gọn (uaGon) lúc TV nối
+  await env.DB.batch([
+    env.DB.prepare(`INSERT INTO nas_tv (phong_id, cn, phong, t, ok, f, ms, na, off, a, e, loi_tu, ok_luc, nas, ua)
+      VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, CASE WHEN ?5 = 0 THEN ?4 END, CASE WHEN ?5 = 1 THEN ?4 END, ?12, ?13)
+      ON CONFLICT(phong_id) DO UPDATE SET cn = excluded.cn, phong = excluded.phong, ok = excluded.ok, f = excluded.f, ms = excluded.ms, na = excluded.na,
+        off = excluded.off, a = excluded.a, e = excluded.e, nas = excluded.nas, ua = COALESCE(excluded.ua, nas_tv.ua),
+        loi_tu = CASE WHEN excluded.ok = 0 THEN (CASE WHEN nas_tv.ok = 0 AND nas_tv.loi_tu IS NOT NULL AND nas_tv.t > ?14 AND nas_tv.nas IS excluded.nas
+          THEN nas_tv.loi_tu ELSE excluded.t END) ELSE NULL END,
+        ok_luc = CASE WHEN excluded.ok = 1 THEN excluded.t ELSE nas_tv.ok_luc END, t = excluded.t`)
+      .bind(c.rid, cn, String(c.name || '').slice(0, 40), now, d.ok, d.f, d.ms, d.na, d.off, d.a, d.e, cfg.nas, ua, now - NAS_TUOI),
+    env.DB.prepare(`INSERT INTO nas_gio (cn, gio, lan, hong, ms, nms, a, e) VALUES (?,?,?,?,?,?,?,?)
+      ON CONFLICT(cn, gio) DO UPDATE SET lan = lan + excluded.lan, hong = hong + excluded.hong, ms = ms + excluded.ms, nms = nms + excluded.nms,
+        a = a + excluded.a, e = e + excluded.e`)
+      .bind(cn, nasGio(now), d.na ? 0 : 1, d.ok === 0 ? 1 : 0, d.ok === 1 ? d.ms : 0, d.ok === 1 ? 1 : 0, d.a, d.e)
+  ]);
+  await nasXet(env, cn, cfg, now);
+  if (now - nasDonLuc > 3600000) {
+    nasDonLuc = now;
+    await env.DB.batch([
+      env.DB.prepare('DELETE FROM nas_gio WHERE gio < ?').bind(nasGio(now - 30 * 86400000)),
+      env.DB.prepare('DELETE FROM nas_su WHERE t < ?').bind(now - 90 * 86400000),
+      env.DB.prepare('DELETE FROM nas_tv WHERE t < ?').bind(now - 30 * 86400000)
+    ]).catch(err => console.error('nasDon', err));
+  }
+}
+/** Tính lại trạng thái chi nhánh; đổi trạng thái → ghi nas_su + Telegram (nếu cần). Trả về kết quả nasTinh. */
+async function nasXet(env, cn, cfg, now) {
+  const { tvs, g1 } = await nasDoc(env, cn, now);
+  const k = nasTinh(cfg, tvs, g1, now);
+  const cu = await env.DB.prepare('SELECT tt, luc, gui_do, gui_tt FROM nas_cb WHERE cn = ?').bind(cn).first();
+  if (cu && cu.tt === k.tt) return k;
+  const r = await env.DB.prepare(`INSERT INTO nas_cb (cn, tt, luc) VALUES (?,?,?)
+    ON CONFLICT(cn) DO UPDATE SET tt = excluded.tt, luc = excluded.luc WHERE nas_cb.tt <> excluded.tt`).bind(cn, k.tt, now).run();
+  if (!r.meta || !r.meta.changes) return k;                         // TV khác vừa ghi cùng trạng thái
+  await env.DB.prepare('INSERT INTO nas_su (t, cn, tt, ly) VALUES (?,?,?,?)').bind(now, cn, k.tt, String(k.ly || '').slice(0, 300)).run();
+  await nasCanhBao(env, cn, k, cu, now).catch(err => console.error('nasCanhBao', err));
+  return k;
+}
+async function nasCanhBao(env, cn, k, cu, now) {
+  if (String(env.TG_KETNOI || '1') === '0') return;
+  const cfg = await knCbDoc(env);
+  if (!cfg.bat) return;
+  let loai = '';
+  if (k.tt === 'do') loai = 'do';
+  else if (cu && cu.gui_tt === 'do' && (k.tt === 'xanh' || k.tt === 'vang')) loai = 'het';
+  if (!loai) return;
+  const cl = loai === 'do'
+    ? await env.DB.prepare(`UPDATE nas_cb SET gui_do = ?, gui_tt = 'do' WHERE cn = ? AND gui_do < ?`).bind(now, cn, now - NAS_CB_IM).run()
+    : await env.DB.prepare(`UPDATE nas_cb SET gui_tt = 'het' WHERE cn = ? AND gui_tt = 'do'`).bind(cn).run();
+  if (!cl.meta || !cl.meta.changes) return;                        // vừa báo đỏ trong 60 phút / đã báo hết đỏ
+  const [token, chats, tenCn] = await Promise.all([tgToken(env), knCbNguoiNhan(env), knTenCn(env)]);
+  if (!token || !chats.length) return;
+  const ten = escHtml(tenCn[cn] || cn);
+  const text = loai === 'do'
+    ? ['📀🔴 <b>NAS quán mất kết nối — ' + ten + '</b>',
+       escHtml(k.ly) + (k.loiTu ? ' (từ ' + bcGio(k.loiTu) + ')' : ''),
+       'Khách vẫn hát được vì TV tự chuyển sang R2/YouTube. Nhưng nếu quán mất luôn Internet thì sẽ không còn bài nào hát được.',
+       '→ Kiểm tra máy NAS: nguồn điện, dây mạng LAN, dịch vụ Caddy, ổ dữ liệu.',
+       '🕐 ' + bcGio(now) + ' · chi tiết: Quầy → 🔌 Kết nối → 📀 NAS'].join('\n')
+    : '📀🟢 <b>NAS ' + ten + ' đã mở lại được</b> lúc ' + bcGio(now) + (cu && cu.luc ? ' (báo đỏ từ ' + bcGio(cu.luc) + ')' : '')
+      + (k.tt === 'vang' ? '\nCòn lưu ý: ' + escHtml(k.ly) : '');
+  await Promise.all(chats.map(ch => tgGoi(token, 'sendMessage', { chat_id: ch, text, parse_mode: 'HTML', disable_web_page_preview: true }).catch(() => {})));
+}
+/** Tóm tắt trạng thái cho các chi nhánh có NAS (dùng ở admin.libGet) */
+async function nasTomTat(env, cfg, now = Date.now()) {
+  const out = {};
+  const cns = Object.keys(cfg).filter(cn => libCn(cfg, cn).nas);
+  if (!cns.length || !env.DB) return out;
+  await nasBang(env);
+  for (const cn of cns) {
+    const c = libCn(cfg, cn), { tvs, g1 } = await nasDoc(env, cn, now), k = nasTinh(c, tvs, g1, now);
+    out[cn] = { tt: k.tt, ly: k.ly, okLuc: k.okLuc || 0 };
+  }
+  return out;
+}
+/** API admin.nasTt {cn?}: không có cn = danh sách mọi chi nhánh có NAS; có cn = chi tiết từng TV, 24 giờ theo giờ, lần đổi trạng thái */
+async function adminNasTt(env, body) {
+  const [q, loi] = await knPhien(env, body);
+  if (loi) return loi;
+  await nasBang(env);
+  const now = Date.now(), cfg = await libCfg(env), ten = await knTenCn(env);
+  const { results: cnTv } = await env.DB.prepare('SELECT DISTINCT cn FROM nas_tv WHERE t > ?').bind(now - 7 * 86400000).all();
+  let cns = [...new Set([...Object.keys(cfg).filter(k => libCn(cfg, k).nas), ...(cnTv || []).map(r => r.cn)])].filter(Boolean);
+  if (q.cn) cns = [q.cn];
+  const ds = [];
+  for (const cn of cns) {
+    const c = libCn(cfg, cn), { tvs, g1 } = await nasDoc(env, cn, now), k = nasTinh(c, tvs, g1, now);
+    const row = Object.assign({ cn, ten: ten[cn] || cn, on: c.on, nas: c.nas }, k);
+    if (q.cn) {
+      row.tv = tvs.sort((x, y) => SAP_PHONG.compare(x.phong || '', y.phong || '')).map(r => ({ phong: r.phong, t: r.t, ok: r.ok, f: r.f, ms: r.ms, na: r.na,
+        off: r.off, a: r.a, e: r.e, loi_tu: r.loi_tu, ok_luc: r.ok_luc, ua: r.ua, cu: now - r.t > NAS_TUOI, nasCu: !!(r.nas && r.nas !== c.nas) }));
+      row.gio = (await env.DB.prepare('SELECT gio, lan, hong, ms, nms, a, e FROM nas_gio WHERE cn = ? AND gio >= ? ORDER BY gio').bind(cn, nasGio(now - 23 * 3600000)).all()).results || [];
+      row.su = (await env.DB.prepare('SELECT t, tt, ly FROM nas_su WHERE cn = ? ORDER BY t DESC LIMIT 30').bind(cn).all()).results || [];
+    }
+    ds.push(row);
+  }
+  ds.sort((x, y) => (NAS_THU_TU[x.tt] - NAS_THU_TU[y.tt]) || SAP_PHONG.compare(x.ten, y.ten));
+  return ok({ ds, now, gioNay: nasGio(now) });
+}
+/** Báo cáo sáng: mục NAS quán 24 giờ qua (chỉ chi nhánh bật thư viện + có NAS) */
+async function bcNas(env, now, ten) {
+  const o = { mau: 0, viec: [], dong: [] };
+  const cfg = await libCfg(env);
+  const cns = Object.keys(cfg).filter(cn => { const c = libCn(cfg, cn); return c.on && c.nas; });
+  if (!cns.length) return o;
+  await nasBang(env);
+  const t24 = now - 86400000, tn = cn => ten[cn] || cn;
+  const [g, su] = await Promise.all([
+    env.DB.prepare('SELECT cn, SUM(lan) lan, SUM(hong) hong, SUM(ms) ms, SUM(nms) nms, SUM(a) a, SUM(e) e FROM nas_gio WHERE gio >= ? GROUP BY cn').bind(nasGio(t24)).all(),
+    env.DB.prepare('SELECT cn, t, tt FROM nas_su WHERE t >= ? ORDER BY t LIMIT 5000').bind(t24 - 7 * 86400000).all()
+  ]);
+  const G = new Map((g.results || []).map(r => [r.cn, r]));
+  for (const cn of cns.sort((a, b) => SAP_PHONG.compare(tn(a), tn(b)))) {
+    const r = G.get(cn) || {}, ev = (su.results || []).filter(x => x.cn === cn);
+    let lanDo = 0, phutDo = 0, dang = '', tu = 0;
+    for (const e of ev) {                                         // cộng thời gian ở trạng thái đỏ trong 24 giờ (trạng thái trước mốc 24 giờ lấy từ sự kiện cũ hơn)
+      if (dang === 'do') phutDo += Math.max(0, e.t - Math.max(tu, t24));
+      if (e.tt === 'do' && e.t >= t24) lanDo++;
+      dang = e.tt; tu = e.t;
+    }
+    if (dang === 'do') phutDo += Math.max(0, now - Math.max(tu, t24));
+    phutDo = Math.round(phutDo / 60000);
+    const lan = +r.lan || 0, hong = +r.hong || 0, A = +r.a || 0, E = +r.e || 0, tb = r.nms ? Math.round(r.ms / r.nms) : 0;
+    let d;
+    if (!lan) d = '⚫ không có số liệu (TV không báo — quán đóng cửa cả ngày hoặc TV chưa lên bản mới)';
+    else {
+      d = (lanDo ? '🔴 mất kết nối ' + lanDo + ' lần, tổng ~' + phutDo + ' phút' : hong ? '🟡' : '🟢') + ' kiểm tra ' + Math.round((lan - hong) * 100 / lan) + '% OK (' + (lan - hong) + '/' + lan + ')'
+        + (tb ? ' · TB ' + tb + ' ms' : '') + (A ? ' · phát từ NAS ' + A + ' bài' + (E ? ', lỗi ' + E : '') : '');
+    }
+    o.dong.push('• ' + escHtml(tn(cn)) + ': ' + d);
+    if (lanDo) { o.mau = Math.max(o.mau, 1); o.viec.push([1, 'NAS ' + escHtml(tn(cn)) + ' mất kết nối ' + lanDo + ' lần (~' + phutDo + ' phút) → kiểm tra nguồn, dây LAN, Caddy của máy NAS; xem Quầy → Kết nối → 📀 NAS']); }
+    else if (A >= 20 && E / A >= 0.1) { o.mau = Math.max(o.mau, 1); o.viec.push([1, 'NAS ' + escHtml(tn(cn)) + ' lỗi khi phát ' + Math.round(E * 100 / A) + '% (' + E + '/' + A + ' bài) → xem Kết nối → 📀 NAS']); }
+  }
+  return o;
 }
 async function adminPhongThem(env, body) {
   const [ss, loi] = await canPhien(env, body, 'admin');
@@ -2555,6 +2777,15 @@ export class Room extends DurableObject {
       return;
     }
 
+    if(m.type === 'nh'){                                 // TV báo sức khoẻ NAS của quán (kiểm tra 5 phút/lần; xem nasGhi)
+      if(a.role !== 'tv' || now - (a.nhT || 0) < 45000 || data.length > 600) return;
+      a.nhT = now; try{ ws.serializeAttachment(a); }catch(e){}
+      const c = await this.cfg();
+      const pr = nasGhi(this.env, c, a, m.d || {}, now).catch(err => console.error('nasGhi', err));
+      try{ this.ctx.waitUntil(pr); }catch(e){}
+      return;
+    }
+
     if(a.role === 'remote' || a.role === 'tablet'){
       if(!a.ok || data.length > MAX_MSG || m.type !== 'cmd') return;
       const c = await this.cfg(); if(!c.open) return;
@@ -3572,13 +3803,14 @@ async function bcLap(env, opt = {}) {
   const ngay = new Date(now + VN_MS).toISOString().slice(0, 10), hom = new Date(now + VN_MS - 86400000).toISOString().slice(0, 10);
   const truocRow = await env.DB.prepare('SELECT gia_tri FROM bc_ngay WHERE ngay = ?').bind(hom).first().catch(() => null);
   let truoc = {}; try { truoc = JSON.parse((truocRow && truocRow.gia_tri) || '{}'); } catch (e) {}
-  const [bmb, dvi, den] = await Promise.all([
+  const [bmb, dvi, den, nas] = await Promise.all([
     bcBmb(env, now, ten).catch(e => ({ mau: 1, viec: [[1, 'BMBPlayer: không lập được mục này (' + escHtml(e && e.message) + ')']], dong: ['• ⚠ Lỗi khi đọc dữ liệu BMBPlayer'] })),
-    bcKhoDoc(env, 'VI', 'Kho Việt'), bcKhoDoc(env, 'EN', 'Kho quốc tế')
+    bcKhoDoc(env, 'VI', 'Kho Việt'), bcKhoDoc(env, 'EN', 'Kho quốc tế'),
+    bcNas(env, now, ten).catch(e => ({ mau: 0, viec: [], dong: ['• ⚠ Không đọc được số liệu NAS (' + escHtml(e && e.message) + ')'] }))
   ]);
   const vi = bcKhoPhanTich(dvi, truoc.vi, now, 'kho-karaoke'), en = bcKhoPhanTich(den, truoc.en, now, 'kho-karaoke-en');
-  const mau = Math.max(bmb.mau, vi.mau, en.mau);
-  const viec = [...bmb.viec, ...vi.viec, ...en.viec].sort((a, b) => b[0] - a[0]);
+  const mau = Math.max(bmb.mau, nas.mau, vi.mau, en.mau);
+  const viec = [...bmb.viec, ...nas.viec, ...vi.viec, ...en.viec].sort((a, b) => b[0] - a[0]);
   const viecCan = viec.filter(v => v[0] >= 1), viecGoiY = viec.filter(v => v[0] === 0);
   const dm = new Date(now + VN_MS).toISOString(), nhan = dm.slice(8, 10) + '/' + dm.slice(5, 7);
   const L = [];
@@ -3590,6 +3822,7 @@ async function bcLap(env, opt = {}) {
   }
   if (viecGoiY.length) { L.push('', '<i>Gợi ý:</i>'); viecGoiY.slice(0, 3).forEach(v => L.push('• ' + v[1])); }
   L.push('', '<b>📺 BMBPlayer — 24 giờ qua</b>', ...bmb.dong);
+  if (nas.dong.length) L.push('', '<b>📀 NAS quán — 24 giờ qua</b>', ...nas.dong);
   L.push('', '<b>🎵 ' + vi.nhan + '</b>', ...vi.dong);
   L.push('', '<b>🌐 ' + en.nhan + '</b>', ...en.dong);
   L.push('', '<i>Chi tiết: Quầy → 🔌 Kết nối · kho.html. Chỉ nêu điều bất thường so với những ngày trước (tối đa 7 ngày); màu đỏ chỉ dành cho TV rớt.</i>');

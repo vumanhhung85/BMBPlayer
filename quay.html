@@ -367,6 +367,22 @@ tbody tr:hover td{background:#FBF8FE}
 .libctl{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
 .libctl .libnas{flex:1 1 240px;min-width:0;padding:8px 10px;border-radius:10px;background:var(--field);border:1px solid var(--line);font-size:13.5px}
 .libctl .libnas:focus{border-color:var(--purple);outline:none;background:#fff}
+/* Sức khoẻ NAS của quán: chip trạng thái (Cài đặt → thư viện, Kết nối → 📀 NAS quán) */
+.nasdot{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:800;padding:1px 9px;border-radius:999px;margin-left:6px;border:1px solid transparent;white-space:nowrap;vertical-align:1px}
+.nasdot.xanh{background:#DDF5EA;color:#0F7A4D}.nasdot.vang{background:#FFF1CC;color:#8a5a00}.nasdot.do{background:#FFE3E8;color:#B3203E}
+.nasdot.den{background:#ECE8F1;color:#4b4060}.nasdot.trang{background:#F6F4F9;color:#8a7aa3;border-color:var(--line)}
+.nasdot.lon{font-size:14px;padding:4px 12px;margin-left:0}
+.nasly{font-size:12.5px;margin-top:6px;color:var(--txt);line-height:1.5}
+.nasly.do{color:#B3203E;font-weight:600}
+.nasgio{display:grid;grid-template-columns:repeat(24,minmax(0,1fr));gap:2px;margin:10px 0 2px}
+.nasgio i{display:block;height:24px;border-radius:3px;background:#EEE9F4}
+.nasgio i.xanh{background:#3BB273}.nasgio i.vang{background:#F5B800}.nasgio i.do{background:#D6314F}
+.nasgiox{display:grid;grid-template-columns:repeat(24,minmax(0,1fr));font-size:9.5px;color:var(--txt-mute);text-align:center}
+.nascard{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px;background:#fff;cursor:pointer}
+.nascard:hover{background:#FBF6FF}
+.nascard .nasten{font-weight:800;color:var(--grape)}
+.nascard .nasly{flex-basis:100%;margin-top:0}
+.nastb{min-width:700px}.nastb td{white-space:nowrap}.nastb.su{min-width:560px}.nastb.su td:last-child{white-space:normal;min-width:260px}
 .knsm{font-size:11.5px;color:var(--txt-mute)}
 .knchip{display:inline-flex;align-items:center;gap:6px;background:var(--tint);border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-size:12.5px}
 .knchip button{border:0;background:transparent;cursor:pointer;color:var(--bad);font-weight:700}
@@ -494,7 +510,7 @@ tbody tr:hover td{background:#FBF8FE}
       <button class="btn btn-ghost btn-sm" id="knTai">↻ Tải lại</button>
       <button class="btn btn-ghost btn-sm" id="knChep" title="Chép tóm tắt để gửi kỹ thuật">📋 Chép báo cáo</button>
     </div>
-    <div class="knsub" id="knSub"><button data-s="tq" class="on">📊 Tổng quan</button><button data-s="may">📺 Thiết bị từng phòng</button><button data-s="nk">🧾 Nhật ký</button><button data-s="ip">🌐 IP &amp; nhà mạng</button><button data-s="xh">📈 Xu hướng tuần</button><button data-s="cb">🔔 Cảnh báo Telegram</button><button data-s="bh">🎤 Bài hay chọn</button></div>
+    <div class="knsub" id="knSub"><button data-s="tq" class="on">📊 Tổng quan</button><button data-s="may">📺 Thiết bị từng phòng</button><button data-s="nas">📀 NAS quán</button><button data-s="nk">🧾 Nhật ký</button><button data-s="ip">🌐 IP &amp; nhà mạng</button><button data-s="xh">📈 Xu hướng tuần</button><button data-s="cb">🔔 Cảnh báo Telegram</button><button data-s="bh">🎤 Bài hay chọn</button></div>
     <div id="knBody"><div class="mut">Đang tải…</div></div>
     <div class="hint" style="margin-top:14px">Lưu trữ: <b>chi tiết từng sự kiện</b> của TV / máy tính bảng / mở-đóng phòng giữ <b>30 ngày</b>, của điện thoại khách giữ <b>7 ngày</b> (theo dõi nhanh); <b>số liệu tổng hợp theo ngày</b> và <b>danh sách IP</b> giữ <b>180 ngày</b> (theo dõi lâu). “Rớt” = máy tự mất kết nối hoặc im lặng quá lâu bị hệ thống ngắt. Một ngày tính từ 06:00 sáng. <b>Đếm lượt chọn bài</b> (tab Bài hay chọn) giữ vĩnh viễn.</div>
   </div>
@@ -552,7 +568,8 @@ tbody tr:hover td{background:#FBF8FE}
       <div class="hint">Bật cho chi nhánh nào thì tivi ở đó phát những bài <b>đã có trong thư viện</b> (app Tải Video tải về) bằng file của mình; bài chưa có, file lỗi hoặc đứng hình lâu thì <b>tự phát YouTube như cũ</b> (tiếp đúng đoạn đang hát). <b>Tắt</b> = y như hiện nay. Tivi nhận thay đổi khi mở phòng hoặc sau tối đa 10 phút.</div>
       <div id="libBox" style="margin-bottom:10px"><div class="hint">Đang tải…</div></div>
       <div class="hint" id="libMsg" style="display:none"></div>
-      <div class="hint" style="margin-bottom:22px"><b>NAS của quán</b> (để trống nếu chưa có): địa chỉ thư mục trên NAS có cùng cấu trúc với R2, ví dụ <code>…/vn/&lt;mã bài&gt;.mp4</code>. Tivi thử NAS trước, NAS không mở được thì dùng R2. Nên dùng địa chỉ <b>https://</b> có chứng chỉ (ví dụ <code>https://nas-cn03.bmb.id.vn/karaoke</code> trỏ về IP trong quán). Địa chỉ <b>http://</b> bị trình duyệt và app hiện tại chặn (trang chạy https), tivi sẽ bỏ qua NAS cho tới khi có bản app cho phép.</div>
+      <div class="hint" style="margin-bottom:22px"><b>NAS của quán</b> (để trống nếu chưa có): địa chỉ thư mục trên NAS có cùng cấu trúc với R2, ví dụ <code>…/vn/&lt;mã bài&gt;.mp4</code>. Tivi thử NAS trước, NAS không mở được thì dùng R2. Nên dùng địa chỉ <b>https://</b> có chứng chỉ (ví dụ <code>https://nas-cn03.bmb.id.vn/karaoke</code> trỏ về IP trong quán). Địa chỉ <b>http://</b> trong mạng quán (vd <code>http://192.168.1.10:8080/karaoke</code>) chỉ chạy với <b>app BMBPlayer 2.9 trở lên</b>; TV dùng app cũ sẽ bỏ qua NAS.<br>
+        <b>Theo dõi NAS:</b> TV tự kiểm tra NAS 5 phút/lần bằng ảnh nhỏ <code>_bmb/ping.png</code> đặt trong thư mục NAS (cùng chỗ với <code>vn</code>, <code>en</code>) — nhớ chép file này lên NAS. Chip 🟢🟡🔴⚫ cạnh tên chi nhánh; chi tiết từng TV ở <b>🔌 Kết nối → 📀 NAS quán</b>. NAS mất kết nối ≥ 10 phút thì báo Telegram cho admin (cùng công tắc với cảnh báo rớt TV).</div>
     </div>
 
     <div id="apkSec" style="display:none">
@@ -2399,7 +2416,9 @@ function libVe2(){
     var tk = tong ? '<div class="knsm" style="margin-top:6px">7 ngày: <b>' + lib + '/' + tong + ' bài (' + Math.round(lib * 100 / tong) + '%) phát từ thư viện</b>'
       + ((d.nas || 0) ? ' · NAS ' + d.nas : '') + ((d.r2 || 0) ? ' · R2 ' + d.r2 : '') + ' · YouTube (chưa có file) ' + (d.yt || 0)
       + ((d.loi || 0) ? ' · <b style="color:var(--warn)">file lỗi → YouTube ' + d.loi + '</b>' : '') + ((d.nasloi || 0) ? ' · <b style="color:var(--warn)">NAS lỗi → R2 ' + d.nasloi + '</b>' : '') + '</div>' : '';
-    return '<div class="librow" data-cn="' + esc(b.id) + '"><div><b>' + esc(b.ten) + '</b><span class="libst' + (c.on ? ' on' : '') + '">' + (c.on ? 'ĐANG BẬT' : 'tắt') + '</span></div>'
+    var ns = (r.nas || {})[b.id], nl = '';
+    if(ns && c.nas) nl = '<div class="nasly' + (ns.tt === 'do' ? ' do' : '') + '">' + esc(ns.ly) + (ns.tt === 'den' && ns.okLuc ? ' · lần cuối NAS ổn: ' + knTgN(ns.okLuc) : '') + '</div>';
+    return '<div class="librow" data-cn="' + esc(b.id) + '"><div><b>' + esc(b.ten) + '</b><span class="libst' + (c.on ? ' on' : '') + '">' + (c.on ? 'ĐANG BẬT' : 'tắt') + '</span>' + (ns && c.nas ? nasChip(ns.tt) : '') + '</div>' + nl
       + '<div class="libctl"><button type="button" class="btn btn-sm ' + (c.on ? 'btn-ghost' : 'btn-y') + '" data-libon="' + (c.on ? '0' : '1') + '">' + (c.on ? 'Tắt' : 'Bật') + '</button>'
       + '<input type="url" class="libnas" placeholder="NAS của quán (tuỳ chọn), vd https://nas-cn03.bmb.id.vn/karaoke" value="' + esc(c.nas || '') + '" autocomplete="off">'
       + '<button type="button" class="btn btn-ghost btn-sm" data-libluu="1">Lưu NAS</button></div>' + tk + '</div>';
@@ -2493,6 +2512,7 @@ function knVe(){
   $('knBody').innerHTML = '<div class="mut">Đang tải…</div>';
   if(KN.sub==='tq') knTq();
   else if(KN.sub==='may') knMay();
+  else if(KN.sub==='nas') knNas();
   else if(KN.sub==='nk'){ KN.nk = []; knNk(); }
   else if(KN.sub==='ip'){ if(KN.ipXem) knIpLs(KN.ipXem); else knIp(); }
   else if(KN.sub==='xh') knXh();
@@ -2809,6 +2829,77 @@ function knXh(){
   }).catch(knLoi);
 }
 /* ---------- Cảnh báo Telegram khi nhiều phòng cùng rớt ---------- */
+/* ---------- 📀 NAS quán: trạng thái do TV báo (Worker không tự gọi được NAS trong mạng quán) ---------- */
+var NAS_TT = { xanh:['🟢','Online'], vang:['🟡','Cảnh báo'], do:['🔴','Mất kết nối'], den:['⚫','Không rõ'], trang:['⚪','Chưa dùng NAS'] };
+function nasChip(tt, lon){ var x = NAS_TT[tt] || NAS_TT.trang; return '<span class="nasdot '+(NAS_TT[tt]?tt:'trang')+(lon?' lon':'')+'">'+x[0]+' NAS: '+x[1]+'</span>'; }
+function knNas(){
+  knGoi('admin.nasTt').then(function(r){ KN.nas = r; knNasVe(r); }).catch(knLoi);
+}
+function knNasGio(row, gioNay){
+  var m = {}; (row.gio||[]).forEach(function(g){ m[g.gio] = g; });
+  var base = Date.parse(gioNay + ':00:00Z'), o = '', nh = '';
+  for(var i = 23; i >= 0; i--){
+    var k = new Date(base - i*3600000).toISOString().slice(0, 13), g = m[k], h = +k.slice(11, 13), cls = '', tip = h + 'h: ';
+    if(!g || !g.lan) tip += g && g.a ? 'phát từ NAS '+g.a+' bài, không có lần kiểm tra' : 'không có số liệu (TV tắt / quán đóng cửa)';
+    else {
+      var tl = g.hong / g.lan, loiPhat = g.a >= 3 && g.e / g.a >= 0.1;
+      cls = tl >= 0.5 ? 'do' : (tl > 0 || loiPhat) ? 'vang' : 'xanh';
+      tip += (g.lan-g.hong)+'/'+g.lan+' lần kiểm tra OK'+(g.nms ? ' · TB '+Math.round(g.ms/g.nms)+' ms' : '')+(g.a ? ' · phát từ NAS '+g.a+' bài'+(g.e ? ', lỗi '+g.e : '') : '');
+    }
+    o += '<i class="'+cls+'" title="'+esc(tip)+'"></i>';
+    nh += '<span>'+(h % 3 === 0 ? h : '')+'</span>';
+  }
+  return '<div class="nasgio">'+o+'</div><div class="nasgiox">'+nh+'</div>';
+}
+function knNasTv(x){
+  if(x.nasCu) return '⚪ báo về địa chỉ NAS cũ';
+  if(x.cu) return '⚫ không báo từ '+knTgN(x.t)+' (TV tắt?)';
+  if(x.na === 'app') return '⚠️ app cũ — không mở được NAS http (cài APK 2.9)';
+  var s = x.ok === 1 ? (x.f === 0 ? '🟡 NAS trả lời, thiếu _bmb/ping.png' : '🟢 mở được NAS') : '🔴 không mở được NAS' + (x.loi_tu ? ' từ '+knTgN(x.loi_tu) : '');
+  return s + (x.off ? ' · đang tạm bỏ qua NAS 10 phút' : '');
+}
+function knNasVe(r){
+  var ds = r.ds || [], h = '';
+  if(KN.cn && ds.length === 1 && ds[0].tt === 'trang' && !ds[0].nas && !(ds[0].tv || []).length) ds = [];
+  if(!ds.length){
+    $('knBody').innerHTML = '<div class="knnote">'+(KN.cn ? '<b>'+esc(knTenCn(KN.cn))+'</b> chưa có NAS.' : 'Chưa chi nhánh nào có NAS.')+' Nhập địa chỉ NAS ở <b>⚙️ Cài đặt → Phát từ thư viện video lưu sẵn</b>, bật thư viện cho chi nhánh đó, rồi chép file <code>_bmb/ping.png</code> lên NAS.</div>' + knNasHd();
+    return;
+  }
+  if(!KN.cn){
+    h += '<div class="knnote">Bấm vào một chi nhánh để xem từng TV. Trạng thái do <b>TV của chi nhánh</b> tự kiểm tra NAS 5 phút/lần rồi báo lên (máy chủ Cloudflare không gọi được NAS trong mạng quán).</div>';
+    h += ds.map(function(x){
+      return '<div class="nascard" data-cn="'+esc(x.cn)+'"><span class="nasten">'+esc(x.ten)+'</span>'+nasChip(x.tt)+(x.on ? '' : '<span class="knsm">thư viện đang tắt</span>')
+        +'<div class="nasly'+(x.tt==='do'?' do':'')+'">'+esc(x.ly)+(x.tt==='den' && x.okLuc ? ' · lần cuối NAS ổn: '+knTgN(x.okLuc) : '')+'</div></div>';
+    }).join('');
+    $('knBody').innerHTML = h + knNasHd();
+    return;
+  }
+  var x = ds[0];
+  h += '<div class="knbox"><h3>'+esc(x.ten)+' — NAS của quán</h3><div>'+nasChip(x.tt, 1)+'</div>'
+    + '<div class="nasly'+(x.tt==='do'?' do':'')+'" style="font-size:13.5px">'+esc(x.ly)+'</div>'
+    + '<div class="knsm" style="margin-top:6px">Địa chỉ: <code>'+esc(x.nas || '—')+'</code>'+(x.okLuc ? ' · lần cuối NAS ổn: <b>'+knTgN(x.okLuc)+'</b>' : '')+(x.on ? '' : ' · <b>thư viện đang tắt</b>')+'</div></div>';
+  h += '<div class="knbox"><h3>24 giờ qua (mỗi ô = 1 giờ)</h3>'+knNasGio(x, r.gioNay)
+    + '<div class="knleg"><span><i style="background:#3BB273"></i>ổn</span><span><i style="background:#F5B800"></i>có lần lỗi / phát lỗi ≥ 10%</span><span><i style="background:#D6314F"></i>lỗi ≥ một nửa số lần kiểm tra</span><span><i style="background:#EEE9F4"></i>không có số liệu</span></div></div>';
+  var tv = x.tv || [];
+  h += '<div class="knbox"><h3>Từng TV</h3>' + (tv.length ? '<div class="tblwrap"><table class="nastb"><thead><tr><th>Phòng</th><th>Tình trạng</th><th>Độ trễ</th><th>Báo lúc</th><th>NAS ổn lần cuối</th><th>Phát từ NAS / lỗi</th><th>App</th></tr></thead><tbody>'
+    + tv.map(function(t){ return '<tr><td><b>'+esc(t.phong||'?')+'</b></td><td>'+knNasTv(t)+'</td><td>'+(t.ok===1 && t.ms!=null ? t.ms+' ms' : '—')+'</td><td>'+knTgN(t.t)+'</td><td>'+knTgN(t.ok_luc)+'</td><td>'+(t.a||0)+(t.e ? ' / <b style="color:var(--bad)">'+t.e+'</b>' : '')+'</td><td class="knsm">'+esc(t.ua||'')+'</td></tr>'; }).join('')
+    + '</tbody></table></div><div class="knsm" style="margin-top:6px">"Phát từ NAS / lỗi" là số bài trong lần báo gần nhất của TV đó (khoảng 5–15 phút).</div>'
+    : '<div class="mut">Chưa TV nào báo. TV cần mở trang bản mới (tự cập nhật) và chi nhánh phải bật thư viện + có NAS.</div>') + '</div>';
+  var su = x.su || [];
+  h += '<div class="knbox"><h3>Các lần đổi trạng thái</h3>' + (su.length ? '<div class="tblwrap"><table class="nastb su"><thead><tr><th>Lúc</th><th>Trạng thái</th><th>Lý do</th></tr></thead><tbody>'
+    + su.map(function(e){ return '<tr><td>'+knTgN(e.t)+'</td><td>'+nasChip(e.tt)+'</td><td class="knsm">'+esc(e.ly||'')+'</td></tr>'; }).join('') + '</tbody></table></div>'
+    : '<div class="mut">Chưa có.</div>') + '</div>';
+  $('knBody').innerHTML = h + knNasHd();
+}
+function knNasHd(){
+  return '<div class="knbox"><h3>Cách đọc</h3><div class="knsm" style="line-height:1.7">'
+    + '🟢 <b>Online</b>: TV mở được NAS, nhanh, ít lỗi. '
+    + '🟡 <b>Cảnh báo</b>: chậm (trên 1,5 giây), một số TV không mở được, lỗi khi phát từ 10%, TV dùng app cũ, thiếu file <code>_bmb/ping.png</code>, hoặc vừa lỗi (chưa đủ 10 phút). '
+    + '🔴 <b>Mất kết nối</b>: TV đang bật nhưng không TV nào mở được NAS từ 10 phút — khách vẫn hát vì TV tự chuyển R2/YouTube, nhưng mất Internet lúc này thì không còn bài nào. '
+    + '⚫ <b>Không rõ</b>: không TV nào báo trong 20 phút (quán đóng cửa / TV tắt) — không phải lỗi. '
+    + '⚪ <b>Chưa dùng NAS</b>: chưa nhập địa chỉ NAS hoặc thư viện đang tắt.<br>'
+    + 'Telegram: gửi admin khi chuyển sang 🔴 (tối đa 1 tin/giờ mỗi chi nhánh) và khi NAS mở lại được; dùng chung công tắc ở tab 🔔 Cảnh báo Telegram. Báo cáo sáng có mục 📀 NAS quán.</div></div>';
+}
 function knCb(){
   knGoi('admin.knCanhBao').then(function(r){ KN.cb = r; knCbVe(r); }).catch(knLoi);
 }

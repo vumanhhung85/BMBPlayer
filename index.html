@@ -596,12 +596,13 @@ function libSet(o){
   if(!o || typeof o !== 'object') return;
   if(typeof o.t === 'string' && o.t) LIB.t = o.t;
   LIB.nas = typeof o.nas === 'string' && /^https?:\/\//i.test(o.nas) ? o.nas.replace(/\/+$/, '') : '';
-  const on = !!o.on && !!LIB.t && !!bc.ws;
+  const on = !!o.on && !!LIB.t && !!bc.ws, vuaBat = on && !LIB.on;
   if(on !== LIB.on){ LIB.on = on; libMemo.clear(); }
+  if(LIB.on && LIB.nas && (vuaBat || LIB.nas !== NH.nas)){ NH.nas = LIB.nas; NH.last = ''; nhSoon('dau', 20000); }   // vừa bật / đổi NAS → kiểm tra sau 20 giây
 }
 /* Đếm bài theo nguồn (nas, r2, yt = chưa có trong thư viện, loi = file lỗi → YouTube, nasloi = NAS lỗi → R2): gửi Worker theo lô 10 bài / 15 phút */
 const LS = { nas:0, r2:0, yt:0, loi:0, nasloi:0, at:Date.now() };
-function lsBump(k){ if(!LIB.on) return; LS[k]++; lsFlush(false); }
+function lsBump(k){ if(!LIB.on) return; LS[k]++; if(k === 'nas') NH.a++; else if(k === 'nasloi') NH.e++; lsFlush(false); }
 function lsFlush(force){
   const n = LS.nas + LS.r2 + LS.yt + LS.loi + LS.nasloi;
   if(!n || !bc.ws) return;
@@ -611,6 +612,51 @@ function lsFlush(force){
 }
 setInterval(() => lsFlush(false), 5 * 60000);
 addEventListener('pagehide', () => lsFlush(true));
+/* ---------- Sức khoẻ NAS của quán (chỉ khi chi nhánh bật thư viện và có NAS) ----------
+   Worker trên Cloudflare không gọi được NAS trong mạng quán, nên chính TV kiểm tra rồi báo lên (tin 'nh'):
+   mỗi 5 phút mở ảnh nhỏ <NAS>/_bmb/ping.png (ảnh không cần NAS cài CORS); ảnh không mở được thì hỏi thư mục gốc kiểu no-cors
+   (NAS còn trả lời nhưng thiếu ảnh = ổ dữ liệu có thể chưa gắn / sai thư mục). Kèm số bài đã thử phát từ NAS và số lần NAS lỗi.
+   Báo khi kết quả đổi, mỗi lần thử mà NAS lỗi, khi có bài lỗi, hoặc 15 phút/lần khi ổn. NAS lỗi lúc phát → thử lại ngay (cách nhau ≥ 60 giây). */
+const NH_MS = 5 * 60000, NH_OK_MS = 15 * 60000, NH_TO = 5000;
+const NH = { a:0, e:0, last:'', at:0, busy:false, nas:'', soon:null, lastRun:0 };
+function nhImg(url){
+  return new Promise(res => {
+    const im = new Image(), t0 = Date.now(); let done = false, to = null;
+    const fin = ok => { if(done) return; done = true; clearTimeout(to); im.onload = im.onerror = null; if(!ok) im.src = ''; res({ ok, ms:Date.now() - t0 }); };
+    to = setTimeout(() => fin(false), NH_TO); im.onload = () => fin(true); im.onerror = () => fin(false); im.src = url;
+  });
+}
+function nhReach(url){
+  const t0 = Date.now(); let to = null;
+  const ctl = typeof AbortController === 'function' ? new AbortController() : null;
+  return Promise.race([
+    fetch(url, { mode:'no-cors', cache:'no-store', signal: ctl ? ctl.signal : undefined }).then(() => true, () => false),
+    new Promise(r => { to = setTimeout(() => { try{ if(ctl) ctl.abort(); }catch(e){} r(false); }, NH_TO); })
+  ]).then(ok => { clearTimeout(to); return { ok, ms:Date.now() - t0 }; });
+}
+async function nhCheck(why){
+  if(NH.busy || !bc.ws || !LIB.on || !LIB.nas) return;
+  NH.busy = true; NH.lastRun = Date.now();
+  try{
+    let d;
+    if(!nasReach(LIB.nas)) d = { na:'app' };                     // NAS http:// mà app chưa cho phép (APK ≤ 2.8 / trình duyệt thường) → TV này không dùng được NAS
+    else {
+      const q = '?t=' + Date.now(), p = await nhImg(LIB.nas + '/_bmb/ping.png' + q);
+      if(p.ok) d = { ok:1, f:1, ms:p.ms };
+      else { const r = await nhReach(LIB.nas + '/' + q); d = r.ok ? { ok:1, f:0, ms:r.ms } : { ok:0, ms:r.ms }; }
+    }
+    if(!LIB.on || !LIB.nas) return;
+    d.a = NH.a; d.e = NH.e; d.off = Date.now() < nasOffUntil ? 1 : 0; d.why = String(why || 'dk').slice(0, 6);
+    const key = d.na || (d.ok ? 'ok' + d.f : 'loi'), now = Date.now();
+    if(key !== NH.last || !d.ok || d.e || now - NH.at >= NH_OK_MS){
+      bc.postMessage({ type:'nh', d });
+      NH.last = key; NH.at = now; NH.a = NH.e = 0;
+    }
+  }catch(e){}
+  finally{ NH.busy = false; }
+}
+function nhSoon(why, ms){ clearTimeout(NH.soon); NH.soon = setTimeout(() => nhCheck(why), ms); }
+setInterval(() => nhCheck('dk'), NH_MS);
 const LIB_ERR = { err:1 };                          // Worker không trả lời được (khác null = Worker nói bài này không có trong thư viện). Chỉ dùng khi quán có NAS (nasCfg)
 const LIB_FAIL = {};
 function libFind(id){
@@ -744,6 +790,7 @@ function libFail(kind, r, id, why, at){
   if(cur < 0 || !queue[cur] || queue[cur].id !== id || src !== kind) return;
   if(kind === 'nas'){
     lsBump('nasloi'); if(++nasBad >= 3){ nasOffUntil = Date.now() + 10 * 60000; nasBad = 0; }
+    if(Date.now() - NH.lastRun > 60000) nhSoon('loi', 1500);       // NAS vừa lỗi khi phát → kiểm tra & báo ngay để quầy thấy sớm
     if(PQ.c) PQ.c.fb = 'nas-' + why;
     playFile('r2', r, at); return;
   }
