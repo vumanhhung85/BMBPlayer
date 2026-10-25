@@ -3,78 +3,93 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Kho karaoke — Quản trị</title>
+<title>Kho BMB Karaoke — Quản trị</title>
 <style>
-  :root{ --bg:#0a0a0f; --panel:#15151f; --line:#2a2a3a; --ink:#f2f2f7; --quiet:#9a9ab0; --accent:#8b5cf6; --accent2:#c084fc; --good:#34d399; --warn:#fbbf24; --bad:#fca5a5; }
+  /* Giao diện cùng bộ màu với Tải Video BMB: nền xanh nhạt, thẻ trắng, thanh đầu xanh navy, nút chính màu cam */
+  :root{ --bg:#f2f6fc; --panel:#fff; --line:#d3deee; --ink:#14213f; --quiet:#64739a; --navy:#1c3b8c; --navy2:#142a66; --teal:#0e7490; --teal2:#134e63;
+    --accent:#f2701a; --accent2:#e85a0c; --good:#11845b; --goodbg:#e6f6ef; --warn:#9a6200; --warnbg:#fff4dc; --bad:#c62f2f; --badbg:#fdecec; --run:#1d5fd1; --runbg:#e8f0fe;
+    --soft:#f5f8fe; --soft2:#eef2fa; }
   *{box-sizing:border-box;margin:0;padding:0}
-  body{background:var(--bg); color:var(--ink); font-family:-apple-system,"Segoe UI",Roboto,Arial,sans-serif; min-height:100vh; font-size:14px; line-height:1.5}
-  header{padding:12px 16px; background:linear-gradient(135deg,#1a1530,#0a0a0f); border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; position:sticky; top:0; z-index:10}
-  .logo{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,var(--accent),var(--accent2)); display:flex;align-items:center;justify-content:center;font-weight:800}
+  body{background:var(--bg); color:var(--ink); font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; min-height:100vh; font-size:14px; line-height:1.45}
+  header{padding:12px 16px; background:linear-gradient(135deg,var(--navy),var(--navy2)); color:#fff; display:flex; align-items:center; gap:12px; flex-wrap:wrap; position:sticky; top:0; z-index:10}
+  .logo{width:40px;height:40px;border-radius:11px;background:linear-gradient(180deg,var(--accent),var(--accent2)); display:flex;align-items:center;justify-content:center;font-weight:800;font-size:20px;color:#fff;flex:none}
+  header .ttl{font-size:26px; line-height:1.2; font-weight:800; letter-spacing:.3px}
+  header .sub{color:rgba(255,255,255,.7); font-size:12px}
   header .sp{margin-left:auto}
-  main{max-width:880px; margin:0 auto; padding:12px 16px 60px}
-  section{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:14px; margin-top:12px}
-  h2{font-size:15px; margin-bottom:8px; display:flex; align-items:center; gap:8px}
+  header button.ghost{background:transparent; border:1px solid rgba(255,255,255,.4); color:#fff}
+  main{max-width:960px; margin:0 auto; padding:16px 16px 60px}
+  section{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:16px; margin-top:16px; box-shadow:0 1px 2px rgba(20,33,63,.04)}
+  h2{font-size:16px; margin-bottom:10px; display:flex; align-items:center; gap:8px; flex-wrap:wrap}
   h2 .sp{margin-left:auto}
-  input, select, textarea{background:#0e0e16; border:1px solid var(--line); color:var(--ink); border-radius:10px; padding:9px 10px; font-size:14px; font-family:inherit}
-  textarea{width:100%; min-height:110px; resize:vertical}
-  button{background:var(--accent); border:none; color:#fff; font-weight:700; border-radius:10px; padding:8px 12px; font-size:13px; cursor:pointer}
-  button.ghost{background:#20202e; border:1px solid var(--line); color:var(--ink)}
-  button.ic{padding:2px 8px; font-size:12px; line-height:1.4; border-radius:8px; color:var(--quiet)}
-  button.danger{background:#3b1520; border:1px solid #5b2030; color:var(--bad)}
-  button:disabled{opacity:.5}
-  .line{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:6px 0}
+  input, select, textarea{background:#fff; border:1px solid var(--line); color:var(--ink); border-radius:10px; padding:8px 10px; font-size:14px; font-family:inherit}
+  select, input:not([type=checkbox]):not([type=radio]){min-height:38px}
+  input:focus, select:focus, textarea:focus{outline:2px solid #b9cdf3; outline-offset:0; border-color:#9fb3d8}
+  textarea{width:100%; min-height:110px; resize:vertical; background:#fbfdff; font-family:ui-monospace,Consolas,monospace; font-size:13px}
+  button{background:linear-gradient(180deg,var(--accent),var(--accent2)); border:none; color:#fff; font-weight:600; border-radius:10px; padding:8px 14px; font-size:13px; cursor:pointer; min-height:36px; font-family:inherit}
+  button.ghost{background:#fff; border:1px solid var(--line); color:var(--ink); font-weight:500}
+  button.ghost:hover{border-color:#9fb3d8}
+  button.ic{padding:2px 8px; font-size:12px; line-height:1.4; border-radius:8px; color:var(--quiet); min-height:0}
+  button.danger{background:#fff; border:1px solid #f0b4b4; color:var(--bad); font-weight:600}
+  button:disabled{opacity:.5; cursor:not-allowed}
+  .line{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:8px 0}
   .line input{flex:1; min-width:180px}
   .line input[type=checkbox]{flex:0 0 auto; min-width:0; margin-right:6px; vertical-align:middle}
   .line label{display:flex; align-items:center}
   .hint{color:var(--quiet); font-size:12px}
   .err{color:var(--bad)} .ok{color:var(--good)}
-  .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:8px}
-  .stat{background:#0e0e16; border:1px solid var(--line); border-radius:12px; padding:10px}
-  .stat b{display:block; font-size:20px} .stat span{color:var(--quiet); font-size:12px}
+  .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:10px}
+  .stat{background:var(--soft); border:1px solid var(--line); border-radius:12px; padding:10px 12px}
+  .stat b{display:block; font-size:20px; color:var(--navy)} .stat span{color:var(--quiet); font-size:12px}
   .stat b.sm{font-size:15px; line-height:1.45; overflow-wrap:anywhere}
-  .row{display:flex; gap:10px; align-items:flex-start; padding:10px 0; border-bottom:1px solid var(--line)}
+  .row{display:flex; gap:10px; align-items:flex-start; padding:10px 0; border-bottom:1px solid #e8eef7}
   .row:last-child{border-bottom:none}
   .row .meta{flex:1; min-width:0}
   .row .name{font-weight:600; overflow:hidden; text-overflow:ellipsis}
   .row .sub{color:var(--quiet); font-size:12px}
   .row .acts{display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; flex:0 0 auto; max-width:55%}
-  .pill{display:inline-block; font-size:11px; font-weight:700; padding:1px 8px; border-radius:999px; background:#20202e; margin-right:4px}
-  .pill.on{background:#123a2a; color:var(--good)} .pill.off{background:#3b1520; color:var(--bad)} .pill.run{background:#3a2f12; color:var(--warn)}
-  .samples{margin-top:6px; font-size:12px; color:var(--quiet); background:#0e0e16; border-radius:10px; padding:8px}
+  .pill{display:inline-block; font-size:11px; font-weight:700; padding:1px 9px; border-radius:999px; background:#eef1f7; color:#4a5674; margin-right:4px}
+  .pill.on{background:var(--goodbg); color:var(--good)} .pill.off{background:var(--badbg); color:var(--bad)} .pill.run{background:var(--warnbg); color:var(--warn)}
+  .samples{margin-top:6px; font-size:12px; color:var(--quiet); background:var(--soft); border-radius:10px; padding:8px}
   .samples div{white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
-  .samples b{color:var(--accent2); font-weight:600}
-  pre{white-space:pre-wrap; word-break:break-word; font-size:12px; color:var(--quiet); background:#0e0e16; border-radius:10px; padding:8px; margin-top:8px}
+  .samples b{color:var(--navy); font-weight:600}
+  pre{white-space:pre-wrap; word-break:break-word; font-size:12px; color:var(--quiet); background:var(--soft); border-radius:10px; padding:8px; margin-top:8px}
   table{width:100%; border-collapse:collapse; font-size:13px}
-  th, td{text-align:left; padding:6px 4px; border-bottom:1px solid var(--line); vertical-align:top}
-  th{color:var(--quiet); font-weight:600; font-size:12px}
+  th, td{text-align:left; padding:7px 6px; border-bottom:1px solid #e8eef7; vertical-align:top}
+  th{color:var(--quiet); font-weight:600; font-size:12px; background:#f7f9fd}
   td.n{text-align:right; white-space:nowrap}
-  h3{font-size:14px; margin:16px 0 4px; display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+  h3{font-size:14px; margin:18px 0 4px; display:flex; align-items:center; gap:8px; flex-wrap:wrap}
   h3 .sp{margin-left:auto}
   textarea.links{min-height:76px}
-  .pill.pl{background:#14304a; color:#7dd3fc} .pill.star{background:#3a2f12; color:var(--warn)} .pill.auto{background:#2a2140; color:var(--accent2)}
+  .pill.pl{background:var(--runbg); color:var(--run)} .pill.star{background:var(--warnbg); color:var(--warn)} .pill.auto{background:#e8eefb; color:var(--navy)}
   .warn{color:var(--warn)}
-  .card{background:#0e0e16; border:1px solid var(--line); border-radius:12px; padding:10px; margin-top:8px}
+  .card{background:#fbfdff; border:1px solid var(--line); border-radius:12px; padding:10px 12px; margin-top:8px}
   .card .row{padding:0; border:none}
-  .card .samples{background:#15151f}
-  details{margin-top:12px} summary{cursor:pointer; color:var(--quiet); font-size:13px}
-  button.star{background:#20202e; border:1px solid var(--line); color:var(--quiet)} button.star.on{background:#3a2f12; border-color:#6b5520; color:var(--warn)}
-  button.dl{background:#20202e; border:1px solid var(--line); color:var(--quiet)} button.dl.on{background:#12332a; border-color:#1f6b52; color:#6ee7b7}
-  .pill.dl{background:#12332a; color:#6ee7b7}
+  .card .samples{background:#fff; border:1px solid #e8eef7}
+  details{margin-top:12px} summary{cursor:pointer; color:var(--navy); font-size:13px}
+  button.star{background:#fff; border:1px solid var(--line); color:var(--quiet); font-weight:500} button.star.on{background:var(--warnbg); border-color:#e8c880; color:var(--warn)}
+  button.dl{background:#fff; border:1px solid var(--line); color:var(--quiet); font-weight:500} button.dl.on{background:var(--goodbg); border-color:#9fd8bf; color:var(--good)}
+  .pill.dl{background:var(--goodbg); color:var(--good)}
   #exTable td,#exTable th{font-size:12.5px}
   .chk{display:inline-flex; align-items:center; gap:5px; font-size:13px; color:var(--ink)}
-  .seg{display:inline-flex; background:#0e0e16; border:1px solid var(--line); border-radius:12px; padding:3px; gap:3px}
-  .seg button{background:transparent; color:var(--quiet); padding:6px 12px; border-radius:9px}
-  .seg button.on{background:var(--accent); color:#fff}
-  body.en .seg button.on{background:#0e7490}
-  body.en header{border-bottom:2px solid #0e7490}
-  .langNote{margin-top:8px; padding:8px 10px; border-radius:10px; background:#0b2a33; border:1px solid #0e7490; color:#a5f3fc; font-size:13px}
+  .seg{display:inline-flex; background:#fff; border:1px solid var(--line); border-radius:10px; overflow:hidden}
+  .seg button{background:#fff; color:var(--ink); padding:7px 14px; border-radius:0; font-weight:500; min-height:38px}
+  .seg button+button{border-left:1px solid var(--line)}
+  .seg button.on{background:var(--navy); color:#fff}
+  header .seg{background:rgba(255,255,255,.12); border-color:rgba(255,255,255,.3)}
+  header .seg button{background:transparent; color:#fff}
+  header .seg button+button{border-left-color:rgba(255,255,255,.3)}
+  header .seg button.on{background:#fff; color:var(--navy); font-weight:700}
+  body.en header{background:linear-gradient(135deg,var(--teal),var(--teal2))}
+  body.en .seg button.on{background:var(--teal)}
+  body.en header .seg button.on{background:#fff; color:var(--teal)}
+  .langNote{margin-top:8px; padding:8px 12px; border-radius:10px; background:#e3f4f8; border:1px solid #9fd3df; color:#0b5566; font-size:13px}
   body.en .vi-only{display:none}
-  @media (max-width:560px){ .row{flex-wrap:wrap} .row .acts{max-width:100%; justify-content:flex-start} .hide-sm{display:none} }
+  @media (max-width:560px){ header .ttl{font-size:21px} .row{flex-wrap:wrap} .row .acts{max-width:100%; justify-content:flex-start} .hide-sm{display:none} }
 </style>
 </head>
 <body>
 <header>
-  <div class="logo">K</div><b>Kho karaoke</b> <span class="hide-sm" style="color:var(--quiet);font-size:12px">quản trị</span>
+  <div class="logo">K</div><b class="ttl">Kho BMB Karaoke</b> <span class="hide-sm sub">quản trị</span>
   <span class="seg" id="khoSeg" title="Chọn kho đang quản trị — hai kho chạy riêng, cài đặt chung một trang"><button data-k="vi">Kho Việt</button><button data-k="en">Kho quốc tế</button></span>
   <button class="ghost sp" id="gear">⚙ Kết nối</button>
 </header>
@@ -232,7 +247,7 @@ const CLEAN_DEF = { vi:{ keep:8, tone:2 }, en:{ keep:4, tone:1 } };
 function paintKho(){
   document.querySelectorAll('#khoSeg button').forEach(b => b.classList.toggle('on', b.dataset.k === CUR));
   document.body.classList.toggle('en', CUR === 'en');
-  document.title = (CUR === 'en' ? 'Kho quốc tế' : 'Kho Việt') + ' · Kho karaoke';
+  document.title = (CUR === 'en' ? 'Kho quốc tế' : 'Kho Việt') + ' · Kho BMB Karaoke';
   $('clKeep').value = CLEAN_DEF[CUR].keep; $('clTone').value = CLEAN_DEF[CUR].tone;
   $('manual').placeholder = CUR === 'en' ? '1. My Love – Westlife\n2. Yesterday Once More – Carpenters' : '1. Tên bài – Ca sĩ\n2. Tên bài – Ca sĩ';
 }
