@@ -51,3 +51,9 @@ Tăng `versionCode` (và `versionName`) trong `android/app/build.gradle`, đẩy
 - Trang quầy có thêm nút 🛠️ Bảo trì / 📋 Đặt phòng → app xin vé 1 lần (`app.veAdmin`) rồi mở `https://boommusicbox.vn/admin.html#ve=…` — không phải đăng nhập lại. Trên admin.html có nút "← Quầy"; nút Quay lại của máy cũng về trang quầy.
 - Thông báo sự cố / đặt phòng: kênh riêng "Sự cố & đặt phòng (quản lý)"; trong giờ yên lặng hiện không kêu (sự cố Khẩn cấp vẫn kêu). Bấm thông báo → mở đúng sự cố / tab Đặt phòng.
 - Đang xem Bảo trì / Đặt phòng trong app thì chuông đơn gọi lễ tân vẫn kêu (chỉ im khi trang quầy đang hiện).
+
+## 2.9 — cửa cho NAS của quán qua http (chuẩn bị sẵn, quán không dùng NAS thì không đổi gì)
+- Trang TV có thể phát video từ NAS trong quán (xem README-BMBPlayer.md, mục "Phát từ thư viện video lưu sẵn"). Trang chạy https nên NAS dạng `http://192.168.x.x:8080/karaoke` cần APK cho phép.
+- `AndroidManifest`: `usesCleartextTraffic="true"`; `MainActivity`: `MIXED_CONTENT_ALWAYS_ALLOW`; `NativeBridge.mixedOk()` trả `true` (bản ≤2.8 không có hàm này → trang bỏ qua NAS http).
+- An toàn: `Client.shouldInterceptRequest` chặn mọi yêu cầu `http://` tới địa chỉ KHÔNG phải mạng nội bộ (`lanHost`: 10.x, 172.16–31.x, 192.168.x, 169.254.x, 127.x, localhost, tên một nhãn, `*.local`, `*.lan`, IPv6 ::1/fc00::/7/fe80::/10; so chữ, không tra DNS) bằng 403 rỗng. Trang chính vẫn phải https (`allowed()` không đổi). Trang TV (`index.html`, `lanHost`/`nasUsable`) kiểm cùng luật nên không chờ vô ích.
+- Chưa thử trên TV/box thật (máy dựng không có Android SDK, chỉ dựng được trên GitHub Actions). Cần thử: NAS http phát được, tua được (Range), quán không NAS vẫn phát R2/YouTube như cũ.

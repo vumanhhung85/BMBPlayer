@@ -402,7 +402,9 @@ public class MainActivity extends Activity {
         s.setAllowFileAccess(false);
         s.setAllowContentAccess(false);
         s.setCacheMode(WebSettings.LOAD_DEFAULT);
-        s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
+        // 2.9: cho trang https tải video từ NAS của quán qua http://<IP-LAN>. Chỉ http tới địa chỉ mạng nội bộ mới qua được (xem Client.shouldInterceptRequest + lanHost);
+        // http ra Internet vẫn bị chặn. Quán không dùng NAS thì không có yêu cầu http nào nên không có gì đổi.
+        s.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
         CookieManager cm = CookieManager.getInstance();
         cm.setAcceptCookie(true);
         cm.setAcceptThirdPartyCookies(web, true);           // khung YouTube cần cookie bên thứ ba
@@ -434,6 +436,30 @@ public class MainActivity extends Activity {
         web = null;
     }
 
+    /** 2.9: địa chỉ mạng nội bộ (NAS của quán): localhost, tên một nhãn (nas), *.local / *.lan, IPv4 10.x / 172.16–31.x / 192.168.x / 169.254.x / 127.x, IPv6 ::1 / fc00::/7 / fe80::/10.
+     *  Không tra DNS (so chữ thuần) để không bị lừa bằng tên miền công cộng trỏ về IP riêng. */
+    static boolean lanHost(String h) {
+        if (h == null || h.isEmpty()) return false;
+        h = h.toLowerCase(java.util.Locale.ROOT);
+        if (h.startsWith("[") && h.endsWith("]")) h = h.substring(1, h.length() - 1);
+        if (h.indexOf(':') >= 0) {                                   // IPv6
+            return h.equals("::1") || h.startsWith("fc") || h.startsWith("fd") || h.startsWith("fe8") || h.startsWith("fe9") || h.startsWith("fea") || h.startsWith("feb");
+        }
+        if (h.equals("localhost") || h.endsWith(".local") || h.endsWith(".lan")) return true;
+        if (h.indexOf('.') < 0) return true;                         // tên một nhãn như "nas"
+        String[] p = h.split("\\.", -1);
+        if (p.length != 4) return false;
+        int[] v = new int[4];
+        for (int i = 0; i < 4; i++) {
+            if (p[i].isEmpty() || p[i].length() > 3) return false;
+            for (int k = 0; k < p[i].length(); k++) if (p[i].charAt(k) < '0' || p[i].charAt(k) > '9') return false;
+            v[i] = Integer.parseInt(p[i]);
+            if (v[i] > 255) return false;
+        }
+        int a = v[0], b = v[1];
+        return a == 10 || a == 127 || (a == 192 && b == 168) || (a == 172 && b >= 16 && b <= 31) || (a == 169 && b == 254);
+    }
+
     private static boolean allowed(Uri u) {
         if (u == null) return false;
         String h = u.getHost();
@@ -455,6 +481,18 @@ public class MainActivity extends Activity {
     }
 
     private class Client extends WebViewClient {
+        /** 2.9: http chỉ được tới mạng nội bộ (NAS của quán). http ra ngoài → 403 rỗng, như trước khi có NAS. */
+        @Override
+        public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest req) {
+            try {
+                Uri u = req.getUrl();
+                if (u != null && "http".equalsIgnoreCase(u.getScheme()) && !lanHost(u.getHost())) {
+                    return new WebResourceResponse("text/plain", "utf-8", 403, "Blocked", null, new java.io.ByteArrayInputStream(new byte[0]));
+                }
+            } catch (Exception ignored) {}
+            return null;
+        }
+
         @Override
         public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest req) {
             if (!req.isForMainFrame()) return false;
@@ -1124,6 +1162,10 @@ public class MainActivity extends Activity {
 
     /** Gọi từ trang web (window.BMBNative). Chỉ cho đọc/đặt âm lượng, không gì khác. */
     private class NativeBridge {
+        /** 2.9: trang hỏi "app này có cho phát video http của NAS quán trong trang https không?". Bản cũ không có hàm này → trang bỏ qua NAS http. */
+        @JavascriptInterface
+        public boolean mixedOk() { return true; }
+
         @JavascriptInterface
         public int getVolume() { return volPct(); }
 

@@ -39,6 +39,8 @@
         </intent>
     </queries>
 
+    <!-- 2.9: cho phép http (cleartext) để phát video từ NAS của quán qua http://<IP-LAN>. Mã (MainActivity.Client.shouldInterceptRequest) chỉ cho http tới mạng nội bộ,
+         trang chính vẫn phải là https (allowed()). -->
     <application
         android:allowBackup="false"
         android:banner="@drawable/banner"
@@ -48,7 +50,7 @@
         android:largeHeap="true"
         android:supportsRtl="false"
         android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen"
-        android:usesCleartextTraffic="false">
+        android:usesCleartextTraffic="true">
 
         <activity
             android:name=".MainActivity"
