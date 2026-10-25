@@ -627,10 +627,25 @@ function libFind(id){
     })
     .catch(() => { clearTimeout(to); return null; });
 }
+/* Địa chỉ mạng nội bộ (giống APK 2.9, MainActivity.lanHost): tên một nhãn / localhost / *.local / *.lan, IPv4 10.x 172.16–31.x 192.168.x 169.254.x 127.x, IPv6 ::1 fc00::/7 fe80::/10 */
+function lanHost(h){
+  h = String(h || '').toLowerCase().replace(/^\[|\]$/g, '');
+  if(!h) return false;
+  if(h.indexOf(':') >= 0) return h === '::1' || /^(fc|fd|fe[89ab])/.test(h);
+  if(h === 'localhost' || /\.(local|lan)$/.test(h) || h.indexOf('.') < 0) return true;
+  const m = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if(!m) return false;
+  const a = +m[1], b = +m[2];
+  if(a > 255 || b > 255 || +m[3] > 255 || +m[4] > 255) return false;
+  return a === 10 || a === 127 || (a === 192 && b === 168) || (a === 172 && b >= 16 && b <= 31) || (a === 169 && b === 254);
+}
 function nasUsable(u){
   if(!u || Date.now() < nasOffUntil) return false;
-  if(location.protocol === 'https:' && /^http:/i.test(u)){
-    try{ return !!(window.BMBNative && typeof BMBNative.mixedOk === 'function' && BMBNative.mixedOk()); }catch(e){ return false; }
+  if(/^http:/i.test(u)){
+    try{ if(!lanHost(new URL(u).hostname)) return false; }catch(e){ return false; }     // http chỉ cho NAS trong mạng quán (APK 2.9 cũng chỉ cho đúng loại này)
+    if(location.protocol === 'https:'){
+      try{ return !!(window.BMBNative && typeof BMBNative.mixedOk === 'function' && BMBNative.mixedOk()); }catch(e){ return false; }
+    }
   }
   return true;
 }
