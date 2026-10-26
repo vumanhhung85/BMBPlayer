@@ -233,7 +233,8 @@
   <div class="line"><label class="chk">Top <input id="exTop" type="number" min="1" max="10000" value="2000" style="width:90px"> bài</label>
     <label class="chk">tối đa <input id="exPer" type="number" min="1" max="8" value="4" style="width:56px"> bản/bài</label>
     <label class="chk">lượt chọn trong <input id="exDays" type="number" min="1" max="3650" value="90" style="width:72px"> ngày</label>
-    <label class="chk"><input type="checkbox" id="exOnlyDl" checked> Chỉ nguồn được phép tải</label></div>
+    <label class="chk"><input type="checkbox" id="exOnlyDl" checked> Chỉ nguồn được phép tải</label>
+    <label class="chk" id="exVnL" title="Loại video tiếng Indonesia, Philippines, Thái, Anh… lẫn trong kho. Giữ lại: nguồn do anh thêm tay, nguồn có ⭐, và bài có chữ Việt trong tiêu đề hoặc tên kênh."><input type="checkbox" id="exVn" checked> Chỉ bài tiếng Việt (loại video nước ngoài)</label></div>
   <div class="line"><button class="ghost" id="exPrev">Xem trước</button> <button id="exCsv">⬇ Tải CSV</button></div>
   <div id="exOut" class="hint"></div>
   <div style="overflow:auto"><table id="exTable"></table></div>
@@ -256,6 +257,7 @@ function paintKho(){
   document.querySelectorAll('#khoSeg button').forEach(b => b.classList.toggle('on', b.dataset.k === CUR));
   document.body.classList.toggle('en', CUR === 'en');
   document.title = (CUR === 'en' ? 'Kho quốc tế' : 'Kho Việt') + ' · Kho BMB Karaoke';
+  if(typeof exModeUi === 'function') exModeUi();
   $('clKeep').value = CLEAN_DEF[CUR].keep; $('clTone').value = CLEAN_DEF[CUR].tone;
   $('manual').placeholder = CUR === 'en' ? '1. My Love – Westlife\n2. Yesterday Once More – Carpenters' : '1. Tên bài – Ca sĩ\n2. Tên bài – Ca sĩ';
 }
@@ -812,16 +814,16 @@ function exDlCount(){
   $('exDl').className = n ? '' : 'warn';
 }
 function exParams(){ return { top: +$('exTop').value || 2000, per: +$('exPer').value || 4, days: +$('exDays').value || 90, onlyDl: $('exOnlyDl').checked,
-  by: $('exBy').value, rising: Math.max(0, Math.min(50, +$('exRise').value || 0)), minPicks: Math.max(1, +$('exMin').value || 3) }; }
+  vnOnly: $('exVn').checked, by: $('exBy').value, rising: Math.max(0, Math.min(50, +$('exRise').value || 0)), minPicks: Math.max(1, +$('exMin').value || 3) }; }
 const EX_WHY = { views:'Lượt xem', rising:'Đang lên', picks:'Lượt chọn', hot:'Hot' };
-function exModeUi(){ const m = $('exBy').value; $('exRiseL').style.display = m === 'pick' ? 'none' : ''; $('exMinL').style.display = m === 'mix' ? '' : 'none'; }
+function exModeUi(){ $('exVnL').style.display = CUR === 'en' ? 'none' : ''; const m = $('exBy').value; $('exRiseL').style.display = m === 'pick' ? 'none' : ''; $('exMinL').style.display = m === 'mix' ? '' : 'none'; }
 $('exBy').onchange = exModeUi; exModeUi();
 $('exPrev').onclick = async () => {
   const b = $('exPrev'); b.disabled = true; $('exOut').textContent = 'Đang tính…'; $('exTable').replaceChildren();
   try{
     const d = await api('/api/kho/export', exParams());
     const tones = {}; d.items.forEach(x => { tones[x.tone] = (tones[x.tone] || 0) + 1; });
-    $('exOut').textContent = d.note ? d.note : ('Lượt chọn của khách trong ' + d.days + ' ngày: ' + fmt(d.picksTotal) + ' lượt, ' + fmt(d.songsPicked) + ' bài. ' + fmt(d.songs) + ' bài · ' + fmt(d.items.length) + ' bản (' + Object.entries(tones).map(([t, n]) => (TONE_VN[t] || t) + ' ' + fmt(n)).join(', ') + ')' +
+    $('exOut').textContent = d.note ? d.note : ((d.vnOnly ? 'Đã loại ' + fmt(d.droppedLangSongs || 0) + ' bài nước ngoài (' + fmt(d.droppedLangVersions || 0) + ' bản). ' : '') + 'Lượt chọn của khách trong ' + d.days + ' ngày: ' + fmt(d.picksTotal) + ' lượt, ' + fmt(d.songsPicked) + ' bài. ' + fmt(d.songs) + ' bài · ' + fmt(d.items.length) + ' bản (' + Object.entries(tones).map(([t, n]) => (TONE_VN[t] || t) + ' ' + fmt(n)).join(', ') + ')' +
       (d.songs < d.top ? ' — chưa đủ ' + fmt(d.top) + ' bài vì các bài còn lại không có bản của nguồn được phép tải' : '') + '. Bảng dưới hiện 60 bản đầu.');
     const t = $('exTable'), hr = el('tr');
     ['Hạng', 'Giọng', 'Tiêu đề', 'Kênh', 'Lượt xem', 'Chọn (bản/bài)', 'Lý do', 'ID'].forEach(x => hr.append(el('th', null, x))); t.append(hr);
@@ -835,7 +837,7 @@ $('exCsv').onclick = async () => {
   try{
     if(!cfg.kho || !cfg.pass) throw new Error('Chưa nhập địa chỉ Worker kho và mật khẩu');
     const q = exParams();
-    const res = await fetch(cfg.kho + '/api/kho/export?format=csv&top=' + q.top + '&per=' + q.per + '&days=' + q.days + '&dl=' + (q.onlyDl ? 1 : 0) + '&by=' + q.by + '&rising=' + q.rising + '&minPicks=' + q.minPicks, { headers:{ 'x-pass':cfg.pass } });
+    const res = await fetch(cfg.kho + '/api/kho/export?format=csv&top=' + q.top + '&per=' + q.per + '&days=' + q.days + '&dl=' + (q.onlyDl ? 1 : 0) + '&vn=' + (q.vnOnly && CUR !== 'en' ? 1 : 0) + '&by=' + q.by + '&rising=' + q.rising + '&minPicks=' + q.minPicks, { headers:{ 'x-pass':cfg.pass } });
     if(!res.ok){ let d = {}; try{ d = await res.json(); }catch(e){} throw new Error(d.error || 'Lỗi ' + res.status); }
     const blob = await res.blob(), a = document.createElement('a');
     a.href = URL.createObjectURL(blob); a.download = 'kho-' + CUR + '-' + q.by + '-top' + q.top + 'x' + q.per + '.csv';
