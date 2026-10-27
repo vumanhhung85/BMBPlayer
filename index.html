@@ -22,6 +22,9 @@
   /* Bài phát từ thư viện lưu sẵn (NAS của quán / R2): thẻ <video> thay chỗ khung YouTube */
   #vid{position:absolute; inset:0; width:100%; height:100%; background:#000; object-fit:contain; display:none}
   body.vsrc #vid{display:block}
+  /* Lớp hứng chạm phủ lên khung YouTube: bấm chuột/chạm vào khung iframe thì trang KHÔNG nhận được sự kiện (khung là trang khác của YouTube)
+     → không bao giờ bật tiếng được. Lớp này nhận cú bấm cho trang: bật tiếng / mở khoá phát, bấm lại = dừng/phát như trước */
+  #tap{position:absolute; inset:0; z-index:2; background:transparent; -webkit-tap-highlight-color:transparent}
   body.vsrc #yt, body.vsrc #stage iframe{visibility:hidden}
   /* Màn chuyển bài: hết bài / đang nạp bài mới thì ẨN trình phát (không phủ lên video đang phát) để không lộ ô gợi ý video của YouTube */
   #swap{position:absolute; inset:0; z-index:3; display:none; flex-direction:column; align-items:center; justify-content:center; gap:2.4vh; padding:4vw; text-align:center;
@@ -222,6 +225,7 @@
 <div id="stage">
   <div id="yt"></div>
   <video id="vid" playsinline preload="auto" disablepictureinpicture disableremoteplayback></video>
+  <div id="tap"></div>
   <div id="swap"><img class="logo" src="Logo_BoomBox.png" alt=""><div class="s1">SẮP HÁT</div><div class="s2" id="swapT"></div></div>
   <div id="score"><div class="rays"></div><canvas id="scConf"></canvas>
     <div class="box"><div class="head" id="scHead">ĐANG CHẤM ĐIỂM…</div><div class="song" id="scSong"></div>
@@ -1014,7 +1018,7 @@ function onGesture(){
   if(!fsTried && !params.has('nofs')){ fsTried = true; try{ const p = document.documentElement.requestFullscreen(); if(p && p.catch) p.catch(sleepless); }catch(e){} }
   keepAwake();
   if(!ready) return;
-  if(lock === 'muted'){ if(!userMuted) P().unMute(); setLock(null); }
+  if(lock === 'muted'){ if(!userMuted) P().unMute(); setLock(null); unlockAt = Date.now(); }   // cú bấm này chỉ để bật tiếng, không dừng bài
   else if(lock === 'tap'){ P().playVideo(); if(!userMuted) P().unMute(); setLock(null); unlockAt = Date.now(); }
 }
 ['pointerdown','touchstart','keydown'].forEach(ev => window.addEventListener(ev, onGesture, { passive:true }));
@@ -1023,6 +1027,7 @@ let uiTimer;
 function showUI(){ document.body.classList.add('ui'); clearTimeout(uiTimer); uiTimer = setTimeout(() => document.body.classList.remove('ui'), 5000); }
 window.addEventListener('mousemove', showUI);
 
+$('tap').onclick = playPause;          // bấm vào video: lần đầu bật tiếng (onGesture), các lần sau dừng/phát như khung YouTube cũ
 $('playBtn').onclick = playPause; $('nextBtn').onclick = next; $('replayBtn').onclick = replay;
 $('muteBtn').onclick = toggleMute;
 $('vol').oninput = e => setVol(+e.target.value);
