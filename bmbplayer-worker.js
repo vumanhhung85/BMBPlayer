@@ -388,6 +388,8 @@ async function handleApi(request, env, ctx) {
         case 'quay.feed':                res = await quayFeed(env, body); break;
         case 'quay.don':                 res = await quayDon(env, body, ctx); break;
         case 'quay.phong':               res = await quayPhong(env, body, ctx); break;
+        case 'quay.hg':                  res = await quayHg(env, body); break;
+        case 'quay.hgSet':               res = await quayHgSet(env, body); break;
         case 'quay.tv':                  res = await quayTv(env, body); break;
         case 'quay.nhatKy':              res = await quayNhatKy(env, body); break;
         case 'admin.knTongQuan':         res = await adminKnTongQuan(env, body); break;
@@ -677,12 +679,21 @@ async function quayFeed(env, body) {
     env.DB.prepare('SELECT id, ten_phong, dang_mo, mo_luc FROM order_phong WHERE chi_nhanh_id = ? ORDER BY ten_phong ASC').bind(ss.b),
     env.DB.prepare('SELECT * FROM order_don WHERE chi_nhanh_id = ? AND tao_luc >= ? ORDER BY tao_luc DESC LIMIT ?').bind(ss.b, mocNgay(ngayKinhDoanh()), FEED_MAX_DON)
   ]);
+  const hgBat = await hgOn(env, ss.b), hgMap = {};
+  if (hgBat) {                                  // nhắc giờ hát: đọc bản chép trong D1 (1 truy vấn cho cả chi nhánh, không gọi từng phòng)
+    try {
+      await hgBang(env);
+      const hr = await env.DB.prepare('SELECT phong_id, het, phut FROM phong_hg WHERE phong_id IN (SELECT id FROM order_phong WHERE chi_nhanh_id = ?)').bind(ss.b).all();
+      for (const h of hr.results || []) hgMap[h.phong_id] = { end: h.het, min: h.phut };
+    } catch (e) { console.error('quayFeed hg', e && e.name); }
+  }
   const rooms = phongRs.results.sort(sapPhong).map(r => ({
     roomId: r.id, roomName: r.ten_phong, open: !!r.dang_mo,
-    hours: (r.dang_mo && r.mo_luc) ? Math.floor((now - r.mo_luc) / 3600000) : 0
+    hours: (r.dang_mo && r.mo_luc) ? Math.floor((now - r.mo_luc) / 3600000) : 0,
+    hg: r.dang_mo && hgMap[r.id] ? hgMap[r.id] : undefined
   }));
   const orders = donRs.results.reverse().map(donRaClient);
-  return ok({ rooms, orders, ips: [], ngay: ngayKinhDoanh() });
+  return ok({ rooms, orders, ips: [], ngay: ngayKinhDoanh(), hgOn: hgBat, now });
 }
 
 // ---------- quay.lichSu: {ngay:'YYYY-MM-DD'} — toàn bộ đơn của 1 ngày kinh doanh (06:00 → 06:00) ----------
@@ -760,11 +771,16 @@ async function quayPhong(env, body, ctx) {
   const roomId = s(body.roomId, 60);
   if (!roomId) return fail('missing_roomId');
   const open = !!body.open;
+  const hgMin = open ? hgPhut(body.hg) : 0;           // nhắc giờ hát: số phút khách dặn lúc mở phòng (0 / không gửi = không nhắc)
   const r = await env.DB.prepare(
     'UPDATE order_phong SET dang_mo = ?, mo_luc = ? WHERE id = ? AND chi_nhanh_id = ?'
   ).bind(open ? 1 : 0, open ? Date.now() : null, roomId, ss.b).run();
   if (!r.meta.changes) return fail('not_found');
   await baoKenhPhong(env, roomId);
+  if (hgMin > 0 && await hgOn(env, ss.b)) {           // sau khi Room đã áp lượt mở mới (lượt mới xoá nhắc giờ cũ)
+    try { await call(roomStub(env, roomId), '/hg', { id: roomId, min: hgMin, nguon: 'quay' }); }
+    catch (e) { console.error('quayPhong hg:', e && e.name); }
+  }
   chayNen(ctx, pokeQuay(env, ss.b, 'phong'));       // màn quầy khác của chi nhánh cập nhật lưới phòng ngay
   return ok({});
 }
@@ -1100,6 +1116,70 @@ async function adminScoreSet(env, body) {
   scoreCache = { v, at: Date.now() };
   return ok({ score: v });
 }
+/* ---------- Nhắc giờ hát (từ 10/2026) ----------
+   Khách dặn trước "hát 2 tiếng": quầy chọn số phút ngay lúc mở phòng (hoặc khách tự đặt ở remote.html). Phòng KHÔNG tự đóng — TV chỉ nhắc, khách hát tiếp thì đồng hồ đếm tăng "+n phút".
+   Công tắc theo chi nhánh (quản lý/admin bật ở quầy): order_meta khoá 'hg' = JSON {<mã chi nhánh>: {on:1}}; chưa đặt = TẮT (chạy y như trước, remote/TV không hiện gì).
+   Giờ kết thúc (hg = {end, min, nguon, sent}) lưu trong Durable Object Room (nguồn chính cho TV/remote: TV rớt mạng rồi nối lại vẫn đúng giờ) và chép sang bảng D1 phong_hg
+   để quầy đọc rẻ (quay.feed không gọi Room từng phòng). end = lúc đặt + số phút + 1 phút ngầm (đồng hồ hiện đủ "còn N phút" lúc đầu). Tính theo PHÚT, không theo giây.
+   Hết giờ: báo quầy (rung chuông quầy + chip) và Telegram quản lý/quầy chi nhánh (TG_HETGIO="0" tắt). Cộng thêm: remote gửi {type:'hg', add:15|30|60}. */
+const HG_MAX_PHUT = 720, HG_GRACE_MS = 60000;
+let hgCache = { v: null, at: 0 }, hgSan = false;
+async function hgCfg(env) {
+  if (hgCache.v && Date.now() - hgCache.at < 20000) return hgCache.v;
+  let v = {};
+  try { const r = await env.DB.prepare(`SELECT v FROM order_meta WHERE k = 'hg'`).first(); if (r && r.v) v = JSON.parse(r.v); } catch (e) { /* chưa có bảng / hỏng → tắt */ }
+  if (!v || typeof v !== 'object' || Array.isArray(v)) v = {};
+  hgCache = { v, at: Date.now() };
+  return v;
+}
+async function hgOn(env, cn) { const c = await hgCfg(env); return !!(cn && c[cn] && c[cn].on); }
+async function hgBang(env) {
+  if (hgSan) return;
+  await env.DB.prepare('CREATE TABLE IF NOT EXISTS phong_hg (phong_id TEXT PRIMARY KEY, het INTEGER NOT NULL, phut INTEGER NOT NULL, nguon TEXT NOT NULL DEFAULT \'\')').run();
+  hgSan = true;
+}
+const hgPhut = v => { const n = Math.round(+v); return Number.isFinite(n) ? Math.max(0, Math.min(HG_MAX_PHUT, n)) : 0; };
+// quay.hgSet {on} — quản lý / admin bật hoặc tắt cho CHÍNH chi nhánh đang chọn
+async function quayHgSet(env, body) {
+  const [ss, loi] = await canPhien(env, body, 'quanLy');
+  if (loi) return loi;
+  hgCache.at = 0;
+  const cfg = await hgCfg(env);
+  cfg[ss.b] = { on: body.on === true || body.on === 1 || body.on === '1' ? 1 : 0 };
+  await pushBangSan(env);
+  await env.DB.prepare(`INSERT INTO order_meta (k, v) VALUES ('hg', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v`).bind(JSON.stringify(cfg)).run();
+  hgCache = { v: cfg, at: Date.now() };
+  return ok({ on: !!cfg[ss.b].on });
+}
+// quay.hg {roomId, min | add} — nhân viên đặt / thêm / tắt nhắc giờ cho phòng đang mở (min = 0 → tắt; tính từ bây giờ)
+async function quayHg(env, body) {
+  const [ss, loi] = await canPhien(env, body);
+  if (loi) return loi;
+  const [p, loi2] = await phongCuaChiNhanh(env, ss, s(body.roomId, 60));
+  if (loi2) return loi2;
+  if (!(await hgOn(env, ss.b))) return fail('hg_tat', 400, 'Chi nhánh chưa bật nhắc giờ hát.');
+  const r = await call(roomStub(env, p.id), '/hg', { id: p.id, min: body.min, add: body.add, nguon: 'quay' });
+  if (!r.ok) return fail(r.error || 'loi', 400, r.error === 'dong' ? 'Phòng chưa mở.' : 'Không đặt được nhắc giờ.');
+  return ok({ hg: r.hg || null });
+}
+// Telegram: phòng hết giờ đặt → quản lý + nhân viên quầy đúng chi nhánh vào hỏi khách có hát tiếp không (cùng người nhận với tin đơn gọi lễ tân)
+async function tgHetGio(env, c, hg) {
+  try {
+    if (String(env.TG_HETGIO || '1') === '0' || !env.DB || !c.branch) return;
+    const rs = await env.DB.batch([
+      env.DB.prepare(`SELECT gia_tri FROM cai_dat WHERE khoa = 'tg_bot_token'`),
+      env.DB.prepare(`SELECT tg_chat_id FROM tai_khoan WHERE chi_nhanh_id = ? AND vai_tro IN ('manager', 'quay') AND hoat_dong = 1 AND tg_chat_id <> '' AND tg_tam_dung = 0`).bind(c.branch)
+    ]);
+    const token = String((rs[0].results[0] || {}).gia_tri || '').trim();
+    const chats = [...new Set(rs[1].results.map(r => String(r.tg_chat_id).trim()).filter(Boolean))];
+    if (!token || !chats.length) return;
+    const gio = hg.min % 60 === 0 ? (hg.min / 60) + ' giờ' : hg.min + ' phút';
+    const text = '⏰ <b>Phòng ' + escHtml(c.name) + (c.bname ? ' · ' + escHtml(c.bname) : '') + ' đã hết giờ đặt</b>\nKhách đặt hát ' + gio + (hg.nguon === 'khach' ? ' (khách tự đặt trên điện thoại)' : '') +
+      '.\nTV đã báo khách, phòng vẫn mở và khách đang hát tiếp. Mời nhân viên vào hỏi khách có hát thêm không.\n🕒 ' + hhmmVn(Date.now());
+    await Promise.allSettled(chats.map(chat => tgGoi(token, 'sendMessage', { chat_id: chat, text, parse_mode: 'HTML', disable_web_page_preview: true })));
+  } catch (e) { console.error('tgHetGio:', e && e.name); }
+}
+
 /* ---------- Thư viện video lưu sẵn: phát file của mình trước, không có thì YouTube nhúng (từ 10/2026) ----------
    File do app Tải Video tải về bucket R2 "taivideo-files" (binding LIB, CHỈ ĐỌC ở Worker này): videos/<thư mục>/<mã YouTube>.mp4,
    thư mục theo kho: vn (kho Việt), en (kho quốc tế), '.' = thẳng trong videos/ (bài dán tay không đặt thư mục con) — biến LIB_DIRS. Sau này mỗi quán có thể có NAS cùng cấu trúc <địa chỉ NAS>/<thư mục>/<mã>.mp4.
@@ -2233,13 +2313,13 @@ async function quayTv(env, body) {
     let st = {};
     try { st = await call(roomStub(env, r.id), '/status', { id: r.id, open: !!r.dang_mo, mo: r.mo_luc || 0 }); } catch (e) { console.error('quayTv status', r.id, e); st = { err: 1 }; }
     const x = { roomId: r.id, roomName: r.ten_phong, open: !!r.dang_mo, since: r.mo_luc || 0,
-      tv: !!st.tv, tablets: st.tablets || 0, remotes: st.remotes || 0, offNet: st.offNet || 0, ph: st.ph || null };
+      tv: !!st.tv, tablets: st.tablets || 0, remotes: st.remotes || 0, offNet: st.offNet || 0, ph: st.ph || null, hg: st.hg || null };
     if (st.open) x.tokQr = await mkToken(env, r.id, 'qr', st.genQ);
     if (ss.r === 'admin') x.tokTv = await mkToken(env, r.id, 'tv', st.genT);
     return x;
   }));
   const lm = String((cn && cn.link_maps) || '').trim();
-  return ok({ rooms, reviewUrl: /^https?:\/\//i.test(lm) ? lm : '', net: env.NET_CHECK || 'off' });
+  return ok({ rooms, reviewUrl: /^https?:\/\//i.test(lm) ? lm : '', net: env.NET_CHECK || 'off', hgOn: await hgOn(env, ss.b), now: Date.now() });
 }
 // ---------- Mạng của chi nhánh ----------
 // Chi nhánh có thể có 2 đường mạng (router cân bằng tải) và IP công cộng đổi khi modem tắt, nên KHÔNG so cứng với 1 IP.
@@ -2513,7 +2593,8 @@ export class Room extends DurableObject {
   async roomMsg(c, extra){
     c = c || await this.cfg();
     return Object.assign({ type: 'room', open: c.open, since: c.since, session: c.session, name: c.name, bname: c.bname, branch: c.branch, tv: this.sockets('tv').length > 0,
-      remotes: this.sockets('remote').length, tablets: this.sockets('tablet').length, seek: await seekOn(this.env), cl: (await this.ctx.storage.get('cl')) || 0 }, extra || {});
+      remotes: this.sockets('remote').length, tablets: this.sockets('tablet').length, seek: await seekOn(this.env), cl: (await this.ctx.storage.get('cl')) || 0,
+      hgOn: await hgOn(this.env, c.branch), hg: c.open ? await this.hgView() : null, tn: Date.now() }, extra || {});    // hg = nhắc giờ hát {end, min}; tn = giờ máy chủ (TV/điện thoại tự bù lệch đồng hồ)
   }
   /* Phần riêng từng vai trò: TV nhận mã QR khách để vẽ ở góc màn hình, máy tính bảng nhận vé tìm bài */
   async roleExtra(c, role){
@@ -2563,14 +2644,57 @@ export class Room extends DurableObject {
     await this.endGuests();
     await this.ctx.storage.put({ open: true, since: mo || Date.now(), moLuc: mo, session: c.session + 1, genQ: c.genQ + 1 });
     await this.ctx.storage.delete(['last', 'svc']);
+    await this.hgBo();
     await this.broadcastRoom();
   }
   async applyClose(c){
     await this.ghi('dong', {});
     await this.ctx.storage.put({ open: false, since: 0, moLuc: 0, session: c.session + 1 });
     await this.ctx.storage.delete(['last', 'svc']);
+    await this.hgBo();
     await this.endGuests();
     await this.broadcastRoom({ reason: 'closed' });     // TV và máy tính bảng vẫn nối, chỉ chuyển sang "phòng chưa mở"
+  }
+  /* ---- Nhắc giờ hát (xem khối hgCfg ở trên) ---- */
+  async hgView(){ const h = await this.ctx.storage.get('hg'); return h && h.end ? { end: h.end, min: h.min } : null; }
+  async hgBo(){                                         // mở lượt mới / đóng phòng: xoá nhắc giờ (storage + bản chép D1)
+    await this.ctx.storage.delete('hg');
+    const rid = (await this.ctx.storage.get('rid')) || this.nkRid;
+    if(rid && this.env.DB){ try{ await hgBang(this.env); await this.env.DB.prepare('DELETE FROM phong_hg WHERE phong_id = ?').bind(rid).run(); }catch(e){} }
+  }
+  /* o = {min} đặt từ bây giờ (0 = tắt) hoặc {add} thêm phút (đang đếm: cộng vào giờ cũ; đã hết giờ: đếm lại từ bây giờ). nguon: 'quay' | 'khach' */
+  async hgDat(o){
+    const c = await this.cfg();
+    if(!c.open) return { ok: false, error: 'dong' };
+    if(!(await hgOn(this.env, c.branch))) return { ok: false, error: 'tat' };
+    const now = Date.now(), min = hgPhut(o.min), add = hgPhut(o.add), nguon = o.nguon === 'khach' ? 'khach' : 'quay';
+    let hg = await this.ctx.storage.get('hg');
+    if(add){
+      if(hg && hg.end > now) hg = { min: Math.min(HG_MAX_PHUT, hg.min + add), end: hg.end + add * 60000, nguon, sent: 0 };
+      else hg = { min: add, end: now + add * 60000 + HG_GRACE_MS, nguon, sent: 0 };
+    }else if(min) hg = { min, end: now + min * 60000 + HG_GRACE_MS, nguon, sent: 0 };
+    else hg = null;
+    if(hg) await this.ctx.storage.put('hg', hg); else await this.ctx.storage.delete('hg');
+    if(this.env.DB && c.rid){
+      try{
+        await hgBang(this.env);
+        if(hg) await this.env.DB.prepare('INSERT INTO phong_hg (phong_id, het, phut, nguon) VALUES (?,?,?,?) ON CONFLICT(phong_id) DO UPDATE SET het = excluded.het, phut = excluded.phut, nguon = excluded.nguon').bind(c.rid, hg.end, hg.min, hg.nguon).run();
+        else await this.env.DB.prepare('DELETE FROM phong_hg WHERE phong_id = ?').bind(c.rid).run();
+      }catch(e){ console.error('hgDat d1', e && e.name); }
+    }
+    if(hg){ const al = await this.ctx.storage.getAlarm(); if(!al || al > hg.end) await this.ctx.storage.setAlarm(hg.end); }   // báo thức đúng giờ hết (alarm() tự đặt lại lịch kiểm 5 phút của TV)
+    console.log('hg', c.rid || '', JSON.stringify({ min: hg ? hg.min : 0, nguon }));
+    await this.broadcastRoom();
+    if(c.branch) await pokeQuay(this.env, c.branch, 'hg');       // quầy tải lại chip giờ
+    return { ok: true, hg: hg ? { end: hg.end, min: hg.min } : null };
+  }
+  /* Đến giờ hết: TV đã tự hiện thông báo theo đồng hồ; ở đây báo quầy (chuông + chip) và Telegram để nhân viên vào hỏi khách */
+  async hetGio(hg){
+    const c = await this.cfg();
+    if(!c.open) return;
+    await this.broadcastRoom();
+    if(c.branch) await pokeQuay(this.env, c.branch, 'hg');
+    await tgHetGio(this.env, c, hg);
   }
   /* Đọc lại phòng trong D1 của Order và áp thay đổi (mở/đóng/lượt mới/đổi tên/phòng bị xoá) */
   async syncDb(){
@@ -2596,11 +2720,18 @@ export class Room extends DurableObject {
     else if(changedMeta) await this.broadcastRoom();
     return await this.cfg();
   }
-  async alarm(){                                       // TV đang bật: 5 phút/lần tự đọc lại D1 (lưới an toàn nếu Order chưa báo sang)
-    if(!this.ctx.getWebSockets('tv').length) return;
-    this.reapStale();
-    await this.syncDb();
-    await this.ctx.storage.setAlarm(Date.now() + RESYNC_MS);
+  async alarm(){                                       // TV đang bật: 5 phút/lần tự đọc lại D1 (lưới an toàn nếu Order chưa báo sang); thêm: đến giờ hết của nhắc giờ hát thì báo quầy
+    const now = Date.now();
+    const hg = await this.ctx.storage.get('hg');
+    if(hg && !hg.sent && now >= hg.end - 1000){
+      hg.sent = 1; await this.ctx.storage.put('hg', hg);
+      try{ await this.hetGio(hg); }catch(e){ console.error('hetGio', e && e.name); }
+    }
+    let next = 0;
+    if(this.ctx.getWebSockets('tv').length){ this.reapStale(); await this.syncDb(); next = Date.now() + RESYNC_MS; }
+    const h2 = await this.ctx.storage.get('hg');
+    if(h2 && !h2.sent) next = next ? Math.min(next, h2.end) : h2.end;
+    if(next) await this.ctx.storage.setAlarm(next);
   }
   /* Quầy hỏi tình trạng (tab TV & phòng, 23+ phòng mỗi lần): KHÔNG đọc D1 mỗi lần nữa — quầy gửi kèm trạng thái mở/đóng đọc từ D1,
      chỉ khi lệch với phòng này đang nhớ thì mới đọc lại D1 (mở/đóng đã được báo sang ngay lúc bấm + lưới an toàn 5 phút). */
@@ -2613,7 +2744,7 @@ export class Room extends DurableObject {
     for(const ws of this.sockets('remote')){ const a = ws.deserializeAttachment() || {}; if(a.off) off++; }
     return { remotes: this.sockets('remote').length, tablets: this.sockets('tablet').length, tv: this.sockets('tv').length > 0, net, offNet: off,
       open: c.open, since: c.since, genQ: c.genQ, genT: c.genT, tvIp: (await this.ctx.storage.get('tvIp')) || '', cl: (await this.ctx.storage.get('cl')) || 0,
-      ph: c.open && this.sockets('tv').length ? await this.phatTt() : null };
+      ph: c.open && this.sockets('tv').length ? await this.phatTt() : null, hg: c.open ? await this.hgView() : null };
   }
   /* TV đang làm gì (quầy xem): lấy từ bản trạng thái TV báo gần nhất (TV báo mỗi khi đổi bài / dừng / phát / khoá tiếng…). Không thêm tin nhắn nào. */
   async phatTt(){
@@ -2648,6 +2779,7 @@ export class Room extends DurableObject {
       return jres({ ok: true, cl });
     }
     if(u.pathname === '/svc'){ await this.svcPut(body.don || {}); return jres({ ok: true }); }
+    if(u.pathname === '/hg') return jres(await this.hgDat(body));
     if(u.pathname === '/rotate'){
       const role = body.kind === 'tv' ? 'tv' : body.kind === 'tb' ? 'tablet' : 'remote', c = await this.cfg();
       const g = c[GEN[role]] + 1;
@@ -2745,6 +2877,13 @@ export class Room extends DurableObject {
     if(a.n > RATE_PER_SEC) return;
     let m; try{ m = JSON.parse(data); }catch(e){ return; }
     if(!m || typeof m !== 'object') return;
+
+    if(m.type === 'hg'){                                 // điện thoại / máy tính bảng đặt nhắc giờ hát: {min} đặt từ bây giờ (0 = tắt) hoặc {add} thêm phút
+      if(a.role === 'tv' || (a.role === 'remote' && !a.ok) || data.length > 120) return;
+      const r = await this.hgDat({ min: m.min, add: m.add, nguon: 'khach' });
+      try{ ws.send(JSON.stringify({ type: 'hgr', ok: !!r.ok, error: r.error || '' })); }catch(e){}
+      return;
+    }
 
     if(m.type === 'dg'){                                 // máy tự báo sau khi nối lại: vì sao mất, mất bao lâu, ping, loại mạng (xem phong-channel.js)
       if(now - (a.dgT || 0) < 15000 || data.length > 600) return;

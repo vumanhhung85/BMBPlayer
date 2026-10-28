@@ -360,6 +360,14 @@ tbody tr:hover td{background:#FBF8FE}
 .knfrm label{font-size:12.5px;color:var(--txt-mute);display:flex;flex-direction:column;gap:4px}
 .knfrm select{background:#fff;border:1px solid #CDB8E3;border-radius:10px;padding:8px 10px;font:inherit;font-size:13.5px;color:var(--txt)}
 .chip.ph{flex-basis:100%;max-width:100%;white-space:normal;line-height:1.35;border-radius:12px;padding-top:5px;padding-bottom:5px}
+
+/* Nhắc giờ hát: chip còn N phút / +n phút (chi nhánh bật). Xanh ≤15 · vàng ≤10 · đỏ ≤5 · tím = quá giờ (khách vẫn hát tiếp) */
+.hgq{display:inline-block;font-style:normal;font-size:10px;font-weight:800;border-radius:9px;padding:1px 6px;white-space:nowrap;line-height:1.3;background:#fff;color:var(--txt-dim);border:1px solid var(--line);margin-top:1px}
+.hgq.hg-g{background:#E3F6EC;color:#0F7A4D;border-color:#A9E0C4} .hgq.hg-y{background:#FFF1D6;color:#8A5200;border-color:#F0D79A}
+.hgq.hg-r{background:#FFE9ED;color:#B5223E;border-color:#F5B5C0} .hgq.hg-o{background:#EFE4F8;color:#4B1272;border-color:#D9C6EC}
+.chip.hgq{font-size:11.5px;padding:3px 10px}
+.hgbtns{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.hgbtns .btn{flex:1 1 30%;min-width:84px;justify-content:center}
 /* Cài đặt → thư viện video lưu sẵn: mỗi chi nhánh một dòng */
 .librow{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px;background:var(--plum)}
 .librow .libst{font-size:11px;font-weight:800;padding:1px 8px;border-radius:999px;background:var(--tint);color:var(--txt-mute);margin-left:6px}
@@ -471,6 +479,11 @@ tbody tr:hover td{background:#FBF8FE}
     <button class="btn btn-ghost btn-sm" id="btnNhatKy" style="display:none;margin:6px 8px 6px 0">🧾 Nhật ký kết nối</button>
     <button class="btn btn-ghost btn-sm" id="btnPrintRv" style="margin:6px 0 6px;border-color:#A9E0C4;color:#0F7A4D">⭐ In QR ĐÁNH GIÁ (thẻ riêng, không số phòng)</button>
     <div class="hint" id="rvHint" style="margin:4px 0 6px">Dùng đường dẫn Google Maps của chi nhánh.</div>
+    <div class="mrow" id="hgAdmin" style="display:none">
+      <div style="flex:1;min-width:200px"><b>⏱ Nhắc giờ hát cho khách</b>
+        <div class="hint" style="margin:2px 0 0">Bật: lúc mở phòng hiện hộp hỏi khách hát bao lâu, khách cũng tự đặt được trên remote. TV nhắc ở 15 · 10 · 5 phút còn lại, hết giờ phòng vẫn mở và đồng hồ đếm tăng +phút. Khi phòng hết giờ quầy được báo (chuông + chip) và Telegram (người đã kết nối) để vào hỏi khách. Mặc định tắt, chỉ áp dụng cho chi nhánh này.</div></div>
+      <button class="btn btn-ghost btn-sm" id="btnHgSw">Đang tắt</button>
+    </div>
     <div class="tvgrid" id="tvList"><div class="mut">Đang tải…</div></div>
   </div>
 
@@ -593,6 +606,23 @@ tbody tr:hover td{background:#FBF8FE}
       <button class="btn btn-ghost btn-sm" id="btnQrCopy">Chép liên kết</button>
       <button class="btn btn-y btn-sm" id="btnQrDong">Đóng</button>
     </div>
+  </div>
+</div>
+
+<!-- Modal nhắc giờ hát: hiện lúc bấm Mở phòng (chi nhánh bật) và khi bấm ⏱ Nhắc giờ ở phòng đang mở -->
+<div class="modal-overlay" id="modalHg">
+  <div class="modal-box">
+    <h3 id="hgTit">⏱ Nhắc giờ hát</h3>
+    <div class="hint" id="hgHint" style="margin-top:4px">Khách dặn hát bao lâu? TV sẽ nhắc khi sắp hết giờ. Phòng không tự đóng, khách vẫn hát tiếp.</div>
+    <div class="hgbtns" id="hgBtns">
+      <button class="btn btn-ghost" data-m="60">1 giờ</button><button class="btn btn-ghost" data-m="90">1 giờ 30</button><button class="btn btn-ghost" data-m="120">2 giờ</button>
+      <button class="btn btn-ghost" data-m="180">3 giờ</button><button class="btn btn-ghost" data-m="240">4 giờ</button>
+    </div>
+    <div class="hgbtns" id="hgAddRow" style="display:none">
+      <button class="btn btn-ghost" data-a="15">+15 phút</button><button class="btn btn-ghost" data-a="30">+30 phút</button><button class="btn btn-ghost" data-a="60">+60 phút</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:10px"><input class="lb" id="hgMinQ" type="number" min="1" max="720" placeholder="hoặc nhập số phút" style="flex:1;min-width:0;background:var(--field);border:1px solid var(--line);border-radius:10px;padding:9px 12px;font:inherit"><button class="btn btn-y btn-sm" id="hgMinGo">Đặt</button></div>
+    <div class="actions"><button class="btn btn-ghost btn-sm" id="hgHuy">Huỷ</button><button class="btn btn-y btn-sm" id="hgKhong" style="margin-left:auto">Không nhắc</button></div>
   </div>
 </div>
 
@@ -1230,6 +1260,7 @@ function hienTheoQuyen(){
   $('phongAdmin').style.display  = S.vaiTro==='admin' ? '' : 'none';   /* phòng cố định — chỉ admin thêm/xoá */
   $('btnThuHoiMtb').style.display = S.quanLy ? '' : 'none';
   $('btnNhatKy').style.display = S.quanLy ? '' : 'none';
+  $('hgAdmin').style.display = S.quanLy ? '' : 'none';
   $('selCN').style.display       = S.vaiTro==='admin' ? '' : 'none';
   $('tabKetNoi').style.display   = S.vaiTro==='admin' ? '' : 'none';   /* 🔌 Kết nối: chỉ admin */
 }
@@ -1332,6 +1363,7 @@ function loadTv(){
   return api('quay.tv').then(function(r){
     if(!r || !r.ok){ if(r && r.msg==='HET_PHIEN') logout(); return; }
     TV.rooms = r.rooms || [];
+    S.hgOn = !!r.hgOn; if(r.now) S.hgDelta = r.now - Date.now();
     S.reviewUrl = r.reviewUrl || '';
     $('rvHint').innerHTML = S.reviewUrl ? 'Thẻ đánh giá khác màu với QR trên TV để khách không nhầm. Dùng đường dẫn Google Maps của chi nhánh.' : '<b style="color:var(--warn)">Chi nhánh chưa có đường dẫn đánh giá Google Maps</b> (cột link_maps của chi nhánh trong app quản lý BMB) — chưa in được thẻ đánh giá.';
     drawTv();
@@ -1351,6 +1383,7 @@ function tvPhat(x){
 function drawTv(){
   kiemMang();
   veGanBar();
+  hgSwDraw();
   var canGan = !!GAN && !GANNET.err;
   var box = $('tvList');
   if(!TV.rooms.length){ box.innerHTML = '<div class="mut">Chưa có phòng nào.'+(S.vaiTro==='admin'?' Thêm phòng ở ô phía trên.':' Liên hệ admin để khai báo phòng.')+'</div>'; return; }
@@ -1362,10 +1395,12 @@ function drawTv(){
       + '<span class="chip'+(x.tablets?' on':'')+'">'+(x.tablets?'Có máy tính bảng':'Chưa có máy tính bảng')+'</span>'
       + '<span class="chip">'+x.remotes+' điện thoại</span>'
       + tvPhat(x)
+      + (x.open && x.hg && S.hgOn ? hgChipHtml(x.hg, false) : '')
       + (x.offNet ? '<span class="chip warn">'+x.offNet+' máy ngoài mạng quán</span>' : '')
       + '</div><div class="ac">';
     if(canGan) h += b('gan', GANNET.same === false ? 'btn-bad' : 'btn-y', GANNET.same === false ? 'Vẫn gán (chắc chắn '+tenMay().toLowerCase()+' ở đây)' : 'Gán '+tenMay().toLowerCase()+' này vào đây');
     h += x.open ? b('dong', 'btn-ghost', 'Đóng phòng') : b('mo', canGan ? 'btn-ghost' : 'btn-y', 'Mở phòng');
+    if(x.open && S.hgOn) h += b('hg', 'btn-ghost', '⏱ Nhắc giờ');
     if(!GAN) h += b('quet', 'btn-ghost', '📺 Gán TV &amp; MTB');
     if(x.open && x.tokQr) h += b('qr', 'btn-ghost', 'QR khách') + b('doiqr', 'btn-ghost', 'Đổi QR khách');
     if(x.tv) h += b('gotv', 'btn-ghost', 'Gỡ TV');
@@ -1409,8 +1444,10 @@ function tvAct(act, id){
   if(act==='gan'){ ganTv(id, GAN, false).then(function(r){ if(r!==true) alert(r); }); return; }
   if(act==='mo' || act==='dong'){
     if(act==='dong' && !confirm('Đóng phòng '+x.roomName+'? Điện thoại khách bị ngắt, hàng chờ bài trên TV bị xoá.')) return;
-    api('quay.phong', {roomId:id, open: act==='mo'}).then(sauTv); return;
+    if(act==='mo'){ moPhongHg(id, x.roomName, sauTv); return; }
+    api('quay.phong', {roomId:id, open:false}).then(sauTv); return;
   }
+  if(act==='hg'){ datGioHg(id, x.roomName, !!x.hg, sauTv); return; }
   if(act==='quet'){
     openQrScanner({
       title: 'Gán TV hoặc máy tính bảng vào phòng ' + x.roomName,
@@ -1488,8 +1525,116 @@ function tick(){
       return;
     }
     S.rooms = r.rooms; S.orders = r.orders;
+    S.hgOn = !!r.hgOn; if(r.now) S.hgDelta = r.now - Date.now();
+    hgDanhDau();
     drawRooms(); drawBoard(); drawToday();
   }).catch(function(){});
+}
+
+/* ---------- Nhắc giờ hát ---------- */
+var HGSEEN = {};
+function hgNow(){ return Date.now() + (S.hgDelta || 0); }
+function hgInfo(end, tile){
+  var ms = end - hgNow(), cls, tx;
+  if(ms <= 0){
+    var n = Math.floor(-ms / 60000); cls = 'hg-o'; tx = '⏱ ' + (n < 1 ? 'hết giờ' : '+' + n + 'p');
+  }else{
+    var rem = Math.floor(ms / 60000); cls = rem <= 5 ? 'hg-r' : rem <= 10 ? 'hg-y' : rem <= 15 ? 'hg-g' : '';
+    tx = '⏱ ' + (tile ? '' : 'còn ') + (rem >= 60 ? Math.floor(rem / 60) + 'h' + (rem % 60 ? ('0' + rem % 60).slice(-2) : '') : rem + 'p');
+  }
+  return { cls: cls, tx: tx };
+}
+function hgChipHtml(hg, tile){
+  var i = hgInfo(hg.end, tile), tg = tile ? 'i' : 'span';
+  return '<' + tg + ' class="' + (tile ? '' : 'chip ') + 'hgq ' + i.cls + '" data-end="' + hg.end + '"' + (tile ? '' : ' title="Phòng không tự đóng; hết giờ khách vẫn hát tiếp"') + '>' + i.tx + '</' + tg + '>';
+}
+function hgChipRefresh(){
+  Array.prototype.forEach.call(document.querySelectorAll('.hgq[data-end]'), function(el){
+    var tile = el.tagName === 'I', i = hgInfo(+el.getAttribute('data-end'), tile);
+    el.className = (tile ? '' : 'chip ') + 'hgq ' + i.cls;
+    el.textContent = i.tx;
+  });
+}
+/* Phòng đã hết giờ từ lâu trước khi mở quầy: đánh dấu đã báo, khỏi báo lại cả loạt */
+function hgDanhDau(){
+  (S.rooms || []).forEach(function(x){
+    if(!x.open || !x.hg) return;
+    var k = x.roomId + '|' + x.hg.end;
+    if(!HGSEEN[k] && hgNow() - x.hg.end > 120000) HGSEEN[k] = 1;
+  });
+}
+function hgTickQ(){
+  if(!S.tok || !S.hgOn) return;
+  hgChipRefresh();
+  (S.rooms || []).forEach(function(x){
+    if(!x.open || !x.hg) return;
+    var k = x.roomId + '|' + x.hg.end;
+    if(hgNow() >= x.hg.end && !HGSEEN[k]){
+      HGSEEN[k] = 1;
+      toast('⏰ Phòng ' + x.roomName + ' đã hết giờ đặt — vào hỏi khách có hát tiếp không');
+      beep();
+    }
+  });
+}
+setInterval(hgTickQ, 15000);
+function hgSwDraw(){
+  var b = $('btnHgSw'); if(!b) return;
+  b.textContent = S.hgOn ? 'Đang BẬT — bấm để tắt' : 'Đang tắt — bấm để bật';
+  b.className = 'btn btn-sm ' + (S.hgOn ? 'btn-y' : 'btn-ghost');
+}
+$('btnHgSw').addEventListener('click', function(){
+  var on = !S.hgOn;
+  if(!on && !confirm('Tắt nhắc giờ hát cho chi nhánh này? Các phòng đang đếm giờ sẽ không còn nhắc.')) return;
+  api('quay.hgSet', { on: on }).then(function(r){
+    if(!r || !r.ok){ alert((r && r.msg) || 'Không đổi được, thử lại.'); return; }
+    S.hgOn = !!r.on; hgSwDraw(); tick(); loadTv();
+    toast(S.hgOn ? 'Đã bật nhắc giờ hát — từ giờ mở phòng sẽ hỏi khách hát bao lâu.' : 'Đã tắt nhắc giờ hát.');
+  });
+});
+/* Hộp chọn giờ. mode 'open' (đang mở phòng mới): "Không nhắc" = mở như cũ, "Huỷ" = không mở phòng.
+   mode 'set' (phòng đã mở): "Tắt nhắc giờ", có nút +15/+30/+60 khi đang đếm. Trả Promise<{min}|{add}|null> */
+var HGASK = null;
+function hgAsk(o){
+  return new Promise(function(res){
+    HGASK = res;
+    $('hgTit').textContent = '⏱ Nhắc giờ hát — ' + (/^ph[oò]ng\b/i.test(o.ten) ? o.ten : 'Phòng ' + o.ten);
+    $('hgHint').textContent = o.mode === 'open' ? 'Khách dặn hát bao lâu? TV sẽ nhắc khi sắp hết giờ. Phòng không tự đóng, khách vẫn hát tiếp.' : (o.running ? 'Đang đếm giờ. Đặt lại số phút (tính từ bây giờ) hoặc thêm giờ.' : 'Đặt số phút hát (tính từ bây giờ).');
+    $('hgKhong').textContent = o.mode === 'open' ? 'Không nhắc' : 'Tắt nhắc giờ';
+    $('hgHuy').textContent = o.mode === 'open' ? 'Huỷ (không mở phòng)' : 'Đóng';
+    $('hgAddRow').style.display = o.mode === 'set' && o.running ? '' : 'none';
+    $('hgMinQ').value = '';
+    $('modalHg').classList.add('show');
+  });
+}
+function hgDong(v){ $('modalHg').classList.remove('show'); var r = HGASK; HGASK = null; if(r) r(v); }
+Array.prototype.forEach.call(document.querySelectorAll('#hgBtns [data-m]'), function(b){ b.addEventListener('click', function(){ hgDong({ min: +b.getAttribute('data-m') }); }); });
+Array.prototype.forEach.call(document.querySelectorAll('#hgAddRow [data-a]'), function(b){ b.addEventListener('click', function(){ hgDong({ add: +b.getAttribute('data-a') }); }); });
+$('hgMinGo').addEventListener('click', function(){
+  var v = Math.round(+$('hgMinQ').value);
+  if(!(v >= 1 && v <= 720)){ alert('Nhập số phút từ 1 đến 720.'); return; }
+  hgDong({ min: v });
+});
+$('hgKhong').addEventListener('click', function(){ hgDong({ min: 0 }); });
+$('hgHuy').addEventListener('click', function(){ hgDong(null); });
+/* Mở phòng: chi nhánh bật nhắc giờ thì hỏi trước; tắt thì mở ngay như cũ */
+function moPhongHg(id, ten, xong){
+  if(!S.hgOn){ api('quay.phong', {roomId:id, open:true}).then(xong); return; }
+  hgAsk({ ten: ten, mode: 'open' }).then(function(r){
+    if(!r) return;
+    api('quay.phong', {roomId:id, open:true, hg: r.min || 0}).then(function(res){
+      if(res && !res.ok) alert((res && res.msg) || 'Không mở được phòng.');
+      xong();
+    });
+  });
+}
+function datGioHg(id, ten, running, xong){
+  hgAsk({ ten: ten, mode: 'set', running: running }).then(function(r){
+    if(!r) return;
+    api('quay.hg', {roomId:id, min:r.min, add:r.add}).then(function(res){
+      if(res && !res.ok) alert((res && res.msg) || 'Không đặt được nhắc giờ.');
+      xong();
+    });
+  });
 }
 
 /* ---------- lưới phòng ---------- */
@@ -1497,12 +1642,14 @@ function drawRooms(){
   $('rooms').innerHTML = S.rooms.map(function(x){
     var cls = 'rm' + (x.open ? ' open':'') + (x.open && x.hours>=6 ? ' long':'');
     var sub = x.open ? ('mở '+x.hours+'h') : 'trống';
-    return '<div class="'+cls+'" data-r="'+esc(x.roomId)+'" data-o="'+(x.open?1:0)+'"><b>'+esc(x.roomName)+'</b><span>'+sub+'</span></div>';
+    return '<div class="'+cls+'" data-r="'+esc(x.roomId)+'" data-o="'+(x.open?1:0)+'"><b>'+esc(x.roomName)+'</b><span>'+sub+'</span>'+(x.open && x.hg && S.hgOn ? hgChipHtml(x.hg, true) : '')+'</div>';
   }).join('');
   Array.prototype.forEach.call(document.querySelectorAll('.rm'), function(el){
     el.addEventListener('click', function(){
       var id = this.getAttribute('data-r'), op = this.getAttribute('data-o')==='1';
-      api('quay.phong', {roomId:id, open: !op}).then(function(){ tick(); if(tabTvDangMo()) loadTv(); });
+      var xong = function(){ tick(); if(tabTvDangMo()) loadTv(); };
+      if(!op){ var rm = S.rooms.filter(function(y){ return y.roomId===id; })[0]; moPhongHg(id, rm ? rm.roomName : '', xong); return; }
+      api('quay.phong', {roomId:id, open:false}).then(xong);
     });
   });
 }

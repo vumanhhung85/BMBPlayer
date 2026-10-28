@@ -172,6 +172,18 @@
   #svc .m{font:600 clamp(9px,1.2vh,16px)/1.25 "Segoe UI",Roboto,Arial,sans-serif; color:#6b7280; margin-top:.3vh}
   @keyframes svcIn{from{opacity:0; transform:translateY(14px) scale(.97)} to{opacity:1; transform:none}}
 
+  /* Nhắc giờ hát (chỉ chi nhánh bật + phòng có đặt giờ): từ 15 phút cuối hiện chip đếm phút ở góc dưới trái; mốc 15 / 10 / 5 phút có thanh báo xanh / vàng / đỏ;
+     hết giờ thì báo "hát tiếp nhé" và chip đếm tăng +n phút. Phòng KHÔNG tự đóng, không chen vào màn hình đang hát. */
+  #hgChip{position:absolute; left:1.6vw; bottom:3.2vh; z-index:12; display:none; align-items:center; gap:.8vh; padding:.9vh 1.8vh; border-radius:999px; background:rgba(10,8,22,.8);
+    border:.4vh solid #34d399; color:#a7f3d0; font:800 clamp(14px,2.5vh,32px)/1 "Segoe UI",Roboto,Arial,sans-serif; box-shadow:0 6px 24px rgba(0,0,0,.5); pointer-events:none; font-variant-numeric:tabular-nums}
+  #hgChip.on{display:flex}
+  #hgChip.ye{border-color:#fbbf24; color:#fde68a} #hgChip.rd{border-color:#f87171; color:#fecaca} #hgChip.ot{border-color:#c084fc; color:#f3e8ff}
+  #hgMsg{left:1.6vw; bottom:calc(3.2vh + 7.4vh); z-index:13; max-width:min(46vw,760px); box-sizing:border-box; padding:1.3vh 2.2vh; border-radius:16px; background:rgba(10,8,22,.9);
+    border-left:1.2vh solid #34d399; box-shadow:0 8px 34px rgba(0,0,0,.6); transform:translateY(14px)}
+  #hgMsg.ye{border-left-color:#fbbf24} #hgMsg.rd{border-left-color:#f87171} #hgMsg.ot{border-left-color:#c084fc}
+  #hgMsg .h{font:800 clamp(15px,2.8vh,34px)/1.2 "Segoe UI",Roboto,Arial,sans-serif; color:#a7f3d0} #hgMsg.ye .h{color:#fde68a} #hgMsg.rd .h{color:#fecaca} #hgMsg.ot .h{color:#f3e8ff}
+  #hgMsg .b{font:600 clamp(12px,2vh,26px)/1.3 "Segoe UI",Roboto,Arial,sans-serif; color:#e5e7eb; margin-top:.4vh}
+
   #progress{position:absolute; left:0; right:0; bottom:0; height:3px; z-index:9; background:rgba(255,255,255,.08); pointer-events:none}
   #progress i{display:block; height:100%; width:0; background:linear-gradient(90deg,var(--accent),var(--accent2))}
 
@@ -277,6 +289,8 @@
   <div class="ov" id="lock"></div>
   <div class="ov" id="toast"></div>
   <div id="svc"></div>
+  <div id="hgChip"></div>
+  <div class="ov" id="hgMsg"><div class="h"></div><div class="b"></div></div>
   <div class="ov" id="volOsd"><span id="volIc"></span><div class="vb"><i id="volBar"></i></div><b id="volNum">100</b></div>
   <div id="progress"><i id="bar"></i></div>
   <div id="verTag"></div>
@@ -1269,6 +1283,52 @@ function svcPaint(){
 }
 setInterval(svcPaint, 1000);
 
+/* ---------- Nhắc giờ hát: đồng hồ theo PHÚT, giờ kết thúc do máy chủ giữ (Worker báo hg {end,min} + tn = giờ máy chủ) ---------- */
+let hg = null, hgDelta = 0, hgBand = '';
+const HG_RANK = { n:0, g:1, y:2, r:3, o:4 };
+const HG_MSG = {
+  g: ['CÒN 15 PHÚT', 'Quý khách còn khoảng 15 phút theo giờ đã đặt.'],
+  y: ['CÒN 10 PHÚT', 'Quý khách còn khoảng 10 phút theo giờ đã đặt.'],
+  r: ['CÒN 5 PHÚT', 'Sắp hết giờ đã đặt, quý khách chọn nốt bài yêu thích nhé.'],
+  o: ['ĐÃ HẾT GIỜ ĐẶT', 'Anh/Chị hát tiếp nhé!']
+};
+function hgBandOf(ms){                                       // ms = (giờ kết thúc − giờ máy chủ bây giờ)
+  if(ms <= 0) return 'o';
+  const rem = Math.floor(ms / 60000);
+  return rem <= 5 ? 'r' : rem <= 10 ? 'y' : rem <= 15 ? 'g' : 'n';
+}
+function hgPaint(){
+  const chip = $('hgChip');
+  if(!hg){ chip.className = ''; return; }
+  const ms = hg.end - (Date.now() + hgDelta), b = hgBandOf(ms);
+  if(b === 'n'){ chip.className = ''; return; }              // còn hơn 15 phút: TV không hiện gì
+  let tx;
+  if(b === 'o'){ const n = Math.floor(-ms / 60000); tx = n < 1 ? '⏱ Hết giờ' : '⏱ Quá giờ +' + n + ' phút'; }
+  else tx = '⏱ Còn ' + Math.floor(ms / 60000) + ' phút';
+  chip.textContent = tx; chip.className = 'on ' + (b === 'g' ? '' : b === 'y' ? 'ye' : b === 'r' ? 'rd' : 'ot');
+}
+function hgTick(){
+  if(!hg) return;
+  const b = hgBandOf(hg.end - (Date.now() + hgDelta));
+  if(b !== hgBand){
+    if(HG_RANK[b] > HG_RANK[hgBand] && HG_MSG[b]){           // chạm mốc mới (xanh → vàng → đỏ → hết giờ) mới báo; nối lại mạng / mở TV giữa chừng thì không báo lại
+      const el = $('hgMsg'); el.className = 'ov ' + (b === 'g' ? '' : b === 'y' ? 'ye' : b === 'r' ? 'rd' : 'ot');
+      el.querySelector('.h').textContent = HG_MSG[b][0]; el.querySelector('.b').textContent = HG_MSG[b][1];
+      flash('hgMsg', b === 'o' ? 20000 : 12000);
+    }
+    hgBand = b;
+  }
+  hgPaint();
+}
+function hgSet(m){
+  const h = m && m.open && m.hgOn && m.hg && m.hg.end ? m.hg : null;
+  if(m && m.tn) hgDelta = m.tn - Date.now();                 // bù lệch đồng hồ TV so với máy chủ
+  if(!h){ hg = null; hgBand = ''; hide('hgMsg'); hgPaint(); return; }
+  if(!hg || hg.end !== h.end){ hg = { end: h.end, min: h.min }; hgBand = hgBandOf(hg.end - (Date.now() + hgDelta)); }   // giờ mới / gia hạn: vào thẳng mốc hiện tại, không báo
+  hgPaint();
+}
+setInterval(hgTick, 5000);
+
 /* ---------- Kênh phòng (chỉ khi mở bằng liên kết có ?r= hoặc TV đã nhớ mã) ---------- */
 function roomNote(t){ const n = $('roomNote'); n.textContent = t || ''; n.style.display = t ? 'block' : 'none'; }
 function resetSession(){
@@ -1294,6 +1354,7 @@ if(bc.ws){
       connTxt = n ? n + ' máy đang nối' : 'chưa có máy chọn bài'; paintRoomTag(connTxt); push();
       $('hint').textContent = 'Quét mã QR ở góc trái màn hình bằng điện thoại để chọn bài và gọi lễ tân.';
     }
+    hgSet(m);
     paintReady();
   };
   bc.onstatus = s => {

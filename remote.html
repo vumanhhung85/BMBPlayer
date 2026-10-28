@@ -197,6 +197,22 @@
   #odPane{ padding:6px 16px 170px }
   .tabs button.od .tl{ color:inherit }
   .odH{ font-size:13px; color:var(--quiet); font-weight:700; letter-spacing:.4px; margin:16px 2px 8px }
+
+  /* ===== Nhắc giờ hát (chi nhánh bật mới hiện): khách bật rồi đặt số phút, TV nhắc khi sắp hết giờ (xanh 15 · vàng 10 · đỏ 5 phút), hết giờ vẫn hát tiếp ===== */
+  #hgBox{ padding:10px 16px 0 }
+  .hgCard{ background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:12px 14px }
+  .hgTop{ display:flex; align-items:center; justify-content:space-between; gap:12px }
+  .hgTop b{ font-size:16px } .hgSub{ font-size:13px; color:var(--quiet); margin-top:3px; line-height:1.4 }
+  .hgSub.g{ color:var(--good); font-weight:700 } .hgSub.y{ color:var(--warn); font-weight:700 } .hgSub.r{ color:#ef4444; font-weight:700 } .hgSub.o{ color:var(--accent2); font-weight:700 }
+  .hgSw{ flex:0 0 auto; width:54px; height:32px; border-radius:99px; border:1px solid var(--line); background:#3a3a4c; position:relative; cursor:pointer; padding:0; transition:background .15s }
+  .hgSw i{ position:absolute; top:3px; left:3px; width:24px; height:24px; border-radius:50%; background:#fff; transition:transform .15s; box-shadow:0 1px 4px rgba(0,0,0,.4) }
+  .hgSw.on{ background:var(--accent); border-color:var(--accent) } .hgSw.on i{ transform:translateX(22px) }
+  .hgChips{ display:flex; flex-wrap:wrap; gap:8px; margin-top:12px }
+  .hgChips button{ flex:1 1 0; min-width:64px; padding:10px 6px; border-radius:12px; border:1px solid var(--line); background:var(--bg); color:var(--ink); font:inherit; font-weight:700; font-size:15px; cursor:pointer }
+  .hgRow{ display:flex; gap:8px; margin-top:10px }
+  .hgRow input{ flex:1; min-width:0; background:var(--bg); border:1px solid var(--line); color:var(--ink); border-radius:12px; padding:10px 12px; font:inherit; font-size:16px }
+  .hgRow button{ padding:10px 18px; border-radius:12px; border:none; background:var(--accent); color:#fff; font:inherit; font-weight:800; cursor:pointer }
+  .hgNote{ font-size:12px; color:var(--quiet); margin-top:8px; line-height:1.5 }
   .svgrid{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px }
   @media(min-width:520px){ .svgrid{ grid-template-columns:repeat(3,1fr) } }
   .svbtn{ background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:14px 8px; display:flex; flex-direction:column; align-items:center; gap:6px; cursor:pointer; color:var(--ink); font:inherit }
@@ -448,6 +464,18 @@
 <div id="paneQueue" style="display:none"><div class="list" id="queueList"></div></div>
 
 <div id="paneOrder" style="display:none">
+  <div id="hgBox" style="display:none"><div class="hgCard">
+    <div class="hgTop"><div><b>⏰ Nhắc giờ hát</b><div class="hgSub" id="hgSub">TV sẽ nhắc khi sắp hết giờ</div></div>
+      <button class="hgSw" id="hgSw" role="switch" aria-checked="false" aria-label="Nhắc giờ hát"><i></i></button></div>
+    <div id="hgSetP" style="display:none">
+      <div class="hgChips"><button data-m="60">1 giờ</button><button data-m="90">1,5 giờ</button><button data-m="120">2 giờ</button><button data-m="180">3 giờ</button></div>
+      <div class="hgRow"><input id="hgMin" type="number" inputmode="numeric" min="1" max="720" placeholder="hoặc nhập số phút"><button id="hgGo">Đặt</button></div>
+    </div>
+    <div id="hgRunP" style="display:none">
+      <div class="hgChips"><button data-a="15">+15 phút</button><button data-a="30">+30 phút</button><button data-a="60">+60 phút</button></div>
+      <div class="hgNote">Hết giờ phòng vẫn mở, quý khách hát tiếp bình thường. Tắt công tắc để không nhắc nữa.</div>
+    </div>
+  </div></div>
   <div id="odPane">
     <button class="lsbtn" id="odLsBtn">📋 Đơn đã gọi</button>
     <div class="odH">CẦN HỖ TRỢ</div>
@@ -1500,8 +1528,51 @@ document.querySelectorAll('.seekHost').forEach(seekMake);
 setInterval(seekPaint, 500);
 
 /* ---------- Nhận trạng thái ---------- */
+
+/* ---------- Nhắc giờ hát (khách tự đặt / tắt / thêm giờ; chi nhánh bật công tắc ở quầy thì mới hiện) ---------- */
+const HG = { on:false, hg:null, want:false, delta:0 };
+const hgFmt = m => m >= 60 ? Math.floor(m / 60) + ' giờ' + (m % 60 ? ' ' + (m % 60) + ' phút' : '') : m + ' phút';
+function hgDraw(){
+  const box = $('hgBox'); if(!box) return;
+  box.style.display = HG.on ? '' : 'none';
+  if(!HG.on) return;
+  const h = HG.hg, sw = $('hgSw'), sub = $('hgSub');
+  sw.classList.toggle('on', !!(h || HG.want)); sw.setAttribute('aria-checked', (h || HG.want) ? 'true' : 'false');
+  $('hgSetP').style.display = !h && HG.want ? '' : 'none';
+  $('hgRunP').style.display = h ? '' : 'none';
+  if(!h){ sub.className = 'hgSub'; sub.textContent = HG.want ? 'Chọn thời gian hát, TV sẽ nhắc khi sắp hết giờ.' : 'TV sẽ nhắc khi sắp hết giờ'; return; }
+  const ms = h.end - (Date.now() + HG.delta);
+  if(ms > 0){
+    const rem = Math.floor(ms / 60000), at = new Date(h.end - HG.delta), hh = String(at.getHours()).padStart(2, '0') + ':' + String(at.getMinutes()).padStart(2, '0');
+    sub.className = 'hgSub ' + (rem <= 5 ? 'r' : rem <= 10 ? 'y' : rem <= 15 ? 'g' : ''); sub.textContent = 'Còn ' + hgFmt(rem) + ' (đến khoảng ' + hh + ')';
+  }else{
+    const n = Math.floor(-ms / 60000); sub.className = 'hgSub o'; sub.textContent = n < 1 ? 'Đã hết giờ đặt — hát tiếp nhé!' : 'Đã quá giờ +' + n + ' phút — hát tiếp nhé!';
+  }
+}
+function hgRoom(m){
+  HG.on = !!(m.open && m.hgOn);
+  if(m.tn) HG.delta = m.tn - Date.now();
+  HG.hg = HG.on && m.hg && m.hg.end ? m.hg : null;
+  if(HG.hg) HG.want = true; else if(!HG.on) HG.want = false;
+  hgDraw();
+}
+function hgSend(o){ if(!bc.ws) return; bc.postMessage(Object.assign({ type:'hg' }, o)); }
+$('hgSw').addEventListener('click', () => {
+  if(HG.hg){ hgSend({ min:0 }); HG.want = false; HG.hg = null; hgDraw(); }       // đang nhắc → bấm là tắt, không nhắc nữa
+  else{ HG.want = !HG.want; hgDraw(); }
+});
+Array.prototype.forEach.call(document.querySelectorAll('#hgSetP .hgChips button'), b => b.addEventListener('click', () => { hgSend({ min:+b.getAttribute('data-m') }); snack('Đã đặt nhắc giờ hát'); }));
+Array.prototype.forEach.call(document.querySelectorAll('#hgRunP .hgChips button'), b => b.addEventListener('click', () => { hgSend({ add:+b.getAttribute('data-a') }); snack('Đã thêm ' + b.getAttribute('data-a') + ' phút'); }));
+$('hgGo').addEventListener('click', () => {
+  const v = Math.round(+$('hgMin').value);
+  if(!(v >= 1 && v <= 720)){ snack('Nhập số phút từ 1 đến 720', true); return; }
+  hgSend({ min:v }); $('hgMin').value = ''; snack('Đã đặt nhắc giờ hát');
+});
+setInterval(() => { if(HG.on && curTab === 'order') hgDraw(); }, 15000);
+
 bc.onmessage = ev => {
   const m = ev.data || {};
+  if(m.type === 'hgr'){ if(!m.ok) snack(m.error === 'tat' ? 'Chi nhánh chưa bật nhắc giờ hát' : 'Chưa đặt được nhắc giờ, thử lại', true); return; }
   if(m.type === 'dead' && /^[\w-]{11}$/.test(m.id || '')){ markDead(m.id); return; }
   if(m.type === 'pos'){ if(sk.on && m.payload) seekSync(m.payload); return; }       // giây đang phát (TV báo ~3 giây/lần)
   if(m.type !== 'state') return;
@@ -1581,6 +1652,7 @@ if(GUEST){
     if(m.gt){ const first = !guestTok; guestTok = m.gt; noTicket = false; if(first){ showQuota(); renderKho(); loadIndex(); probeEn(); } }
     else if(m.open && !guestTok && !noTicket) setTimeout(() => { if(!guestTok && !noTicket){ noTicket = true; renderKho(); } }, 4000);   // chờ tin kèm vé tới (có thể tới sau tin phòng)
     window.__bmbOpen = !!m.open;   /* APK 2.4: chỉ hỏi cập nhật khi phòng đóng */
+    hgRoom(m);
     if(m.open){ if(m.tv === false) banner(BANNER.notv); else{ banner(''); send('hello'); } } else banner(BANNER[m.reason === 'notopen' ? 'waiting' : 'closed']);
   };
   bc.onstatus = s => { if(bc.tablet && s === 'rotated') return showPair('Máy tính bảng đã được gỡ khỏi phòng (hoặc phòng đã gán máy khác).');
