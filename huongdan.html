@@ -274,11 +274,13 @@ tbody tr:nth-child(even) td{background:#FBF8FE}
   #ql2 header{margin-bottom:10px}#ql2 .qrstep{padding:12px 16px;margin-bottom:12px}
   .tvauto .figs .dlg{max-width:230px!important}
   #khach #kh5 .card{padding:11px 14px}#khach #kh5 .card .ic{font-size:22px;margin-bottom:3px}
-  #khach .faq details{padding:5px 12px;margin-bottom:4px;font-size:12.6px}
+  #khach .faq details{padding:4px 12px;margin-bottom:3px;font-size:12.3px}
   #khach .faq details[open] summary{margin-bottom:2px}
   #khach #kh5 .card{padding:10px 14px}
   #quan-ly #ql9 table td,#quan-ly #ql9 table th{padding-top:5px;padding-bottom:5px}
   #quan-ly .foot{margin-top:6mm}
+  #quan-ly #ql9 table td,#quan-ly #ql9 table th{padding-top:4px!important;padding-bottom:4px!important;font-size:12.6px}
+  #quan-ly #ql9 .foot{margin-top:3mm}
   #khach .faq.mt{margin-top:10px}
   #khach .foot{margin-top:6mm;padding:14px 18px 16px}
   #khach #kh5 .chap-h{}
@@ -346,7 +348,7 @@ tbody tr:nth-child(even) td{background:#FBF8FE}
   <div class="cards">
     <div class="card"><div class="ic">📺</div><h4>TV trong phòng</h4><p>Phát bài hát khách chọn. Góc trái luôn có <b>mã QR</b> để khách quét, và hiện các yêu cầu khách đã gửi cho lễ tân.</p></div>
     <div class="card"><div class="ic">📱</div><h4>Điện thoại khách &amp; máy tính bảng</h4><p>Chọn bài, điều khiển TV, <b>gọi lễ tân</b>, gọi nước theo số lượng, báo sự cố — không cần cài ứng dụng.</p></div>
-    <div class="card"><div class="ic">🧾</div><h4>Quầy phục vụ</h4><p>Nhận yêu cầu <b>ngay lập tức</b>, xác nhận, theo dõi phòng, quản lý TV, menu và nhân viên.</p></div>
+    <div class="card"><div class="ic">🧾</div><h4>Quầy phục vụ</h4><p>Nhận yêu cầu <b>ngay lập tức</b>, xác nhận, theo dõi phòng — <b>thấy TV từng phòng đang phát bài gì</b> — quản lý TV, menu và nhân viên.</p></div>
   </div>
 
   <div class="flow">
@@ -563,9 +565,44 @@ tbody tr:nth-child(even) td{background:#FBF8FE}
     <div class="figs"><figure class="photo" style="max-width:250px"><div class="fig"><img src="huongdan/img/tvqr.jpg" alt=""></div><figcaption>Góc trái TV khi phòng đang mở</figcaption></figure></div>
   </div>
 
+  <div class="step rev">
+    <div>
+      <span class="badge"><b>4</b> TV đang làm gì?</span>
+      <h3>Mỗi phòng có một dòng cho biết TV đang phát gì</h3>
+      <p>Mở tab <b>📺 TV &amp; MTB</b>: dưới tên phòng đang mở có thêm một dòng màu — không cần đi lên phòng cũng biết TV có đang hát hay không. Dòng này tự cập nhật theo TV.</p>
+      <table>
+        <thead><tr><th>Dòng hiện ra</th><th>Nghĩa là</th></tr></thead>
+        <tbody>
+          <tr><td><b>🎵 Đang phát: tên bài · còn N bài chờ</b></td><td>TV đang hát bình thường. Thêm <b>🔇 tắt tiếng</b> nếu TV đang bị tắt tiếng.</td></tr>
+          <tr><td><b>📀 NAS quán</b> hoặc <b>📀 thư viện R2</b> (cuối dòng)</td><td>Bài đang phát từ bài lưu sẵn (ở quán có NAS hoặc trên đám mây). Không có chữ này = phát từ YouTube.</td></tr>
+          <tr><td><b>⏸ Đang dừng</b></td><td>Có người bấm dừng. Bấm phát lại trên TV hoặc điện thoại.</td></tr>
+          <tr><td><b>👆 Có bài nhưng chưa phát được</b></td><td>Trình duyệt trên TV chặn tự phát: bấm OK / chạm vào màn hình TV một lần (app Android không gặp).</td></tr>
+          <tr><td><b>🏆 Đang hiện điểm</b></td><td>Hết bài, TV đang hiện điểm vui — vài giây sau tự sang bài kế.</td></tr>
+          <tr><td><b>⚠️ Trình phát YouTube lỗi</b></td><td>Mở menu ẩn của TV → <b>Tải lại trang</b> (chương 8).</td></tr>
+          <tr><td><b>Chưa có bài (chờ khách chọn)</b></td><td>Phòng đang mở nhưng chưa ai chọn bài — bình thường.</td></tr>
+          <tr><td><b>chưa cập nhật &gt;12 phút, TV có thể treo</b></td><td>TV báo đang phát nhưng đã lâu không thấy tin mới: nên ghé phòng xem hoặc tải lại trang TV.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="figs"><figure class="phone"><div class="fig"><img src="huongdan/img/q_tvphat.jpg" alt=""></div></figure></div>
+  </div>
+
   <div class="step wide">
     <div>
-      <span class="badge"><b>4</b> Phòng bị rớt kết nối?</span>
+      <span class="badge"><b>5</b> Mất Internet của quán</span>
+      <h3>Quán có NAS: TV vẫn hát tiếp các bài đang xếp</h3>
+      <ul class="tick">
+        <li><b>Quán có NAS</b> (thư viện bài lưu sẵn trong quán): khi mất Internet, TV tự hát tiếp những bài <b>có trong NAS</b>. Bài không có trong NAS được <b>dời xuống cuối hàng chờ</b>, TV hiện thông báo và phát bài kế phát được. Nếu không còn bài nào phát được, TV hiện màn chờ và <b>tự hát tiếp khi có mạng lại</b>.</li>
+        <li><b>Quán chưa có NAS</b>: không đổi gì — mất Internet thì TV không tải được bài YouTube mới.</li>
+        <li>Lúc mất Internet, <b>điện thoại khách và máy tính bảng không điều khiển được</b> (lệnh đi qua Internet). Chỉ những bài đã xếp sẵn trong hàng chờ của TV mới tiếp tục. Có mạng lại là dùng bình thường.</li>
+      </ul>
+      <div class="note tip"><b>Mẹo:</b> khách hay chọn nhiều bài trước giờ có thể mất mạng thì nhắc họ <b>xếp sẵn vài bài</b> vào hàng chờ.</div>
+    </div>
+  </div>
+
+  <div class="step wide">
+    <div>
+      <span class="badge"><b>6</b> Phòng bị rớt kết nối?</span>
       <h3>🧾 Nhật ký kết nối — xem ngay nguyên nhân</h3>
       <ul class="tick">
         <li>Ở tab <b>📺 TV &amp; MTB</b> bấm <span class="k">🧾 Nhật ký kết nối</span>, chọn phòng (hoặc xem chung) — mỗi phòng giữ <b>60 sự kiện gần nhất</b>, có giờ và địa chỉ mạng (IP) mỗi lần máy nối vào.</li>
@@ -632,6 +669,7 @@ tbody tr:nth-child(even) td{background:#FBF8FE}
         <li>Máy quầy báo khi mở app. <b>TV và máy tính bảng chỉ hỏi khi phòng đang đóng</b> (hoặc buổi sáng 9–12 giờ lúc ít khách), nên không làm gián đoạn khách đang hát.</li>
         <li>Không ai bấm thì hộp tự đóng sau ít phút và <b>hỏi lại sau</b>. Bấm <span class="k">Để sau</span> cũng vậy.</li>
         <li>Bấm <span class="k y">Cập nhật ngay</span>, rồi bấm <span class="k y">Cài đặt</span> trên hộp của Android. Mất khoảng <b>1 phút</b>, sau đó BMBPlayer <b>tự mở lại</b>.</li>
+        <li>Muốn biết máy đang dùng bản nào? Nhìn <b>góc dưới bên phải màn hình chờ của TV</b>: dòng <span class="k">App 2.9 · Web …</span> (App = bản ứng dụng; Web = giờ của trang, tự cập nhật không cần cài lại). Bản mới nhất hiện tại là <b>2.9</b>.</li>
       </ul>
       <div class="sbs">
         <figure class="tvf" style="width:420px;max-width:100%"><div class="fig"><img src="huongdan/img/tvupd_c.jpg" alt=""><i class="hl" data-n="1" style="left:74.5%;top:57%;width:15%;height:14%"></i></div><figcaption>Trên TV</figcaption></figure>
@@ -678,8 +716,9 @@ tbody tr:nth-child(even) td{background:#FBF8FE}
       <tr><td>Khách báo <b>QR hết hiệu lực</b> hoặc không vào được</td><td>Nhờ khách quét QR <b>mới</b> ở góc trái TV. Cần thì bấm <span class="k">Đổi QR khách</span>.</td></tr>
       <tr><td><b>Mất máy tính bảng</b></td><td><span class="k r">Thu hồi mọi máy tính bảng</span>, sau đó gán lại những máy còn dùng.</td></tr>
       <tr><td>Không nghe chuông khi có đơn</td><td>Kiểm tra app đang chạy chế độ Quầy (có dòng “BMB Quầy đang nhận đơn”), cho phép thông báo và chạy nền. Dùng web thì bấm 🔔.</td></tr>
-      <tr><td>TV đứng hình, trắng màn hình</td><td>Mở menu ẩn → <b>Tải lại trang</b>. Vẫn lỗi: <b>Xoá dữ liệu trang</b> rồi gán lại phòng.</td></tr>
+      <tr><td>TV đứng hình, trắng màn hình — hoặc quầy báo phòng <b>“chưa cập nhật &gt;12 phút, TV có thể treo”</b></td><td>Mở menu ẩn → <b>Tải lại trang</b>. Vẫn lỗi: <b>Xoá dữ liệu trang</b> rồi gán lại phòng.</td></tr>
       <tr><td>Phòng <b>bị rớt</b> giữa lúc hát, khách báo “TV mất kết nối”</td><td>Chờ vài giây — thiết bị tự nối lại, bài vẫn phát và hàng chờ còn nguyên. Rớt lặp lại thì mở <span class="k">🧾 Nhật ký kết nối</span> (chương 5) và chụp gửi kỹ thuật.</td></tr>
+      <tr><td>TV chạy bằng <b>Chrome</b> (không phải app), hát mà <b>không có tiếng</b>, hiện “Đang phát không tiếng”</td><td>Trình duyệt chặn tiếng tự phát. <b>Bấm chuột (hoặc chạm) vào giữa video một lần</b> là có tiếng. Điện thoại không bật tiếng thay được; dùng app BMBPlayer (chương 2) thì không gặp.</td></tr>
       <tr><td>Hết bài mà TV đứng ~8 giây rồi mới sang bài</td><td>Đó là màn <b>điểm vui</b>. Muốn tắt, báo bộ phận kỹ thuật.</td></tr>
       <tr><td>Cài / cập nhật bị <b>Play Protect chặn</b></td><td>Bấm <b>Chi tiết khác</b> → <b>Tiếp tục cài đặt</b> (chương 2).</td></tr>
       <tr><td>Báo <b>“Cần cập nhật trình hiển thị web”</b></td><td>Vào CH Play cập nhật <b>Android System WebView</b> (hoặc Google Chrome) rồi mở lại BMBPlayer.</td></tr>
@@ -734,7 +773,7 @@ tbody tr:nth-child(even) td{background:#FBF8FE}
     <div>
       <ol class="no">
         <li>Ở tab <span class="k y">🔍 Tìm bài</span>, gõ <b>tên bài hát</b> hoặc tên ca sĩ rồi bấm <span class="k y">Tìm</span>.</li>
-        <li>Chưa nghĩ ra bài? Xem mục <b>Bài hot</b>, chuyển giữa <span class="k">Nhạc Việt</span> và <span class="k">Quốc tế</span>.</li>
+        <li>Chưa nghĩ ra bài? Xem mục <b>Bài hot</b>, chuyển giữa <span class="k">Nhạc Việt</span> và <span class="k">Quốc tế</span>. <b>Kéo xuống cuối danh sách</b>: tự hiện thêm các bài được nhiều người chọn và bài mới.</li>
         <li>Chạm vào bài muốn hát, rồi chọn:
           <ul class="tick"><li><span class="k y">CHỌN</span> — thêm vào hàng chờ, hát theo thứ tự.</li><li><span class="k" style="background:#FFE9D2;border-color:#F5B87A;color:#B35400">ƯU TIÊN</span> — hát ngay sau bài đang phát.</li></ul></li>
       </ol>
@@ -792,7 +831,7 @@ tbody tr:nth-child(even) td{background:#FBF8FE}
     <details open><summary>Bạn bè trong phòng cũng chọn bài được chứ?</summary><p>Được. Mỗi người quét QR trên điện thoại của mình, mọi bài sẽ xếp chung vào một hàng chờ.</p></details>
     <details open><summary>Chọn nhầm bài thì sao?</summary><p>Vào tab Hàng chờ, chạm vào bài đó rồi chọn <b>Xoá</b>. Nếu bài đang phát, chọn <b>Qua bài</b>.</p></details>
     <details open><summary>Tôi gọi nước rồi, bao giờ có?</summary><p>Lễ tân nhận yêu cầu ngay và lên phòng trong ít phút. Trong “Đơn đã gọi”, trạng thái sẽ đổi sang <b>Đã xác nhận</b> khi lễ tân nhận đơn của bạn.</p></details>
-    <details open><summary>Điện thoại báo “TV của phòng đang mất kết nối”?</summary><p>Mạng của phòng chập chờn vài giây. Bạn cứ đợi — TV nối lại là điện thoại tự chạy tiếp, danh sách bài không mất. Quá lâu thì nhờ nhân viên kiểm tra.</p></details>
+    <details open><summary>Điện thoại báo “TV của phòng đang mất kết nối”?</summary><p>Mạng của phòng chập chờn vài giây. Bạn cứ đợi — TV nối lại là điện thoại tự chạy tiếp, danh sách bài không mất. Quá lâu thì nhờ nhân viên kiểm tra. Mất hẳn mạng thì điện thoại tạm không điều khiển được; quán có thư viện bài lưu sẵn thì TV vẫn hát tiếp các bài đã xếp — nên xếp sẵn vài bài.</p></details>
     <details open><summary>Điểm cuối bài có chính xác không?</summary><p>Đó là điểm vui để tăng không khí, không đo giọng hát thật. Hát tiếp bình thường — TV tự sang bài kế sau vài giây.</p></details>
     <details open><summary>Hết giờ hát thì điện thoại có tự thoát không?</summary><p>Có. Khi phòng đóng, điện thoại của bạn tự ngắt. Muốn hát tiếp, nhờ nhân viên mở phòng và quét mã QR mới trên TV.</p></details>
   </div>
