@@ -1552,8 +1552,9 @@ function hgDraw(){
 function hgRoom(m){
   HG.on = !!(m.open && m.hgOn);
   if(m.tn) HG.delta = m.tn - Date.now();
+  const trc = HG.hg;                                                   // nhắc giờ trước đó (nếu có)
   HG.hg = HG.on && m.hg && m.hg.end ? m.hg : null;
-  if(HG.hg) HG.want = true; else if(!HG.on) HG.want = false;
+  if(HG.hg) HG.want = true; else if(!HG.on || trc) HG.want = false;   // máy khác vừa tắt nhắc → máy này cũng về trạng thái tắt
   hgDraw();
 }
 function hgSend(o){ if(!bc.ws) return; bc.postMessage(Object.assign({ type:'hg' }, o)); }
