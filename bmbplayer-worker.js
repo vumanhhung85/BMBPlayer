@@ -1122,7 +1122,7 @@ async function adminScoreSet(env, body) {
    Giờ kết thúc (hg = {end, min, nguon, sent}) lưu trong Durable Object Room (nguồn chính cho TV/remote: TV rớt mạng rồi nối lại vẫn đúng giờ) và chép sang bảng D1 phong_hg
    để quầy đọc rẻ (quay.feed không gọi Room từng phòng). end = lúc đặt + số phút + 1 phút ngầm (đồng hồ hiện đủ "còn N phút" lúc đầu). Tính theo PHÚT, không theo giây.
    Hết giờ: báo quầy (rung chuông quầy + chip) và Telegram quản lý/quầy chi nhánh (TG_HETGIO="0" tắt). Cộng thêm: remote gửi {type:'hg', add:15|30|60}. */
-const HG_MAX_PHUT = 720, HG_GRACE_MS = 60000;
+const HG_MAX_PHUT = 720, HG_GRACE_MS = 60000, HG_ADD_DEDUP_MS = 5000;
 let hgCache = { v: null, at: 0 }, hgSan = false;
 async function hgCfg(env) {
   if (hgCache.v && Date.now() - hgCache.at < 20000) return hgCache.v;
@@ -2056,7 +2056,7 @@ async function adminKnNhatKy(env, body) {
   if (pid) { sql += ' AND phong_id = ?'; b.push(pid); }
   if (['tv', 'tablet', 'remote'].includes(role)) { sql += ' AND role = ?'; b.push(role); }
   if (ev === 'rot') sql += ` AND (ev = 'dut' OR (ev = 'cat' AND code = 4007))`;
-  else if (['noi', 'dut', 'cat', 'tuchoi', 'mo', 'dong', 'loi', 'xoa', 'tai', 'phat'].includes(ev)) { sql += ' AND ev = ?'; b.push(ev); }
+  else if (['noi', 'dut', 'cat', 'tuchoi', 'mo', 'dong', 'loi', 'xoa', 'tai', 'phat', 'hg'].includes(ev)) { sql += ' AND ev = ?'; b.push(ev); }
   else sql += ` AND ev <> 'phat'`;                                  // báo cáo từng bài hát nhiều → chỉ hiện khi lọc "Phát nhạc trên TV"
   if (ip) { sql += ' AND ip = ?'; b.push(ip); }
   if (quanh) { sql += ' AND t BETWEEN ? AND ?'; b.push(quanh - 120000, quanh + 120000); }     // ±2 phút quanh 1 sự cố
@@ -2669,11 +2669,18 @@ export class Room extends DurableObject {
     if(!(await hgOn(this.env, c.branch))) return { ok: false, error: 'tat' };
     const now = Date.now(), min = hgPhut(o.min), add = hgPhut(o.add), nguon = o.nguon === 'khach' ? 'khach' : 'quay';
     let hg = await this.ctx.storage.get('hg');
+    const truoc = hg;                                  // nhắc giờ ngay trước lệnh này (để so sánh / ghi nhật ký)
+    // Hai khách cùng bấm "+n" gần như cùng lúc (hoặc một khách bấm đúp) chỉ tính MỘT lần; nhân viên quầy bấm liên tiếp thì vẫn cộng dồn
+    if(add && nguon === 'khach' && truoc && truoc.end > now && truoc.la && truoc.la.a === add && now - truoc.la.t < HG_ADD_DEDUP_MS) return { ok: true, hg: { end: truoc.end, min: truoc.min }, trung: true };
     if(add){
-      if(hg && hg.end > now) hg = { min: Math.min(HG_MAX_PHUT, hg.min + add), end: hg.end + add * 60000, nguon, sent: 0 };
-      else hg = { min: add, end: now + add * 60000 + HG_GRACE_MS, nguon, sent: 0 };
+      if(hg && hg.end > now) hg = { min: Math.min(HG_MAX_PHUT, hg.min + add), end: hg.end + add * 60000, nguon, sent: 0, la: { a: add, t: now } };
+      else hg = { min: add, end: now + add * 60000 + HG_GRACE_MS, nguon, sent: 0, la: { a: add, t: now } };
     }else if(min) hg = { min, end: now + min * 60000 + HG_GRACE_MS, nguon, sent: 0 };
     else hg = null;
+    // Khách tắt / rút ngắn giờ mà quầy đã đặt trước đó → ghi nhật ký phòng để nhân viên biết ai đổi (chỉ lần đầu khách chạm vào giờ của quầy)
+    if(nguon === 'khach' && truoc && truoc.nguon === 'quay' && truoc.end > now && (!hg || hg.end < truoc.end)){
+      this.ghi('hg', { role: o.role || 'remote', why: hg ? 'khách rút giờ: ' + truoc.min + 'p → ' + hg.min + 'p' : 'khách tắt nhắc (quầy đặt ' + truoc.min + 'p)' });
+    }
     if(hg) await this.ctx.storage.put('hg', hg); else await this.ctx.storage.delete('hg');
     if(this.env.DB && c.rid){
       try{
@@ -2880,7 +2887,7 @@ export class Room extends DurableObject {
 
     if(m.type === 'hg'){                                 // điện thoại / máy tính bảng đặt nhắc giờ hát: {min} đặt từ bây giờ (0 = tắt) hoặc {add} thêm phút
       if(a.role === 'tv' || (a.role === 'remote' && !a.ok) || data.length > 120) return;
-      const r = await this.hgDat({ min: m.min, add: m.add, nguon: 'khach' });
+      const r = await this.hgDat({ min: m.min, add: m.add, nguon: 'khach', role: a.role });
       try{ ws.send(JSON.stringify({ type: 'hgr', ok: !!r.ok, error: r.error || '' })); }catch(e){}
       return;
     }

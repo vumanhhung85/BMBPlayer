@@ -2626,6 +2626,7 @@ function knSuKien(e){
       + ((p.bn||0)>0?' · <b>đứng hình chờ tải '+p.bn+' lần ('+knDown(p.bms)+')</b>':'')+((p.ltms||0)>=1000?' · <b>máy bận '+knDown(p.ltms)+'</b>':'')+(p.err?' · <b>lỗi '+p.err+'</b>':'')
       + '<div class="knsm">'+(p.vw?'màn '+p.vw+'×'+p.vh+(p.dpr?' @'+p.dpr+'x':''):'')+(p.cl?' · giới hạn '+p.cl+'p':' · chất lượng tự động')+(p.qmx&&p.qmx!==p.q?' · cao nhất '+knQ(p.qmx):'')+(p.hc?' · '+p.hc+' nhân CPU':'')+(p.mem?' · '+p.mem+'GB':'')+(p.up!=null?' · trang chạy '+knTuoi(p.up):'')+(p.sk?' · +'+p.sk+' bài êm trước đó':'')+'</div>';
     cls = xau ? 'kn-ev-cat' : 'kn-ev-noi'; }
+  else if(e.ev==='hg'){ tx = '⏱ Nhắc giờ: '+esc(e.why||'đổi'); cls = 'kn-ev-cat'; }
   else if(e.ev==='mo') tx = '<b>Phòng MỞ</b>';
   else if(e.ev==='dong') tx = '<b>Phòng ĐÓNG</b>';
   else if(e.ev==='xoa'){ tx = 'phòng bị xoá'; cls = 'kn-ev-rot'; }
@@ -2825,7 +2826,7 @@ function knMay(){
 function knNkLoc(){
   var L = KN.loc, h = '<div class="knf">'
     + '<select id="knfRole"><option value="">Mọi thiết bị</option><option value="tv">TV</option><option value="tablet">Máy tính bảng</option><option value="remote">Điện thoại khách</option></select>'
-    + '<select id="knfEv"><option value="">Mọi sự kiện</option><option value="rot">Chỉ RỚT</option><option value="noi">Nối vào</option><option value="tai">Nối lại (máy tự báo)</option><option value="phat">🎵 Phát nhạc trên TV (giật/đứng hình)</option><option value="cat">Server cắt</option><option value="tuchoi">Bị từ chối</option><option value="mo">Mở phòng</option><option value="dong">Đóng phòng</option></select>'
+    + '<select id="knfEv"><option value="">Mọi sự kiện</option><option value="rot">Chỉ RỚT</option><option value="noi">Nối vào</option><option value="tai">Nối lại (máy tự báo)</option><option value="phat">🎵 Phát nhạc trên TV (giật/đứng hình)</option><option value="cat">Server cắt</option><option value="tuchoi">Bị từ chối</option><option value="hg">⏱ Nhắc giờ (khách đổi)</option><option value="mo">Mở phòng</option><option value="dong">Đóng phòng</option></select>'
     + '<input id="knfIp" placeholder="Lọc IP" style="width:150px" value="'+esc(L.ip)+'">'
     + (L.phong ? '<span class="knchip">Phòng '+esc(L.phongTen)+'<button data-bo="phong" title="Bỏ lọc">✕</button></span>' : '')
     + (L.quanh ? '<span class="knchip">±2 phút quanh '+knTg(L.quanh)+'<button data-bo="quanh" title="Bỏ lọc">✕</button></span>' : '')
