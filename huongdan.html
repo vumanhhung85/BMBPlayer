@@ -166,6 +166,7 @@ tbody tr:nth-child(even) td{background:#FBF8FE}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
 .sbs{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;align-items:flex-start;margin:6px 0}
 .sbs figure{flex:0 1 auto}
+.sbs.dr{flex-wrap:nowrap}.sbs.dr figure{flex:0 1 190px;min-width:0}
 
 /* chế độ khách — đồ hoạ lớn hơn */
 .big{font-size:17px}
@@ -234,6 +235,8 @@ tbody tr:nth-child(even) td{background:#FBF8FE}
 @page{size:A4;margin:12mm 12mm 14mm}
 @page :first{margin:0}
 @media print{
+  #ql5 .qrs{max-width:128px!important}
+  .sbs.dr figure{flex:1 1 0!important;max-width:165px}
   html{font-size:13.4px}
   body{background:#fff}
   .nav,.pdfbtn,.tabs{display:none!important}
@@ -316,7 +319,7 @@ tbody tr:nth-child(even) td{background:#FBF8FE}
       <span class="kick"><img src="huongdan/img/logoB.png" alt="">BMBPlayer · Boom Music Box</span>
       <h1>Hướng dẫn<br>sử dụng <em>BMBPlayer</em></h1>
       <p class="sub">Dành cho Nhân viên quầy &amp; Quản lý chi nhánh</p>
-      <div class="chips"><span>Quầy phục vụ</span><span>TV &amp; máy tính bảng</span><span>Menu</span><span>Cập nhật ứng dụng</span></div>
+      <div class="chips"><span>Phòng &amp; yêu cầu</span><span>Nhắc giờ hát</span><span>TV &amp; máy tính bảng</span><span>Menu</span><span>Cuối ca</span></div>
     </div>
     <div class="art">
       <div class="laptop lp"><div class="scr"><div class="fig"><img src="huongdan/img/q_desk.jpg" alt=""></div></div><div class="base"></div></div>
@@ -331,9 +334,9 @@ tbody tr:nth-child(even) td{background:#FBF8FE}
   <ol>
     <li><a href="#ql1">Làm quen với BMBPlayer</a></li>
     <li><a href="#ql2">Cài ứng dụng (Android, iPhone, iPad) &amp; đăng nhập</a></li>
-    <li><a href="#ql3">Hàng đợi — trái tim của quầy</a></li>
-    <li><a href="#ql4">Lịch sử đơn &amp; đối soát</a></li>
-    <li><a href="#ql5">TV, máy tính bảng &amp; phòng</a></li>
+    <li><a href="#ql3">Màn hình Quầy — phòng &amp; yêu cầu</a></li>
+    <li><a href="#ql4">Cuối ca &amp; đối soát</a></li>
+    <li><a href="#ql5">Phòng, TV &amp; máy tính bảng</a></li>
     <li><a href="#ql6">Menu nước &amp; dịch vụ</a></li>
     <li><a href="#ql7">Tài khoản &amp; vân tay</a></li>
     <li><a href="#ql8">Cập nhật BMBPlayer</a></li>
@@ -347,8 +350,8 @@ tbody tr:nth-child(even) td{background:#FBF8FE}
 
   <div class="cards">
     <div class="card"><div class="ic">📺</div><h4>TV trong phòng</h4><p>Phát bài hát khách chọn. Góc trái luôn có <b>mã QR</b> để khách quét, và hiện các yêu cầu khách đã gửi cho lễ tân.</p></div>
-    <div class="card"><div class="ic">📱</div><h4>Điện thoại khách &amp; máy tính bảng</h4><p>Chọn bài, điều khiển TV, <b>gọi lễ tân</b>, gọi nước theo số lượng, báo sự cố — không cần cài ứng dụng.</p></div>
-    <div class="card"><div class="ic">🧾</div><h4>Quầy phục vụ</h4><p>Nhận yêu cầu <b>ngay lập tức</b>, xác nhận, theo dõi phòng — <b>thấy TV từng phòng đang phát bài gì</b> — quản lý TV, menu và nhân viên.</p></div>
+    <div class="card"><div class="ic">📱</div><h4>Điện thoại khách &amp; máy tính bảng</h4><p>Chọn bài, điều khiển TV, <b>gọi lễ tân</b>, gọi nước theo số lượng, báo sự cố, xem giờ hát — không cần cài ứng dụng.</p></div>
+    <div class="card"><div class="ic">🧾</div><h4>Quầy phục vụ</h4><p>Nhận yêu cầu <b>ngay lập tức</b>, xác nhận, mở / đóng phòng, theo dõi giờ hát — <b>thấy TV từng phòng đang phát bài gì</b> — quản lý TV, menu và nhân viên.</p></div>
   </div>
 
   <div class="flow">
@@ -361,13 +364,27 @@ tbody tr:nth-child(even) td{background:#FBF8FE}
   <table>
     <thead><tr><th>Chức năng</th><th class="c">Nhân viên quầy</th><th class="c">Quản lý chi nhánh</th></tr></thead>
     <tbody>
-      <tr><td>Hàng đợi, lịch sử đơn, mở/đóng phòng, gán TV, QR khách</td><td class="c y">✔</td><td class="c y">✔</td></tr>
+      <tr><td>Màn hình Quầy, yêu cầu từ phòng, Cuối ca, mở/đóng phòng, gán TV, QR khách</td><td class="c y">✔</td><td class="c y">✔</td></tr>
+      <tr><td>Đặt / gia hạn giờ hát của từng phòng (khi chi nhánh đã bật Nhắc giờ hát)</td><td class="c y">✔</td><td class="c y">✔</td></tr>
+      <tr><td><b>Bật / tắt Nhắc giờ hát</b> cho cả chi nhánh</td><td class="c n">—</td><td class="c y">✔</td></tr>
       <tr><td>Báo món <b>Còn hàng / Hết hàng</b></td><td class="c y">✔</td><td class="c y">✔</td></tr>
       <tr><td>Sửa menu: thêm, ẩn, bỏ, sắp xếp món</td><td class="c">khi được cấp quyền</td><td class="c y">✔</td></tr>
-      <tr><td>Tài khoản quầy, gỡ / thu hồi máy tính bảng, vân tay</td><td class="c n">—</td><td class="c y">✔</td></tr>
+      <tr><td>Quản lý → Tài khoản quầy, gỡ / thu hồi máy tính bảng, vân tay</td><td class="c n">—</td><td class="c y">✔</td></tr>
       <tr><td>Nhật ký kết nối, nối Telegram riêng</td><td class="c">Telegram: ✔</td><td class="c y">✔</td></tr>
     </tbody>
   </table>
+  <div class="step">
+    <div>
+      <span class="badge"><b>★</b> Đi lại trong quầy</span>
+      <h3>Ba mục chính: Quầy · Cuối ca · Quản lý</h3>
+      <ol class="no">
+        <li><b>Điện thoại:</b> thanh dưới có <b>Quầy</b> (phòng) · <b>Đơn</b> (yêu cầu của khách) · <b>Cuối ca</b> (đối soát) · <b>Thêm</b>.</li>
+        <li><b>Thêm</b> mở mục <b>Quản lý</b>: <b>Menu</b>, <b>Tài khoản quầy</b>, <b>Cài đặt</b> — hiện theo quyền của tài khoản.</li>
+      </ol>
+      <p>Trên máy tính, ba mục <b>Quầy · Cuối ca · Quản lý ▾</b> nằm ngay đầu trang.</p>
+    </div>
+    <div class="figs"><figure class="phone"><div class="fig"><img src="huongdan/img/q_them.jpg" alt=""><i class="hl" data-n="1" style="left:1.5%;top:91.6%;width:97%;height:7.2%"></i><i class="hl" data-n="2" style="left:3%;top:68.6%;width:94%;height:21.2%"></i></div></figure></div>
+  </div>
   <div class="note tip"><b>Địa chỉ cần nhớ:</b> trang quầy <span class="k">bmb.id.vn/quay.html</span> · tải ứng dụng Android <span class="k">bmb.id.vn/app.apk</span>. Tài khoản đăng nhập là tài khoản của hệ thống quản lý Boom Music Box.</div>
 </div></section>
 
@@ -424,7 +441,7 @@ tbody tr:nth-child(even) td{background:#FBF8FE}
     <div>
       <span class="badge"><b>4</b> Đăng nhập quầy</span>
       <h3>Đăng nhập bằng tài khoản được cấp</h3>
-      <p>Nhập tên đăng nhập rồi bấm <span class="k y">Đăng nhập</span>. Tài khoản <b>quản lý chi nhánh</b> có thêm các tab Menu, Tài khoản quầy, Cài đặt.</p>
+      <p>Nhập tên đăng nhập rồi bấm <span class="k y">Đăng nhập</span>. Tài khoản <b>quản lý chi nhánh</b> có thêm mục <b>Quản lý</b> (Menu, Tài khoản quầy, Cài đặt).</p>
       <p>Đã bật vân tay? Chạm <span class="k">Đăng nhập bằng vân tay</span> — nhanh hơn nhiều (xem chương 7).</p>
     </div>
     <div class="figs"><figure class="dlg" style="width:100%;max-width:300px"><div class="fig"><img src="huongdan/img/login.jpg" alt="" style="border-radius:20px"><i class="hl" data-n="1" style="left:3%;top:62%;width:94%;height:30%"></i></div></figure></div>
@@ -454,48 +471,67 @@ tbody tr:nth-child(even) td{background:#FBF8FE}
 
 <!-- 3 -->
 <section class="chap pb" id="ql3"><div class="wrap">
-  <header><span class="num">03</span><div><h2>Hàng đợi — trái tim của quầy</h2><p class="lead">Mọi yêu cầu của khách hiện ở đây theo thời gian thực.</p></div></header>
+  <header><span class="num">03</span><div><h2>Màn hình Quầy — phòng &amp; yêu cầu</h2><p class="lead">Nhìn một lượt là biết phòng nào đang hát, phòng nào đang chờ bạn.</p></div></header>
 
   <div class="step">
     <div>
       <span class="badge"><b>1</b> Đọc nhanh màn hình</span>
-      <h3>Số liệu và tình trạng phòng</h3>
-      <ul class="tick">
-        <li><b>Bốn ô số</b> trên cùng: <span class="k" style="background:#FFE9D2;border-color:#F5B87A;color:#B35400">Đã gửi</span> chờ xác nhận · <span class="k">Đã xác nhận</span> · <span class="k g">Đã phục vụ hôm nay</span> · <span class="k r">Đơn nghi ngờ</span>.</li>
-        <li><b>Ô phòng</b> cho biết phòng nào đang hát và đã hát bao lâu:</li>
-      </ul>
-      <div class="legend"><span><i style="background:#17935F"></i>Đang mở</span><span><i style="background:#F5A11B"></i>Mở từ 6 giờ trở lên</span><span><i style="background:#fff;border:1px solid #CDB8E3"></i>Trống</span></div>
-      <p>Dưới đó là <b>ba cột</b>: Đã gửi → Đã xác nhận → Đơn nghi ngờ. Đơn mới luôn nằm đầu cột.</p>
-    </div>
-    <div class="figs"><figure class="phone"><div class="fig"><img src="huongdan/img/q_queue.jpg" alt=""><i class="hl" data-n="1" style="left:3%;top:15.5%;width:94%;height:14%"></i><i class="hl" data-n="2" style="left:3%;top:31%;width:94%;height:18%"></i></div></figure></div>
-  </div>
-
-  <div class="step rev">
-    <div>
-      <span class="badge"><b>2</b> Xử lý một đơn</span>
-      <h3>Xác nhận → Phục vụ → Nhập POS</h3>
+      <h3>Dải số, thẻ phòng, thanh dưới</h3>
       <ol class="no">
-        <li>Đơn mới ở cột <b>Đã gửi</b>: bấm <span class="k y">Xác nhận</span> — khách thấy ngay “đã xác nhận” trên máy của họ. Không làm được thì bấm <span class="k">Huỷ</span>.</li>
-        <li>Mang đồ vào phòng xong, bấm <span class="k g">Đã phục vụ</span>.</li>
-        <li>Đơn có <b>nước</b> sẽ nhắc <b>“Nhớ nhập POS”</b>. Nhập vào máy tính tiền rồi bấm <span class="k y">Đã nhập</span> để cuối ca đối soát không sót.</li>
+        <li><b>Dải ô số</b> trên cùng (vuốt ngang để xem hết): phòng đang mở · phòng trống · <b>yêu cầu chờ xác nhận</b>; có thêm <b>TV chưa nối</b> khi cần.</li>
+        <li><b>Mỗi phòng một thẻ</b>: nhãn trạng thái, <b>“Mở từ”</b> mấy giờ, dòng chấm <b>TV · MTB · ĐT</b>. Số cam ở góc thẻ là số yêu cầu của phòng đó đang chờ.</li>
+        <li><b>Thanh dưới cùng</b>: Quầy · Đơn (số đỏ = yêu cầu chờ) · Cuối ca · Thêm.</li>
       </ol>
-      <p>Thời gian chờ đổi màu <b>xám → vàng → đỏ</b> khi đơn để lâu. Mỗi đơn có mã <span class="k">#XXXXXX</span> để tra cứu.</p>
-      <div class="note warn"><b>Đơn nghi ngờ</b> (một máy gọi quá nhiều lần liên tục) bị tách sang cột riêng và làm mờ. Bấm <span class="k r">Chặn thiết bị 24h</span> nếu đúng là gọi phá.</div>
+      <div class="legend"><span><i style="background:#17935F"></i>Đang hát</span><span><i style="background:#F5A11B"></i>Sắp hết giờ</span><span><i style="background:#D6314F"></i>Quá giờ / TV chưa nối</span><span><i style="background:#fff;border:1px solid #CDB8E3"></i>Trống</span></div>
+      <p>Chấm <b>xanh</b> = đã nối, <b>đỏ</b> = TV chưa nối, <b>xám nhạt</b> = chưa có máy tính bảng; “2 ĐT” là 2 điện thoại khách đang nối. Nút trên thẻ: <span class="k y">Mở phòng</span> · <span class="k">Đóng phòng</span> · <span class="k">⋯</span> (chi tiết phòng, chương 5).</p>
+      <div class="note"><b>Phần giờ hát</b> (“Còn 1h30”, thanh tiến độ, nút <span class="k">Giờ</span> / <span class="k y">+30 phút</span>, ô sắp hết giờ / quá giờ) <b>chỉ hiện khi chi nhánh bật Nhắc giờ hát</b> (chương 5, mục 4). Chưa bật thì thẻ chỉ có Đang hát / Trống.</div>
     </div>
-    <div class="figs"><figure class="phone"><div class="fig"><img src="huongdan/img/q_queue2.jpg" alt=""></div></figure></div>
+    <div class="figs"><figure class="phone"><div class="fig"><img src="huongdan/img/q_queue.jpg" alt=""><i class="hl" data-n="1" style="left:2%;top:12.6%;width:96%;height:5.4%"></i><i class="hl" data-n="2" style="left:3%;top:25%;width:45.5%;height:23.3%"></i><i class="hl" data-n="3" style="left:1.5%;top:91.6%;width:97%;height:7.2%"></i></div></figure></div>
   </div>
 
   <div class="step wide">
     <div>
-      <span class="badge"><b>3</b> Chuông · rung · thông báo</span>
-      <h3>Có đơn là biết ngay — kể cả khi tắt màn hình</h3>
+      <span class="badge"><b>2</b> Trên máy tính</span>
+      <h3>Cùng một màn hình, nhìn được nhiều hơn</h3>
+      <div class="row2">
+        <ol class="no">
+          <li>Trên đầu trang có ba mục: <b>Quầy</b> · <b>Cuối ca</b> · <b>Quản lý ▾</b> (Menu, Tài khoản quầy, Cài đặt — hiện theo quyền của tài khoản).</li>
+          <li>Các <b>thẻ phòng xếp thành lưới</b> ở bên trái.</li>
+          <li><b>Cột bên phải</b> là <b>Yêu cầu từ phòng</b>. Chạm một thẻ phòng thì cột này đổi thành <b>chi tiết của phòng đó</b> (đóng bằng dấu ✕).</li>
+        </ol>
+        <figure class="laptop"><div class="scr"><div class="fig"><img src="huongdan/img/q_desk.jpg" alt=""><i class="hl" data-n="1" style="left:9%;top:6.8%;width:25.7%;height:4.8%"></i><i class="hl" data-n="2" style="left:2.5%;top:26.5%;width:66%;height:61.5%"></i><i class="hl" data-n="3" style="left:69.3%;top:21.5%;width:28.2%;height:77%"></i></div></div><div class="base"></div></figure>
+      </div>
+    </div>
+  </div>
+
+  <div class="step rev">
+    <div>
+      <span class="badge"><b>3</b> Xử lý yêu cầu</span>
+      <h3>Xác nhận → Nhập POS → Đã phục vụ</h3>
+      <p>Mở mục <b>Đơn</b> (trên máy tính: cột <b>Yêu cầu từ phòng</b>). Lọc bằng <b>Tất cả · Chờ xác nhận · Đã xác nhận · Nghi ngờ</b>. Mỗi thẻ có phòng, loại (Nước / Dịch vụ), món và ghi chú của khách, nguồn gọi và mã <span class="k">#XXXXXX</span>.</p>
+      <ol class="no">
+        <li>Yêu cầu mới: bấm <span class="k y">Xác nhận</span> — khách thấy ngay “đã xác nhận” trên máy của họ. Không làm được thì bấm <span class="k">Huỷ</span>.</li>
+        <li>Đơn có <b>nước</b> hiện dòng <b>“Nhớ nhập POS”</b>: nhập vào máy tính tiền rồi bấm <span class="k y">Đã nhập</span> để cuối ca đối soát không sót.</li>
+        <li>Mang đồ vào phòng xong, bấm <span class="k g">Đã phục vụ</span>.</li>
+      </ol>
+      <p>Số phút chờ đổi màu <b>xám → cam → đỏ</b> khi yêu cầu để lâu.</p>
+      <div class="note warn"><b>Nghi ngờ</b>: một máy gọi quá nhiều lần liên tục bị tách sang mục riêng và làm mờ. Bấm <span class="k r">Chặn thiết bị 24h</span> nếu đúng là gọi phá.</div>
+    </div>
+    <div class="figs"><figure class="phone"><div class="fig"><img src="huongdan/img/q_queue2.jpg" alt=""><i class="hl" data-n="1" style="left:6%;top:17.8%;width:80%;height:8.6%"></i><i class="hl" data-n="2" style="left:11.5%;top:49.9%;width:78%;height:4.9%"></i></div></figure></div>
+  </div>
+
+  <div class="step wide">
+    <div>
+      <span class="badge"><b>4</b> Chuông · rung · thông báo</span>
+      <h3>Có yêu cầu là biết ngay — kể cả khi tắt màn hình</h3>
       <div class="row2">
         <div>
           <ul class="tick">
             <li>Khi app ở chế độ <b>Quầy</b>, thanh thông báo luôn có dòng <b>“BMB Quầy đang nhận đơn”</b>.</li>
-            <li>Đơn mới <b>kêu chuông riêng và rung</b>, rồi <b>nhắc lại mỗi 30 giây</b> cho tới khi có người bấm Xác nhận.</li>
-            <li>Chi nhánh đã nối Telegram nhận thêm tin báo trong nhóm.</li>
-            <li>Dùng trang web thay cho app? Bấm nút <span class="k">🔔</span> trên đầu trang để bật thông báo trên máy đó.</li>
+            <li>Yêu cầu mới <b>kêu chuông riêng và rung</b>, rồi <b>nhắc lại mỗi 30 giây</b> cho tới khi có người bấm Xác nhận.</li>
+            <li>Chi nhánh đã nối Telegram nhận thêm tin báo.</li>
+            <li>Dùng trang web thay cho app? Bấm nút chuông <span class="k">🔔</span> trên đầu trang để bật thông báo trên máy đó.</li>
+            <li>Chi nhánh bật Nhắc giờ hát: phòng <b>hết giờ</b> cũng kêu chuông và hiện <b>thanh cảnh báo đỏ</b> ở đầu trang quầy (chương 5, mục 4).</li>
           </ul>
           <div class="note tip"><b>Mẹo:</b> đừng gạt tắt dòng “BMB Quầy đang nhận đơn” và hãy cho app chạy nền — đó là thứ giúp chuông luôn kêu.</div>
         </div>
@@ -507,36 +543,49 @@ tbody tr:nth-child(even) td{background:#FBF8FE}
 
 <!-- 4 -->
 <section class="chap" id="ql4"><div class="wrap">
-  <header><span class="num">04</span><div><h2>Lịch sử đơn &amp; đối soát</h2><p class="lead">Dùng cuối ca để khớp với báo cáo máy tính tiền.</p></div></header>
+  <header><span class="num">04</span><div><h2>Cuối ca &amp; đối soát</h2><p class="lead">Dùng cuối ca để khớp với báo cáo máy tính tiền.</p></div></header>
   <div class="step">
     <div>
-      <ul class="tick">
-        <li>Tab <b>📅 Lịch sử đơn</b>: xem lại đơn theo ngày, dùng nút ◀ ▶ hoặc <span class="k">Hôm nay</span>.</li>
-        <li><b>Một ngày tính từ 06:00 sáng đến 06:00 sáng hôm sau</b> — trọn một ca mở cửa, nên đơn lúc 1–2 giờ sáng vẫn thuộc ngày hôm trước.</li>
-        <li>Cột <b>POS</b> cho biết đơn có nước đã được nhập vào máy tính tiền hay chưa; ô <b>“Có nước, chưa nhập POS”</b> là việc cần xử lý trước khi chốt ca.</li>
-        <li>Bấm <span class="k y">⬇ Tải CSV đối soát</span> để lấy bảng chi tiết, mở được bằng Excel.</li>
-      </ul>
+      <ol class="no">
+        <li>Mục <b>Cuối ca</b> (thanh dưới trên điện thoại, hoặc trên đầu trang máy tính): xem lại yêu cầu theo ngày, dùng nút <span class="k">◀</span> <span class="k">▶</span> hoặc <span class="k">Hôm nay</span>.</li>
+        <li>Bấm <span class="k y">⬇️ Tải CSV đối soát</span> để lấy bảng chi tiết, mở được bằng Excel.</li>
+        <li>Ô <b>“Có nước, chưa nhập POS”</b> là việc cần xử lý trước khi chốt ca; cột <b>POS</b> trong bảng cho biết đơn nào đã nhập vào máy tính tiền.</li>
+      </ol>
+      <div class="note tip"><b>Một ngày tính từ 06:00 sáng đến 06:00 sáng hôm sau</b> — trọn một ca mở cửa, nên đơn lúc 1–2 giờ sáng vẫn thuộc ngày hôm trước.</div>
     </div>
-    <div class="figs"><figure class="phone"><div class="fig"><img src="huongdan/img/q_hist.jpg" alt=""></div></figure></div>
+    <div class="figs"><figure class="phone"><div class="fig"><img src="huongdan/img/q_hist.jpg" alt=""><i class="hl" data-n="1" style="left:3%;top:33%;width:83.5%;height:4.6%"></i><i class="hl" data-n="2" style="left:3%;top:38.6%;width:39%;height:4.4%"></i><i class="hl" data-n="3" style="left:51.5%;top:60.6%;width:45.5%;height:9%"></i></div></figure></div>
   </div>
 </div></section>
 
 <!-- 5 -->
 <section class="chap pb" id="ql5"><div class="wrap">
-  <header><span class="num">05</span><div><h2>TV, máy tính bảng &amp; phòng</h2><p class="lead">Mỗi phòng có 1 TV và có thể có 1 máy tính bảng; xem nhật ký kết nối khi phòng bị rớt.</p></div></header>
+  <header><span class="num">05</span><div><h2>Phòng, TV &amp; máy tính bảng</h2><p class="lead">Mỗi phòng có 1 TV và có thể có 1 máy tính bảng; mọi việc của phòng nằm trong bảng chi tiết phòng.</p></div></header>
 
-  <div class="step">
+  <div class="step wide">
     <div>
-      <span class="badge"><b>1</b> Mở / đóng phòng</span>
-      <h3>Vào tab 📺 TV &amp; MTB</h3>
-      <ul class="tick">
-        <li>Mỗi phòng hiện trạng thái: <b>Đang mở từ…</b>, TV đã nối, máy tính bảng, số điện thoại đang kết nối.</li>
-        <li><span class="k y">Mở phòng</span> khi khách vào. <b>Mỗi lần mở là một QR khách mới</b> trên TV — khách lượt trước không vào lại được.</li>
-        <li><span class="k">Đóng phòng</span> khi khách ra: điện thoại khách bị ngắt và hàng chờ bài trên TV được xoá.</li>
-        <li><span class="k">QR khách</span> / <span class="k">Đổi QR khách</span>: dùng khi TV hỏng hoặc khách nhờ quét lại.</li>
-      </ul>
+      <span class="badge"><b>1</b> Mở / đóng phòng &amp; chi tiết phòng</span>
+      <h3>Chạm vào thẻ phòng để xem chi tiết</h3>
+      <div class="row2">
+        <div>
+          <ul class="tick">
+            <li><span class="k y">Mở phòng</span> khi khách vào. <b>Mỗi lần mở là một QR khách mới</b> trên TV — khách lượt trước không vào lại được.</li>
+            <li><span class="k">Đóng phòng</span> khi khách ra: điện thoại khách bị ngắt và hàng chờ bài trên TV được xoá.</li>
+            <li>Chạm thẻ phòng (hoặc <span class="k">⋯</span>) mở bảng chi tiết, từ trên xuống:</li>
+          </ul>
+          <ol class="no">
+            <li><b>Giờ hát</b> — chỉ khi chi nhánh bật Nhắc giờ hát: <span class="k">+15</span> <span class="k">+30</span> <span class="k">+60</span>, <span class="k">Đặt giờ khác…</span>, <span class="k">Tắt nhắc giờ</span>.</li>
+            <li><b>Thiết bị</b> — TV đã nối / chưa nối, máy tính bảng, số điện thoại, dòng <b>🎵 Đang phát</b>; nút <span class="k">Gán TV &amp; MTB</span>, <span class="k">Gỡ TV</span>, <span class="k">Gỡ MTB</span>.</li>
+            <li><b>QR cho khách</b> — <span class="k">Hiện QR</span>, <span class="k">Đổi QR khách</span> (khi TV hỏng hoặc khách nhờ quét lại).</li>
+            <li><b>Phòng</b> — <span class="k r">Đóng phòng</span> (hoặc Mở phòng nếu phòng đang trống).</li>
+          </ol>
+          <p style="font-size:13.5px;color:var(--mute)">Ngay đầu bảng là <b>YÊU CẦU CỦA PHÒNG</b> — xác nhận ngay tại đây, không cần quay về danh sách.</p>
+        </div>
+        <div class="sbs dr">
+          <figure class="phone"><div class="fig"><img src="huongdan/img/q_drawer.jpg" alt=""><i class="hl" data-n="1" style="left:4%;top:70.8%;width:60%;height:9.9%"></i><i class="hl" data-n="2" style="left:4%;top:87.4%;width:92%;height:11.2%"></i></div></figure>
+          <figure class="phone"><div class="fig"><img src="huongdan/img/q_drawer2.jpg" alt=""><i class="hl" data-n="3" style="left:4.2%;top:73.2%;width:51.5%;height:4.9%"></i><i class="hl" data-n="4" style="left:4.2%;top:92.8%;width:27.5%;height:4.6%"></i></div></figure>
+        </div>
+      </div>
     </div>
-    <div class="figs"><figure class="phone"><div class="fig"><img src="huongdan/img/q_tv2.jpg" alt=""></div></figure></div>
   </div>
 
   <div class="step rev">
@@ -545,31 +594,46 @@ tbody tr:nth-child(even) td{background:#FBF8FE}
       <h3>Thiết bị chưa gán sẽ hiện mã 6 số + QR</h3>
       <ol class="no">
         <li>Bật TV hoặc máy tính bảng mới: màn hình hiện <b>mã gán 6 số</b> và QR.</li>
-        <li>Trên điện thoại đã đăng nhập quầy, <b>quét QR đó bằng camera</b> — trang quầy mở thẳng, đầu trang báo <b>“đang chờ gán”</b>. (Hoặc bấm <span class="k">📺 Gán TV &amp; MTB</span> ở phòng rồi quét / nhập mã.)</li>
-        <li>Bấm <span class="k y">Gán … này vào đây</span> ở <b>đúng phòng</b>. Thiết bị tự vào phòng sau vài giây.</li>
+        <li>Trên điện thoại đã đăng nhập quầy, <b>quét QR đó bằng camera</b> — trang quầy mở thẳng, đầu trang hiện thanh vàng <b>“TV mã … đang chờ gán”</b>. (Hoặc mở chi tiết phòng → <span class="k">Gán TV &amp; MTB</span> rồi quét / nhập mã.)</li>
+        <li>Bấm <span class="k y">Gán TV vào đây</span> trên <b>đúng thẻ phòng</b> (máy tính bảng thì nút ghi “Gán máy tính bảng vào đây”). Thiết bị tự vào phòng sau vài giây.</li>
       </ol>
-      <p>Máy tính bảng đã gán sẽ tự quét QR trên TV khi cần đổi phòng. Cần chuyển thiết bị: dùng <span class="k">Gỡ TV</span> / <span class="k">Gỡ máy tính bảng</span>.</p>
-      <div class="note warn"><b>Mất máy tính bảng?</b> Bấm <span class="k r">🔒 Thu hồi mọi máy tính bảng</span> — mọi máy bị gỡ khỏi phòng và phải gán lại từng máy.</div>
+      <p>Nút đỏ <span class="k r">Vẫn gán vào đây</span> hiện khi TV không cùng mạng với chi nhánh — chỉ bấm khi chắc chắn TV đang ở đây. Cần chuyển thiết bị: chi tiết phòng → <span class="k">Gỡ TV</span> / <span class="k">Gỡ MTB</span>.</p>
+      <div class="note warn"><b>Mất máy tính bảng?</b> Bấm <span class="k">⋯</span> (cạnh chữ “Phòng”) → <span class="k r">🔒 Thu hồi mọi máy tính bảng</span> — mọi máy bị gỡ khỏi phòng và phải gán lại từng máy.</div>
     </div>
-    <div class="figs"><figure class="phone"><div class="fig"><img src="huongdan/img/q_gan2.jpg" alt=""></div></figure></div>
+    <div class="figs"><figure class="phone"><div class="fig"><img src="huongdan/img/q_gan2.jpg" alt=""><i class="hl" data-n="1" style="left:3%;top:13.8%;width:94%;height:18.2%"></i><i class="hl" data-n="2" style="left:7%;top:62.8%;width:39%;height:5%"></i></div></figure></div>
   </div>
 
   <div class="step">
     <div>
       <span class="badge"><b>3</b> Mã QR của phòng</span>
       <h3>QR góc trái TV — cửa vào của khách</h3>
-      <p>Khi phòng mở, TV hiện QR kèm tên phòng ở giữa. Khách quét bằng camera điện thoại là vào được trang chọn bài và gọi lễ tân. Bên dưới QR, TV hiện luôn các yêu cầu khách vừa gửi cho lễ tân.</p>
-      <p>Cần in <b>thẻ QR đánh giá</b> cho khách? Bấm <span class="k">⭐ In QR ĐÁNH GIÁ</span> (thẻ riêng, không có số phòng) — chi nhánh cần có đường dẫn Google Maps trong app quản lý BMB.</p>
-      
+      <p>Khi phòng mở, TV hiện QR kèm tên phòng ở giữa; khách quét bằng camera là vào được trang chọn bài và gọi lễ tân. Bên dưới QR, TV hiện các yêu cầu khách vừa gửi.</p>
+      <p><b>Thẻ QR đánh giá</b> (thẻ riêng, không số phòng): <span class="k">⋯</span> → <span class="k">⭐ In QR ĐÁNH GIÁ</span> — chi nhánh cần có đường dẫn Google Maps.</p>
     </div>
-    <div class="figs"><figure class="photo" style="max-width:250px"><div class="fig"><img src="huongdan/img/tvqr.jpg" alt=""></div><figcaption>Góc trái TV khi phòng đang mở</figcaption></figure></div>
+    <div class="figs"><figure class="photo qrs" style="max-width:250px"><div class="fig"><img src="huongdan/img/tvqr.jpg" alt=""></div><figcaption>Góc trái TV khi phòng đang mở</figcaption></figure></div>
   </div>
 
   <div class="step rev">
     <div>
-      <span class="badge"><b>4</b> TV đang làm gì?</span>
-      <h3>Mỗi phòng có một dòng cho biết TV đang phát gì</h3>
-      <p>Mở tab <b>📺 TV &amp; MTB</b>: dưới tên phòng đang mở có thêm một dòng màu — không cần đi lên phòng cũng biết TV có đang hát hay không. Dòng này tự cập nhật theo TV.</p>
+      <span class="badge"><b>4</b> Nhắc giờ hát</span>
+      <h3>Báo khách và quầy khi sắp hết giờ</h3>
+      <p>Tính năng <b>tuỳ chọn</b>, mặc định <b>tắt</b>, bật riêng cho từng chi nhánh. Bật hoặc tắt: <span class="k">⋯</span> (cạnh chữ “Phòng”) → <b>⏱ Nhắc giờ hát cho khách</b> — <b>chỉ quản lý chi nhánh</b> làm được.</p>
+      <ul class="tick">
+        <li>Khi <b>mở phòng</b>, quầy chọn khách hát bao lâu (60 · 90 · 120 phút hoặc <span class="k">Khác…</span>). Khách cũng tự đặt được trên điện thoại.</li>
+        <li>TV nhắc khách ở các mốc <b>còn 15 · 10 · 5 phút</b>. Hết giờ <b>phòng vẫn mở</b>, đồng hồ đếm tăng “+phút” — khách không bị ngắt.</li>
+        <li>Phòng hết giờ: quầy nghe <b>chuông</b>, thanh đỏ báo <b>“vào hỏi khách có hát tiếp không?”</b> với <span class="k y">Gia hạn +30 phút</span> / <span class="k">Đã nhắc khách</span>, và Telegram báo thêm.</li>
+        <li>Đổi giờ từng phòng: nút <span class="k">Giờ</span> trên thẻ phòng (nhân viên cũng làm được khi chi nhánh đã bật).</li>
+        <li>Thanh vàng cảnh báo <b>TV chưa nối</b> hiện khi phòng đã mở hơn 2 phút mà TV chưa vào.</li>
+      </ul>
+    </div>
+    <div class="figs"><figure class="phone"><div class="fig"><img src="huongdan/img/q_setup.jpg" alt=""><i class="hl" data-n="1" style="left:6.9%;top:16.2%;width:55.2%;height:4.2%"></i><i class="hl" data-n="2" style="left:6.9%;top:22%;width:36.8%;height:4.2%"></i><i class="hl" data-n="3" style="left:6.9%;top:27.6%;width:84%;height:4.3%"></i><i class="hl" data-n="4" style="left:10.2%;top:73.6%;width:45.2%;height:4.1%"></i></div><figcaption style="color:#ccc;margin-bottom:4px">Bảng ⋯: 1 Thu hồi MTB · 2 Nhật ký kết nối · 3 QR đánh giá · 4 Nhắc giờ hát</figcaption></figure></div>
+  </div>
+
+  <div class="step wide">
+    <div>
+      <span class="badge"><b>5</b> TV đang làm gì?</span>
+      <h3>Dòng xanh “🎵 Đang phát” trong chi tiết phòng</h3>
+      <p>Mở chi tiết phòng, mục <b>Thiết bị</b>: dưới các chip có thêm một dòng màu — không cần đi lên phòng cũng biết TV có đang hát hay không. Dòng này tự cập nhật theo TV.</p>
       <table>
         <thead><tr><th>Dòng hiện ra</th><th>Nghĩa là</th></tr></thead>
         <tbody>
@@ -584,12 +648,11 @@ tbody tr:nth-child(even) td{background:#FBF8FE}
         </tbody>
       </table>
     </div>
-    <div class="figs"><figure class="phone"><div class="fig"><img src="huongdan/img/q_tvphat.jpg" alt=""></div></figure></div>
   </div>
 
   <div class="step wide">
     <div>
-      <span class="badge"><b>5</b> Mất Internet của quán</span>
+      <span class="badge"><b>6</b> Mất Internet của quán</span>
       <h3>Quán có NAS: TV vẫn hát tiếp các bài đang xếp</h3>
       <ul class="tick">
         <li><b>Quán có NAS</b> (thư viện bài lưu sẵn trong quán): khi mất Internet, TV tự hát tiếp những bài <b>có trong NAS</b>. Bài không có trong NAS được <b>dời xuống cuối hàng chờ</b>, TV hiện thông báo và phát bài kế phát được. Nếu không còn bài nào phát được, TV hiện màn chờ và <b>tự hát tiếp khi có mạng lại</b>.</li>
@@ -602,10 +665,10 @@ tbody tr:nth-child(even) td{background:#FBF8FE}
 
   <div class="step wide">
     <div>
-      <span class="badge"><b>6</b> Phòng bị rớt kết nối?</span>
+      <span class="badge"><b>7</b> Phòng bị rớt kết nối?</span>
       <h3>🧾 Nhật ký kết nối — xem ngay nguyên nhân</h3>
       <ul class="tick">
-        <li>Ở tab <b>📺 TV &amp; MTB</b> bấm <span class="k">🧾 Nhật ký kết nối</span>, chọn phòng (hoặc xem chung) — mỗi phòng giữ <b>60 sự kiện gần nhất</b>, có giờ và địa chỉ mạng (IP) mỗi lần máy nối vào.</li>
+        <li>Bấm <span class="k">⋯</span> (cạnh chữ “Phòng”) → <span class="k">🧾 Nhật ký kết nối</span>, chọn phòng (hoặc xem chung) — mỗi phòng giữ <b>60 sự kiện gần nhất</b>, có giờ và địa chỉ mạng (IP) mỗi lần máy nối vào.</li>
         <li><b>Máy rớt</b> = máy tự mất kết nối (mạng chập chờn, máy ngủ, đóng app). <b>Server cắt</b> = hệ thống chủ động ngắt, kèm lý do.</li>
         <li>TV <b>và</b> điện thoại cùng rớt trong <b>cùng một giây</b>, rồi tự nối lại sau vài giây ⇒ thường là <b>đường mạng/router/wifi của phòng đó</b>, không phải lỗi phần mềm.</li>
         <li>Khi TV mất kết nối, điện thoại khách hiện dòng <b>“TV của phòng đang mất kết nối… trang tự chạy tiếp khi TV về”</b>; TV nối lại là dùng tiếp, hàng chờ vẫn còn, bài đang phát không bị dừng.</li>
@@ -621,20 +684,17 @@ tbody tr:nth-child(even) td{background:#FBF8FE}
   <header><span class="num">06</span><div><h2>Menu nước &amp; dịch vụ</h2><p class="lead">Khách chỉ thấy những gì còn bán — bạn chủ động bật tắt ngay tại quầy.</p></div></header>
   <div class="step">
     <div>
-      <span class="badge"><b>1</b> Tab 🍺 Menu</span>
+      <span class="badge"><b>1</b> Quản lý → Menu</span>
       <h3>Hết hàng thì bấm một nút</h3>
-      <ul class="tick">
-        <li><span class="k g">✅ Còn hàng</span> ⇄ <span class="k r">⛔ Hết hàng</span>: món hết tự ẩn khỏi màn hình khách; hàng về bấm lại.</li>
-        <li>Món được nhóm: <b>Bia · Nước uống · Đồ ăn · Phục vụ thêm · Dịch vụ / báo sự cố</b>. Dịch vụ là nút bấm gọi; nước là chọn số lượng.</li>
-      </ul>
-      <p><b>Quản lý &amp; tài khoản được cấp quyền</b> còn có:</p>
-      <ul class="tick">
-        <li><span class="k">Ẩn / Hiện</span> tạm không bán · <span class="k r">Bỏ</span> xoá khỏi menu chi nhánh (đơn cũ không bị ảnh hưởng) · <span class="k">▲ ▼</span> xếp thứ tự hiện cho khách.</li>
+      <p>Trên điện thoại: <span class="k y">Thêm</span> → <b>Menu</b>. Trên máy tính: <b>Quản lý ▾</b> → <b>Menu</b>.</p>
+      <ol class="no">
+        <li><span class="k g">✅ Còn hàng</span> ⇄ <span class="k r">⛔ Hết hàng</span>: món hết tự ẩn khỏi màn hình khách (tên món gạch ngang); hàng về bấm lại.</li>
+        <li><b>Quản lý &amp; tài khoản được cấp quyền</b> còn có: <span class="k">▲ ▼</span> xếp thứ tự hiện cho khách · <span class="k">Ẩn</span> tạm không bán · <span class="k r">Bỏ</span> xoá khỏi menu chi nhánh (đơn cũ không bị ảnh hưởng).</li>
         <li><span class="k y">＋ Chọn từ menu mẫu</span> lấy món có sẵn của chuỗi · <span class="k">✏️ Tạo món riêng</span> cho chi nhánh.</li>
-      </ul>
-      
+      </ol>
+      <p>Món được nhóm: <b>Bia · Nước uống · Đồ ăn · Phục vụ thêm · Dịch vụ / báo sự cố</b>. Dịch vụ là nút bấm gọi; nước là chọn số lượng.</p>
     </div>
-    <div class="figs"><figure class="phone"><div class="fig"><img src="huongdan/img/q_menu.jpg" alt=""></div></figure></div>
+    <div class="figs"><figure class="phone"><div class="fig"><img src="huongdan/img/q_menu.jpg" alt=""><i class="hl" data-n="1" style="left:6.2%;top:48.4%;width:28.5%;height:4.6%"></i><i class="hl" data-n="2" style="left:35.5%;top:48.4%;width:47%;height:4.6%"></i><i class="hl" data-n="3" style="left:2.5%;top:30.2%;width:80.5%;height:4.4%"></i></div></figure></div>
   </div>
 </div></section>
 
@@ -642,16 +702,16 @@ tbody tr:nth-child(even) td{background:#FBF8FE}
 <section class="chap" id="ql7"><div class="wrap">
   <header><span class="num">07</span><div><h2>Tài khoản &amp; vân tay</h2><p class="lead">Dành cho quản lý chi nhánh.</p></div></header>
   <div class="cards">
-    <div class="card"><div class="ic">👥</div><h4>Tab Tài khoản quầy</h4>
+    <div class="card"><div class="ic">👥</div><h4>Quản lý → Tài khoản quầy</h4>
       <p>Tạo tài khoản cho nhân viên quầy của chi nhánh bằng <b>＋ Tạo tài khoản mới</b>.</p>
       <ul class="tick" style="font-size:14px"><li><span class="k r">Khoá</span>: nhân viên bị đăng xuất ngay và không vào lại được. <span class="k g">Mở</span> để cho dùng lại.</li><li>Cột <b>Sửa menu</b>: tích để cho phép nhân viên đó chỉnh menu.</li></ul>
       <p style="margin-top:6px">Tài khoản quản lý và kỹ thuật được tạo trong app quản lý BMB.</p></div>
     <div class="card"><div class="ic">🖐</div><h4>Đăng nhập bằng vân tay</h4>
       <p>Có trong <b>app BMBPlayer Android bản 2.4 trở lên</b> (không có khi mở bằng Chrome hay iPhone).</p>
-      <ol class="no" style="font-size:14px"><li>Vào tab <b>⚙️ Cài đặt</b> → <span class="k y">Bật vân tay</span>.</li><li>Làm theo hướng dẫn trên màn hình để xác nhận tài khoản rồi quét vân tay.</li><li>Lần sau chạm <span class="k">Đăng nhập bằng vân tay</span> ở màn đăng nhập.</li></ol>
+      <ol class="no" style="font-size:14px"><li>Vào <b>Quản lý → ⚙️ Cài đặt</b> (điện thoại: <b>Thêm → Cài đặt</b>) → <span class="k y">Bật vân tay</span>.</li><li>Làm theo hướng dẫn trên màn hình để xác nhận tài khoản rồi quét vân tay.</li><li>Lần sau chạm <span class="k">Đăng nhập bằng vân tay</span> ở màn đăng nhập.</li></ol>
       <p style="font-size:14px">Máy cần đã đặt <b>khoá màn hình + vân tay</b> (Android 9 trở lên). Thêm vân tay mới trong máy thì bật lại. <span class="k">Tắt vân tay</span> bất cứ lúc nào.</p></div>
     <div class="card"><div class="ic">✈️</div><h4>Nhận đơn qua Telegram riêng</h4>
-      <p>Quản lý và nhân viên quầy tự nối Telegram của mình ngay trong quầy: <b>⚙️ Cài đặt</b> → <span class="k y">✈️ Kết nối Telegram</span> → trong Telegram bấm <b>Start / Bắt đầu</b>. Trang tự báo “Đã kết nối”.</p>
+      <p>Quản lý và nhân viên quầy tự nối Telegram của mình ngay trong quầy: <b>Quản lý → ⚙️ Cài đặt</b> → <span class="k y">✈️ Kết nối Telegram</span> → trong Telegram bấm <b>Start / Bắt đầu</b>. Trang tự báo “Đã kết nối”.</p>
       <ul class="tick" style="font-size:14px"><li>Tin đơn mới có sẵn nút <span class="k y">Tiếp nhận</span> / <span class="k">Huỷ</span>, rồi <span class="k g">Đã xong</span> và <span class="k y">Đã nhập POS</span> — bấm ngay trên tin nhắn, tin được cập nhật tại chỗ và hiện tên người thao tác.</li><li>Nút chỉ bấm được trong <b>chat riêng với bot</b> (trong nhóm không bấm được) và đúng chi nhánh của tài khoản.</li><li><span class="k">Tạm dừng</span> / <span class="k r">Ngắt kết nối</span> bất cứ lúc nào.</li></ul></div>
   </div>
 </div></section>
@@ -711,14 +771,15 @@ tbody tr:nth-child(even) td{background:#FBF8FE}
   <table>
     <thead><tr><th style="width:34%">Hiện tượng</th><th>Cách xử lý</th></tr></thead>
     <tbody>
-      <tr><td>TV báo <b>“Phòng chưa mở — chờ nhân viên mở phòng”</b></td><td>Quầy → tab TV &amp; MTB → <span class="k y">Mở phòng</span> đúng phòng đó.</td></tr>
-      <tr><td>TV / máy tính bảng hiện <b>mã 6 số</b></td><td>Thiết bị chưa gán phòng — làm theo mục “Gán TV &amp; máy tính bảng” (chương 5).</td></tr>
-      <tr><td>Khách báo <b>QR hết hiệu lực</b> hoặc không vào được</td><td>Nhờ khách quét QR <b>mới</b> ở góc trái TV. Cần thì bấm <span class="k">Đổi QR khách</span>.</td></tr>
+      <tr><td>TV báo <b>“Phòng chưa mở — chờ nhân viên mở phòng”</b></td><td>Quầy → thẻ phòng đó → <span class="k y">Mở phòng</span>.</td></tr>
+      <tr><td>TV / máy tính bảng hiện <b>mã 6 số</b></td><td>Thiết bị chưa gán phòng — làm theo mục “Gán TV &amp; máy tính bảng” (chương 5, mục 2).</td></tr>
+      <tr><td>Khách báo <b>QR hết hiệu lực</b> hoặc không vào được</td><td>Nhờ khách quét QR <b>mới</b> ở góc trái TV. Cần thì mở chi tiết phòng → <span class="k">Đổi QR khách</span>.</td></tr>
       <tr><td><b>Mất máy tính bảng</b></td><td><span class="k r">Thu hồi mọi máy tính bảng</span>, sau đó gán lại những máy còn dùng.</td></tr>
       <tr><td>Không nghe chuông khi có đơn</td><td>Kiểm tra app đang chạy chế độ Quầy (có dòng “BMB Quầy đang nhận đơn”), cho phép thông báo và chạy nền. Dùng web thì bấm 🔔.</td></tr>
       <tr><td>TV đứng hình, trắng màn hình — hoặc quầy báo phòng <b>“chưa cập nhật &gt;12 phút, TV có thể treo”</b></td><td>Mở menu ẩn → <b>Tải lại trang</b>. Vẫn lỗi: <b>Xoá dữ liệu trang</b> rồi gán lại phòng.</td></tr>
-      <tr><td>Phòng <b>bị rớt</b> giữa lúc hát, khách báo “TV mất kết nối”</td><td>Chờ vài giây — thiết bị tự nối lại, bài vẫn phát và hàng chờ còn nguyên. Rớt lặp lại thì mở <span class="k">🧾 Nhật ký kết nối</span> (chương 5) và chụp gửi kỹ thuật.</td></tr>
+      <tr><td>Phòng <b>bị rớt</b> giữa lúc hát, khách báo “TV mất kết nối”</td><td>Chờ vài giây — thiết bị tự nối lại, bài vẫn phát và hàng chờ còn nguyên. Rớt lặp lại thì mở <span class="k">🧾 Nhật ký kết nối</span> (chương 5, mục 7) và chụp gửi kỹ thuật.</td></tr>
       <tr><td>TV chạy bằng <b>Chrome</b> (không phải app), hát mà <b>không có tiếng</b>, hiện “Đang phát không tiếng”</td><td>Trình duyệt chặn tiếng tự phát. <b>Bấm chuột (hoặc chạm) vào giữa video một lần</b> là có tiếng. Điện thoại không bật tiếng thay được; dùng app BMBPlayer (chương 2) thì không gặp.</td></tr>
+      <tr><td>Phòng hiện <b>“Quá giờ”</b>, quầy kêu chuông</td><td>Chi nhánh đang bật Nhắc giờ hát: vào hỏi khách có hát tiếp không, rồi bấm <span class="k y">Gia hạn +30 phút</span> hoặc <span class="k">Đóng phòng</span> (chương 5, mục 4).</td></tr>
       <tr><td>Hết bài mà TV đứng ~8 giây rồi mới sang bài</td><td>Đó là màn <b>điểm vui</b>. Muốn tắt, báo bộ phận kỹ thuật.</td></tr>
       <tr><td>Cài / cập nhật bị <b>Play Protect chặn</b></td><td>Bấm <b>Chi tiết khác</b> → <b>Tiếp tục cài đặt</b> (chương 2).</td></tr>
       <tr><td>Báo <b>“Cần cập nhật trình hiển thị web”</b></td><td>Vào CH Play cập nhật <b>Android System WebView</b> (hoặc Google Chrome) rồi mở lại BMBPlayer.</td></tr>
@@ -774,13 +835,14 @@ tbody tr:nth-child(even) td{background:#FBF8FE}
       <ol class="no">
         <li>Ở tab <span class="k y">🔍 Tìm bài</span>, gõ <b>tên bài hát</b> hoặc tên ca sĩ rồi bấm <span class="k y">Tìm</span>.</li>
         <li>Chưa nghĩ ra bài? Xem mục <b>Bài hot</b>, chuyển giữa <span class="k">Nhạc Việt</span> và <span class="k">Quốc tế</span>. <b>Kéo xuống cuối danh sách</b>: tự hiện thêm các bài được nhiều người chọn và bài mới.</li>
-        <li>Chạm vào bài muốn hát, rồi chọn:
+        <li>Mỗi bài có nút tròn vàng <span class="k y">＋</span> bên phải. Bấm <b>＋</b> (hoặc chạm vào bài) rồi chọn:
           <ul class="tick"><li><span class="k y">CHỌN</span> — thêm vào hàng chờ, hát theo thứ tự.</li><li><span class="k" style="background:#FFE9D2;border-color:#F5B87A;color:#B35400">ƯU TIÊN</span> — hát ngay sau bài đang phát.</li></ul></li>
+        <li>Bài đã nằm trong hàng chờ hiện nhãn <span class="k g">ĐÃ CHỌN</span> và nút <b>dấu ✓ xanh</b> — khỏi chọn lại. Muốn hát thêm một lần nữa vẫn chạm vào bài được.</li>
       </ol>
     </div>
     <div class="figs">
-      <figure class="phone"><div class="fig"><img src="huongdan/img/g_ph_search.jpg" alt=""></div><figcaption style="color:#d8c9ea">Gõ tên bài hát</figcaption></figure>
-      <figure class="phone"><div class="fig"><img src="huongdan/img/g_ph_pick.jpg" alt=""></div><figcaption style="color:#d8c9ea">Chọn hoặc ưu tiên</figcaption></figure>
+      <figure class="phone"><div class="fig"><img src="huongdan/img/g_ph_search.jpg" alt=""><i class="hl" data-n="3" style="left:84.5%;top:22.8%;width:13.5%;height:5.6%;border-radius:50%"></i><i class="hl" data-n="4" style="left:84.5%;top:30.7%;width:13.5%;height:5.6%;border-radius:50%"></i></div><figcaption style="color:#d8c9ea">Gõ tên bài hát</figcaption></figure>
+      <figure class="phone"><div class="fig"><img src="huongdan/img/g_ph_pick.jpg" alt=""><i class="hl" data-n="3" style="left:8.9%;top:57.4%;width:82.3%;height:5.6%"></i><i class="hl" data-n="3" style="left:8.9%;top:64.2%;width:82.3%;height:5.6%"></i></div><figcaption style="color:#d8c9ea">Chọn hoặc ưu tiên</figcaption></figure>
     </div>
   </div>
 </div></section>
@@ -789,31 +851,36 @@ tbody tr:nth-child(even) td{background:#FBF8FE}
   <header><span class="num">3</span><div><h2>Hàng chờ &amp; điều khiển</h2><p class="lead">Bạn làm chủ buổi hát ngay trên điện thoại.</p></div></header>
   <div class="step rev">
     <div>
-      <p>Tab <span class="k y">🎶 Hàng chờ</span> cho thấy <b>bài đang hát</b> (khung vàng) và các bài kế tiếp. Chạm một bài trong hàng chờ để:</p>
-      <ul class="tick"><li><b>Ưu tiên</b> — hát ngay sau bài này.</li><li><b>Đẩy lên</b> — dịch lên một bậc.</li><li><b>Xoá</b> — bỏ khỏi hàng chờ.</li></ul>
-      <p>Hàng nút phía dưới điều khiển TV:</p>
+      <p>Tab <span class="k y">🎶 Hàng chờ</span> cho thấy:</p>
+      <ol class="no">
+        <li><b>ĐANG HÁT</b> — bài đang phát, khung vàng ở trên cùng.</li>
+        <li><b>Kế tiếp · N bài</b> — các bài đánh số theo thứ tự hát. Nút <b>↑</b> cho bài đó <b>hát kế tiếp</b> ngay sau bài đang hát.</li>
+        <li>Nút <b>✕</b> bỏ bài khỏi hàng chờ. <b>Bấm hai lần</b>: lần đầu chữ đổi thành “Xoá?”, bấm lần nữa mới xoá — để khỏi xoá nhầm.</li>
+        <li><b>Đã hát · N bài</b> — gập gọn; bấm để xem lại các bài đã hát.</li>
+      </ol>
+      <p>Chạm vào chính hàng bài còn hiện thêm <b>Ưu tiên · Đẩy lên · Xoá</b>. Hàng nút phía dưới điều khiển TV:</p>
       <div class="keys"><div><b>↺</b>Hát lại</div><div><b>▶ / ⏸</b>Phát / Dừng</div><div><b>⏭</b>Qua bài</div><div><b>🔇</b>Tắt tiếng</div><div><b>🔉 🔊</b>Giảm / tăng âm</div></div>
       <ul class="tick" style="margin-top:8px"><li>Nhiều người cùng điều khiển: <b>ai bấm gì, mọi điện thoại trong phòng cùng thấy ngay</b> (thêm bài, ưu tiên, phát/dừng, tắt tiếng).</li><li>Một số phòng có <b>thanh tua</b> và nút ±10 giây để nhảy tới đoạn bạn muốn.</li><li>Hết bài, TV có thể hiện <b>màn điểm vui</b> vài giây rồi tự sang bài kế — điểm mang tính giải trí.</li></ul>
     </div>
-    <div class="figs"><figure class="phone"><div class="fig"><img src="huongdan/img/g_ph_queue.jpg" alt=""></div></figure></div>
+    <div class="figs"><figure class="phone"><div class="fig"><img src="huongdan/img/g_ph_queue.jpg" alt=""><i class="hl" data-n="1" style="left:3.2%;top:16.4%;width:93.6%;height:12.2%"></i><i class="hl" data-n="2" style="left:74.5%;top:41.9%;width:10.3%;height:4.8%;border-radius:50%"></i><i class="hl" data-n="3" style="left:87%;top:41.9%;width:10.3%;height:4.8%;border-radius:50%"></i><i class="hl" data-n="4" style="left:3.2%;top:57%;width:93.6%;height:4.4%"></i></div></figure></div>
   </div>
 </div></section>
 
-<section class="chap" id="kh4"><div class="wrap big">
+<section class="chap pb" id="kh4"><div class="wrap big">
   <header><span class="num">4</span><div><h2>Gọi lễ tân &amp; gọi nước</h2><p class="lead">Cần gì cứ bấm — nhân viên sẽ lên phòng.</p></div></header>
   <div class="step three">
     <div>
       <ol class="no">
-        <li>Mở tab <span class="k" style="background:#FFE9D2;border-color:#F5B87A;color:#B35400">🛎️ Gọi lễ tân</span>.</li>
-        <li><b>Cần hỗ trợ</b>: chạm vào nút phù hợp (thay pin micro, micro rè, dọn phòng, gọi nhân viên…).</li>
-        <li><b>Gọi nước</b>: bấm <span class="k">＋</span> để chọn số lượng từng món; thêm ghi chú nếu cần.</li>
-        <li>Bấm <span class="k" style="background:#F26A1B;border-color:#D95B10;color:#fff">Gửi yêu cầu</span>. Màn hình báo <b>“Đã gửi yêu cầu tới lễ tân”</b>, yêu cầu cũng hiện ở góc TV.</li>
+        <li>Mở tab <span class="k" style="background:#FFE9D2;border-color:#F5B87A;color:#B35400">🛎️ Gọi lễ tân</span>. Nếu quán bật, trên cùng có thẻ <b>⏰ Nhắc giờ hát</b>: xem còn bao lâu, bấm <span class="k">+15</span> <span class="k">+30</span> <span class="k">+60 phút</span> để thêm giờ, hoặc gạt công tắc để tắt nhắc.</li>
+        <li><b>Cần hỗ trợ</b>: chạm vào ô phù hợp (đổi micro, giảm / tăng nhạc, gọi nhân viên…) — ô được chọn đổi sang màu cam.</li>
+        <li><b>Gọi nước</b>: bấm <span class="k">＋</span> trên món; hiện <b>− số +</b> để tăng giảm số lượng. Muốn dặn thêm, gõ vào ô <b>ghi chú</b> cuối danh sách.</li>
+        <li>Thanh tối phía dưới ghi <b>“N món”</b>. Bấm <span class="k" style="background:#F26A1B;border-color:#D95B10;color:#fff">Gửi yêu cầu</span> (hoặc <span class="k">Xoá</span> để chọn lại). Màn hình báo <b>“Đã gửi yêu cầu tới lễ tân”</b>, yêu cầu cũng hiện ở góc TV.</li>
       </ol>
       <p>Muốn xem lại? Bấm <span class="k">📋 Đơn đã gọi</span> — trạng thái <b>Đã gửi → Đã xác nhận</b> tự cập nhật khi lễ tân nhận.</p>
       <div class="note"><b>Lưu ý:</b> ứng dụng không tính tiền. Giá do nhân viên xác nhận trực tiếp với bạn. Món nào hết hàng sẽ tự ẩn.</div>
     </div>
     <div class="figs">
-      <figure class="phone"><div class="fig"><img src="huongdan/img/g_ph_order.jpg" alt=""></div></figure>
+      <figure class="phone"><div class="fig"><img src="huongdan/img/g_ph_order.jpg" alt=""><i class="hl" data-n="1" style="left:4%;top:16.2%;width:92%;height:19.4%"></i><i class="hl" data-n="2" style="left:3.5%;top:41.7%;width:45.5%;height:7%"></i><i class="hl" data-n="3" style="left:67%;top:62%;width:26.5%;height:4.2%"></i><i class="hl" data-n="4" style="left:3%;top:91.7%;width:94%;height:5.8%"></i></div></figure>
       <figure class="phone"><div class="fig"><img src="huongdan/img/mtbsent.jpg" alt=""></div></figure>
       <figure class="phone"><div class="fig"><img src="huongdan/img/donda.jpg" alt=""></div></figure>
     </div>
@@ -829,11 +896,11 @@ tbody tr:nth-child(even) td{background:#FBF8FE}
   <div class="faq mt">
     <details open><summary>Tôi không quét được mã QR?</summary><p>Đưa camera lại gần hơn, giữ thẳng vào màn hình TV. Vẫn không được thì nhờ nhân viên mở lại phòng hoặc đổi mã QR cho bạn.</p></details>
     <details open><summary>Bạn bè trong phòng cũng chọn bài được chứ?</summary><p>Được. Mỗi người quét QR trên điện thoại của mình, mọi bài sẽ xếp chung vào một hàng chờ.</p></details>
-    <details open><summary>Chọn nhầm bài thì sao?</summary><p>Vào tab Hàng chờ, chạm vào bài đó rồi chọn <b>Xoá</b>. Nếu bài đang phát, chọn <b>Qua bài</b>.</p></details>
+    <details open><summary>Chọn nhầm bài thì sao?</summary><p>Vào tab Hàng chờ, bấm <b>✕</b> cạnh bài đó <b>hai lần</b> (lần đầu hiện “Xoá?”). Nếu bài đang phát, bấm <b>⏭ Qua bài</b>.</p></details>
     <details open><summary>Tôi gọi nước rồi, bao giờ có?</summary><p>Lễ tân nhận yêu cầu ngay và lên phòng trong ít phút. Trong “Đơn đã gọi”, trạng thái sẽ đổi sang <b>Đã xác nhận</b> khi lễ tân nhận đơn của bạn.</p></details>
     <details open><summary>Điện thoại báo “TV của phòng đang mất kết nối”?</summary><p>Mạng của phòng chập chờn vài giây. Bạn cứ đợi — TV nối lại là điện thoại tự chạy tiếp, danh sách bài không mất. Quá lâu thì nhờ nhân viên kiểm tra. Mất hẳn mạng thì điện thoại tạm không điều khiển được; quán có thư viện bài lưu sẵn thì TV vẫn hát tiếp các bài đã xếp — nên xếp sẵn vài bài.</p></details>
-    <details open><summary>Điểm cuối bài có chính xác không?</summary><p>Đó là điểm vui để tăng không khí, không đo giọng hát thật. Hát tiếp bình thường — TV tự sang bài kế sau vài giây.</p></details>
-    <details open><summary>Hết giờ hát thì điện thoại có tự thoát không?</summary><p>Có. Khi phòng đóng, điện thoại của bạn tự ngắt. Muốn hát tiếp, nhờ nhân viên mở phòng và quét mã QR mới trên TV.</p></details>
+    <details open><summary>Quán có nhắc giờ hát, hết giờ thì sao?</summary><p>TV nhắc khi còn 15, 10 và 5 phút. Hết giờ phòng <b>vẫn mở</b> — nhân viên vào hỏi bạn có hát tiếp không. Muốn thêm giờ, bấm <b>+15 / +30 / +60 phút</b> ở tab Gọi lễ tân.</p></details>
+    <details open><summary>Phòng đóng rồi thì điện thoại có tự thoát không?</summary><p>Có. Khi phòng đóng, điện thoại của bạn tự ngắt. Muốn hát tiếp, nhờ nhân viên mở phòng và quét mã QR mới trên TV.</p></details>
   </div>
 </div></section>
 
@@ -851,15 +918,15 @@ tbody tr:nth-child(even) td{background:#FBF8FE}
   <div class="sts">
     <div class="st"><span class="n">1</span><div class="ph qrp"><img src="huongdan/img/tvqr.jpg" alt=""></div><h4>Quét QR trên TV</h4><p>Mở <b>camera</b>, hướng vào mã QR ở <b>góc trái TV</b>, chạm vào liên kết hiện ra.</p></div>
     <div class="st"><span class="n">2</span><div class="ph"><img src="huongdan/img/g_ph_search.jpg" alt=""></div><h4>Tìm bài hát</h4><p>Gõ tên bài hoặc ca sĩ rồi bấm <span class="k y">Tìm</span>. Thư viện đủ nhạc Việt và nước ngoài.</p></div>
-    <div class="st"><span class="n">3</span><div class="ph"><img src="huongdan/img/g_ph_pick.jpg" alt=""></div><h4>Chọn bài</h4><p><span class="k y">CHỌN</span> hát theo thứ tự · <span class="k" style="background:#FFE9D2;border-color:#F5B87A;color:#B35400">ƯU TIÊN</span> hát ngay sau bài đang phát.</p></div>
+    <div class="st"><span class="n">3</span><div class="ph"><img src="huongdan/img/g_ph_pick.jpg" alt=""></div><h4>Chọn bài</h4><p>Bấm <span class="k y">＋</span> → <span class="k y">CHỌN</span> hát theo thứ tự · <span class="k" style="background:#FFE9D2;border-color:#F5B87A;color:#B35400">ƯU TIÊN</span> hát ngay sau bài đang phát. Có dấu <b>✓</b> là đã chọn.</p></div>
     <div class="st"><span class="n">4</span><div class="ph"><img src="huongdan/img/g_ph_order.jpg" alt=""></div><h4>Gọi lễ tân &amp; nước</h4><p>Tab <b>🛎️ Gọi lễ tân</b> → chọn món/yêu cầu → <b>Gửi yêu cầu</b>.</p></div>
   </div>
 
   <div class="mid">
     <div class="box a"><h5>🎶 Điều khiển ngay trên điện thoại</h5>
-      <ul><li><b>Hàng chờ:</b> chạm một bài để <b>Ưu tiên · Đẩy lên · Xoá</b>.</li><li><b>Nút dưới cùng:</b> Hát lại · Phát/Dừng · Qua bài · Tắt tiếng · Âm lượng.</li><li>Cả phòng cùng quét được — mọi bài xếp chung một hàng chờ.</li></ul></div>
+      <ul><li><b>Hàng chờ:</b> <b>↑</b> cho bài hát kế tiếp · <b>✕</b> xoá bài (bấm 2 lần).</li><li><b>Nút dưới cùng:</b> Hát lại · Phát/Dừng · Qua bài · Tắt tiếng · Âm lượng.</li><li>Cả phòng cùng quét được — mọi bài xếp chung một hàng chờ.</li></ul></div>
     <div class="box b"><h5>🛎️ Cần gì cứ bấm</h5>
-      <p>Thay pin micro, micro rè, dọn phòng, gọi nhân viên, gọi nước… Lễ tân nhận <b>ngay lập tức</b> và lên phòng.</p>
+      <p>Đổi micro, giảm / tăng nhạc, gọi nhân viên, gọi nước… Lễ tân nhận <b>ngay lập tức</b> và lên phòng. Quán có nhắc giờ hát: thêm giờ ở thẻ <b>⏰ Nhắc giờ hát</b>.</p>
       <div class="keys2"><span>📋 Đơn đã gọi → xem trạng thái</span><span>Đã gửi → Đã xác nhận</span></div></div>
   </div>
 
