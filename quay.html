@@ -1466,6 +1466,7 @@ var GAN = maGan(location.hash);
 var TV = { rooms:[], tm:null };
 var GANNET = { code:'', same:null, canForce:false, kind:'tv' };   // TV / máy tính bảng chờ gán có cùng mạng chi nhánh không (null: đang kiểm)
 function tenMay(){ return GANNET.kind === 'tb' ? 'Máy tính bảng' : 'TV'; }
+function tenMayT(){ var t = tenMay(); return t === 'TV' ? t : t.toLowerCase(); }   /* giữa câu: “Gán TV này…” / “Gán máy tính bảng này…” */
 function kiemMang(){
   if(!GAN){ GANNET = { code:'', same:null, canForce:false }; return; }
   if(GANNET.code === GAN) return;
@@ -1488,7 +1489,7 @@ function veGanBar(){
   g.innerHTML = kq === false
     ? '<span style="color:var(--warn)">⚠️ '+ten+' mã '+m+' đang ở <b>mạng chưa từng thấy</b> của chi nhánh này. Có thể do quán có 2 đường mạng / nhà mạng vừa đổi IP — hoặc đây là máy của chi nhánh khác. Chỉ gán nếu chắc chắn máy đang ở đây.</span> <button class="btn btn-ghost btn-sm" id="btnBoGan">Bỏ</button>'
     : GANNET.err ? '<span style="color:var(--bad)">⚠️ '+esc(GANNET.err)+'</span> <button class="btn btn-ghost btn-sm" id="btnBoGan">Bỏ</button>'
-    : '<span>'+ic+' '+ten+' mã '+m+(kq === true ? ' (cùng mạng chi nhánh)' : ' — đang kiểm tra mạng…')+' đang chờ gán — bấm <u>Gán '+ten.toLowerCase()+' này vào đây</u> ở đúng phòng.</span> <button class="btn btn-ghost btn-sm" id="btnBoGan">Bỏ</button>';
+    : '<span>'+ic+' '+ten+' mã '+m+(kq === true ? ' (cùng mạng chi nhánh)' : ' — đang kiểm tra mạng…')+' đang chờ gán — bấm <u>Gán '+(ten === 'TV' ? ten : ten.toLowerCase())+' này vào đây</u> ở đúng phòng.</span> <button class="btn btn-ghost btn-sm" id="btnBoGan">Bỏ</button>';
   g.style.display = 'flex';
   $('btnBoGan').addEventListener('click', boGan);
 }
@@ -1527,7 +1528,7 @@ function tagPhong(el, side, name){
 function ganTv(id, code, force){
   return api('quay.ganTv', {roomId:id, code:code, force:!!force}).then(function(r){
     if(r && !r.ok && r.error === 'khac_mang'){
-      if(r.canForce && !force && confirm(r.msg + '\n\nVẫn gán ' + tenMay().toLowerCase() + ' này vào phòng?')) return ganTv(id, code, true);
+      if(r.canForce && !force && confirm(r.msg + '\n\nVẫn gán ' + tenMayT() + ' này vào phòng?')) return ganTv(id, code, true);
       return r.msg;
     }
     if(!r || !r.ok) return (r && r.msg) || 'Không gán được, thử lại.';
@@ -3264,7 +3265,7 @@ function cardPhong(x, dem){
        + (x.open ? '<span>'+x.remotes+' ĐT</span>' : '') + '</div>';
   }else h += '<div class="dev"><span>&nbsp;</span></div>';
   h += '<div class="act">';
-  if(canGan) h += b('gan', GANNET.same === false ? 'btn-bad' : 'btn-y', GANNET.same === false ? 'Vẫn gán vào đây' : 'Gán '+tenMay().toLowerCase()+' vào đây');
+  if(canGan) h += b('gan', GANNET.same === false ? 'btn-bad' : 'btn-y', GANNET.same === false ? 'Vẫn gán vào đây' : 'Gán '+tenMayT()+' vào đây');
   else if(tt === 'trong') h += b('mo', 'btn-y', 'Mở phòng');
   else if(tt === 'sap' || tt === 'het') h += b('add', 'btn-y', '+30 phút', ' data-n="30"') + b('dong', 'btn-ghost sec', 'Đóng phòng');
   else h += (S.hgOn ? b('hg', 'btn-y', sic('clock')+' Giờ') + b('dong', 'btn-ghost sec', 'Đóng phòng') : b('dong', 'btn-ghost', 'Đóng phòng'));
@@ -3375,7 +3376,7 @@ function drawerHtml(x){
        + (tvPhat(x) ? '<div class="row">'+tvPhat(x)+'</div>' : '');
   }else h += '<div class="mut">Đang tải thiết bị…</div>';
   h += '<div class="row">';
-  if(canGan) h += b('gan', GANNET.same === false ? 'btn-bad' : 'btn-y', GANNET.same === false ? 'Vẫn gán (chắc chắn '+tenMay().toLowerCase()+' ở đây)' : 'Gán '+tenMay().toLowerCase()+' này vào đây');
+  if(canGan) h += b('gan', GANNET.same === false ? 'btn-bad' : 'btn-y', GANNET.same === false ? 'Vẫn gán (chắc chắn '+tenMayT()+' ở đây)' : 'Gán '+tenMayT()+' này vào đây');
   if(!GAN) h += b('quet', 'btn-ghost', sic('tv')+' Gán TV &amp; MTB');
   if(x.tv) h += b('gotv', 'btn-ghost', 'Gỡ TV');
   if(S.quanLy && x.tablets) h += b('gomtb', 'btn-ghost', 'Gỡ MTB');
