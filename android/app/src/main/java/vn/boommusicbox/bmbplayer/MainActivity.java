@@ -58,7 +58,14 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
@@ -98,6 +105,12 @@ public class MainActivity extends Activity {
     private static final String URL_QUAY = "https://" + HOST + "/quay.html";      // 2.0: điện thoại / máy của quầy nhận đơn
     private static final int REQ_NOTIF = 8;
     private static final int MIN_WEBVIEW = 86;           // trang dùng tính năng có từ Chrome/WebView 86
+    // 3.0: WebView 64–85 (vd Android 9 gốc = 66, TV không có CH Play nên không cập nhật được) vẫn chạy được nhờ lớp tương thích
+    // assets/compat-webview-cu.js chèn vào đầu trang (bù replaceChildren, viết lại CSS inset/clamp/min/max/aspect-ratio/gap flex).
+    // Dưới 64 thì cú pháp JS của trang không chạy được → vẫn báo cần cập nhật.
+    private static final int COMPAT_MIN = 64;
+    private static final String COMPAT_ASSET = "compat-webview-cu.js";
+    private static final String K_COMPAT_TOLD = "compat_told";
     private static final int REQ_CAMERA = 7;
     private String versionName() {
         try { return getPackageManager().getPackageInfo(getPackageName(), 0).versionName; }
@@ -120,6 +133,8 @@ public class MainActivity extends Activity {
     private long lastBack = 0, lastCorner = 0;
     private int chooserLeft = 0;
     private AlertDialog openDialog;
+    private volatile boolean compat = false;               // 3.0: đang chạy chế độ tương thích WebView cũ
+    private volatile String compatJs = null;
 
     // ---- 2.4 Tự cập nhật: hỏi /api/app/ver (Worker bmbplayer), tải /app.apk (R2) rồi giao cho trình cài đặt Android ----
     private static final String VER_URL = "https://" + HOST + "/api/app/ver";
@@ -408,6 +423,12 @@ public class MainActivity extends Activity {
         CookieManager cm = CookieManager.getInstance();
         cm.setAcceptCookie(true);
         cm.setAcceptThirdPartyCookies(web, true);           // khung YouTube cần cookie bên thứ ba
+        try {
+            int wv = webViewMajor();
+            compat = wv >= COMPAT_MIN && wv < MIN_WEBVIEW;
+            if (compat && compatJs == null) compatJs = readAsset(COMPAT_ASSET);
+            if (compatJs == null) compat = false;
+        } catch (Exception e) { compat = false; }
         web.setWebViewClient(new Client());
         web.setWebChromeClient(new Chrome());
         web.addJavascriptInterface(new NativeBridge(), "BMBNative");   // trang TV đọc/đặt âm lượng hệ thống
@@ -480,6 +501,112 @@ public class MainActivity extends Activity {
         } catch (Exception ignored) {}
     }
 
+    private String readAsset(String name) {
+        InputStream in = null;
+        try {
+            in = getAssets().open(name);
+            ByteArrayOutputStream bo = new ByteArrayOutputStream();
+            byte[] buf = new byte[8192]; int n;
+            while ((n = in.read(buf)) > 0) bo.write(buf, 0, n);
+            return new String(bo.toByteArray(), "UTF-8");
+        } catch (Exception e) {
+            return null;
+        } finally {
+            try { if (in != null) in.close(); } catch (Exception ignored) {}
+        }
+    }
+
+    /** 3.0 (WebView cũ): tải trang HTML của bmb.id.vn bằng HttpURLConnection, chèn &lt;script&gt; tương thích ngay sau &lt;head&gt;.
+     *  Chạy ở luồng nền (shouldInterceptRequest). Không phải HTML / lỗi → trả null để WebView tự tải như thường. */
+    private WebResourceResponse fetchWithCompat(String url, Map<String, String> reqHeaders) {
+        HttpURLConnection c = null;
+        try {
+            c = (HttpURLConnection) new URL(url).openConnection();
+            c.setInstanceFollowRedirects(true);
+            c.setConnectTimeout(15_000);
+            c.setReadTimeout(20_000);
+            if (reqHeaders != null) for (Map.Entry<String, String> e : reqHeaders.entrySet()) {
+                String k = e.getKey();
+                if (k == null || e.getValue() == null) continue;
+                String kl = k.toLowerCase(Locale.ROOT);
+                if (kl.equals("accept-encoding") || kl.equals("cookie") || kl.equals("range")
+                        || kl.equals("if-none-match") || kl.equals("if-modified-since")) continue;   // luôn lấy bản đầy đủ (200) để chèn được
+                c.setRequestProperty(k, e.getValue());
+            }
+            CookieManager cm = CookieManager.getInstance();
+            String ck = cm.getCookie(url);
+            if (ck != null && !ck.isEmpty()) c.setRequestProperty("Cookie", ck);
+            int code = c.getResponseCode();
+            Map<String, List<String>> hf = c.getHeaderFields();
+            if (hf != null) {
+                for (Map.Entry<String, List<String>> e : hf.entrySet()) {
+                    if (e.getKey() == null || !"set-cookie".equalsIgnoreCase(e.getKey()) || e.getValue() == null) continue;
+                    for (String v : e.getValue()) cm.setCookie(url, v);
+                }
+            }
+            String ct = c.getContentType();
+            if (code != 200 || ct == null || !ct.toLowerCase(Locale.ROOT).contains("text/html")) return null;
+            String cs = "UTF-8";
+            Matcher mc = Pattern.compile("charset=([\\w-]+)", Pattern.CASE_INSENSITIVE).matcher(ct);
+            if (mc.find()) cs = mc.group(1);
+            InputStream in = c.getInputStream();
+            ByteArrayOutputStream bo = new ByteArrayOutputStream();
+            byte[] buf = new byte[16384]; int n;
+            while ((n = in.read(buf)) > 0) bo.write(buf, 0, n);
+            in.close();
+            String html = new String(bo.toByteArray(), cs);
+            String tag = "<script>/*bmb-compat*/" + compatJs + "\n</script>";
+            Matcher mh = Pattern.compile("<head[^>]*>", Pattern.CASE_INSENSITIVE).matcher(html);
+            html = mh.find() ? html.substring(0, mh.end()) + tag + html.substring(mh.end()) : tag + html;
+            Map<String, String> out = new HashMap<>();
+            if (hf != null) for (Map.Entry<String, List<String>> e : hf.entrySet()) {
+                String k = e.getKey();
+                if (k == null || e.getValue() == null || e.getValue().isEmpty()) continue;
+                String kl = k.toLowerCase(Locale.ROOT);
+                if (kl.equals("content-length") || kl.equals("content-encoding") || kl.equals("transfer-encoding")
+                        || kl.equals("set-cookie") || kl.equals("content-type") || kl.equals("connection")) continue;
+                out.put(k, e.getValue().get(e.getValue().size() - 1));
+            }
+            String reason = c.getResponseMessage();
+            if (reason == null || reason.trim().isEmpty()) reason = "OK";
+            return new WebResourceResponse("text/html", "UTF-8", code, reason, out, new ByteArrayInputStream(html.getBytes("UTF-8")));
+        } catch (Exception e) {
+            return null;
+        } finally {
+            try { if (c != null) c.disconnect(); } catch (Exception ignored) {}
+        }
+    }
+
+    /** 3.0: trả quyền "màn hình chính" về launcher của TV (vd Cao Thiên Phát): xoá mặc định của BMBPlayer rồi mở bảng chọn Home của hệ thống. */
+    private void releaseHome() {
+        try { getPackageManager().clearPackagePreferredActivities(getPackageName()); } catch (Exception ignored) {}
+        List<ResolveInfo> homes = null;
+        try { homes = getPackageManager().queryIntentActivities(new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), 0); } catch (Exception ignored) {}
+        String other = null;
+        if (homes != null) for (ResolveInfo ri : homes) {
+            if (ri.activityInfo == null) continue;
+            String pk = ri.activityInfo.packageName;
+            if (getPackageName().equals(pk) || "com.android.settings".equals(pk) || pk.contains("fallbackhome")) continue;
+            other = pk; break;
+        }
+        if (other == null) { toast("Đã bỏ BMBPlayer khỏi màn hình chính. Không tìm thấy launcher khác của TV."); return; }
+        toast("Đã bỏ BMBPlayer khỏi màn hình chính. Bấm nút Home, chọn launcher của TV → Luôn luôn.");
+        try {
+            Intent i = getPackageManager().getLaunchIntentForPackage(other);
+            if (i == null) i = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).setPackage(other);
+            startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        } catch (Exception ignored) {}
+    }
+
+    private boolean canResolve(Intent i) {
+        // Có ít nhất một ứng dụng thật nhận Intent này (bỏ qua bảng chọn của hệ thống "android" — chính là màn "No apps can perform this action")
+        try {
+            List<ResolveInfo> l = getPackageManager().queryIntentActivities(i, 0);
+            if (l != null) for (ResolveInfo ri : l) if (ri.activityInfo != null && ri.activityInfo.enabled && !"android".equals(ri.activityInfo.packageName)) return true;
+        } catch (Exception ignored) {}
+        return false;
+    }
+
     private class Client extends WebViewClient {
         /** 2.9: http chỉ được tới mạng nội bộ (NAS của quán). http ra ngoài → 403 rỗng, như trước khi có NAS. */
         @Override
@@ -488,6 +615,11 @@ public class MainActivity extends Activity {
                 Uri u = req.getUrl();
                 if (u != null && "http".equalsIgnoreCase(u.getScheme()) && !lanHost(u.getHost())) {
                     return new WebResourceResponse("text/plain", "utf-8", 403, "Blocked", null, new java.io.ByteArrayInputStream(new byte[0]));
+                }
+                // 3.0: WebView cũ → tự tải trang chính của hệ thống mình và chèn lớp tương thích vào đầu <head>
+                if (compat && req.isForMainFrame() && "GET".equalsIgnoreCase(req.getMethod()) && allowed(u)) {
+                    WebResourceResponse r = fetchWithCompat(u.toString(), req.getRequestHeaders());
+                    if (r != null) return r;
                 }
             } catch (Exception ignored) {}
             return null;
@@ -725,7 +857,12 @@ public class MainActivity extends Activity {
         labels.add("▦  Mở ứng dụng khác…"); acts.add(this::showApps);
         labels.add("📶  Cài đặt Wi-Fi"); acts.add(() -> openSettings(Settings.ACTION_WIFI_SETTINGS));
         labels.add("⚙  Cài đặt Android"); acts.add(() -> openSettings(Settings.ACTION_SETTINGS));
-        labels.add("⌂  Chọn ứng dụng màn hình chính (Home)"); acts.add(() -> openSettings(Settings.ACTION_HOME_SETTINGS));
+        if (canResolve(new Intent(Settings.ACTION_HOME_SETTINGS))) {
+            labels.add("⌂  Chọn ứng dụng màn hình chính (Home)"); acts.add(() -> openSettings(Settings.ACTION_HOME_SETTINGS));
+        }
+        if (isDefaultHome()) {
+            labels.add("↩  Trả màn hình chính về launcher của TV"); acts.add(this::releaseHome);
+        }
         if (Build.VERSION.SDK_INT >= 23 && !Settings.canDrawOverlays(this)) {
             labels.add("⏻  Cho phép tự mở khi bật máy"); acts.add(this::openOverlaySettings);
         }
@@ -739,7 +876,7 @@ public class MainActivity extends Activity {
         labels.add("✕  Thoát BMBPlayer"); acts.add(() -> { if (Build.VERSION.SDK_INT >= 21) finishAndRemoveTask(); else finish(); });
 
         AlertDialog.Builder b = new AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert);
-        b.setTitle("BMBPlayer " + versionName() + " · " + modeName(mode) + " · WebView " + webViewMajor());
+        b.setTitle("BMBPlayer " + versionName() + " · " + modeName(mode) + " · WebView " + webViewMajor() + (compat ? " (chế độ tương thích)" : ""));
         b.setItems(labels.toArray(new String[0]), (d, which) -> acts.get(which).run());
         b.setNegativeButton("Đóng", null);
         openDialog = b.create();
@@ -942,6 +1079,13 @@ public class MainActivity extends Activity {
     private void checkWebViewVersion() {
         final int v = webViewMajor();
         if (v == 0 || v >= MIN_WEBVIEW || isFinishing()) return;
+        if (compat) {                                        // 3.0: chạy được nhờ lớp tương thích, không làm phiền (báo một lần)
+            if (!prefs.getBoolean(K_COMPAT_TOLD, false)) {
+                prefs.edit().putBoolean(K_COMPAT_TOLD, true).apply();
+                toast("WebView bản " + v + ": BMBPlayer chạy chế độ tương thích");
+            }
+            return;
+        }
         String pkg = "com.google.android.webview";
         if (Build.VERSION.SDK_INT >= 26) {
             try { android.content.pm.PackageInfo pi = WebView.getCurrentWebViewPackage(); if (pi != null) pkg = pi.packageName; } catch (Exception ignored) {}
@@ -949,10 +1093,22 @@ public class MainActivity extends Activity {
             pkg = "com.android.chrome";                     // Android 7–9: Chrome đảm nhận WebView
         }
         final String target = pkg;
+        final String appName = "com.android.chrome".equals(target) ? "Google Chrome" : "Android System WebView";
+        // 3.0: TV không có CH Play → không có nút mở CH Play (trước đây bấm vào thì hiện "No apps can perform this action")
+        if (!canResolve(new Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=" + target)))) {
+            new AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
+                    .setTitle("Cần cập nhật trình hiển thị web")
+                    .setMessage("Máy đang dùng WebView bản " + v + " (quá cũ, cần từ " + COMPAT_MIN + " trở lên) và không có CH Play.\n\n"
+                            + "Cần cài bản \"" + appName + "\" mới bằng file APK, rồi mở lại BMBPlayer.")
+                    .setPositiveButton("Đã hiểu", null)
+                    .setOnDismissListener(d -> hideBars())
+                    .show();
+            return;
+        }
         new AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
                 .setTitle("Cần cập nhật trình hiển thị web")
                 .setMessage("Máy đang dùng WebView bản " + v + ", BMBPlayer cần bản " + MIN_WEBVIEW + " trở lên.\n\n"
-                        + "Vào CH Play cập nhật \"" + ("com.android.chrome".equals(target) ? "Google Chrome" : "Android System WebView") + "\", rồi mở lại BMBPlayer.")
+                        + "Vào CH Play cập nhật \"" + appName + "\", rồi mở lại BMBPlayer.")
                 .setPositiveButton("Mở CH Play", (d, w) -> {
                     try { startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=" + target)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); }
                     catch (Exception e) {
