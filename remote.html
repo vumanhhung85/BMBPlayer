@@ -381,6 +381,91 @@
   #pair .pScan{ background:#FFD21A; color:#3A0F5A; box-shadow:0 8px 20px -6px rgba(255,210,26,.6) }
   #pair .pBack{ background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.35); color:#fff }
   #pair .pNote{ color:#E5D3F5 } #pair .pErr{ color:#FFD0D8 }
+
+  /* ===== Giao diện A "Gọn & rõ" (11/2026): header một dòng, tab có icon, nút + tròn, hàng chờ dạng thẻ, gọi món dạng ô + giỏ hàng ===== */
+  header{ padding:8px 12px 2px; gap:8px }
+  .logoImg{ height:30px; border-radius:9px; padding:2px 5px; border:2px solid #FFD21A }
+  header .room{ margin-left:0; font-size:14px; font-weight:800; padding:5px 14px }
+  #uiBtn, #gear{ background:none; border:1.5px solid rgba(255,255,255,.55); color:#fff; border-radius:999px; padding:4px 12px; font-size:13px; font-weight:700 }
+  #uiBtn{ margin-left:auto } #gear{ padding:4px 9px }
+  body.wide header .room{ margin-left:auto } body.wide #uiBtn{ margin-left:0 }
+  #now{ margin:6px 12px 0; padding:6px 10px; border-radius:12px; border-top:none; background:rgba(255,255,255,.13); font-weight:600 }
+  #now .eqi{ flex:0 0 auto; display:flex; align-items:center } #now .eq{ margin:0; height:15px } #now .eq i{ background:#FFD21A; width:3.5px }
+  #now .t{ font-weight:600; font-size:13.5px }
+  .tabs{ padding:8px 12px 10px; gap:6px }
+  .tabs button{ padding:7px 4px; gap:6px; background:rgba(255,255,255,.1) }
+  .tabs .ti{ display:flex; font-size:0 } .tabs .ti svg{ width:17px; height:17px }
+  .tabs .cnt{ background:#fff; color:#4B1272; font-weight:800 }
+  .tabs button.od.on{ background:#F28A12; border-color:#F28A12; box-shadow:0 4px 12px -4px rgba(242,138,18,.8) }
+  .tabs button.on{ box-shadow:0 4px 12px -4px rgba(255,210,26,.85) }
+  #paneSearch #searchBox{ padding:10px 12px 6px }
+  #searchBox input{ border:2px solid #8B2FBE; padding:10px 16px; box-shadow:0 6px 16px -10px rgba(139,47,190,.8) }
+  #searchBox input{ min-width:0 }
+  #searchBox button{ flex:0 0 auto; padding:0 20px; font-size:15px; font-weight:800 }
+  .secHead{ padding:10px 0 4px; font-size:11.5px; letter-spacing:.07em; text-transform:uppercase; color:var(--quiet) } .secHead b{ font-weight:800 }
+  .secAct{ text-transform:none; letter-spacing:0 }
+  .row{ gap:11px; padding:9px 0 }
+  .row img{ width:84px; height:47px; border-radius:10px }
+  .row .name{ font-size:14.5px; font-weight:700; line-height:1.25 }
+  .row button.addv{ flex:0 0 auto; width:44px; height:44px; padding:0; border:none; border-radius:50%; background:#FFD21A; color:#3A0F5A; display:grid; place-items:center; box-shadow:0 6px 14px -6px rgba(245,161,27,.9) }
+  .addv svg{ width:24px; height:24px } .addv .i-ok{ display:none }
+  .row.inq .addv, .row .addv.done{ background:#17935F; color:#fff; box-shadow:none }
+  .row.inq .addv .i-plus, .row .addv.done .i-plus{ display:none } .row.inq .addv .i-ok, .row .addv.done .i-ok{ display:block }
+  .row.inq .sub::before{ content:'ĐÃ CHỌN'; display:inline-block; font-size:10.5px; font-weight:800; letter-spacing:.04em; background:#DDF3E8; color:#0F7A4D; border-radius:99px; padding:1px 8px; margin-right:6px }
+  .row.dead .addv{ display:none }
+  body.wide .card > .row, body.wide .row.card{ position:relative }
+  body.wide .row.card .addv, body.wide .card > .row .addv{ position:absolute; top:8px; right:8px; width:40px; height:40px; z-index:2 }
+  /* hàng chờ */
+  #queueList{ padding-top:6px }
+  .row.cur{ position:relative; margin:16px 0 8px; padding:14px 12px 12px; border-radius:18px; background:linear-gradient(135deg,#FFF6D6,#FFFDF3); border:2.5px solid #FFD21A; box-shadow:0 0 0 4px rgba(255,210,26,.2),0 10px 22px -12px rgba(139,47,190,.6) }
+  .row.cur img{ width:112px; height:63px; border-radius:12px }
+  .row.cur .name{ font-size:16px; -webkit-line-clamp:3 }
+  .row.cur .sub{ position:absolute; top:-12px; left:14px; margin:0; display:flex; align-items:center; background:#FFD21A; color:#3A0F5A; font-weight:900; font-size:11px; letter-spacing:.08em; padding:3px 10px; border-radius:99px; overflow:visible }
+  .row.cur .sub .eq{ margin-right:6px } .row.cur .sub .eq i{ background:#3A0F5A }
+  .row .num{ color:var(--accent2); width:22px; font-size:15px }
+  .row button.rb2{ flex:0 0 auto; width:38px; height:38px; padding:0; border-radius:50%; background:#fff; border:1.5px solid var(--line); color:var(--grape); display:grid; place-items:center }
+  .rb2 svg{ width:18px; height:18px } .rb2 .at{ display:none; font-size:12.5px; font-weight:800 }
+  .row button.rb2.x{ color:#D6314F; border-color:#F5B5C0 }
+  .row button.rb2.x.arm{ width:auto; padding:0 12px; border-radius:99px; background:#D6314F; border-color:#D6314F; color:#fff } .rb2.arm .at{ display:inline } .rb2.arm svg{ display:none }
+  .row.done .sub{ font-size:12px }
+  .fold{ margin:10px 0 4px }
+  .fold summary{ list-style:none; display:flex; align-items:center; justify-content:space-between; background:#fff; border:1px dashed #CDB8E3; border-radius:12px; padding:10px 12px; font-size:13px; font-weight:700; color:#4E3A68; cursor:pointer }
+  .fold summary::-webkit-details-marker{ display:none }
+  .fold summary::after{ content:''; width:8px; height:8px; border-right:2px solid currentColor; border-bottom:2px solid currentColor; transform:rotate(45deg); margin:-3px 4px 0 0 }
+  .fold[open] summary::after{ transform:rotate(-135deg); margin-top:3px }
+  .sList .row .rb2{ width:34px; height:34px }
+  /* gọi lễ tân */
+  #odPane{ padding:2px 14px 170px }
+  .odH{ display:flex; align-items:center; justify-content:space-between; font-size:11.5px; letter-spacing:.07em; font-weight:800; margin:14px 2px 8px; text-transform:uppercase }
+  .lsbtn{ display:inline-flex; width:auto; margin:0; padding:5px 12px; border-radius:99px; border:1px solid var(--line); background:#fff; color:var(--grape); font-size:12px; font-weight:700; letter-spacing:0; text-transform:none }
+  .svgrid{ gap:8px }
+  .svbtn{ flex-direction:row; justify-content:flex-start; gap:10px; padding:10px 12px; text-align:left }
+  .svbtn .ico{ width:36px; height:36px; border-radius:11px; background:#EEDDFA; display:grid; place-items:center; font-size:20px; flex:none } .svbtn .ico.ph{ width:36px; height:36px }
+  .svbtn .tx{ text-align:left; font-size:14px; font-weight:700 }
+  .svbtn.on{ border-color:#F28A12; background:#FFF4E5; box-shadow:0 0 0 3px rgba(242,138,18,.25) } .svbtn.on .ico{ background:#F28A12 }
+  .drow{ gap:11px; padding:9px 12px; border-radius:14px } .drow.on{ border-color:#F28A12; background:#FFFBF5 }
+  .drow .di{ flex:1; gap:11px }
+  .drow .dic{ width:42px; height:42px; border-radius:13px; background:#EEDDFA; display:grid; place-items:center; font-size:22px; flex:none } .drow .dic.ph{ width:42px; height:42px }
+  .drow .dtx{ font-size:14.5px; font-weight:700 }
+  .qty{ background:var(--bg); border-radius:99px; padding:3px; gap:2px }
+  .qty button{ width:32px; height:32px; border-radius:50%; border:none; background:#fff; color:var(--grape); box-shadow:0 1px 3px rgba(75,18,114,.2); font-size:18px; line-height:1; padding:0 }
+  .qty button.qp{ background:#F28A12; color:#fff }
+  .qty .qn{ width:26px; color:var(--ink) } .drow.on .qn{ color:var(--ink) }
+  .drow:not(.on) .qty{ background:none; padding:0 } .drow:not(.on) .qm, .drow:not(.on) .qn{ display:none }
+  .hgCard{ border-radius:16px; box-shadow:var(--sh) }
+  .hgChips button{ border-radius:99px; font-weight:800; color:var(--grape) }
+  #odBar{ left:12px; right:12px; bottom:calc(12px + env(safe-area-inset-bottom)); border:none; border-radius:18px; background:#24123A; color:#fff; padding:10px 10px 10px 16px; box-shadow:0 16px 30px -10px rgba(36,18,58,.8) }
+  #odBar .sum{ color:#fff; font-size:12.5px } #odBar .sum b{ display:block; font-size:14px } #odBar .sum span{ display:block; opacity:.75; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+  #odBar button{ background:rgba(255,255,255,.14); color:#fff; border-radius:13px; padding:11px 12px; font-size:14px }
+  #odBar #odSendBtn{ background:#F28A12; color:#fff; padding:11px 16px; font-size:14.5px }
+  body.wide #odBar{ right:calc(clamp(300px,35vw,460px) + 12px) }
+  /* thanh điều khiển */
+  #dock{ padding:8px 14px calc(12px + env(safe-area-inset-bottom)); gap:6px }
+  .ctrlRow{ justify-content:space-between; gap:6px }
+  .ctrlRow button{ width:46px; height:46px; border:1.5px solid var(--line) } .ctrlRow button svg{ width:22px; height:22px }
+  .ctrlRow button.primary{ width:62px; height:62px; background:#4B1272; border:none; box-shadow:0 8px 18px -8px rgba(75,18,114,.9) } .ctrlRow button.primary svg{ width:30px; height:30px }
+  .seekRow .sk{ height:30px; min-width:44px; font-size:12px; border-radius:15px; border:1.5px solid var(--line) }
+  .seekRow input{ height:30px } .seekRow input::-webkit-slider-thumb{ background:#fff; border:3px solid #6B21A8; width:20px; height:20px; margin-top:-7px }
 </style>
 </head>
 <body>
@@ -423,12 +508,12 @@
   <div class="uiSeg" data-k="layout"><button data-v="auto">Tự động</button><button data-v="tall">Đứng</button><button data-v="wide">Ngang</button></div>
 </div>
 <div id="roomBanner" style="display:none;padding:12px 14px;background:#3a2a10;color:#fbbf24;font-weight:700;font-size:15px;text-align:center"></div>
-<div id="now"><div class="ic">♪</div><div class="t" id="nowTitle">—</div></div>
+<div id="now"><div class="eqi"><span class="eq"><i></i><i></i><i></i></span></div><div class="t" id="nowTitle">—</div></div>
 
 <div class="tabs">
-  <button id="tabSearch" class="on"><span class="ti">🔍</span><span class="tl">Tìm bài</span></button>
-  <button id="tabQueue"><span class="ti">🎶</span><span class="tl">Hàng chờ <span class="cnt" id="qCount">0</span></span></button>
-  <button id="tabOrder" class="od" style="display:none"><span class="ti">🛎️</span><span class="tl">Gọi lễ tân</span></button>
+  <button id="tabSearch" class="on"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg></span><span class="tl">Tìm bài</span></button>
+  <button id="tabQueue"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/></svg></span><span class="tl">Hàng chờ <span class="cnt" id="qCount">0</span></span></button>
+  <button id="tabOrder" class="od" style="display:none"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16v-5a6 6 0 0112 0v5l1.5 2h-15z"/><path d="M10 21h4"/></svg></span><span class="tl">Gọi lễ tân</span></button>
 </div>
 </div>
 
@@ -450,7 +535,7 @@
 <div id="paneSearch">
   <div id="searchBox">
     <input id="q" type="search" placeholder="Gõ tên bài hát…" autocomplete="off" enterkeyhint="go">
-    <button id="goBtn" aria-label="Tìm">🔍</button>
+    <button id="goBtn" aria-label="Tìm">Tìm</button>
   </div>
   <div id="detect"></div>
   <div class="opt" id="quotaLine"></div>
@@ -477,8 +562,7 @@
     </div>
   </div></div>
   <div id="odPane">
-    <button class="lsbtn" id="odLsBtn">📋 Đơn đã gọi</button>
-    <div class="odH">CẦN HỖ TRỢ</div>
+    <div class="odH"><span>CẦN HỖ TRỢ</span><button class="lsbtn" id="odLsBtn">📋 Đơn đã gọi</button></div>
     <div class="svgrid" id="odSv"></div>
     <div class="odH">GỌI NƯỚC</div>
     <div id="odDr"></div>
@@ -553,6 +637,10 @@ const send = (action, extra) => bc.postMessage({ type:'cmd', payload:Object.assi
 
 /* ---------- Tiện ích ---------- */
 function el(tag, cls, text){ const e = document.createElement(tag); if(cls) e.className = cls; if(text != null) e.textContent = text; return e; }
+const SVG = (() => { const f = (c, p, w) => '<svg class="' + c + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="' + (w || 2.4) + '" stroke-linecap="round" stroke-linejoin="round">' + p + '</svg>';
+  return { plus:f('i-plus', '<path d="M12 5v14M5 12h14"/>', 2.8), ok:f('i-ok', '<path d="M5 12.5l4.5 4.5L19 7.5"/>', 3), up:f('i-up', '<path d="M12 19V5M6 11l6-6 6 6"/>', 2.6), x:f('i-x', '<path d="M6 6l12 12M18 6L6 18"/>', 2.6) }; })();
+let INQ = new Set();                                    // mã các bài đang ở hàng chờ (chưa hát xong), TV báo → mọi remote đều thấy ĐÃ CHỌN
+function paintInQ(){ document.querySelectorAll('.row[data-vid]').forEach(r => r.classList.toggle('inq', INQ.has(r.dataset.vid))); }
 function btn(label, cls, fn){ const b = el('button', cls, label); b.onclick = fn; return b; }
 const nd = s => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').replace(/Đ/g,'D').toLowerCase();
 const decode = s => new DOMParser().parseFromString(s || '', 'text/html').documentElement.textContent;
@@ -643,7 +731,7 @@ function parseYT(input){
 /* ---------- Hiển thị ---------- */
 function msg(text, err){ const b = $('results'); b.replaceChildren(); b.append(el('div', 'msg' + (err ? ' err' : ''), text)); }
 function rowEl(it, actions){
-  const row = el('div', 'row card tap');
+  const row = el('div', 'row card tap'); row.dataset.vid = it.id || ''; if(INQ.has(it.id)) row.classList.add('inq');
   const img = document.createElement('img'); img.alt = ''; img.loading = 'lazy'; if(it.thumb) img.src = it.thumb;
   const meta = el('div', 'meta'); meta.append(el('div', 'name', it.title), el('div', 'sub', it.channel || ''));
   row.append(img, meta); actions.forEach(a => row.append(a)); return row;
@@ -689,16 +777,17 @@ $('vmX').onclick = closeVers; $('vm').addEventListener('click', e => { if(e.targ
 $('pk').addEventListener('click', e => { if(e.target === $('pk')) closePick(); });
 function addBtn(it, fresh){
   const b = el('button', 'pick', '＋ Chọn');
+  const v = el('button', 'addv'); v.type = 'button'; v.setAttribute('aria-label', 'Chọn bài ' + (it.title || '')); v.innerHTML = SVG.plus + SVG.ok; v.onclick = () => b.click();
   let last = 0;
   const add = prio => {
     const now = Date.now(); if(now - last < 700) return; last = now;          // chạm đúp vô tình: không thêm hai lần
     addToQueue(it, fresh, prio); reportPick(it.id); expectOnTv(it);
     try{ if(navigator.vibrate) navigator.vibrate(20); }catch(e){}
-    b.textContent = '✓ Đã thêm'; b.classList.add('done');
-    setTimeout(() => { b.textContent = '＋ Chọn'; b.classList.remove('done'); }, 2000);
+    b.textContent = '✓ Đã thêm'; b.classList.add('done'); v.classList.add('done');
+    setTimeout(() => { b.textContent = '＋ Chọn'; b.classList.remove('done'); v.classList.remove('done'); }, 2000);
   };
   b.onclick = () => pickBox(it.title, it.thumb || thumbOf(it.id), [['CHỌN', '', () => add(false)], ['ƯU TIÊN', 'y', () => add(true)]]);
-  return b;
+  const f = document.createDocumentFragment(); f.append(b, v); return f;       // b = nút ẩn (rowTap bấm), v = nút + tròn hiện ra
 }
 /* Chạm vào cả dòng / thẻ bài cũng mở hộp chọn */
 const rowTap = e => {
@@ -926,7 +1015,7 @@ function markDead(id){
   document.querySelectorAll('[data-vid="' + id + '"]').forEach(r => {
     if(r.classList.contains('dead')) return;
     r.classList.add('dead');
-    const b = r.querySelector(':scope > button'); if(b) b.replaceWith(el('span', 'gone', 'Đã bị gỡ khỏi YouTube'));
+    const bs = r.querySelectorAll(':scope > button'); if(bs.length){ bs[0].replaceWith(el('span', 'gone', 'Đã bị gỡ khỏi YouTube')); for(let k = 1; k < bs.length; k++) bs[k].remove(); }
   });
 }
 function suspectDead(id){
@@ -961,7 +1050,7 @@ async function openVers(it, opts){
 }
 function khoRow(v, opts){
   const it = kItem(v), row = el('div', 'row tap'), en = !!(opts.en || v.en);
-  row.dataset.vid = it.id;
+  row.dataset.vid = it.id; if(INQ.has(it.id)) row.classList.add('inq');
   if(en){ EN_IDS.add(it.id); opts = Object.assign({}, opts, { en:true }); }
   const img = document.createElement('img'); img.alt = ''; img.loading = 'lazy'; img.src = it.thumb;
   img.onload = () => { if(img.naturalWidth === 120 && img.naturalHeight === 90) suspectDead(it.id); };   // mqdefault thật là 320×180
@@ -1308,7 +1397,8 @@ function odRender(){
   document.querySelectorAll('#odDr .drow').forEach(r => { const n = OD.cart[r.dataset.c] || 0;
     r.classList.toggle('on', n > 0); r.querySelector('.qn').textContent = n; r.querySelector('.qm').disabled = n <= 0; r.querySelector('.qp').disabled = n >= QTY_MAX; });
   const ks = Object.keys(OD.cart);
-  $('odSum').textContent = ks.map(c => { const m = odItem(c); return (m ? m.label : c) + (m && m.type === 'DR' ? ' ×' + OD.cart[c] : ''); }).join(' · ');
+  const odN = ks.reduce((a, c) => a + (OD.cart[c] || 0), 0);
+  $('odSum').replaceChildren(el('b', null, odN + ' món'), el('span', null, ks.map(c => { const m = odItem(c); return (m ? m.label : c) + (m && m.type === 'DR' ? ' ×' + OD.cart[c] : ''); }).join(' · ')));
   $('odBar').style.display = curTab === 'order' && ks.length ? 'flex' : 'none';
 }
 async function odSend(){
@@ -1588,26 +1678,56 @@ bc.onmessage = ev => {
   if(Date.now() - muteHold > 1500){ lastMuted = tvMuted; paintMute(lastMuted); }
   if(typeof s.volume === 'number' && !volDrag && Date.now() - volHold > 1500){ $('vol').value = s.volume; volNum(s.volume); volSent = s.volume; }
   const q = s.queue || [], cur = s.cur;
+  INQ = new Set(q.filter((x, i) => i >= Math.max(cur, 0)).map(x => x.id)); paintInQ();
   const up = q.filter((x, i) => i > cur).length;                      // số bài sắp hát (không tính bài đang hát)
   $('qCount').textContent = q.length ? up + (cur >= 0 ? 1 : 0) : 0;
   confirmFromTv(s);
   paintSide(s, q, cur);
   const box = $('queueList'); box.replaceChildren();
   if(!q.length || (cur >= 0 && cur >= q.length)){ box.append(el('div', 'msg', 'Hàng chờ trống. Chọn bài ở tab Tìm bài.')); return; }
-  q.forEach((it, i) => { if(i >= Math.max(cur, 0)) box.append(queueRow(it, i, cur, i === cur ? null : i - Math.max(cur, 0))); });
+  const c0 = Math.max(cur, 0), kOf = i => cur >= 0 ? i - cur : i + 1;
+  if(cur >= 0) box.append(queueRow(q[cur], cur, cur, null));
+  const nxN = q.length - (cur >= 0 ? cur + 1 : 0);
+  const hd = el('div', 'secHead'); hd.append(el('b', null, 'Kế tiếp · ' + nxN + ' bài')); box.append(hd);
+  if(!nxN) box.append(el('div', 'hint', 'Chưa có bài kế tiếp. Chọn thêm ở tab Tìm bài.'));
+  q.forEach((it, i) => { if(i > cur && i >= c0) box.append(queueRow(it, i, cur, kOf(i))); });
+  if(cur > 0){
+    const d = el('details', 'fold'); d.open = doneOpen; d.addEventListener('toggle', () => { doneOpen = d.open; });
+    d.append(el('summary', null, 'Đã hát · ' + cur + ' bài'));
+    for(let i = cur - 1; i >= 0; i--) d.append(queueRow(q[i], i, cur, null));
+    box.append(d);
+  }
 };
+let doneOpen = false, rmArm = { id:'' };
 /* Một dòng trong hàng chờ: chạm để mở hộp Ưu tiên / Đẩy lên / Xoá (bài đang hát: Hát lại / Qua bài) */
 function queueRow(it, i, cur, n){
-  const isCur = i === cur;
-  const row = el('div', 'row tap' + (isCur ? ' cur' : ''));
-  if(!isCur) row.append(el('div', 'num', String(n)));
+  const isCur = i === cur, played = cur >= 0 && i < cur;
+  const row = el('div', 'row' + (played ? ' done' : ' tap') + (isCur ? ' cur' : ''));
+  if(!isCur && !played) row.append(el('div', 'num', String(n)));
   const th = thumbOf(it.id);
   if(th){ const img = document.createElement('img'); img.className = 'qth'; img.alt = ''; img.loading = 'lazy'; img.src = th; row.append(img); }
   const meta = el('div', 'meta'), sub = el('div', 'sub');
   if(isCur){ const eq = el('span', 'eq'); eq.innerHTML = '<i></i><i></i><i></i>'; sub.append(eq, 'ĐANG HÁT'); }
-  else sub.textContent = n === 1 ? 'Hát kế tiếp' : 'Chờ';
+  else sub.textContent = played ? 'Đã hát' : n === 1 ? 'Hát kế tiếp' : 'Chờ';
   meta.append(el('div', 'name', it.title), sub); row.append(meta);
+  if(played) return row;
   row.onclick = () => queueAsk(it, i, cur);
+  if(!isCur){
+    if(i > cur + 1){
+      const up = el('button', 'rb2'); up.type = 'button'; up.innerHTML = SVG.up; up.title = 'Hát kế tiếp'; up.setAttribute('aria-label', 'Cho hát kế tiếp: ' + it.title);
+      up.onclick = e => { e.stopPropagation(); send('prio', { index:i, id:it.id }); snack('⏫ Hát ngay sau bài này: ' + it.title); };
+      row.append(up);
+    }
+    const x = el('button', 'rb2 x'); x.type = 'button'; x.innerHTML = SVG.x + '<b class="at">Xoá?</b>'; x.title = 'Xoá khỏi hàng chờ'; x.setAttribute('aria-label', 'Xoá khỏi hàng chờ: ' + it.title);
+    if(rmArm.id === it.id && Date.now() - rmArm.at < 2500) x.classList.add('arm');
+    x.onclick = e => {
+      e.stopPropagation();
+      if(x.classList.contains('arm')){ rmArm = { id:'' }; send('remove', { index:i, id:it.id }); return; }       // bấm lần hai mới xoá thật
+      rmArm = { id:it.id, at:Date.now() }; x.classList.add('arm');
+      setTimeout(() => { if(rmArm.id === it.id) rmArm = { id:'' }; document.querySelectorAll('.rb2.x.arm').forEach(b => b.classList.remove('arm')); }, 2500);
+    };
+    row.append(x);
+  }
   return row;
 }
 function queueAsk(it, i, cur){
