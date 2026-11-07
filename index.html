@@ -101,6 +101,24 @@
   #pairQr img{width:100%; height:100%; image-rendering:pixelated; display:block}
   #pairCode{font:800 clamp(40px,7vw,92px)/1.05 ui-monospace,Consolas,monospace; letter-spacing:.08em; color:#fff; text-shadow:0 4px 24px rgba(139,92,246,.6)}
   #pairSub{color:var(--quiet); font-size:clamp(12px,1.3vw,16px); margin-top:4px}
+  /* 11/2026: màn CHƯA GÁN PHÒNG (body.nodeco = đang hiện #setup) bị tràn dọc trên box Android (mất logo phía trên, mất mép thẻ phía dưới).
+     Thu gọn các khối theo CẢ chiều cao màn hình (vh) để vừa mọi cỡ 16:9 / 16:10; màn đã gán phòng không đổi. */
+  body.nodeco #idle{gap:min(14px,1.7vh); padding:min(20px,2.4vh) 24px}
+  body.nodeco #idle .logo{height:min(12vh,150px)}
+  body.nodeco #idle h1{font-size:min(4.2vw,6.4vh,58px); line-height:1.1}
+  body.nodeco #clock{font-size:min(6.5vw,10vh,100px); line-height:1}
+  body.nodeco #dateLine{font-size:min(1.8vw,3vh,24px); margin-top:-.6vh}
+  body.nodeco #readyPill{padding:min(10px,1.3vh) 22px; font-size:min(2vw,3.4vh,26px)}
+  body.nodeco #setup{padding:min(16px,2vh) 22px}
+  body.nodeco .pairWrap{gap:min(2.4vw,3.6vh,30px)}
+  body.nodeco #pairQr{width:min(25vh,260px); height:min(25vh,260px)}
+  body.nodeco #setup b{font-size:min(2vw,3.4vh,26px)}
+  body.nodeco #setup p b{font-size:inherit}
+  body.nodeco #setup p{font-size:min(1.5vw,2.6vh,19px); line-height:1.45; margin:min(6px,.8vh) 0 min(8px,1vh)}
+  body.nodeco #pairCode{font-size:min(7vw,11vh,92px)}
+  body.nodeco #pairSub{font-size:min(1.3vw,2.3vh,16px)}
+  body.nodeco #setup details{margin-top:min(10px,1.2vh); font-size:min(14px,2.3vh)}
+  body.nodeco #setup summary{margin-bottom:0}
   #setup details{margin-top:12px; color:var(--quiet); font-size:14px}
   #setup summary{cursor:pointer; margin-bottom:8px}
   #setup .f{display:flex; gap:10px}
