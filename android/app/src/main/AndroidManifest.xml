@@ -37,6 +37,11 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
         </intent>
+        <!-- 3.1: để tìm launcher khác của TV (kiểm tra trước khi bỏ BMBPlayer khỏi màn hình chính) -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.HOME" />
+        </intent>
     </queries>
 
     <!-- 2.9: cho phép http (cleartext) để phát video từ NAS của quán qua http://<IP-LAN>. Mã (MainActivity.Client.shouldInterceptRequest) chỉ cho http tới mạng nội bộ,
@@ -65,13 +70,22 @@
                 <category android:name="android.intent.category.LAUNCHER" />
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
-            <!-- Có thể chọn làm "màn hình chính": bật máy là vào BMBPlayer, chắc chắn nhất trên mọi đời Android -->
+        </activity>
+
+        <!-- Có thể chọn làm "màn hình chính": bật máy là vào BMBPlayer, chắc chắn nhất trên mọi đời Android.
+             3.1: tách thành activity-alias để app tự BẬT/TẮT được (menu nhân viên) mà không cần màn hình cài đặt của hệ thống
+             (nhiều TV box như Redmi không có mục chọn Home). Mặc định BẬT như các bản trước. -->
+        <activity-alias
+            android:name=".HomeAlias"
+            android:enabled="true"
+            android:exported="true"
+            android:targetActivity=".MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.HOME" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
-        </activity>
+        </activity-alias>
 
         <!-- Chế độ Quầy: giữ kết nối "cái chuông" với máy chủ, tự hiện thông báo đơn -->
         <service

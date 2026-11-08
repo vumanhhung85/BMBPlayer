@@ -10,6 +10,7 @@ import android.content.ActivityNotFoundException;
 import android.content.BroadcastReceiver;
 import android.content.IntentFilter;
 import android.media.AudioManager;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -577,25 +578,57 @@ public class MainActivity extends Activity {
         }
     }
 
-    /** 3.0: trả quyền "màn hình chính" về launcher của TV (vd Cao Thiên Phát): xoá mặc định của BMBPlayer rồi mở bảng chọn Home của hệ thống. */
-    private void releaseHome() {
-        try { getPackageManager().clearPackagePreferredActivities(getPackageName()); } catch (Exception ignored) {}
-        List<ResolveInfo> homes = null;
-        try { homes = getPackageManager().queryIntentActivities(new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), 0); } catch (Exception ignored) {}
-        String other = null;
-        if (homes != null) for (ResolveInfo ri : homes) {
-            if (ri.activityInfo == null) continue;
-            String pk = ri.activityInfo.packageName;
-            if (getPackageName().equals(pk) || "com.android.settings".equals(pk) || pk.contains("fallbackhome")) continue;
-            other = pk; break;
-        }
-        if (other == null) { toast("Đã bỏ BMBPlayer khỏi màn hình chính. Không tìm thấy launcher khác của TV."); return; }
-        toast("Đã bỏ BMBPlayer khỏi màn hình chính. Bấm nút Home, chọn launcher của TV → Luôn luôn.");
+    /** 3.1: BMBPlayer có đăng ký làm "màn hình chính" qua activity-alias HomeAlias; app tự bật/tắt được, không cần màn hình cài đặt của hệ thống (Redmi không có). */
+    private static final String HOME_ALIAS = "vn.boommusicbox.bmbplayer.HomeAlias";
+
+    private boolean homeAliasOn() {
         try {
-            Intent i = getPackageManager().getLaunchIntentForPackage(other);
-            if (i == null) i = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).setPackage(other);
-            startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            int st = getPackageManager().getComponentEnabledSetting(new ComponentName(getPackageName(), HOME_ALIAS));
+            return st == PackageManager.COMPONENT_ENABLED_STATE_DEFAULT || st == PackageManager.COMPONENT_ENABLED_STATE_ENABLED;
+        } catch (Exception e) { return true; }
+    }
+
+    private void setHomeAlias(boolean on) {
+        try {
+            getPackageManager().setComponentEnabledSetting(new ComponentName(getPackageName(), HOME_ALIAS),
+                    on ? PackageManager.COMPONENT_ENABLED_STATE_ENABLED : PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                    PackageManager.DONT_KILL_APP);
         } catch (Exception ignored) {}
+    }
+
+    /** Gói của một launcher khác (không phải BMBPlayer, không phải hộp chọn/ngoại lệ của hệ thống); null nếu máy không có. */
+    private String otherHome() {
+        try {
+            List<ResolveInfo> homes = getPackageManager().queryIntentActivities(new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), 0);
+            if (homes != null) for (ResolveInfo ri : homes) {
+                if (ri.activityInfo == null) continue;
+                String pk = ri.activityInfo.packageName;
+                if (getPackageName().equals(pk) || "android".equals(pk) || "com.android.settings".equals(pk) || pk.contains("fallbackhome")) continue;
+                return pk;
+            }
+        } catch (Exception ignored) {}
+        return null;
+    }
+
+    /** 3.1: bỏ BMBPlayer khỏi danh sách màn hình chính (để launcher của TV, vd Cao Thiên Phát, tự lên khi bật máy). Từ chối nếu máy không còn launcher nào khác (tránh kẹt màn đen). */
+    private void releaseHome() {
+        final String other = otherHome();
+        if (other == null) {
+            toast("Máy không có launcher nào khác nên giữ nguyên, tránh kẹt màn đen khi bật máy.");
+            return;
+        }
+        setHomeAlias(false);
+        try { getPackageManager().clearPackagePreferredActivities(getPackageName()); } catch (Exception ignored) {}
+        toast("Đã bỏ BMBPlayer khỏi màn hình chính. Nếu máy hỏi chọn launcher, chọn launcher của TV → Luôn luôn.");
+        try {
+            Intent i = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).setPackage(other).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(i);
+        } catch (Exception e) {
+            try {
+                Intent i = getPackageManager().getLaunchIntentForPackage(other);
+                if (i != null) startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            } catch (Exception ignored) {}
+        }
     }
 
     private boolean canResolve(Intent i) {
@@ -860,11 +893,15 @@ public class MainActivity extends Activity {
         if (canResolve(new Intent(Settings.ACTION_HOME_SETTINGS))) {
             labels.add("⌂  Chọn ứng dụng màn hình chính (Home)"); acts.add(() -> openSettings(Settings.ACTION_HOME_SETTINGS));
         }
-        if (isDefaultHome()) {
-            labels.add("↩  Trả màn hình chính về launcher của TV"); acts.add(this::releaseHome);
+        if (homeAliasOn()) {
+            labels.add("↩  Không làm màn hình chính (để launcher của TV)");
+            acts.add(() -> confirm("Bỏ BMBPlayer khỏi màn hình chính?", "Khi bật máy sẽ lên launcher của TV (vd Cao Thiên Phát) thay vì BMBPlayer. Muốn bật lại: menu này → \"Làm BMBPlayer thành màn hình chính\".", this::releaseHome));
+        } else {
+            labels.add("⌂  Làm BMBPlayer thành màn hình chính");
+            acts.add(() -> { setHomeAlias(true); toast("Đã bật: BMBPlayer có thể làm màn hình chính"); });
         }
         if (Build.VERSION.SDK_INT >= 23 && !Settings.canDrawOverlays(this)) {
-            labels.add("⏻  Cho phép tự mở khi bật máy"); acts.add(this::openOverlaySettings);
+            labels.add("▶  Cho phép tự mở khi bật máy"); acts.add(this::openOverlaySettings);
         }
         final boolean auto = prefs.getBoolean(K_AUTOSTART, true);
         labels.add(auto ? "☑  Tự mở khi bật máy: BẬT (bấm để tắt)" : "☐  Tự mở khi bật máy: TẮT (bấm để bật)");
