@@ -466,6 +466,43 @@
   .ctrlRow button.primary{ width:62px; height:62px; background:#4B1272; border:none; box-shadow:0 8px 18px -8px rgba(75,18,114,.9) } .ctrlRow button.primary svg{ width:30px; height:30px }
   .seekRow .sk{ height:30px; min-width:44px; font-size:12px; border-radius:15px; border:1.5px solid var(--line) }
   .seekRow input{ height:30px } .seekRow input::-webkit-slider-thumb{ background:#fff; border:3px solid #6B21A8; width:20px; height:20px; margin-top:-7px }
+
+  /* ===== 🎧 Nghe nhạc: nhóm riêng cạnh «Quốc tế», thẻ mix, thanh «đang nghe» ===== */
+  .modeBar{display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:6px 0 2px}
+  .modeBar .hotTabs{display:inline-flex}
+  .modeBar .hotTabs button{border:none; padding:7px 12px; border-radius:9px; font:inherit; font-weight:800; font-size:13px; background:transparent; color:var(--quiet)}
+  .modeBar .hotTabs button.on{background:var(--grape, var(--accent)); color:#fff}
+  .modeBar .hotTabs.ng{border:1.5px solid #ec4899; background:linear-gradient(135deg,rgba(236,72,153,.10),rgba(139,92,246,.10)); box-shadow:0 0 0 3px rgba(236,72,153,.10)}
+  .modeBar .hotTabs.ng button{color:#be185d}
+  .modeBar .hotTabs.ng button.on{background:linear-gradient(135deg,#ec4899,#8b5cf6); color:#fff; box-shadow:0 4px 14px -4px rgba(236,72,153,.7)}
+  .ngChips{display:flex; gap:8px; overflow-x:auto; padding:8px 0 6px; scrollbar-width:none; -webkit-overflow-scrolling:touch}
+  .ngChips::-webkit-scrollbar{display:none}
+  .ngChip{flex:0 0 auto; border:none; border-radius:14px; padding:8px 14px; font:inherit; font-size:13.5px; font-weight:800; color:#fff; background:var(--c,#8b5cf6); opacity:.55; box-shadow:0 3px 0 rgba(0,0,0,.18); transition:transform .12s, opacity .12s}
+  .ngChip small{font-weight:700; opacity:.85; margin-left:4px}
+  .ngChip.on{opacity:1; transform:translateY(-2px); box-shadow:0 6px 14px -4px var(--c,#8b5cf6), 0 3px 0 rgba(0,0,0,.2)}
+  .ngChip:active{transform:scale(.96)}
+  .ngList{display:flex; flex-direction:column; gap:10px; padding:4px 0 14px}
+  .ngc{position:relative; display:flex; gap:12px; align-items:stretch; padding:8px; border-radius:16px; background:var(--panel); border:1px solid var(--line); border-left:5px solid var(--c,#8b5cf6); box-shadow:var(--sh, 0 6px 16px -8px rgba(0,0,0,.4)); cursor:pointer; -webkit-tap-highlight-color:transparent}
+  .ngc:active{transform:scale(.985)}
+  .ngc.on{background:linear-gradient(135deg,rgba(236,72,153,.14),rgba(139,92,246,.16)); border-color:#ec4899; box-shadow:0 0 0 3px rgba(236,72,153,.22), 0 10px 24px -10px rgba(236,72,153,.6)}
+  .ngTh{position:relative; flex:0 0 118px; aspect-ratio:16/9; border-radius:11px; overflow:hidden; background:#2a2140}
+  .ngTh img{width:100%; height:100%; object-fit:cover; display:block}
+  .ngDur{position:absolute; right:5px; bottom:5px; background:rgba(0,0,0,.78); color:#fff; font-size:11.5px; font-weight:800; padding:1px 6px; border-radius:6px; font-variant-numeric:tabular-nums}
+  .ngBd{flex:1; min-width:0; display:flex; flex-direction:column; justify-content:center; gap:4px}
+  .ngT{font-weight:800; font-size:14.5px; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden}
+  .ngM{font-size:12px; color:var(--quiet); display:flex; flex-wrap:wrap; gap:4px 10px; align-items:center}
+  .ngM .hot{color:#c2410c; font-weight:800} .ngM .pin{color:#b45309; font-weight:800} .ngM .now{color:#be185d; font-weight:900; letter-spacing:.4px}
+  .ngPlay{flex:0 0 auto; align-self:center; width:44px; height:44px; border-radius:50%; border:none; color:#fff; font-size:18px; background:linear-gradient(135deg,#ec4899,#8b5cf6); box-shadow:0 6px 14px -4px rgba(236,72,153,.7)}
+  .ngc.on .ngPlay{background:linear-gradient(135deg,#10b981,#06b6d4)}
+  #ngStrip{display:none; align-items:center; gap:8px; padding:6px 12px; background:linear-gradient(90deg,#be185d,#6d28d9); color:#fff; font-size:13px}
+  #ngStrip .ngI{font-size:20px; flex:0 0 auto}
+  #ngStrip .ngTx{flex:1; min-width:0; line-height:1.25} #ngStrip small{display:none; font-size:10.5px; font-weight:800; letter-spacing:.8px; opacity:.85}
+  @media(min-width:520px){#ngStrip small{display:block}}
+  #ngStrip #ngStripNext{padding:7px 12px; font-size:15px; line-height:1}
+  #ngStrip b{display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  #ngStrip button{flex:0 0 auto; border:1.5px solid rgba(255,255,255,.55); background:rgba(255,255,255,.14); color:#fff; border-radius:999px; padding:7px 11px; font:inherit; font-size:12.5px; font-weight:800}
+  #ngStrip button.hot{background:#FFD21A; border-color:#FFD21A; color:#3A0F5A}
+  #ngStrip button:active{transform:scale(.95)}
 </style>
 </head>
 <body>
@@ -509,6 +546,8 @@
 </div>
 <div id="roomBanner" style="display:none;padding:12px 14px;background:#3a2a10;color:#fbbf24;font-weight:700;font-size:15px;text-align:center"></div>
 <div id="now"><div class="eqi"><span class="eq"><i></i><i></i><i></i></span></div><div class="t" id="nowTitle">—</div></div>
+
+<div id="ngStrip"><span class="ngI">🎧</span><div class="ngTx"><small>ĐANG NGHE NHẠC</small><b id="ngStripT"></b></div><button id="ngStripNext" type="button" aria-label="Mix kế tiếp" title="Mix kế tiếp">⏭</button><button id="ngStripKara" type="button">🎤 Hát karaoke<span id="ngStripN"></span></button></div>
 
 <div class="tabs">
   <button id="tabSearch" class="on"><span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg></span><span class="tl">Tìm bài</span></button>
@@ -740,7 +779,7 @@ function rowEl(it, actions){
   const meta = el('div', 'meta'); meta.append(el('div', 'name', it.title), el('div', 'sub', it.channel || ''));
   row.append(img, meta); actions.forEach(a => row.append(a)); return row;
 }
-function addToQueue(it, fresh, prio){ send('add', Object.assign({ id:it.id, title:it.title }, prio ? { prio:true } : {})); }
+function addToQueue(it, fresh, prio){ send('add', Object.assign({ id:it.id, title:it.title }, prio ? { prio:true } : {})); if(LISTEN) setTimeout(() => snack('🎤 Đã thêm. Đang nghe nhạc: bấm «Hát karaoke» ở thanh trên khi muốn hát.'), 300); }
 /* Báo nhận rõ ràng: nút đổi màu ngay, rồi chờ TV xác nhận (bài xuất hiện trong hàng chờ của TV) */
 let snackTimer = null;
 function snack(text, warn){
@@ -810,6 +849,7 @@ function renderResults(items, title, extra){
 }
 function updateDetect(){
   const d = $('detect'); d.replaceChildren();
+  if(ngMode()){ d.style.display = 'none'; $('goBtn').textContent = 'Lọc'; return; }
   const p = parseYT($('q').value);
   $('goBtn').textContent = (p.vid || p.list) ? 'Thêm' : 'Tìm';
   if(p.vid) d.append(btn('＋ Thêm bài từ link', null, () => addByLink(p.vid)));
@@ -1183,6 +1223,7 @@ async function showGroups(box, groups, seq, suffix){
 function khoHead(title, act){ const head = el('div', 'secHead'); head.append(el('b', null, title)); if(act){ const a = el('span', 'secAct'); a.append(act); head.append(a); } return head; }
 async function renderKho(){
   const box = $('khoSec');
+  if(ngMode()) return renderNghe(box);
   if(!hasKho()){
     // khách đã vào phòng nhưng phòng không cấp vé kho → nói rõ thay vì để trống (thường do Worker bmbplayer thiếu secret GUEST_SECRET)
     if(GUEST && noTicket) box.replaceChildren(khoHead('Kho karaoke'), el('div', 'hint err', 'Danh sách bài của quán chưa mở được cho phòng này, nhờ nhân viên kiểm tra (mã: thiếu vé kho). Vẫn tìm được trên YouTube bằng nút Tìm.'));
@@ -1240,21 +1281,135 @@ async function renderKho(){
     return 0;
   }
 }
-function hotHead(en, n){
-  const act = el('span', 'secAct');
+function modeBar(cur){            // cur: 'vi' | 'en' | 'nghe' — hai nhóm bo tròn riêng: karaoke (Nhạc Việt + Quốc tế) và 🎧 Nghe nhạc
+  if(!enOk && !NG.on) return null;
+  const bar = el('div', 'modeBar');
   if(enOk){
     const t = el('span', 'hotTabs');
-    [['vi', 'Nhạc Việt'], ['en', 'Quốc tế']].forEach(([k, label]) => {
-      const b = el('button', (en ? 'en' : 'vi') === k ? 'on' : null, label);
-      b.onclick = () => { if(hotLang === k) return; hotLang = k; lsSet('kho_hotlang', k); if(k === 'en' && !IDX_EN) loadIndex(true); renderKho(); };
-      t.append(b);
-    });
-    act.append(t);
+    [['vi', 'Nhạc Việt'], ['en', 'Quốc tế']].forEach(([k, label]) => { const b = el('button', cur === k ? 'on' : null, label); b.type = 'button'; b.onclick = () => setMode(k); t.append(b); });
+    bar.append(t);
   }
+  if(NG.on){
+    const t = el('span', 'hotTabs ng'), b = el('button', cur === 'nghe' ? 'on' : null, '🎧 Nghe nhạc'); b.type = 'button'; b.onclick = () => setMode('nghe'); t.append(b); bar.append(t);
+  }
+  return bar;
+}
+function setMode(k){
+  if(hotLang === k) return;
+  hotLang = k; if(k !== 'nghe') lsSet('kho_hotlang', k);                       // Nghe nhạc chỉ nhớ trong lần mở này: mở lại luôn về karaoke
+  if(k === 'en' && !IDX_EN) loadIndex(true);
+  if(k === 'nghe'){ NG.grp = ''; ngLoad(false); }
+  ngUi(); renderKho();
+}
+function hotHead(en, n){
+  const act = el('span', 'secAct');
   act.append(btn('↻', 'ghost', () => { if(en) hotCacheEn = null; else hotCache = null; renderKho(); }));
   const head = el('div', 'secHead'); head.append(el('b', null, (en ? '🌍 Quốc tế hot' : '🔥 Bài hot') + (n != null ? ' (' + n + ')' : ''))); head.append(act);
-  return head;
+  const bar = modeBar(en ? 'en' : 'vi'), f = document.createDocumentFragment(); if(bar) f.append(bar); f.append(head);
+  return f;
 }
+
+/* ---------- 🎧 Nghe nhạc ----------
+   Danh sách do admin duyệt (Worker: nghe.list), xếp ghim → được chọn nhiều → mới. Chạm một lần = TV phát cả mix, các mix kế cùng nhóm tự nối.
+   Ô tìm ở chế độ này chỉ LỌC trong danh sách (không tìm YouTube). Trạng thái đang nghe lấy từ tin 'state' của TV (s.listen) nên mọi điện thoại/máy tính bảng thấy giống nhau. */
+const NG = { on:false, loaded:false, items:[], groups:[], grp:'', next:'mix', at:0, busy:null, want:null, wt:0 };
+let LISTEN = null, lastState = null;
+const NG_COL = ['#ec4899', '#8b5cf6', '#06b6d4', '#f59e0b', '#10b981', '#ef4444', '#3b82f6', '#84cc16'];
+const NG_ICO = ['🔥', '🎶', '🌙', '💃', '🎻', '🎸', '⚡', '🌴'];
+const ngMode = () => hotLang === 'nghe' && NG.on;
+const ngColor = g => NG_COL[Math.max(0, NG.groups.indexOf(g)) % NG_COL.length];
+const ngDur = s => { s = Math.round(+s || 0); if(s < 60) return ''; const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60); return h ? h + ':' + String(m).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0') : m + ':' + String(s % 60).padStart(2, '0'); };
+function ngUi(){                    // ô tìm đổi chữ theo chế độ
+  const n = ngMode(); $('q').placeholder = n ? 'Tìm trong danh sách Nghe nhạc…' : 'Gõ tên bài hát…'; if(n) $('goBtn').textContent = 'Lọc'; else updateDetect();
+}
+function ngLoad(force){
+  if(!bc.ws) return Promise.resolve();                                                // chạy thử cục bộ (không có phòng): không có Nghe nhạc
+  if(NG.busy) return NG.busy;
+  if(!force && NG.loaded && Date.now() - NG.at < 60000) return Promise.resolve();
+  NG.busy = odApi('nghe.list', odAuth()).then(r => {
+    const was = NG.on;
+    if(r && r.ok){ NG.on = !!r.on; NG.items = r.items || []; NG.groups = r.groups || []; NG.next = r.next || 'mix'; NG.loaded = true; NG.at = Date.now(); }
+    else if(r && (r.error === 'het_luot' || r.error === 'phong_dong')) { /* phòng chưa mở: giữ nguyên */ }
+    if(NG.grp && !NG.groups.includes(NG.grp)) NG.grp = '';
+    if(!NG.on && hotLang === 'nghe'){ hotLang = lsGet('kho_hotlang') === 'en' && enOk ? 'en' : 'vi'; ngUi(); }
+    if(was !== NG.on || ngMode()) renderKho();
+  }).catch(() => {}).finally(() => { NG.busy = null; });
+  return NG.busy;
+}
+function renderNghe(box){
+  $('results').replaceChildren();
+  box.replaceChildren(); const bar = modeBar('nghe'); if(bar) box.append(bar);
+  if(!NG.loaded){ box.append(el('div', 'hint', 'Đang tải danh sách…')); ngLoad(false); return 0; }
+  const raw = $('q').value.trim(), toks = nd(raw).split(/\s+/).filter(Boolean);
+  if(NG.groups.length > 1){
+    const chips = el('div', 'ngChips'), mk = (g, label, n, col) => {
+      const b = el('button', 'ngChip' + (NG.grp === g ? ' on' : ''), label); b.type = 'button'; b.style.setProperty('--c', col);
+      b.append(el('small', null, String(n))); b.onclick = () => { NG.grp = g; renderKho(); }; chips.append(b);
+    };
+    mk('', '🎧 Tất cả', NG.items.length, '#475569');
+    NG.groups.forEach((g, i) => mk(g, NG_ICO[i % NG_ICO.length] + ' ' + g, NG.items.filter(x => x.g === g).length, ngColor(g)));
+    box.append(chips);
+  }
+  let list = NG.items.filter(x => !NG.grp || x.g === NG.grp);
+  if(toks.length) list = list.filter(x => { const h = nd(x.t + ' ' + x.a + ' ' + x.g); return toks.every(t => h.includes(t)); });
+  if(!list.length){ box.append(el('div', 'msg', toks.length ? 'Không có mix nào khớp «' + raw + '» trong danh sách Nghe nhạc.' : 'Chưa có mix nào trong nhóm này.')); return list.length; }
+  const wrap = el('div', 'ngList');
+  list.slice(0, 200).forEach(x => wrap.append(ngCard(x)));
+  box.append(wrap);
+  return list.length;
+}
+function ngCard(x){
+  const c = el('div', 'ngc'); c.dataset.mid = x.id; c.style.setProperty('--c', ngColor(x.g));
+  if(LISTEN && LISTEN.mid === x.id) c.classList.add('on');
+  const th = el('div', 'ngTh'), img = document.createElement('img'); img.alt = ''; img.loading = 'lazy';
+  const tsrc = x.k === 'video' && x.y ? thumbOf(x.y) : x.th; if(tsrc) img.src = tsrc;               // video: ảnh 16:9 của YouTube (ảnh oEmbed có viền đen); playlist: ảnh oEmbed
+  th.append(img); const d = ngDur(x.d); if(d) th.append(el('span', 'ngDur', d));
+  const bd = el('div', 'ngBd'); bd.append(el('div', 'ngT', x.t));
+  const m = el('div', 'ngM');
+  if(LISTEN && LISTEN.mid === x.id) m.append(el('span', 'now', '● ĐANG NGHE'));
+  if(x.p) m.append(el('span', 'pin', '📌 Đề cử'));
+  if(x.a) m.append(el('span', null, x.a));
+  if(x.n >= 3) m.append(el('span', 'hot', '🔥 ' + x.n + ' lượt chọn'));
+  bd.append(m);
+  const pb = el('button', 'ngPlay', '▶'); pb.type = 'button'; pb.setAttribute('aria-label', 'Nghe ' + x.t);
+  c.append(th, bd, pb); c.onclick = () => ngPlay(x);
+  return c;
+}
+function ngPlay(x){
+  if(LISTEN && LISTEN.mid === x.id){ snack('🎧 Mix này đang phát rồi'); return; }
+  const go = () => {
+    send('mix', { mid:x.id });
+    NG.want = { mid:x.id, title:x.t, at:Date.now() }; clearTimeout(NG.wt);
+    NG.wt = setTimeout(() => { if(NG.want && !(LISTEN && LISTEN.mid === NG.want.mid)) snack('⚠ TV chưa nhận mix “' + NG.want.title + '”. Kiểm tra TV còn mở trang phát và mạng, rồi chọn lại.', true); NG.want = null; }, 7000);
+    try{ if(navigator.vibrate) navigator.vibrate(20); }catch(e){}
+    snack('🎧 Đang mở: ' + x.t);
+  };
+  const s = lastState;
+  if(!LISTEN && s && s.cur >= 0 && s.nowTitle){
+    pickBox('Đang hát “' + s.nowTitle + '”. Bật mix sẽ dừng bài này (bài vẫn nằm đầu hàng chờ, hát lại từ đầu khi bấm «Hát karaoke»).', x.k === 'video' && x.y ? thumbOf(x.y) : (x.th || ''), [['🎧 NGHE MIX NÀY', '', go], ['ĐỂ SAU', 'y', () => {}]]);
+  } else go();
+}
+function ngPaint(){                 // gọi mỗi lần TV báo trạng thái: thanh «đang nghe» + đánh dấu thẻ đang phát + xác nhận TV đã nhận lệnh
+  const st = $('ngStrip'), on = !!LISTEN;
+  if((st.style.display === 'flex') !== on){ st.style.display = on ? 'flex' : 'none'; stickTop(); }
+  if(on){
+    $('ngStripT').textContent = LISTEN.title;
+    const n = ((lastState && lastState.queue) || []).length;
+    $('ngStripN').textContent = n ? ' · ' + n + ' bài chờ' : ''; $('ngStripKara').classList.toggle('hot', n > 0);
+  }
+  document.querySelectorAll('.ngc').forEach(c => {
+    const now = !!LISTEN && +c.dataset.mid === LISTEN.mid;
+    if(c.classList.contains('on') !== now){ c.classList.toggle('on', now); const m = c.querySelector('.ngM'), t = m && m.querySelector('.now');
+      if(now && m && !t) m.prepend(el('span', 'now', '● ĐANG NGHE')); else if(!now && t) t.remove(); }
+  });
+  if(on && NG.want && NG.want.mid === LISTEN.mid){ clearTimeout(NG.wt); snack('🎧 Đang nghe: ' + LISTEN.title); NG.want = null; }
+}
+$('ngStripNext').onclick = () => { send('next'); snack('⏭ Chuyển sang mix kế tiếp'); };
+$('ngStripKara').onclick = () => {
+  const n = ((lastState && lastState.queue) || []).length;
+  if(!n){ snack('Hàng chờ karaoke đang trống: chọn bài karaoke trước rồi bấm lại nhé.', true); if(hotLang === 'nghe') setMode(lsGet('kho_hotlang') === 'en' && enOk ? 'en' : 'vi'); tab('search'); return; }
+  send('karaoke'); snack('🎤 Chuyển sang karaoke…');
+};
 function khoSoon(){ clearTimeout(khoTimer); if(IDX) renderKho(); else khoTimer = setTimeout(renderKho, 300); }   // có danh mục trên máy: tìm ngay, không chờ
 
 /* ---------- Danh mục kho trên máy (giống songs.dat của SmartK) ----------
@@ -1334,6 +1489,7 @@ const QN = new Set(['karaoke', 'beat', 'tone', 'ton', 'nhac', 'song', 'bai', 'ha
 
 /* ---------- Ô nhập thông minh: link bài → thêm; link playlist → nạp; còn lại → tìm ---------- */
 function go(){
+  if(ngMode()){ renderKho(); return; }                              // Nghe nhạc: ô tìm chỉ lọc trong danh sách admin duyệt, không gọi YouTube
   const p = parseYT($('q').value);
   if(p.vid) return addByLink(p.vid);
   if(p.list) return loadPlaylist(p.list);
@@ -1677,14 +1833,17 @@ setInterval(() => { if(HG.on && curTab === 'order') hgDraw(); }, 15000);
 bc.onmessage = ev => {
   const m = ev.data || {};
   if(m.type === 'hgr'){ if(!m.ok) snack(m.error === 'tat' ? 'Chi nhánh chưa bật nhắc giờ hát' : 'Chưa đặt được nhắc giờ, thử lại', true); return; }
+  if(m.type === 'mixr'){ NG.want = null; clearTimeout(NG.wt); snack('Mix này tạm chưa phát được, chọn mix khác nhé.', true); ngLoad(true); return; }
   if(m.type === 'dead' && /^[\w-]{11}$/.test(m.id || '')){ markDead(m.id); return; }
   if(m.type === 'pos'){ if(sk.on && m.payload) seekSync(m.payload); return; }       // giây đang phát (TV báo ~3 giây/lần)
   if(m.type !== 'state') return;
   const s = m.payload || {};
+  lastState = s; LISTEN = s.listen || null;
   seekEnable(s.seek); if(s.seek) seekSync({ t:s.t, dur:s.dur, playing:s.playing });
   $('nowTitle').textContent = s.scoring ? '🎤 Đang chấm điểm…' : s.apiFailed ? '⚠ Màn hình phát không tải được YouTube, xem hướng dẫn trên màn hình phát'
     : s.needStart ? '⚠ TV đang chờ một lần bấm OK / chạm màn hình để bật tiếng'
     : s.ready === false && s.cur >= 0 ? '⏳ Màn hình phát đang khởi động YouTube…'
+    : s.listen ? '🎧 ' + s.listen.title
     : (s.nowTitle || '—');
   $('playBtn').innerHTML = s.playing ? IC.pause : IC.play; lastPlaying = !!s.playing;
   tvMuted = !!s.muted;
@@ -1695,6 +1854,7 @@ bc.onmessage = ev => {
   const up = q.filter((x, i) => i > cur).length;                      // số bài sắp hát (không tính bài đang hát)
   $('qCount').textContent = q.length ? up + (cur >= 0 ? 1 : 0) : 0;
   confirmFromTv(s);
+  ngPaint();
   paintSide(s, q, cur);
   const box = $('queueList'); box.replaceChildren();
   if(!q.length || (cur >= 0 && cur >= q.length)){ box.append(el('div', 'msg', 'Hàng chờ trống. Chọn bài ở tab Tìm bài.')); return; }
@@ -1787,6 +1947,7 @@ if(GUEST){
     else if(m.open && !guestTok && !noTicket) setTimeout(() => { if(!guestTok && !noTicket){ noTicket = true; renderKho(); } }, 4000);   // chờ tin kèm vé tới (có thể tới sau tin phòng)
     window.__bmbOpen = !!m.open;   /* APK 2.4: chỉ hỏi cập nhật khi phòng đóng */
     hgRoom(m);
+    if(m.open){ if(m.nghe === false){ if(NG.on){ NG.on = false; if(hotLang === 'nghe'){ hotLang = lsGet('kho_hotlang') === 'en' && enOk ? 'en' : 'vi'; ngUi(); } renderKho(); } } else ngLoad(false); }
     if(m.open){ if(m.tv === false) banner(BANNER.notv); else{ banner(''); send('hello'); } } else banner(BANNER[m.reason === 'notopen' ? 'waiting' : 'closed']);
   };
   bc.onstatus = s => { if(bc.tablet && s === 'rotated') return showPair('Máy tính bảng đã được gỡ khỏi phòng (hoặc phòng đã gán máy khác).');

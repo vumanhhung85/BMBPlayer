@@ -195,6 +195,11 @@
   #hgChip{position:absolute; left:1.6vw; bottom:3.2vh; z-index:12; display:none; align-items:center; gap:.8vh; padding:.9vh 1.8vh; border-radius:999px; background:rgba(10,8,22,.8);
     border:.4vh solid #34d399; color:#a7f3d0; font:800 clamp(14px,2.5vh,32px)/1 "Segoe UI",Roboto,Arial,sans-serif; box-shadow:0 6px 24px rgba(0,0,0,.5); pointer-events:none; font-variant-numeric:tabular-nums}
   #hgChip.on{display:flex}
+  /* Nghe nhạc: chip nhỏ ở góc trên phải suốt lúc nghe mix, để khách hiểu đây KHÔNG phải hàng chờ karaoke */
+  #listenChip{position:absolute; right:2vw; top:2.4vh; z-index:12; display:none; align-items:center; gap:1vh; padding:.9vh 1.9vh; border-radius:999px; max-width:46vw;
+    background:linear-gradient(90deg,rgba(236,72,153,.85),rgba(139,92,246,.85)); color:#fff; font:800 clamp(13px,2.3vh,30px)/1 "Segoe UI",Roboto,Arial,sans-serif; box-shadow:0 6px 24px rgba(0,0,0,.5); pointer-events:none; opacity:.92}
+  #listenChip.on{display:flex} #listenChip span{white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  body.scoring #listenChip{display:none}
   #hgChip.ye{border-color:#fbbf24; color:#fde68a} #hgChip.rd{border-color:#f87171; color:#fecaca} #hgChip.ot{border-color:#c084fc; color:#f3e8ff}
   #hgMsg{left:1.6vw; bottom:calc(3.2vh + 7.4vh); z-index:13; max-width:min(46vw,760px); box-sizing:border-box; padding:1.3vh 2.2vh; border-radius:16px; background:rgba(10,8,22,.9);
     border-left:1.2vh solid #34d399; box-shadow:0 8px 34px rgba(0,0,0,.6); transform:translateY(14px)}
@@ -308,6 +313,7 @@
   <div class="ov" id="toast"></div>
   <div id="svc"></div>
   <div id="hgChip"></div>
+  <div id="listenChip"><b>🎧 NGHE NHẠC</b><span id="listenChipT"></span></div>
   <div class="ov" id="hgMsg"><div class="h"></div><div class="b"></div></div>
   <div class="ov" id="volOsd"><span id="volIc"></span><div class="vb"><i id="volBar"></i></div><b id="volNum">100</b></div>
   <div id="progress"><i id="bar"></i></div>
@@ -379,6 +385,7 @@ if(NATIVE){ try{ NATIVE.setVolume(vol); }catch(e){} }          // người dùng
 let lock = null;                // null | 'muted' (đang phát im lặng vì bị chặn) | 'tap' (chưa phát được, cần một lần chạm)
 let unlocked = false;           // đã có thao tác của người dùng trên trang này
 let roomOpen = !bc.ws, lastSession = null, connTxt = '';
+let listen = false, mix = null, mixQ = [], mixFail = 0, ngheOn = true;   // Nghe nhạc: listen = đang nghe mix, mix = {mid,kind,yt,title,nx}, mixQ = các mix kế tiếp (Worker gửi kèm)
 let seekOn = !bc.ws, nPeers = bc.ws ? 0 : 1;     // seekOn: admin cho phép thanh tua (Worker báo trong tin 'room'); nPeers: số điện thoại / máy tính bảng đang nối
 /* Chưa có mã phòng (mở trang gốc lần đầu, hoặc trình duyệt chế độ Khách/ẩn danh xoá mất mã đã nhớ) → hỏi gán phòng.
    ?local=1 = chạy thử trong cùng trình duyệt (BroadcastChannel) như trước. */
@@ -839,7 +846,7 @@ function libFail(kind, r, id, why, at){
    video bắt đầu phát là hiện lại ngay. Không che gì khi video đang phát. */
 let swapTimer = null;
 function swapOn(){
-  $('swapT').textContent = cur >= 0 && queue[cur] ? queue[cur].title : '';
+  $('swapT').textContent = listen && mix ? mix.title : cur >= 0 && queue[cur] ? queue[cur].title : '';
   document.body.classList.add('swap');
   clearTimeout(swapTimer); swapTimer = setTimeout(swapOff, 12000);     // phòng khi không nhận được trạng thái "đang phát"
 }
@@ -850,7 +857,8 @@ function onStateChange(e){
   pqState(e.data);
   if(e.data === S.PLAYING){ if(!pStart) pStart = Date.now(); if(scoring) endScoreUi(); } else if(pStart){ playedMs += Date.now() - pStart; pStart = 0; }   // thời gian đã nghe của bài (tua nhảy cóc thì không tính)
   if(e.data === S.PLAYING) ccOff();
-  if(e.data === S.ENDED){ if(!startScore()){ swapOn(); next(); } }
+  if(e.data === S.ENDED){ if(listen){ mixEnded(); } else if(!startScore()){ swapOn(); next(); } }
+  if(e.data === S.PLAYING && listen) mixFail = 0;
   if(e.data === S.PLAYING) swapOff();
   if(e.data === S.PLAYING){
     if(lock === 'tap') setLock(null);
@@ -877,6 +885,7 @@ function reportDead(id, done){
     .then(r => r.ok ? r.json() : null).then(d => { if(d && (d.removed || []).includes(id) && done) done(); }).catch(() => {});
 }
 function onError(e){
+  if(listen){ mixError(e.data); return; }
   swapOff();
   pqEnd('err', e.data);
   const it = queue[cur];
@@ -903,6 +912,7 @@ function setLock(kind){
 }
 function showNowOverlay(){
   if(cur < 0 || !queue[cur]) return;
+  $('ovTitle').querySelector('.lbl').textContent = 'ĐANG HÁT';
   $('ovTitleT').textContent = queue[cur].title;
   flash('ovTitle', 8000);
   paintCount();
@@ -953,7 +963,9 @@ function load(){
 /* Giữ bài phát được dù trình duyệt chặn tự phát có tiếng:
    bước 1 → thử phát im lặng (trình duyệt cho phép); bước 2 → nếu vẫn không chạy, chờ một lần chạm. */
 function guard(id, stage){
-  if(!ready || cur < 0 || !queue[cur] || queue[cur].id !== id) return;
+  if(!ready) return;
+  if(listen){ if(!mix || mix.mid !== id) return; }                      // Nghe nhạc: id = mã mix
+  else if(cur < 0 || !queue[cur] || queue[cur].id !== id) return;
   const st = P().getPlayerState();
   if(st !== -1 && st !== 5) return;                      // đang phát / đang tải / đã dừng chủ ý → không can thiệp
   if(PQ.c) PQ.c.lock = true;                             // bị chặn tự phát: thời gian mở bài không phản ánh tốc độ máy
@@ -968,6 +980,12 @@ function guard(id, stage){
 function addSong(it, prio){
   if(!/^[\w-]{11}$/.test(it.id || '')) return;
   const item = { id:it.id, title:String(it.title||'Bài không tên').slice(0,200) };
+  if(listen){                                                       // đang nghe mix: bài karaoke chỉ xếp hàng chờ, KHÔNG ngắt mix (khách bấm «Hát karaoke ngay» trên điện thoại khi muốn hát)
+    if(prio) queue.unshift(item); else queue.push(item);
+    render(); push();
+    $('ovAddL').textContent = 'ĐÃ THÊM · ĐANG NGHE NHẠC'; $('ovAddT').textContent = item.title + ' — chờ chuyển sang karaoke'; flash('ovAdd', 5000);
+    return;
+  }
   if(cur < 0){ queue.push(item); cur = queue.length - 1; load(); return; }    // không đang hát → phát ngay, không cần bấm gì
   const at = prio ? cur + 1 : queue.length;
   queue.splice(at, 0, item);
@@ -976,6 +994,7 @@ function addSong(it, prio){
   $('ovAddT').textContent = item.title; flash('ovAdd', 5000);
 }
 function next(){
+  if(listen){ mixNext(false); return; }                             // đang nghe mix: «Qua bài» = mix kế tiếp
   endScoreUi();
   if(cur >= 0 && cur < queue.length) queue.splice(cur, 1);                  // bỏ bài vừa hát
   cur = queue.length ? Math.min(Math.max(cur, 0), queue.length - 1) : -1;
@@ -984,13 +1003,14 @@ function next(){
 function playPause(){
   if(!ready){ toast(apiFailed ? 'Không tải được trình phát YouTube.' : 'Trình phát YouTube đang khởi động, thử lại sau vài giây.'); return; }
   if(scoring){ finishScore(); return; }                  // đang hiện điểm: nút Phát/OK = qua màn điểm
+  if(listen){ if(Date.now() - unlockAt < 800) return; if(P().getPlayerState() === PS.PLAYING) P().pauseVideo(); else P().playVideo(); return; }
   if(OFF.wait){ toast('Đang chờ có mạng để hát tiếp các bài trong hàng chờ.'); return; }
   if(cur < 0 && queue.length){ cur = 0; load(); return; }
   if(Date.now() - unlockAt < 800) return;
   const st = P().getPlayerState();
   if(st === PS.PLAYING) P().pauseVideo(); else P().playVideo();
 }
-function replay(){ if(ready && cur>=0){ if(PQ.c) PQ.c.seekT = Date.now(); endScoreUi(); playedMs = 0; pStart = 0; P().seekTo(0,true); P().playVideo(); } }
+function replay(){ if(listen && ready){ try{ P().seekTo(0, true); P().playVideo(); }catch(e){} return; } if(ready && cur>=0){ if(PQ.c) PQ.c.seekT = Date.now(); endScoreUi(); playedMs = 0; pStart = 0; P().seekTo(0,true); P().playVideo(); } }
 function applyMute(){ $('muteBtn').textContent = (userMuted ? '🔇 Tiếng: Tắt' : '🔊 Tiếng: Bật'); }
 function toggleMute(on){                    // on = true/false: đặt hẳn (remote gửi theo icon đang thấy, không đảo ngược nếu máy đó lệch); không có → đảo như cũ
   if(!ready){ push(); return; }
@@ -1083,6 +1103,7 @@ document.addEventListener('visibilitychange', keepAwake); keepAwake();
 
 /* Thanh tiến độ + biểu ngữ "Tiếp theo" trong ~20 giây cuối */
 setInterval(()=>{
+  if(listen && ready){ try{ const d = P().getDuration(), t = P().getCurrentTime(); $('bar').style.width = d > 0 ? (t / d * 100) + '%' : '0'; }catch(e){} hide('ovNext'); return; }
   if(!ready || cur<0 || !queue[cur]){ $('bar').style.width='0'; return; }
   const d = P().getDuration(), t = P().getCurrentTime();
   if(d > 0){
@@ -1094,11 +1115,11 @@ setInterval(()=>{
 }, 500);
 
 /* ---------- Tua bài (thanh trượt + ±10 giây trên remote), chỉ khi admin bật ---------- */
-function curT(){ try{ return ready && cur >= 0 ? Math.max(0, +P().getCurrentTime() || 0) : 0; }catch(e){ return 0; } }
-function curDur(){ try{ return ready && cur >= 0 ? Math.max(0, +P().getDuration() || 0) : 0; }catch(e){ return 0; } }
+function curT(){ try{ return ready && (cur >= 0 || listen) ? Math.max(0, +P().getCurrentTime() || 0) : 0; }catch(e){ return 0; } }
+function curDur(){ try{ return ready && (cur >= 0 || listen) ? Math.max(0, +P().getDuration() || 0) : 0; }catch(e){ return 0; } }
 function fmtT(s){ s = Math.max(0, Math.floor(s || 0)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60; return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(x).padStart(2, '0'); }
 function seekCmd(c){
-  if(scoring || !seekOn || !ready || cur < 0 || !queue[cur]) return;
+  if(scoring || (!seekOn && !listen) || !ready || (!listen && (cur < 0 || !queue[cur]))) return;   // Nghe nhạc luôn cho tua (mix dài); karaoke tua khi admin bật
   const d = curDur();
   let t = typeof c.t === 'number' && isFinite(c.t) ? c.t : curT() + (+c.by || 0);
   t = Math.max(0, d > 1 ? Math.min(t, d - 1) : t);
@@ -1109,7 +1130,7 @@ function seekCmd(c){
   setTimeout(pushPos, 250);
 }
 function pushPos(){
-  if(!seekOn || !nPeers || !ready || cur < 0) return;
+  if((!seekOn && !listen) || !nPeers || !ready || (cur < 0 && !listen)) return;
   let playing = false; try{ playing = P().getPlayerState() === 1; }catch(e){}
   if(!playing) return;                     // dừng/đổi bài đã có tin 'state' kèm giây; remote tự chạy đồng hồ giữa hai lần báo
   bc.postMessage({ type:'pos', payload:{ cur, t: curT(), dur: curDur(), playing } });
@@ -1229,14 +1250,89 @@ function endScoreUi(){                                     // bỏ màn điểm 
 }
 function finishScore(){ if(!scoring) return; endScoreUi(); swapOn(); next(); }
 
+/* ---------- 🎧 Nghe nhạc: phát nguyên mix 1–4 tiếng, tách khỏi hàng chờ karaoke ----------
+   Lệnh 'mix' do Worker dựng (mã YouTube lấy từ danh sách admin duyệt). Đang hát karaoke mà khách bật mix thì bài đang hát đứng đầu hàng chờ (hát lại từ đầu khi quay về).
+   Trong lúc nghe: khách thêm bài karaoke → chỉ xếp hàng chờ (không ngắt mix); «Hát karaoke ngay» ('karaoke') → mixStop. Hết mix: nx 'mix' = tự phát mix kế cùng nhóm, 'karaoke' = về hàng chờ.
+   Không chấm điểm, không tra thư viện NAS/R2, không đo chất lượng karaoke. Tua luôn bật. */
+function paintListen(){
+  const on = listen && !!mix;
+  $('listenChip').classList.toggle('on', on); $('listenChipT').textContent = on ? mix.title : '';
+}
+function mixCmd(c){
+  const yt = String(c.yt || ''), mid = +c.mid | 0;
+  if(mid <= 0 || !(c.kind === 'playlist' ? /^[\w-]{10,64}$/ : /^[\w-]{11}$/).test(yt)) return;
+  if(!ngheOn || !ready){ push(); return; }
+  if(!listen){                                                      // vào Nghe nhạc: bài karaoke đang hát (nếu có) quay về đầu hàng chờ
+    endScoreUi(); pqEnd('stop'); clearTimeout(wd); clearTimeout(offW);
+    if(cur >= 0) cur = -1;
+    if(OFF.wait){ OFF.wait = false; $('offMsg').style.display = 'none'; }
+    listen = true;
+  }
+  mixQ = (Array.isArray(c.list) ? c.list : []).filter(x => x && (+x.mid | 0) > 0 && (x.kind === 'playlist' ? /^[\w-]{10,64}$/ : /^[\w-]{11}$/).test(String(x.yt || ''))).slice(0, 30)
+    .map(x => ({ mid: +x.mid | 0, kind: x.kind === 'playlist' ? 'playlist' : 'video', yt: String(x.yt), title: String(x.title || '').slice(0, 120) }));
+  mixFail = 0;
+  mixPlay({ mid, kind: c.kind === 'playlist' ? 'playlist' : 'video', yt, title: String(c.title || 'Mix').slice(0, 120), nx: c.nx === 'karaoke' ? 'karaoke' : 'mix', dur: +c.dur || 0 });
+}
+function mixPlay(m){
+  mix = m; src = 'yt'; loadSeq++;
+  VP.stopVideo(); document.body.classList.remove('vsrc'); $('idle').style.display = 'none';
+  try{
+    if(m.kind === 'playlist') player.loadPlaylist({ list: m.yt, listType: 'playlist', index: 0 });
+    else player.loadVideoById(m.yt);
+    if(!userMuted && lock !== 'muted') player.unMute();
+  }catch(e){ toast('Không mở được trình phát YouTube.'); }
+  swapOn(); paintListen();
+  $('ovTitle').querySelector('.lbl').textContent = '🎧 NGHE NHẠC'; $('ovTitleT').textContent = m.title; flash('ovTitle', 9000); hide('ovNext'); hide('ovCount');
+  clearTimeout(wd); wd = setTimeout(() => guard(m.mid, 1), 3500);
+  clearTimeout(mixDurT); if(m.kind === 'video' && !m.dur) mixDurT = setTimeout(() => mixDurSend(m), 20000);
+  push();
+}
+let mixDurT = 0;
+function mixDurSend(m){            // lần đầu mix này phát: báo độ dài thật để khách thấy "2:15:00" (Worker chỉ ghi khi chưa có)
+  if(!listen || mix !== m) return;
+  const d = curDur(); if(d >= 60 && P().getPlayerState() === PS.PLAYING) bc.postMessage({ type:'mixdur', mid: m.mid, dur: Math.round(d) });
+}
+function mixEnded(){
+  if(!mix) return;
+  if(mix.kind === 'playlist'){                                      // playlist: YouTube tự sang video kế, chỉ coi là hết mix khi video cuối kết thúc
+    try{ const l = player.getPlaylist() || [], i = player.getPlaylistIndex(); if(i >= 0 && i < l.length - 1) return; }catch(e){}
+  }
+  swapOn(); mixNext(true);
+}
+function mixNext(auto){
+  if(!listen || !mix) return;
+  if(auto && mix.nx === 'karaoke'){ mixStop(); return; }            // cài đặt admin: hết mix thì về hàng chờ karaoke
+  const prev = mix, nx = mixQ.shift() || { mid: prev.mid, kind: prev.kind, yt: prev.yt, title: prev.title };   // nhóm chỉ có 1 mix: phát lại chính nó
+  mixQ.push({ mid: prev.mid, kind: prev.kind, yt: prev.yt, title: prev.title });                                  // xoay vòng cả nhóm
+  mixPlay(Object.assign({}, nx, { nx: prev.nx }));
+}
+function mixStop(){                // thoát Nghe nhạc, hát hàng chờ karaoke (rỗng thì về màn chờ)
+  if(!listen) return;
+  listen = false; mix = null; mixQ = []; mixFail = 0; clearTimeout(wd); clearTimeout(mixDurT); loadSeq++;
+  $('ovTitle').querySelector('.lbl').textContent = 'ĐANG HÁT'; paintListen();
+  cur = queue.length ? 0 : -1;
+  load();
+}
+function mixError(code){
+  swapOff();
+  const m = mix; if(!m) return;
+  if([100, 101, 150].includes(code)) bc.postMessage({ type:'mixbad', mid: m.mid, code });   // Worker đánh dấu lỗi nhúng, khách không thấy mix này nữa
+  if(code === 153){ toast(ERRMSG[153]); return; }
+  mixFail++;
+  if(mixFail >= 3){ toast('Nhiều mix liên tiếp không phát được, chuyển về karaoke.'); mixStop(); return; }
+  toast('Không phát được mix «' + m.title + '»\n' + (ERRMSG[code] || ('Mã lỗi ' + code)) + '\nTự chuyển mix kế sau 4 giây.');
+  setTimeout(() => { if(listen && mix === m) mixNext(false); }, 4000);
+}
+
 /* ---------- Đồng bộ với remote ---------- */
 function push(){
   bc.postMessage({ type:'state', payload:{
-    room:ROOM, ready, needStart: lock !== null && queue.length > 0, soundLocked: lock !== null, apiFailed: apiFailed || $('diag').style.display === 'block',
+    room:ROOM, ready, needStart: lock !== null && (queue.length > 0 || listen), soundLocked: lock !== null, apiFailed: apiFailed || $('diag').style.display === 'block',
     playing: ready && P().getPlayerState()===1,
     muted: userMuted, scoring, src: (src === 'r2' || src === 'nas') ? src : 'yt',
     volume: vol,
-    seek: seekOn, t: curT(), dur: curDur(),
+    seek: seekOn || listen, t: curT(), dur: curDur(),
+    listen: listen && mix ? { mid: mix.mid, title: mix.title, kind: mix.kind, nx: mix.nx, more: mixQ.length } : null,
     nowTitle: cur>=0 ? queue[cur].title : null,
     cur, queue: queue.map(q=>({ id:q.id, title:q.title }))
   }});
@@ -1263,6 +1359,8 @@ bc.onmessage = ev => {
     case 'vol': setVol(+c.value || 0); break;
     case 'prio': if(!idOk(c)) break; prio(+c.index); break;
     case 'remove': if(!idOk(c)) break; removeAt(+c.index); break;
+    case 'mix': mixCmd(c); break;
+    case 'karaoke': if(listen) mixStop(); else push(); break;
     case 'hello': push(); break;
   }
 };
@@ -1350,7 +1448,7 @@ setInterval(hgTick, 5000);
 /* ---------- Kênh phòng (chỉ khi mở bằng liên kết có ?r= hoặc TV đã nhớ mã) ---------- */
 function roomNote(t){ const n = $('roomNote'); n.textContent = t || ''; n.style.display = t ? 'block' : 'none'; }
 function resetSession(){
-  endScoreUi(); scoreBest = 0; scoreN = 0; queue = []; cur = -1; setLock(null); svcSet([]);
+  endScoreUi(); scoreBest = 0; scoreN = 0; queue = []; cur = -1; listen = false; mix = null; mixQ = []; paintListen(); setLock(null); svcSet([]);
   loadSeq++; stopAll(); src = 'yt';
   $('idle').style.display = 'flex'; hide('ovTitle'); hide('ovNext'); hide('ovCount'); render();
 }
@@ -1363,6 +1461,7 @@ if(bc.ws){
     /* mặc định cho tua; chỉ khi admin tắt (Worker báo seek:false) mới không */
     applyCl(m.cl);
     if(m.lib) libSet(m.lib);                                 // thư viện video lưu sẵn của chi nhánh (công tắc + NAS + vé)
+    ngheOn = m.nghe !== false; if(listen && !ngheOn) mixStop();     // admin tắt Nghe nhạc giữa chừng: thoát về karaoke
     { const was = seekOn; seekOn = m.seek !== false; nPeers = (m.remotes || 0) + (m.tablets || 0); if(was !== seekOn) setTimeout(push, 0); }
     paintGuestQr(m.open ? m.qr : '', m.name);
     if(!m.open){ resetSession(); roomNote((roomName ? (/^ph[oò]ng\b/i.test(roomName) ? roomName : 'Phòng ' + roomName) : 'Phòng') + ' chưa mở — chờ nhân viên mở phòng'); paintRoomTag(); connTxt = ''; $('hint').textContent = HINT0; }
@@ -1400,7 +1499,7 @@ if(bc.ws){
     }
     return parts.join('|');
   }
-  const idle = () => cur < 0 && (!ready || P().getPlayerState() !== 1);
+  const idle = () => cur < 0 && !listen && (!ready || P().getPlayerState() !== 1);
   let base = null;
   async function check(){
     try{

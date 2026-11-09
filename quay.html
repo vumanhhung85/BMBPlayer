@@ -518,6 +518,27 @@ svg.sic{width:1.1em;height:1.1em;stroke:currentColor;fill:none;stroke-width:2;st
   #bnav .nb.zero{display:none}
   #mgMenu{left:12px!important;right:12px;top:auto!important;bottom:84px;z-index:70}
 }
+
+/* 🎧 Nghe nhạc (Cài đặt): danh sách mix admin duyệt */
+.ngAdd{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 10px}
+.ngAdd input{flex:1 1 260px;min-width:0;padding:10px 12px;border-radius:10px;background:var(--field);border:1px solid var(--line);font-size:14px}
+#ngheNext{background:#fff;border:1px solid #CDB8E3;border-radius:10px;padding:9px 12px;font:inherit;font-size:13.5px;color:var(--txt);max-width:100%;margin:2px 0 12px}
+#ngheAddMsg:empty{display:none}
+.ngAdd select,.ngrow select{background:#fff;border:1px solid #CDB8E3;border-radius:10px;padding:8px 10px;font:inherit;font-size:13px;color:var(--txt);max-width:100%}
+.nggrp{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 12px}
+.nggc{display:inline-flex;align-items:center;gap:2px;background:var(--tint);border:1px solid #CDB8E3;border-radius:999px;padding:3px 4px 3px 12px;font-size:13px;font-weight:700;color:var(--grape)}
+.nggc b{font-weight:800;margin-right:4px} .nggc small{color:var(--txt-dim);margin-right:4px}
+.nggc button{border:none;background:none;padding:3px 6px;border-radius:8px;font-size:13px;color:var(--txt-dim);cursor:pointer} .nggc button:hover{background:#fff;color:var(--grape)}
+.nggh{font-size:13px;font-weight:800;color:var(--grape);margin:14px 0 6px}
+.ngrow{display:flex;gap:10px;align-items:center;padding:8px;border:1px solid var(--line);border-radius:12px;background:#fff;margin-bottom:8px}
+.ngrow img{flex:0 0 96px;width:96px;height:54px;border-radius:8px;object-fit:cover;background:#E9DDF5}
+.ngrow.bad{border-color:#F2A3AE;background:#FFF5F6} .ngrow.hid{opacity:.62}
+.ngi{flex:1;min-width:0;line-height:1.35} .ngi b{font-size:14px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.ngi small{display:block;color:var(--txt-dim);font-size:12px}
+.ngst{display:inline-block;font-size:12px;font-weight:700;margin-top:2px} .ngst.ok{color:#17935F} .ngst.bad{color:#C0243E} .ngst.off{color:#7B6A91}
+.ngb{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;flex:0 0 auto;max-width:210px}
+.ngb button{border:1px solid #CDB8E3;background:#fff;border-radius:9px;padding:6px 9px;font-size:13px;cursor:pointer} .ngb button:hover{background:var(--tint)} .ngb button.on{background:#FFD21A;border-color:#FFD21A}
+@media(max-width:640px){.ngrow{flex-wrap:wrap}.ngb{max-width:none;justify-content:flex-start;width:100%}}
 </style>
 </head>
 <body>
@@ -679,6 +700,29 @@ svg.sic{width:1.1em;height:1.1em;stroke:currentColor;fill:none;stroke-width:2;st
       <div class="actions wrap" style="margin-bottom:22px">
         <button class="btn btn-y btn-sm" id="seekBtn" disabled>…</button>
       </div>
+    </div>
+
+    <div id="ngheSec" style="display:none">
+      <div class="sect-lbl">🎧 Nghe nhạc — nghe liền cả mix 1–4 tiếng <span class="tagx">chỉ admin</span></div>
+      <div class="hint" id="ngheInfo">Đang tải…</div>
+      <div class="actions wrap" style="margin-bottom:10px">
+        <button class="btn btn-y btn-sm" id="ngheBtn" disabled>…</button>
+      </div>
+      <div class="fld"><span>Khi một mix phát hết</span><select id="ngheNext" disabled>
+        <option value="mix">Tự phát mix kế tiếp trong nhóm (mặc định)</option>
+        <option value="karaoke">Quay lại hàng chờ karaoke</option>
+      </select></div>
+      <div class="hint" id="ngheMsg">Khách chỉ chọn trong danh sách bên dưới (không tìm tự do trên YouTube). Mix được chọn nhiều nằm trên cùng; bấm 📌 để đề cử mix mới lên đầu. Lúc đang nghe, khách vẫn thêm bài karaoke vào hàng chờ và bấm «Hát karaoke» khi muốn hát.</div>
+      <div class="sect-lbl" style="margin-top:14px">➕ Thêm mix</div>
+      <div class="ngAdd"><input id="ngheLink" type="text" placeholder="Dán link YouTube (video mix hoặc playlist)" autocomplete="off"><select id="ngheGrp" aria-label="Nhóm"></select><button class="btn btn-y btn-sm" id="ngheThem">＋ Thêm</button></div>
+      <div class="hint" id="ngheAddMsg" style="min-height:18px"></div>
+      <div class="sect-lbl" style="margin-top:6px">Nhóm (thứ tự khách thấy)</div>
+      <div class="nggrp" id="ngheGroups"></div>
+      <div class="actions wrap" style="margin:6px 0 8px">
+        <button class="btn btn-ghost btn-sm" id="ngheChkAll">🔎 Kiểm tra nhúng tất cả</button>
+        <button class="btn btn-ghost btn-sm" id="ngheTai">↻ Tải lại</button>
+      </div>
+      <div id="ngheList" style="margin-bottom:22px"></div>
     </div>
 
     <div id="decoSec" style="display:none">
@@ -1387,6 +1431,7 @@ function hienTheoQuyen(){
   $('tabCaiDatApp').style.display = S.quanLy ? '' : 'none';   /* Cài đặt: quản lý + admin (vân tay); mục Phát hành APK chỉ admin cao nhất */
   $('apkSec').style.display = S.sieuAdmin ? '' : 'none';
   $('seekSec').style.display = S.vaiTro === 'admin' ? '' : 'none';
+  $('ngheSec').style.display = S.vaiTro === 'admin' ? '' : 'none';
   $('decoSec').style.display = S.vaiTro === 'admin' ? '' : 'none';
   $('libSec').style.display = S.vaiTro === 'admin' ? '' : 'none';
   $('phongAdmin').style.display  = S.vaiTro==='admin' ? '' : 'none';   /* phòng cố định — chỉ admin thêm/xoá */
@@ -2590,6 +2635,115 @@ $('seekBtn').onclick = function(){
     seekVe2(r.on);
   }).catch(function(){ b.disabled = false; alert('Không kết nối được máy chủ.'); });
 };
+/* ---- 🎧 Nghe nhạc: bật/tắt, hết mix làm gì, danh sách mix duyệt sẵn (admin) ---- */
+var NGHE = null;
+function ngheVe(){
+  api('admin.ngheGet', {}).then(function(r){
+    if(!r || !r.ok){ $('ngheInfo').textContent = (r && r.msg) || 'Không hỏi được cài đặt.'; return; }
+    NGHE = r; ngheVe2();
+  }).catch(function(){ $('ngheInfo').textContent = 'Không kết nối được máy chủ.'; });
+}
+function ngheDur(s){ s = Math.round(+s || 0); if(s < 60) return ''; var h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60); return h ? h + ' giờ ' + m + ' phút' : m + ' phút'; }
+function ngheVe2(){
+  var r = NGHE; if(!r) return;
+  var b = $('ngheBtn'); b.disabled = false; b.dataset.on = r.on ? '1' : '0'; b.textContent = r.on ? 'Tắt Nghe nhạc' : 'Bật Nghe nhạc';
+  $('ngheNext').value = r.next; $('ngheNext').disabled = false;
+  var soMix = r.mixes.length, ok = r.mixes.filter(function(m){ return !m.hidden && !m.bad; }).length;
+  $('ngheInfo').innerHTML = 'Hiện đang <b>' + (r.on ? 'BẬT' : 'TẮT') + '</b> cho mọi chi nhánh. Bật: điện thoại / máy tính bảng của khách có ô <b>🎧 Nghe nhạc</b> cạnh «Quốc tế» (chỉ hiện khi có ít nhất 1 mix dùng được). Tắt: ô này ẩn hẳn, ai đang nghe thì tivi quay về karaoke. <b>' + ok + '/' + soMix + '</b> mix đang dùng được.';
+  var g = $('ngheGrp'), cur = g.value;
+  g.innerHTML = r.groups.map(function(x){ return '<option value="' + esc(x) + '">' + esc(x) + '</option>'; }).join('') + '<option value="__new">➕ Nhóm mới…</option>';
+  if(cur && r.groups.indexOf(cur) >= 0) g.value = cur;
+  var dem = {}; r.mixes.forEach(function(m){ dem[m.grp] = (dem[m.grp] || 0) + 1; });
+  $('ngheGroups').innerHTML = r.groups.map(function(x, i){
+    return '<span class="nggc" data-g="' + esc(x) + '"><b>' + esc(x) + '</b><small>' + (dem[x] || 0) + '</small>'
+      + (i > 0 ? '<button data-a="gup" title="Lên trước">◀</button>' : '') + (i < r.groups.length - 1 ? '<button data-a="gdn" title="Xuống sau">▶</button>' : '')
+      + '<button data-a="gren" title="Đổi tên">✎</button>' + (dem[x] ? '' : '<button data-a="gdel" title="Xoá nhóm trống">✕</button>') + '</span>';
+  }).join('') || '<span class="hint">Chưa có nhóm.</span>';
+  var h = '';
+  r.groups.forEach(function(x){
+    var l = r.mixes.filter(function(m){ return m.grp === x; });
+    if(!l.length) return;
+    h += '<div class="nggh">' + esc(x) + ' · ' + l.length + ' mix</div>';
+    l.forEach(function(m){
+      var th = m.kind === 'video' ? 'https://i.ytimg.com/vi/' + m.yt + '/mqdefault.jpg' : m.thumb;
+      var st = m.bad ? '<span class="ngst bad">⛔ Lỗi: ' + esc(m.why || 'không phát được') + ' — khách không thấy</span>'
+        : m.hidden ? '<span class="ngst off">🙈 Đang ẩn khỏi khách</span>'
+        : '<span class="ngst ok">✅ Nhúng được' + (m.chk ? ' · kiểm tra ' + knTgN(m.chk) : ' · chưa kiểm tra') + '</span>';
+      h += '<div class="ngrow' + (m.bad ? ' bad' : '') + (m.hidden ? ' hid' : '') + '" data-id="' + m.id + '"><img alt="" loading="lazy" src="' + esc(th) + '">'
+        + '<div class="ngi"><b>' + esc(m.title) + '</b><small>' + esc(m.author || '') + (m.kind === 'playlist' ? ' · playlist' : '') + (ngheDur(m.dur) ? ' · ' + ngheDur(m.dur) : '') + ' · 🔥 ' + m.n + ' lượt (60 ngày)</small>' + st + '</div>'
+        + '<div class="ngb"><select data-a="grp" aria-label="Chuyển nhóm">' + r.groups.map(function(y){ return '<option' + (y === m.grp ? ' selected' : '') + '>' + esc(y) + '</option>'; }).join('') + '</select>'
+        + '<button data-a="pin" class="' + (m.pin ? 'on' : '') + '" title="Đề cử: luôn nằm đầu nhóm">📌</button>'
+        + '<button data-a="hid" title="' + (m.hidden ? 'Hiện lại cho khách' : 'Ẩn khỏi khách') + '">' + (m.hidden ? '👁' : '🙈') + '</button>'
+        + '<button data-a="chk" title="Kiểm tra nhúng ngay">🔎</button>'
+        + (m.bad ? '<button data-a="ok" title="Bỏ cờ lỗi (đã tự kiểm tra lại)">↺</button>' : '')
+        + '<button data-a="del" title="Xoá khỏi danh sách">🗑</button></div></div>';
+    });
+  });
+  $('ngheList').innerHTML = h || '<div class="hint">Chưa có mix nào. Dán link YouTube ở trên để thêm.</div>';
+}
+function ngheLoi(r){ alert((r && r.msg) || 'Không thực hiện được.'); ngheVe(); }
+$('ngheBtn').onclick = function(){
+  var b = $('ngheBtn'), want = b.dataset.on !== '1'; b.disabled = true;
+  api('admin.ngheSet', {on:want}).then(function(r){ if(!r || !r.ok){ b.disabled = false; return ngheLoi(r); } ngheVe(); }).catch(function(){ b.disabled = false; alert('Không kết nối được máy chủ.'); });
+};
+$('ngheNext').onchange = function(){
+  var s = $('ngheNext'); s.disabled = true;
+  api('admin.ngheSet', {next:s.value}).then(function(r){ s.disabled = false; if(!r || !r.ok) return ngheLoi(r); $('ngheMsg').textContent = 'Đã lưu. Áp dụng từ lần khách chọn mix kế tiếp.'; }).catch(function(){ s.disabled = false; alert('Không kết nối được máy chủ.'); });
+};
+$('ngheGrp').onchange = function(){
+  if($('ngheGrp').value !== '__new') return;
+  var n = (prompt('Tên nhóm mới (ví dụ: Bolero, Acoustic, EDM):') || '').trim().slice(0, 30);
+  if(!n){ $('ngheGrp').selectedIndex = 0; return; }
+  var o = document.createElement('option'); o.value = o.textContent = n; $('ngheGrp').insertBefore(o, $('ngheGrp').lastChild); $('ngheGrp').value = n;
+};
+$('ngheThem').onclick = function(){
+  var link = $('ngheLink').value.trim(), grp = $('ngheGrp').value, m = $('ngheAddMsg');
+  if(!link){ m.textContent = 'Dán link YouTube trước.'; return; }
+  if(!grp || grp === '__new'){ m.textContent = 'Chọn nhóm cho mix.'; return; }
+  var b = $('ngheThem'); b.disabled = true; m.textContent = 'Đang hỏi YouTube…';
+  api('admin.ngheThem', {link:link, grp:grp}).then(function(r){
+    b.disabled = false;
+    if(!r || !r.ok){ m.innerHTML = '<b style="color:var(--bad)">' + esc((r && r.msg) || 'Không thêm được.') + '</b>'; return; }
+    m.innerHTML = '✅ Đã thêm: <b>' + esc(r.title || '') + '</b>'; $('ngheLink').value = ''; ngheVe();
+  }).catch(function(){ b.disabled = false; m.textContent = 'Không kết nối được máy chủ.'; });
+};
+$('ngheTai').onclick = ngheVe;
+$('ngheChkAll').onclick = function(){
+  var b = $('ngheChkAll'); b.disabled = true; b.textContent = 'Đang kiểm tra…';
+  api('admin.ngheKiemTra', {all:true}).then(function(r){
+    b.disabled = false; b.textContent = '🔎 Kiểm tra nhúng tất cả';
+    if(!r || !r.ok) return ngheLoi(r);
+    var bad = r.kq.filter(function(x){ return x.st === 'noembed' || x.st === 'gone'; }).length, err = r.kq.filter(function(x){ return x.st === 'err'; }).length;
+    $('ngheMsg').textContent = 'Đã kiểm tra ' + r.kq.length + ' mix (cũ nhất trước): ' + bad + ' mix lỗi bị ẩn khỏi khách' + (err ? ', ' + err + ' mix YouTube chưa trả lời (thử lại sau)' : '') + '. Mỗi lần kiểm tra tối đa 40 mix.';
+    ngheVe();
+  }).catch(function(){ b.disabled = false; b.textContent = '🔎 Kiểm tra nhúng tất cả'; alert('Không kết nối được máy chủ.'); });
+};
+$('ngheList').addEventListener('change', function(e){
+  var t = e.target; if(t.dataset.a !== 'grp') return;
+  var row = t.closest('.ngrow'); api('admin.ngheSua', {id:+row.dataset.id, grp:t.value}).then(function(r){ if(!r || !r.ok) return ngheLoi(r); ngheVe(); }).catch(function(){ alert('Không kết nối được máy chủ.'); });
+});
+$('ngheList').addEventListener('click', function(e){
+  var t = e.target.closest('button[data-a]'); if(!t || !NGHE) return;
+  var row = t.closest('.ngrow'), id = +row.dataset.id, m = NGHE.mixes.filter(function(x){ return x.id === id; })[0], a = t.dataset.a, p = null;
+  if(!m) return;
+  if(a === 'pin') p = api('admin.ngheSua', {id:id, pin:!m.pin});
+  else if(a === 'hid') p = api('admin.ngheSua', {id:id, hidden:!m.hidden});
+  else if(a === 'ok') p = api('admin.ngheSua', {id:id, bad:false});
+  else if(a === 'chk'){ t.disabled = true; p = api('admin.ngheKiemTra', {id:id}).then(function(r){ if(r && r.ok && r.kq[0] && r.kq[0].st === 'err') alert('YouTube chưa trả lời, thử lại sau ít phút.'); return r; }); }
+  else if(a === 'del'){ if(!confirm('Xoá «' + m.title + '» khỏi danh sách Nghe nhạc?\nLượt chọn của mix này cũng mất. Không hoàn tác được (muốn tạm cất thì dùng nút ẩn 🙈).')) return; p = api('admin.ngheXoa', {id:id}); }
+  if(!p) return;
+  p.then(function(r){ if(!r || !r.ok) return ngheLoi(r); ngheVe(); }).catch(function(){ alert('Không kết nối được máy chủ.'); });
+});
+$('ngheGroups').addEventListener('click', function(e){
+  var t = e.target.closest('button[data-a]'); if(!t || !NGHE) return;
+  var g = t.closest('.nggc').dataset.g, a = t.dataset.a, gs = NGHE.groups.slice(), i = gs.indexOf(g), body = null;
+  if(a === 'gup' && i > 0){ gs.splice(i, 1); gs.splice(i - 1, 0, g); body = {groups:gs}; }
+  else if(a === 'gdn' && i < gs.length - 1){ gs.splice(i, 1); gs.splice(i + 1, 0, g); body = {groups:gs}; }
+  else if(a === 'gdel'){ gs.splice(i, 1); body = {groups:gs}; }
+  else if(a === 'gren'){ var n = (prompt('Đổi tên nhóm «' + g + '» thành:', g) || '').trim().slice(0, 30); if(!n || n === g) return; body = {groups:gs, rename:{from:g, to:n}}; }
+  if(!body) return;
+  api('admin.ngheNhom', body).then(function(r){ if(!r || !r.ok) return ngheLoi(r); ngheVe(); }).catch(function(){ alert('Không kết nối được máy chủ.'); });
+});
 function decoVe(){
   api('admin.decoGet', {}).then(function(r){
     if(!r || !r.ok){ $('decoMsg').textContent = (r && r.msg) || 'Không hỏi được cài đặt.'; return; }
@@ -2657,7 +2811,7 @@ $('libBox').addEventListener('click', function(e){
     $('libMsg').style.display = ''; $('libMsg').textContent = 'Đã lưu ' + ten + ': ' + (r.on ? 'BẬT' : 'TẮT') + (r.nas ? ' · NAS ' + r.nas : '') + '. Tivi nhận khi mở phòng hoặc sau tối đa 10 phút.';
   }).catch(function(){ bt.disabled = false; alert('Không kết nối được máy chủ.'); });
 });
-function cdMo(){ vtVe(); if(S.vaiTro === 'admin'){ seekVe(); decoVe(); scoreVe(); libVe(); } if(S.sieuAdmin) apkVe();
+function cdMo(){ vtVe(); if(S.vaiTro === 'admin'){ seekVe(); ngheVe(); decoVe(); scoreVe(); libVe(); } if(S.sieuAdmin) apkVe();
   var tg = tgDuocNhan(); $('tgSecCd').style.display = tg ? '' : 'none'; if(tg) tgTai($('tgHostCd')); else clearInterval(TG.timer); }
 $('lgVt').addEventListener('click', vtDangNhap);
 $('vtBat').addEventListener('click', vtBat);
