@@ -5,74 +5,171 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Kho BMB Karaoke — Quản trị</title>
 <style>
-  /* Giao diện cùng bộ màu với Tải Video BMB: nền xanh nhạt, thẻ trắng, thanh đầu xanh navy, nút chính màu cam */
-  :root{ --bg:#f2f6fc; --panel:#fff; --line:#d3deee; --ink:#14213f; --quiet:#64739a; --navy:#1c3b8c; --navy2:#142a66; --teal:#0e7490; --teal2:#134e63;
+  /* Bố cục 5 thẻ: Tổng quan (xem + chạy việc hằng ngày) · Nguồn · Mở rộng (bài tìm hụt…) · Bài hot · Xuất & dọn.
+     Cùng bộ màu với Tải Video BMB: nền xanh nhạt, thẻ trắng, đầu trang xanh navy, nút chính màu cam. Kho quốc tế đổi sang xanh ngọc. */
+  :root{ --bg:#f2f6fc; --panel:#fff; --line:#d3deee; --ink:#14213f; --quiet:#5d6b92; --navy:#1c3b8c; --navy2:#142a66; --teal:#0e7490; --teal2:#134e63;
     --accent:#f2701a; --accent2:#e85a0c; --good:#11845b; --goodbg:#e6f6ef; --warn:#9a6200; --warnbg:#fff4dc; --bad:#c62f2f; --badbg:#fdecec; --run:#1d5fd1; --runbg:#e8f0fe;
-    --soft:#f5f8fe; --soft2:#eef2fa; }
+    --soft:#f5f8fe; --soft2:#eef2fa; --r:14px;
+    --ic-alert:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3l10 18H2zM12 10v5M12 18h.01'/%3E%3C/svg%3E"); }
+  body.en{ --navy:#0e7490; --navy2:#134e63; }
   *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-padding-top:120px}
   body{background:var(--bg); color:var(--ink); font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; min-height:100vh; font-size:14px; line-height:1.45}
-  header{padding:12px 16px; background:linear-gradient(135deg,var(--navy),var(--navy2)); color:#fff; display:flex; align-items:center; gap:12px; flex-wrap:wrap; position:sticky; top:0; z-index:10}
-  .logo{width:46px;height:46px;border-radius:12px;background:linear-gradient(180deg,var(--accent),var(--accent2)); display:flex;align-items:center;justify-content:center;font-size:28px;line-height:1;flex:none;box-shadow:0 1px 3px rgba(0,0,0,.25)}
-  header .ttl{font-size:26px; line-height:1.2; font-weight:800; letter-spacing:.3px}
-  header .sub{color:rgba(255,255,255,.7); font-size:12px}
+  svg.i{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;vertical-align:-3px}
+  svg.i.fill{fill:currentColor;stroke:none}
+  :focus-visible{outline:2px solid var(--run); outline-offset:2px}
+
+  /* ----- Đầu trang + thanh thẻ (dính trên cùng) ----- */
+  .top{position:sticky; top:0; z-index:30; box-shadow:0 2px 10px rgba(20,33,63,.18)}
+  header{padding:10px 16px; background:linear-gradient(135deg,var(--navy),var(--navy2)); color:#fff; display:flex; align-items:center; gap:12px; flex-wrap:wrap}
+  .logo{width:40px;height:40px;border-radius:12px;background:linear-gradient(180deg,var(--accent),var(--accent2)); display:flex;align-items:center;justify-content:center;flex:none;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+  .logo svg.i{width:22px;height:22px;stroke:#fff}
+  header .ttl{font-size:22px; line-height:1.15; font-weight:800; letter-spacing:.2px}
+  header .sub{color:rgba(255,255,255,.72); font-size:12px}
   header .sp{margin-left:auto}
+  header .right{margin-left:auto; display:flex; gap:8px; align-items:center; flex-wrap:wrap}
   header button.ghost{background:transparent; border:1px solid rgba(255,255,255,.4); color:#fff}
-  main{max-width:960px; margin:0 auto; padding:16px 16px 60px}
-  section{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:16px; margin-top:16px; box-shadow:0 1px 2px rgba(20,33,63,.04)}
+  header button.ghost:hover{background:rgba(255,255,255,.12)}
+  .chipst{display:inline-flex; align-items:center; gap:7px; border-radius:999px; padding:6px 12px; font-size:12.5px; font-weight:700; border:1px solid rgba(255,255,255,.35); background:rgba(255,255,255,.12); color:#fff; min-height:34px; cursor:pointer}
+  .chipst::before{content:""; width:9px; height:9px; border-radius:50%; background:#c9d4ee; flex:none}
+  .chipst.ok::before{background:#4ade9a; box-shadow:0 0 0 3px rgba(74,222,154,.25)}
+  .chipst.bad{background:#fff; color:var(--bad); border-color:#fff}
+  .chipst.bad::before{background:var(--bad); box-shadow:0 0 0 3px rgba(198,47,47,.2)}
+  .tabs{display:flex; gap:4px; background:var(--panel); border-bottom:1px solid var(--line); padding:0 10px; overflow-x:auto; scrollbar-width:none}
+  .tabs::-webkit-scrollbar{display:none}
+  .tabs button{flex:0 0 auto; display:flex; align-items:center; gap:7px; background:none; color:var(--quiet); font-weight:600; font-size:14px; padding:0 14px; min-height:46px; border-radius:0; border:none; border-bottom:3px solid transparent; white-space:nowrap}
+  .tabs button:hover{color:var(--ink); background:var(--soft)}
+  .tabs button[aria-selected=true]{color:var(--navy); border-bottom-color:var(--accent)}
+  .tb{display:inline-block; background:var(--accent); color:#fff; border-radius:999px; font-size:11px; font-weight:700; padding:0 7px; line-height:18px; min-width:18px; text-align:center}
+  .tb.soft{background:var(--soft2); color:var(--navy)}
+
+  main{max-width:1020px; margin:0 auto; padding:6px 16px 70px}
+  .panel{animation:rise .22s ease-out}
+  .panel[hidden]{display:none}
+  @keyframes rise{from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:none}}
+  @media (prefers-reduced-motion:reduce){ .panel{animation:none} *{transition:none!important} }
+
+  section, details.acc{background:var(--panel); border:1px solid var(--line); border-radius:var(--r); padding:16px; margin-top:14px; box-shadow:0 1px 2px rgba(20,33,63,.04)}
   h2{font-size:16px; margin-bottom:10px; display:flex; align-items:center; gap:8px; flex-wrap:wrap}
-  h2 .sp{margin-left:auto}
+  h2 .sp, h3 .sp{margin-left:auto}
+  h3{font-size:14px; margin:16px 0 4px; display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+  .sec-sub{font-size:12px; color:var(--quiet); margin:-4px 0 10px}
+
+  /* ----- Ô nhập, nút ----- */
   input, select, textarea{background:#fff; border:1px solid var(--line); color:var(--ink); border-radius:10px; padding:8px 10px; font-size:14px; font-family:inherit}
   select, input:not([type=checkbox]):not([type=radio]){min-height:38px}
   input:focus, select:focus, textarea:focus{outline:2px solid #b9cdf3; outline-offset:0; border-color:#9fb3d8}
   textarea{width:100%; min-height:110px; resize:vertical; background:#fbfdff; font-family:ui-monospace,Consolas,monospace; font-size:13px}
-  button{background:linear-gradient(180deg,var(--accent),var(--accent2)); border:none; color:#fff; font-weight:600; border-radius:10px; padding:8px 14px; font-size:13px; cursor:pointer; min-height:36px; font-family:inherit}
+  textarea.links{min-height:70px}
+  button{background:linear-gradient(180deg,var(--accent),var(--accent2)); border:none; color:#fff; font-weight:600; border-radius:10px; padding:8px 14px; font-size:13px; cursor:pointer; min-height:38px; font-family:inherit; display:inline-flex; align-items:center; justify-content:center; gap:7px; transition:transform .12s, box-shadow .12s, border-color .12s, background .12s}
+  button:active:not(:disabled){transform:translateY(1px)}
   button.ghost{background:#fff; border:1px solid var(--line); color:var(--ink); font-weight:500}
-  button.ghost:hover{border-color:#9fb3d8}
-  button.ic{padding:2px 8px; font-size:12px; line-height:1.4; border-radius:8px; color:var(--quiet); min-height:0}
+  button.ghost:hover:not(:disabled){border-color:#9fb3d8; background:var(--soft)}
+  button.ic{padding:2px 8px; font-size:12px; line-height:1.4; border-radius:8px; color:var(--quiet); min-height:30px}
   button.danger{background:#fff; border:1px solid #f0b4b4; color:var(--bad); font-weight:600}
+  button.danger:hover:not(:disabled){background:var(--badbg)}
+  button.big{min-height:46px; font-size:15px; padding:10px 20px; box-shadow:0 3px 10px rgba(232,90,12,.28)}
   button:disabled{opacity:.5; cursor:not-allowed}
   .line{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:8px 0}
-  .line input{flex:1; min-width:180px}
+  .line input:not([type=checkbox]):not([type=number]){flex:1; min-width:180px}
   .line input[type=checkbox]{flex:0 0 auto; min-width:0; margin-right:6px; vertical-align:middle}
   .line label{display:flex; align-items:center}
   .hint{color:var(--quiet); font-size:12px}
-  .err{color:var(--bad)} .ok{color:var(--good)}
-  .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:10px}
-  .stat{background:var(--soft); border:1px solid var(--line); border-radius:12px; padding:10px 12px}
-  .stat b{display:block; font-size:20px; color:var(--navy)} .stat span{color:var(--quiet); font-size:12px}
+  .err{color:var(--bad)} .ok{color:var(--good)} .warn{color:var(--warn)}
+
+  /* ----- Cảnh báo ----- */
+  .alert{display:flex; gap:10px; align-items:flex-start; padding:10px 12px; border-radius:12px; font-size:13px; line-height:1.45; margin-top:12px; border:1px solid; color:var(--ink)}
+  .alert::before{content:""; flex:none; width:18px; height:18px; margin-top:1px; background:currentColor; -webkit-mask:var(--ic-alert) center/contain no-repeat; mask:var(--ic-alert) center/contain no-repeat}
+  .alert.bad{background:var(--badbg); border-color:#f0b4b4} .alert.bad::before{color:var(--bad)}
+  .alert.info{background:var(--runbg); border-color:#b9cdf3} .alert.info::before{color:var(--run)}
+  .langNote{margin-top:10px; padding:8px 12px; border-radius:10px; background:#e3f4f8; border:1px solid #9fd3df; color:#0b5566; font-size:13px}
+
+  /* ----- Mảng số liệu ----- */
+  .hero{background:radial-gradient(900px 260px at 100% 0%,rgba(242,112,26,.38),transparent 60%),linear-gradient(135deg,var(--navy),var(--navy2)); color:#fff; border:none; box-shadow:0 8px 24px rgba(20,42,102,.25); position:relative; overflow:hidden}
+  .hero h2{color:#fff; margin-bottom:4px}
+  .hero .hint{color:rgba(255,255,255,.75)}
+  .hero button.ghost{background:rgba(255,255,255,.12); border-color:rgba(255,255,255,.35); color:#fff}
+  .hero button.ghost:hover:not(:disabled){background:rgba(255,255,255,.22)}
+  .hero .langNote{background:rgba(255,255,255,.14); border-color:rgba(255,255,255,.3); color:#fff}
+  .hnums{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin-top:12px}
+  .hn{background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.22); border-radius:14px; padding:12px 14px; backdrop-filter:blur(2px); min-width:0}
+  .hn b{display:block; font-size:30px; line-height:1.1; font-weight:800; letter-spacing:.2px; overflow-wrap:anywhere}
+  .hn b.sm{font-size:20px}
+  .hn span{font-size:12px; color:rgba(255,255,255,.8)}
+  .hn b small{font-size:13px; font-weight:600; opacity:.8; margin-left:4px}
+  .stat b small{font-size:12px; font-weight:500; color:var(--quiet); margin-left:3px}
+  .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px}
+  .stat{background:var(--soft); border:1px solid var(--line); border-radius:12px; padding:10px 12px; border-left:4px solid var(--line); min-width:0}
+  .stat b{display:block; font-size:20px; color:var(--navy); line-height:1.25}
+  .stat span{color:var(--quiet); font-size:12px}
   .stat b.sm{font-size:15px; line-height:1.45; overflow-wrap:anywhere}
-  .row{display:flex; gap:10px; align-items:flex-start; padding:10px 0; border-bottom:1px solid #e8eef7}
+  .stat.warn{border-left-color:#e0a028; background:var(--warnbg)} .stat.bad{border-left-color:var(--bad); background:var(--badbg)}
+  .stat.good{border-left-color:#3cb88a}
+  .stat.warn b{color:var(--warn)} .stat.bad b{color:var(--bad)}
+  .bar{height:6px; background:#dfe7f5; border-radius:99px; margin-top:7px; overflow:hidden}
+  .bar i{display:block; height:100%; background:var(--navy); border-radius:99px; transition:width .5s}
+  .bar i.warn{background:#e0a028} .bar i.bad{background:var(--bad)}
+  #stats{margin-top:12px}
+  details.more-stats{margin-top:12px; background:transparent}
+  details.more-stats summary{color:var(--navy)}
+  details.more-stats .grid{margin-top:8px}
+  .hero details.more-stats summary{color:rgba(255,255,255,.9)}
+  .hero .stat{background:var(--panel); color:var(--ink)}
+  .hero .hint.err{color:#ffd2d2; font-weight:600}
+
+  /* ----- Nút chạy việc ----- */
+  .runbar{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+  .jobs{display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:10px; margin-top:14px}
+  .jobgrp{background:var(--soft); border:1px solid var(--line); border-radius:12px; padding:10px 12px}
+  .jobgrp .gt{font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.4px}
+  .jobgrp .gd{font-size:12px; color:var(--quiet); margin:2px 0 8px}
+  .jobgrp .btns{display:flex; gap:6px; flex-wrap:wrap}
+  pre{white-space:pre-wrap; word-break:break-word; font-size:12px; color:var(--quiet); background:var(--soft); border-radius:10px; padding:10px; margin-top:8px}
+  #last{max-height:260px; overflow:auto; line-height:1.5}
+
+  /* ----- Danh sách, bảng ----- */
+  .row{display:flex; gap:10px; align-items:flex-start; padding:12px 0; border-bottom:1px solid #e8eef7}
   .row:last-child{border-bottom:none}
   .row .meta{flex:1; min-width:0}
   .row .name{font-weight:600; overflow:hidden; text-overflow:ellipsis}
   .row .sub{color:var(--quiet); font-size:12px}
-  .row .acts{display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; flex:0 0 auto; max-width:55%}
+  .row .acts{display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; flex:0 0 auto; max-width:52%; align-items:center}
   .pill{display:inline-block; font-size:11px; font-weight:700; padding:1px 9px; border-radius:999px; background:#eef1f7; color:#4a5674; margin-right:4px}
   .pill.on{background:var(--goodbg); color:var(--good)} .pill.off{background:var(--badbg); color:var(--bad)} .pill.run{background:var(--warnbg); color:var(--warn)}
+  .pill.pl{background:var(--runbg); color:var(--run)} .pill.star{background:var(--warnbg); color:var(--warn)} .pill.auto{background:#e8eefb; color:var(--navy)} .pill.dl{background:var(--goodbg); color:var(--good)}
   .samples{margin-top:6px; font-size:12px; color:var(--quiet); background:var(--soft); border-radius:10px; padding:8px}
   .samples div{white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
   .samples b{color:var(--navy); font-weight:600}
-  pre{white-space:pre-wrap; word-break:break-word; font-size:12px; color:var(--quiet); background:var(--soft); border-radius:10px; padding:8px; margin-top:8px}
-  table{width:100%; border-collapse:collapse; font-size:13px}
-  th, td{text-align:left; padding:7px 6px; border-bottom:1px solid #e8eef7; vertical-align:top}
-  th{color:var(--quiet); font-weight:600; font-size:12px; background:#f7f9fd}
-  td.n{text-align:right; white-space:nowrap}
-  h3{font-size:14px; margin:18px 0 4px; display:flex; align-items:center; gap:8px; flex-wrap:wrap}
-  h3 .sp{margin-left:auto}
-  textarea.links{min-height:76px}
-  .pill.pl{background:var(--runbg); color:var(--run)} .pill.star{background:var(--warnbg); color:var(--warn)} .pill.auto{background:#e8eefb; color:var(--navy)}
-  .warn{color:var(--warn)}
   .card{background:#fbfdff; border:1px solid var(--line); border-radius:12px; padding:10px 12px; margin-top:8px}
   .card .row{padding:0; border:none}
   .card .samples{background:#fff; border:1px solid #e8eef7}
-  details{margin-top:12px} summary{cursor:pointer; color:var(--navy); font-size:13px}
-  button.star{background:#fff; border:1px solid var(--line); color:var(--quiet); font-weight:500} button.star.on{background:var(--warnbg); border-color:#e8c880; color:var(--warn)}
-  button.dl{background:#fff; border:1px solid var(--line); color:var(--quiet); font-weight:500} button.dl.on{background:var(--goodbg); border-color:#9fd8bf; color:var(--good)}
-  .pill.dl{background:var(--goodbg); color:var(--good)}
+  .tbl{overflow:auto; max-height:460px; border:1px solid var(--line); border-radius:12px; margin-top:8px}
+  .tbl.free{max-height:none}
+  table{width:100%; border-collapse:collapse; font-size:13px}
+  th, td{text-align:left; padding:7px 8px; border-bottom:1px solid #e8eef7; vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  th{color:var(--quiet); font-weight:600; font-size:12px; background:#f7f9fd; position:sticky; top:0; z-index:1}
+  td.n, th.n{text-align:right; white-space:nowrap}
+  tbody tr:hover td, table tr:hover td{background:#fafcff}
   #exTable td,#exTable th{font-size:12.5px}
   #exBy{max-width:100%;min-width:0}
   label.chk:has(#exBy){max-width:100%;flex-wrap:wrap}
   .chk{display:inline-flex; align-items:center; gap:5px; font-size:13px; color:var(--ink)}
+
+  /* ----- Thẻ gập (details) ----- */
+  summary{cursor:pointer; color:var(--navy); font-size:13px; font-weight:600; list-style:none; display:flex; align-items:center; gap:8px; flex-wrap:wrap; min-height:30px}
+  summary::-webkit-details-marker{display:none}
+  summary::before{content:""; width:8px; height:8px; border-right:2px solid currentColor; border-bottom:2px solid currentColor; transform:rotate(-45deg); transition:transform .15s; flex:none; margin:0 4px 0 2px}
+  details[open] > summary::before{transform:rotate(45deg)}
+  details.acc > summary{font-size:15px; color:var(--ink)}
+  details.acc[open] > summary{margin-bottom:8px}
+  details.help{margin-top:10px; background:var(--soft); border:1px solid var(--line); border-radius:10px; padding:6px 12px}
+  details.help summary{font-weight:500; color:var(--quiet)}
+  details.help .hint{margin:6px 0; font-size:12.5px; line-height:1.55}
+  .badge{display:inline-block; background:var(--soft2); color:var(--navy); border-radius:999px; font-size:11px; font-weight:700; padding:0 8px; line-height:18px}
+  .badge.on{background:var(--accent); color:#fff}
+
+  /* ----- Nút chuyển / lọc ----- */
   .seg{display:inline-flex; background:#fff; border:1px solid var(--line); border-radius:10px; overflow:hidden}
   .seg button{background:#fff; color:var(--ink); padding:7px 14px; border-radius:0; font-weight:500; min-height:38px}
   .seg button+button{border-left:1px solid var(--line)}
@@ -81,20 +178,81 @@
   header .seg button{background:transparent; color:#fff}
   header .seg button+button{border-left-color:rgba(255,255,255,.3)}
   header .seg button.on{background:#fff; color:var(--navy); font-weight:700}
-  body.en header{background:linear-gradient(135deg,var(--teal),var(--teal2))}
-  body.en .seg button.on{background:var(--teal)}
-  body.en header .seg button.on{background:#fff; color:var(--teal)}
-  .langNote{margin-top:8px; padding:8px 12px; border-radius:10px; background:#e3f4f8; border:1px solid #9fd3df; color:#0b5566; font-size:13px}
+  .chips{display:flex; gap:6px; flex-wrap:wrap; margin:8px 0}
+  .chips button{background:#fff; border:1px solid var(--line); color:var(--ink); font-weight:500; border-radius:999px; min-height:32px; padding:4px 12px}
+  .chips button.on{background:var(--navy); border-color:var(--navy); color:#fff}
+  .chips button small{opacity:.75; font-size:11px}
+  button.star, button.dl{background:#fff; border:1px solid var(--line); color:var(--quiet); font-weight:500}
+  button.star.on{background:var(--warnbg); border-color:#e8c880; color:var(--warn)}
+  button.dl.on{background:var(--goodbg); border-color:#9fd8bf; color:var(--good)}
+  button.sw{background:#fff; border:1px solid var(--line); color:var(--ink); font-weight:600}
+  button.sw.on{background:var(--goodbg); border-color:#9fd8bf; color:var(--good)}
+  button.sw.off{background:var(--badbg); border-color:#f0b4b4; color:var(--bad)}
+  details.more{position:relative}
+  details.more > summary{display:inline-flex; min-height:38px; width:38px; justify-content:center; border:1px solid var(--line); border-radius:10px; background:#fff; color:var(--quiet); padding:0}
+  details.more > summary::before{display:none}
+  details.more > summary:hover{border-color:#9fb3d8; background:var(--soft)}
+  details.more .menu{position:absolute; right:0; top:42px; z-index:12; background:#fff; border:1px solid var(--line); border-radius:12px; box-shadow:0 10px 28px rgba(20,33,63,.18); padding:6px; display:flex; flex-direction:column; gap:2px; min-width:170px}
+  details.more .menu button{background:none; color:var(--ink); font-weight:500; justify-content:flex-start; border-radius:8px; width:100%}
+  details.more .menu button:hover{background:var(--soft)}
+  details.more .menu button.danger{color:var(--bad); border:none}
+  details.more .menu hr{border:none; border-top:1px solid var(--line); margin:3px 0}
+  .zone-danger{border-color:#f0b4b4; background:linear-gradient(180deg,#fff,#fffafa)}
+  .zone-danger h2{color:var(--bad)}
+
+  @media (max-width:640px){
+    main{padding:4px 12px 70px}
+    header{padding:8px 12px; gap:8px}
+    header .ttl{font-size:19px}
+    .logo{width:36px;height:36px}
+    .hnums{gap:8px; grid-template-columns:1fr 1fr} .hn{padding:10px} .hn b{font-size:24px} .hn:last-child{grid-column:1/-1}
+    .row{flex-wrap:wrap} .row .acts{max-width:100%; justify-content:flex-start}
+    .hide-sm{display:none}
+    section, details.acc{padding:14px 12px}
+    .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+    button.big{width:100%}
+    details.more .menu{right:auto; left:0}
+  }
   body.en .vi-only{display:none}
-  @media (max-width:560px){ header .ttl{font-size:21px} .logo{width:40px;height:40px;font-size:24px} .row{flex-wrap:wrap} .row .acts{max-width:100%; justify-content:flex-start} .hide-sm{display:none} }
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-db" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></symbol>
+  <symbol id="i-src" viewBox="0 0 24 24"><path d="M3 6h12M3 12h7M3 18h7"/><path d="M14 11l7 4-7 4z"/></symbol>
+  <symbol id="i-grow" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3M11 8v6M8 11h6"/></symbol>
+  <symbol id="i-hot" viewBox="0 0 24 24"><path d="M12 3c.6 3.2 4.8 5 4.8 9.6A4.8 4.8 0 0 1 12 17.4a4.8 4.8 0 0 1-4.8-4.8c0-1.9 1-3.2 2-4.2.3 1.4 1 2.1 2 2.1 0-3-.8-5 .8-7.5z"/><path d="M8 21h8"/></symbol>
+  <symbol id="i-tool" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="5" rx="1.2"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9M10 13h4"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z"/></symbol>
+  <symbol id="i-dl" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M4 20h16"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.7" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.7" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.7" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-merge" viewBox="0 0 24 24"><path d="M6 3v6a6 6 0 0 0 6 6h0a6 6 0 0 0 6-6V3M12 15v6"/></symbol>
+</svg>
+
+<div class="top">
 <header>
-  <div class="logo" aria-hidden="true">🗄️</div><b class="ttl">Kho BMB Karaoke</b> <span class="hide-sm sub">quản trị</span>
+  <div class="logo" aria-hidden="true"><svg class="i"><use href="#i-db"/></svg></div>
+  <div><b class="ttl">Kho BMB Karaoke</b> <span class="hide-sm sub">quản trị</span></div>
   <span class="seg" id="khoSeg" title="Chọn kho đang quản trị — hai kho chạy riêng, cài đặt chung một trang"><button data-k="vi">Kho Việt</button><button data-k="en">Kho quốc tế</button></span>
-  <button class="ghost sp" id="gear">⚙ Kết nối</button>
+  <div class="right">
+    <button class="chipst" id="chip" type="button" title="Bấm để xem cảnh báo">Đang kiểm…</button>
+    <button class="ghost" id="gear" type="button"><svg class="i"><use href="#i-gear"/></svg>Kết nối</button>
+  </div>
 </header>
+<nav class="tabs" id="tabs" role="tablist" aria-label="Các mục quản trị">
+  <button role="tab" data-tab="home" aria-selected="true"><svg class="i"><use href="#i-home"/></svg>Tổng quan</button>
+  <button role="tab" data-tab="src" aria-selected="false"><svg class="i"><use href="#i-src"/></svg>Nguồn <span class="tb soft" id="tbSrc" style="display:none"></span></button>
+  <button role="tab" data-tab="grow" aria-selected="false"><svg class="i"><use href="#i-grow"/></svg>Mở rộng <span class="tb" id="tbGrow" style="display:none"></span></button>
+  <button role="tab" data-tab="hot" aria-selected="false"><svg class="i"><use href="#i-hot"/></svg>Bài hot</button>
+  <button role="tab" data-tab="tool" aria-selected="false"><svg class="i"><use href="#i-tool"/></svg>Xuất &amp; dọn</button>
+</nav>
+</div>
 
 <main>
 <section id="settings" style="display:none">
@@ -108,151 +266,243 @@
   <div class="hint">Lưu trong trình duyệt này, dùng chung với remote.html nếu cùng địa chỉ trang.</div>
 </section>
 
-<section>
-  <h2>Tình trạng kho <button class="ghost sp" id="reloadStats">↻</button></h2>
-  <div class="langNote" id="langNote" style="display:none"></div>
-  <div class="grid" id="stats" style="margin-top:8px"></div>
-  <div class="line" style="margin-top:10px">
-    <button id="fastScan">⚡ Quét nhanh đến khi xong</button>
-    <button class="ghost" id="runAuto">▶ Chạy 1 lượt</button>
-    <button class="ghost" data-job="scan">Quét kênh</button>
-    <button class="ghost" data-job="refresh">Làm mới</button>
-    <button class="ghost" data-job="hot">Cập nhật bài hot</button>
-    <button class="ghost" data-job="hotsearch">Tìm bài hot còn thiếu</button>
-    <button class="ghost vi-only" data-job="discover">Khám phá kênh</button>
-    <button class="ghost" data-job="gap">Lấp bài tìm hụt</button>
-    <button class="ghost vi-only" data-job="plsearch">Tìm playlist ca sĩ</button>
+<!-- ============ 1. TỔNG QUAN: xem tình trạng + chạy việc hằng ngày ============ -->
+<div class="panel" id="p-home" role="tabpanel">
+  <div id="alerts">
+    <div class="alert bad" id="cronWarn" style="display:none"></div>
+    <div class="alert bad" id="keyWarn" style="display:none"></div>
+    <div class="alert bad" id="writeWarn" style="display:none"></div>
+    <div class="alert bad" id="lagWarn" style="display:none"></div>
   </div>
-  <div class="hint">Kho tự chạy 10 phút/lần (Cron Trigger), mỗi lượt làm một việc nhỏ. <b>Quét nhanh</b> dùng khi mới thêm kênh: trang này gọi quét liên tục (giữ trang mở) cho tới khi quét hết các kênh, rồi tự ghép lại bài hot.</div>
-  <div class="hint err" id="cronWarn" style="display:none"></div>
-  <div class="hint err" id="keyWarn" style="display:none"></div>
-  <div class="hint err" id="writeWarn" style="display:none"></div>
-  <div class="hint err" id="lagWarn" style="display:none"></div>
-  <pre id="last">—</pre>
-</section>
 
-<section>
-  <h2>Mở rộng kho (tự động) <button class="ghost sp" id="reloadGrow">↻</button></h2>
-  <div class="hint">Kho tự đi tìm bài còn thiếu theo 3 cách, xen kẽ trong các lượt chạy 10 phút: <b>lấp bài tìm hụt</b> (bài anh bấm Tìm mà kho chưa có),
-    <b>khám phá kênh</b> (kênh chưa thêm nhưng đã có bản karaoke trong kho → thêm cả kênh nếu chuyên karaoke, hoặc chỉ các playlist karaoke của kênh),
-    <b>tìm playlist theo ca sĩ/nhạc sĩ</b>. Nguồn do kho tự thêm có nhãn <span class="pill auto">Tự thêm</span>, quét 1 lần, mang về dưới 5 bản mới thì tự tắt.
-    Luôn chừa lại một phần lượt tìm cho anh tìm tay trên remote.</div>
-  <div class="grid" id="growStats" style="margin-top:8px"></div>
+  <section class="hero">
+    <h2>Tình trạng kho <button class="ghost sp" id="reloadStats" type="button" title="Tải lại số liệu"><svg class="i"><use href="#i-refresh"/></svg>Làm mới số liệu</button></h2>
+    <div class="hint" id="heroLast">Đang tải…</div>
+    <div class="langNote" id="langNote" style="display:none"></div>
+    <div class="hnums" id="heroStats"></div>
+    <div class="grid" id="stats"></div>
+    <details class="more-stats"><summary>Chi tiết số liệu</summary><div class="grid" id="statsMore"></div></details>
+  </section>
 
-  <h3>Bài tìm hụt <span class="hint" id="missHint"></span></h3>
-  <div style="overflow:auto"><table id="missTable"></table></div>
+  <section>
+    <h2>Chạy việc</h2>
+    <div class="runbar">
+      <button class="big" id="fastScan" type="button"><svg class="i"><use href="#i-bolt"/></svg><span id="fastLbl">Quét nhanh đến khi xong</span></button>
+      <button class="ghost" id="runAuto" type="button"><svg class="i"><use href="#i-play"/></svg>Chạy 1 lượt</button>
+      <span class="hint" id="scanInfo"></span>
+    </div>
+    <div class="hint" style="margin-top:8px">Kho tự chạy 10 phút/lần (Cron Trigger), mỗi lượt làm một việc nhỏ. <b>Quét nhanh</b> dùng khi mới thêm kênh: trang này gọi quét liên tục (giữ trang mở) cho tới khi quét hết các kênh, rồi tự ghép lại bài hot.</div>
+    <div class="jobs">
+      <div class="jobgrp"><div class="gt">Nạp bài</div><div class="gd">Lấy bài mới từ các nguồn</div>
+        <div class="btns"><button class="ghost" data-job="scan" type="button">Quét kênh</button><button class="ghost" data-job="refresh" type="button">Làm mới</button></div></div>
+      <div class="jobgrp"><div class="gt">Bài hot</div><div class="gd">Bảng xếp hạng thịnh hành</div>
+        <div class="btns"><button class="ghost" data-job="hot" type="button">Cập nhật bài hot</button><button class="ghost" data-job="hotsearch" type="button">Tìm bài hot còn thiếu</button></div></div>
+      <div class="jobgrp"><div class="gt">Mở rộng kho</div><div class="gd">Tự đi tìm bài còn thiếu</div>
+        <div class="btns"><button class="ghost" data-job="gap" type="button">Lấp bài tìm hụt</button><button class="ghost vi-only" data-job="discover" type="button">Khám phá kênh</button><button class="ghost vi-only" data-job="plsearch" type="button">Tìm playlist ca sĩ</button></div></div>
+    </div>
+  </section>
 
-  <h3>Ca sĩ / nhạc sĩ để tìm playlist <span class="hint" id="artHint"></span></h3>
-  <div class="hint">Tự lấy từ tiêu đề trong kho; người có bài anh hay chọn được ưu tiên. Muốn ưu tiên ai thì dán tên vào đây (mỗi dòng một người, có dấu hay không đều được). Lỡ thêm nhầm thì bấm ✕ ở dòng đó.</div>
-  <textarea id="artInput" class="links" placeholder="Đàm Vĩnh Hưng&#10;Trịnh Công Sơn&#10;Lam Trường"></textarea>
-  <div class="line"><button id="artSave">Ưu tiên tìm các tên này</button></div>
-  <div style="overflow:auto"><table id="artTable"></table></div>
+  <section>
+    <h2>Kết quả lượt chạy gần nhất</h2>
+    <pre id="last">—</pre>
+  </section>
+</div>
 
-  <h3>Kênh vừa khám phá <span class="hint" id="candHint"></span></h3>
-  <div style="overflow:auto"><table id="candTable"></table></div>
+<!-- ============ 2. NGUỒN: thêm nguồn, gợi ý, danh sách đang dùng ============ -->
+<div class="panel" id="p-src" role="tabpanel" hidden>
+  <section>
+    <h2>Thêm nguồn karaoke <span class="hint">kênh hoặc playlist YouTube</span></h2>
+    <textarea id="chInput" class="links" placeholder="Dán link kênh hoặc playlist, mỗi dòng một link&#10;youtube.com/@ten-kenh&#10;youtube.com/playlist?list=PL…"></textarea>
+    <div class="line"><button id="chPreview" type="button"><svg class="i"><use href="#i-search"/></svg>Xem trước</button><button class="ghost" id="chAdd" type="button">＋ Thêm ngay</button>
+      <span class="hint">Xem trước ≈ 3 đơn vị/link, không tốn lượt tìm, chưa lưu gì vào kho.</span></div>
+    <div class="hint">Kênh hỗn hợp (ca sĩ, nhiều loại video) thì dán link playlist karaoke của kênh thay vì cả kênh.</div>
+    <div id="preview"></div>
+    <details class="acc" id="discBox" style="margin-top:12px;box-shadow:none;background:var(--soft)">
+      <summary>Gợi ý từ kho <span class="badge" id="discCount">0</span> <span class="hint">không tốn lượt tìm</span></summary>
+      <div class="hint">Kênh chưa thêm nhưng đã có bản karaoke vào kho (qua tìm YouTube, tìm bài hot, dán link). Xếp theo lượt anh chọn, rồi số bài kho chỉ có từ kênh đó.</div>
+      <div id="discover"><div class="hint">Đang tải…</div></div>
+    </details>
+    <details class="acc" style="margin-top:10px;box-shadow:none;background:var(--soft)">
+      <summary>Tìm kênh trên YouTube <span class="hint">tốn 1 lượt tìm/lần</span></summary>
+      <div class="line"><input id="sgInput" value="karaoke" placeholder="Từ khoá tìm kênh"><button class="ghost" id="sgBtn" type="button">Tìm kênh</button></div>
+      <div id="suggest"></div>
+    </details>
+  </section>
 
-  <h3>Tiêu đề bị loại vì thiếu chữ “karaoke/beat”</h3>
-  <div class="hint">Nhiều bản tự làm chỉ ghi “Tone Nữ”, “Song ca”, “MR”… Xem mẫu bên dưới; dấu hiệu nào đúng là karaoke thì tick rồi bấm Lưu: kho nhận các bài đó ngay và từ nay nhận thêm. Dấu hiệu hay lẫn MV/bản cover thì để trống.</div>
-  <div class="line" id="kwBox"></div>
-  <div class="line"><button id="kwSave">Lưu dấu hiệu được nhận</button></div>
-  <div class="samples" id="nearBox" style="max-height:260px; overflow:auto"></div>
-</section>
+  <section>
+    <h2>Nguồn đang dùng <span class="hint" id="chCount"></span>
+      <select id="chSort" class="sp" aria-label="Sắp xếp nguồn">
+        <option value="added">Thứ tự thêm</option><option value="uniq">Bài riêng: ít → nhiều</option>
+        <option value="picks">Lượt chọn: nhiều → ít</option><option value="star">⭐ trước</option><option value="auto">Tự thêm trước</option><option value="dl">⬇ Được phép tải trước</option></select>
+      <button class="ghost" id="reloadCh" type="button" title="Tải lại danh sách nguồn"><svg class="i"><use href="#i-refresh"/></svg></button></h2>
+    <div class="line" style="margin:0"><input id="chFilter" type="search" placeholder="Lọc theo tên kênh / playlist…" autocomplete="off" aria-label="Lọc nguồn"></div>
+    <div class="chips" id="chChips"></div>
+    <div id="channels"><div class="hint">Đang tải…</div></div>
+    <details class="help"><summary>Giải thích các mục</summary>
+      <div class="hint"><b>Bài riêng</b> = số bài kho CHỈ có từ nguồn đó. Nguồn đã quét hết mà bài riêng gần 0 thì chỉ thêm bản trùng, có thể tắt để đỡ lượt quét.</div>
+      <div class="hint"><b>⬇ Được phép tải</b>: nguồn anh đã có thoả thuận cho tải bản sao. App Tải Video chỉ lấy bài do kênh có cờ này đăng (cờ đặt ở playlist thì tính cho kênh chủ playlist).</div>
+      <div class="hint"><b>⭐ Tin dùng</b>: khi các bản của cùng một bài hoà lượt chọn, bản của nguồn ⭐ được đưa lên trước (kênh nhỏ ít lượt xem không bị chìm).</div>
+      <div class="hint"><b>Nhịp kiểm</b>: nguồn đã quét hết được kiểm bài mới mỗi ngày nếu vừa đăng trong 14 ngày, 3 ngày nếu trong 60 ngày, 7 ngày nếu lâu hơn; playlist 3 ngày.</div>
+      <div class="hint"><b>Kiểu tiêu đề</b>: hầu hết kênh đặt “Karaoke <i>Tên bài</i> – Ca sĩ”. Nếu kênh đặt “Ca sĩ – <i>Tên bài</i>”, bấm <b>Xem mẫu</b> (trong nút ⋯) rồi đổi sang <b>Ca sĩ trước</b>.</div>
+    </details>
+  </section>
+</div>
 
-<section>
-  <h2>Dọn kho <span class="pill">thủ công — kho không bao giờ tự dọn</span></h2>
-  <div class="hint">Mỗi bài chỉ giữ lại các bản tốt nhất, bỏ bớt bản thừa và bản quá ít người xem. Xếp hạng: bản anh từng chọn trước, rồi kênh gắn ⭐, rồi lượt xem.
-    <b>Không bao giờ dọn</b> bản anh từng chọn, bản của kênh ⭐ và bản ưu tiên của bài hot. Bản đã dọn được nhớ lại nên lần quét sau không nạp lại.
-    Luôn bấm <b>Xem trước</b> trước (chưa xoá gì); mỗi lần dọn thật xoá 2.000 bản rồi gọi lặp, tốn khoảng 10 dòng ghi D1 cho mỗi bản.</div>
-  <div class="line"><label class="chk">Giữ tối đa <input id="clKeep" type="number" min="3" max="30" value="8" style="width:64px"> bản/bài</label>
-    <label class="chk">luôn giữ <input id="clTone" type="number" min="1" max="5" value="2" style="width:56px"> bản mỗi giọng</label></div>
-  <div class="line"><label class="chk">Bản dưới <input id="clViews" type="number" min="0" value="500" style="width:90px"> lượt xem coi là ít xem</label>
-    <label class="chk">(luôn giữ ít nhất <input id="clMin" type="number" min="1" max="5" value="2" style="width:56px"> bản/bài)</label></div>
-  <div class="line"><button class="ghost" id="dumpBtn">⬇ Tải toàn bộ kho (CSV)</button> <span class="hint" id="dumpOut">Nên tải trước khi dọn thật (dọn xong không hoàn tác được). Tải lại sau khi dọn để so trước/sau.</span></div>
-  <div class="line"><button class="ghost" id="clPrev">Xem trước</button> <button class="danger" id="clGo" disabled>Dọn thật…</button> <button class="ghost" id="clStop" style="display:none">⏹ Dừng</button></div>
-  <pre id="clOut">Chưa xem trước.</pre>
-</section>
+<!-- ============ 3. MỞ RỘNG: bài tìm hụt, ca sĩ, kênh khám phá, dấu hiệu karaoke ============ -->
+<div class="panel" id="p-grow" role="tabpanel" hidden>
+  <section>
+    <h2>Bài khách tìm mà kho chưa có <span class="hint" id="missHint"></span>
+      <button class="ghost sp" id="reloadGrow" type="button" title="Tải lại"><svg class="i"><use href="#i-refresh"/></svg></button></h2>
+    <div class="grid" id="growStats"></div>
+    <div class="line" style="margin-top:12px">
+      <button class="ghost" id="mergePrev" type="button"><svg class="i"><use href="#i-merge"/></svg>Gộp dòng gần giống: xem trước</button>
+      <button id="mergeGo" type="button" disabled>Gộp thật…</button>
+      <span class="hint">Khách gõ sai chính tả thì các dòng gần giống nhau được gom làm một (kho cũng tự gộp mỗi giờ).</span>
+    </div>
+    <div class="samples" id="mergeOut" style="display:none; max-height:240px; overflow:auto"></div>
+    <div class="tbl"><table id="missTable"></table></div>
+    <details class="help"><summary>Kho tự mở rộng như thế nào</summary>
+      <div class="hint">Kho tự đi tìm bài còn thiếu theo 3 cách, xen kẽ trong các lượt chạy 10 phút: <b>lấp bài tìm hụt</b> (bài anh bấm Tìm mà kho chưa có),
+        <b>khám phá kênh</b> (kênh chưa thêm nhưng đã có bản karaoke trong kho → thêm cả kênh nếu chuyên karaoke, hoặc chỉ các playlist karaoke của kênh),
+        <b>tìm playlist theo ca sĩ/nhạc sĩ</b>. Nguồn do kho tự thêm có nhãn <span class="pill auto">Tự thêm</span>, quét 1 lần, mang về dưới 5 bản mới thì tự tắt.
+        Luôn chừa lại một phần lượt tìm cho anh tìm tay trên remote.</div>
+    </details>
+  </section>
 
-<section>
-  <h2>Nguồn karaoke: kênh &amp; playlist <button class="ghost sp" id="reloadCh">↻</button></h2>
-  <textarea id="chInput" class="links" placeholder="Dán link kênh hoặc playlist, mỗi dòng một link&#10;youtube.com/@ten-kenh&#10;youtube.com/playlist?list=PL…"></textarea>
-  <div class="line"><button id="chPreview">🔍 Xem trước</button><button class="ghost" id="chAdd">＋ Thêm ngay</button>
-    <span class="hint">Xem trước ≈ 3 đơn vị/link, không tốn lượt tìm, chưa lưu gì vào kho. Kênh hỗn hợp (ca sĩ, nhiều loại video) thì dán link playlist karaoke của kênh thay vì cả kênh.</span></div>
-  <div id="preview"></div>
-
-  <h3>Gợi ý từ kho <span class="hint">không tốn lượt tìm</span></h3>
-  <div class="hint">Kênh chưa thêm nhưng đã có bản karaoke vào kho (qua tìm YouTube, tìm bài hot, dán link). Xếp theo lượt anh chọn, rồi số bài kho chỉ có từ kênh đó.</div>
-  <div id="discover"><div class="hint">Đang tải…</div></div>
-  <details><summary>Tìm kênh trên YouTube (tốn 1 lượt tìm/lần)</summary>
-    <div class="line"><input id="sgInput" value="karaoke" placeholder="Từ khoá tìm kênh"><button class="ghost" id="sgBtn">Tìm kênh</button></div>
-    <div id="suggest"></div>
+  <details class="acc">
+    <summary>Ca sĩ / nhạc sĩ để tìm playlist <span class="hint" id="artHint"></span></summary>
+    <div class="hint">Tự lấy từ tiêu đề trong kho; người có bài anh hay chọn được ưu tiên. Muốn ưu tiên ai thì dán tên vào đây (mỗi dòng một người, có dấu hay không đều được). Lỡ thêm nhầm thì bấm ✕ ở dòng đó.</div>
+    <textarea id="artInput" class="links" placeholder="Đàm Vĩnh Hưng&#10;Trịnh Công Sơn&#10;Lam Trường"></textarea>
+    <div class="line"><button id="artSave" type="button">Ưu tiên tìm các tên này</button></div>
+    <div class="tbl"><table id="artTable"></table></div>
   </details>
 
-  <h3>Nguồn đang dùng <select id="chSort" class="sp">
-    <option value="added">Thứ tự thêm</option><option value="uniq">Bài riêng: ít → nhiều</option>
-    <option value="picks">Lượt chọn: nhiều → ít</option><option value="star">⭐ trước</option><option value="auto">Tự thêm trước</option><option value="dl">⬇ Được phép tải trước</option></select></h3>
-  <div id="channels"><div class="hint">Đang tải…</div></div>
-  <div class="hint" style="margin-top:8px">
-    <b>Bài riêng</b> = số bài kho CHỈ có từ nguồn đó. Nguồn đã quét hết mà bài riêng gần 0 thì chỉ thêm bản trùng, có thể tắt để đỡ lượt quét.
-    <b>⬇ Được phép tải</b>: nguồn anh đã có thoả thuận cho tải bản sao. App Tải Video chỉ lấy bài do kênh có cờ này đăng (cờ đặt ở playlist thì tính cho kênh chủ playlist).
-    <b>⭐ Tin dùng</b>: khi các bản của cùng một bài hoà lượt chọn, bản của nguồn ⭐ được đưa lên trước (kênh nhỏ ít lượt xem không bị chìm).
-    <b>Nhịp kiểm</b>: nguồn đã quét hết được kiểm bài mới mỗi ngày nếu vừa đăng trong 14 ngày, 3 ngày nếu trong 60 ngày, 7 ngày nếu lâu hơn; playlist 3 ngày.
-    <b>Kiểu tiêu đề</b>: hầu hết kênh đặt “Karaoke <i>Tên bài</i> – Ca sĩ”. Nếu kênh đặt “Ca sĩ – <i>Tên bài</i>”, bấm <b>Xem mẫu</b> rồi đổi sang <b>Ca sĩ trước</b>.
-  </div>
-</section>
+  <details class="acc">
+    <summary>Kênh vừa khám phá <span class="hint" id="candHint"></span></summary>
+    <div class="tbl"><table id="candTable"></table></div>
+  </details>
 
-<section>
-  <h2>Bài hot <button class="ghost sp" id="reloadHot">↻</button></h2>
-  <div class="hint">Điểm = thịnh hành (hạng 1 → 100 điểm) + tốc độ tăng lượt xem của bản karaoke + số lần anh chọn trong 30 ngày. Mỗi bài dùng bản được chọn nhiều nhất (hoà thì bản nhiều lượt xem hơn).</div>
-  <div style="overflow:auto"><table id="hotTable"></table></div>
-  <h2 style="margin-top:14px">Bài được chọn nhiều nhất <button class="ghost sp" id="reloadTop">↻</button></h2>
-  <div class="hint">Đếm mỗi lần khách bấm Chọn hoặc Ưu tiên trên điện thoại / máy tính bảng. <b>Các bản karaoke của cùng một bài được gộp</b>, mỗi bài hiện bản được chọn nhiều nhất (hoà thì bản của nguồn ⭐, rồi bản nhiều lượt xem). Kho chỉ giữ lịch sử <b>365 ngày</b> nên cần tải danh sách trước khi quá hạn. Lượt chọn của bản đã bị xoá khỏi kho không gộp được (có ghi số lượt ở dưới bảng). Bảng chỉ hiện 50 bài đầu; bấm ↻ để xem, không tự tải để đỡ tốn lượt đọc D1.</div>
-  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:6px 0">
-    <select id="topDays" class="sp"><option value="30">30 ngày</option><option value="90" selected>90 ngày</option><option value="365">1 năm (tối đa kho giữ)</option></select>
-    <button class="ghost" id="topCsv">⬇ Tải top 5000 (CSV)</button>
-  </div>
-  <div class="hint" id="topNote"></div>
-  <div style="overflow:auto"><table id="topTable"></table></div>
-  <h2 style="margin-top:14px">Nguồn thịnh hành &amp; danh sách tay</h2>
-  <div class="hint">Dán danh sách bài từ bảng xếp hạng bất kỳ (Zing, Spotify, TikTok…), mỗi dòng một bài, ví dụ “Hãy Trao Cho Anh – Sơn Tùng M-TP”. Bài chưa có trong kho sẽ được tự tìm bản karaoke dần dần (tối đa số lượt tìm tự động mỗi ngày).</div>
-  <textarea id="manual" placeholder="1. Tên bài – Ca sĩ&#10;2. Tên bài – Ca sĩ"></textarea>
-  <div class="line"><label class="hint"><input type="checkbox" id="manualReplace"> Thay toàn bộ danh sách tay cũ</label><button id="manualSave" class="sp">Lưu danh sách</button></div>
-  <div style="overflow:auto"><table id="rawTable"></table></div>
-</section>
+  <details class="acc">
+    <summary>Tiêu đề bị loại vì thiếu chữ “karaoke/beat”</summary>
+    <div class="hint">Nhiều bản tự làm chỉ ghi “Tone Nữ”, “Song ca”, “MR”… Xem mẫu bên dưới; dấu hiệu nào đúng là karaoke thì tick rồi bấm Lưu: kho nhận các bài đó ngay và từ nay nhận thêm. Dấu hiệu hay lẫn MV/bản cover thì để trống.</div>
+    <div class="line" id="kwBox"></div>
+    <div class="line"><button id="kwSave" type="button">Lưu dấu hiệu được nhận</button></div>
+    <div class="samples" id="nearBox" style="max-height:260px; overflow:auto"></div>
+  </details>
+</div>
 
-<section>
-  <h2>Xuất danh sách cho app Tải Video</h2>
-  <div class="hint">Danh sách bài nên tải về R2. Chọn <b>cách xếp hạng</b>: <b>Theo lượt xem YouTube</b> dùng khi các quán mới chạy thử (lượt chọn lúc này chỉ là bài bấm thử, chưa phản ánh khách);
-    <b>Trộn</b> khi đã có khách thật: bài được chọn từ k lượt trở lên xếp trước, còn lại theo lượt xem; <b>Lượt chọn + hot</b> khi quán chạy đông.
-    Điểm của bài = lượt xem của bản nhiều xem nhất; một phần số chỗ (mặc định 20%) dành cho bài <b>đang lên</b> (tốc độ tăng lượt xem) để không bỏ sót bài mới.
-    Mỗi bài lấy tối đa N bản: bản <b>nam</b> tốt nhất, bản <b>nữ</b> tốt nhất, bản <b>song ca</b>, rồi các bản tiếp theo.
-    App Tải Video tự lấy danh sách này mỗi đêm (nếu anh bật tự đồng bộ ở app đó); ở đây chỉ để xem trước hoặc tải file CSV.
-    <span id="exDl"></span></div>
-  <div class="line"><label class="chk">Cách xếp <select id="exBy"><option value="views">Theo lượt xem YouTube (đang thử)</option><option value="mix">Trộn: bài khách chọn trước, còn lại theo lượt xem</option><option value="pick">Lượt chọn + hot (quán đông)</option></select></label>
-    <label class="chk" id="exRiseL">dành <input id="exRise" type="number" min="0" max="50" value="20" style="width:64px">% chỗ cho bài đang lên</label>
-    <label class="chk" id="exMinL">bài được chọn từ <input id="exMin" type="number" min="1" max="1000" value="3" style="width:64px"> lượt</label></div>
-  <div class="line"><label class="chk">Top <input id="exTop" type="number" min="1" max="10000" value="2000" style="width:90px"> bài</label>
-    <label class="chk">tối đa <input id="exPer" type="number" min="1" max="8" value="4" style="width:56px"> bản/bài</label>
-    <label class="chk">lượt chọn trong <input id="exDays" type="number" min="1" max="3650" value="90" style="width:72px"> ngày</label>
-    <label class="chk"><input type="checkbox" id="exOnlyDl" checked> Chỉ nguồn được phép tải</label>
-    <label class="chk" id="exVnL" title="Loại video tiếng Indonesia, Philippines, Thái, Anh… lẫn trong kho. Giữ lại: nguồn do anh thêm tay, nguồn có ⭐, và bài có chữ Việt trong tiêu đề hoặc tên kênh."><input type="checkbox" id="exVn" checked> Chỉ bài tiếng Việt (loại video nước ngoài)</label></div>
-  <div class="line"><button class="ghost" id="exPrev">Xem trước</button> <button id="exCsv">⬇ Tải CSV</button></div>
-  <div id="exOut" class="hint"></div>
-  <div style="overflow:auto"><table id="exTable"></table></div>
-</section>
+<!-- ============ 4. BÀI HOT ============ -->
+<div class="panel" id="p-hot" role="tabpanel" hidden>
+  <section>
+    <h2>Bài hot <button class="ghost sp" id="reloadHot" type="button" title="Tải lại"><svg class="i"><use href="#i-refresh"/></svg></button></h2>
+    <div class="hint">Điểm = thịnh hành (hạng 1 → 100 điểm) + tốc độ tăng lượt xem của bản karaoke + số lần anh chọn trong 30 ngày. Mỗi bài dùng bản được chọn nhiều nhất (hoà thì bản nhiều lượt xem hơn).</div>
+    <div class="tbl"><table id="hotTable"></table></div>
+  </section>
+
+  <section>
+    <h2>Bài được chọn nhiều nhất
+      <select id="topDays" class="sp" aria-label="Khoảng thời gian"><option value="30">30 ngày</option><option value="90" selected>90 ngày</option><option value="365">1 năm (tối đa kho giữ)</option></select>
+      <button class="ghost" id="reloadTop" type="button"><svg class="i"><use href="#i-refresh"/></svg>Xem bảng</button>
+      <button class="ghost" id="topCsv" type="button"><svg class="i"><use href="#i-dl"/></svg>Tải top 5000 (CSV)</button></h2>
+    <div class="hint" id="topNote">Bấm “Xem bảng” để đọc (không tự tải cho đỡ tốn lượt đọc D1). Bảng hiện 50 bài đầu.</div>
+    <div class="tbl"><table id="topTable"></table></div>
+    <details class="help"><summary>Cách đếm</summary>
+      <div class="hint">Đếm mỗi lần khách bấm Chọn hoặc Ưu tiên trên điện thoại / máy tính bảng. <b>Các bản karaoke của cùng một bài được gộp</b>, mỗi bài hiện bản được chọn nhiều nhất (hoà thì bản của nguồn ⭐, rồi bản nhiều lượt xem). Kho chỉ giữ lịch sử <b>365 ngày</b> nên cần tải danh sách trước khi quá hạn. Lượt chọn của bản đã bị xoá khỏi kho không gộp được (có ghi số lượt ở dưới bảng).</div>
+    </details>
+  </section>
+
+  <section>
+    <h2>Nguồn thịnh hành &amp; danh sách tay</h2>
+    <div class="hint">Dán danh sách bài từ bảng xếp hạng bất kỳ (Zing, Spotify, TikTok…), mỗi dòng một bài, ví dụ “Hãy Trao Cho Anh – Sơn Tùng M-TP”. Bài chưa có trong kho sẽ được tự tìm bản karaoke dần dần (tối đa số lượt tìm tự động mỗi ngày).</div>
+    <textarea id="manual" placeholder="1. Tên bài – Ca sĩ&#10;2. Tên bài – Ca sĩ"></textarea>
+    <div class="line"><label class="hint"><input type="checkbox" id="manualReplace"> Thay toàn bộ danh sách tay cũ</label><button id="manualSave" class="sp" type="button">Lưu danh sách</button></div>
+    <details class="help"><summary>Danh sách nguồn thịnh hành hiện có</summary>
+      <div class="tbl"><table id="rawTable"></table></div>
+    </details>
+  </section>
+</div>
+
+<!-- ============ 5. XUẤT & DỌN ============ -->
+<div class="panel" id="p-tool" role="tabpanel" hidden>
+  <section>
+    <h2>Xuất danh sách cho app Tải Video</h2>
+    <div class="hint">Danh sách bài nên tải về R2; app Tải Video tự lấy mỗi đêm (nếu bật tự đồng bộ ở app đó), ở đây chỉ để xem trước hoặc tải file CSV. <span id="exDl"></span></div>
+    <div class="line"><label class="chk">Cách xếp <select id="exBy"><option value="views">Theo lượt xem YouTube (đang thử)</option><option value="mix">Trộn: bài khách chọn trước, còn lại theo lượt xem</option><option value="pick">Lượt chọn + hot (quán đông)</option></select></label>
+      <label class="chk" id="exRiseL">dành <input id="exRise" type="number" min="0" max="50" value="20" style="width:64px">% chỗ cho bài đang lên</label>
+      <label class="chk" id="exMinL">bài được chọn từ <input id="exMin" type="number" min="1" max="1000" value="3" style="width:64px"> lượt</label></div>
+    <div class="line"><label class="chk">Top <input id="exTop" type="number" min="1" max="10000" value="2000" style="width:90px"> bài</label>
+      <label class="chk">tối đa <input id="exPer" type="number" min="1" max="8" value="4" style="width:56px"> bản/bài</label>
+      <label class="chk">lượt chọn trong <input id="exDays" type="number" min="1" max="3650" value="90" style="width:72px"> ngày</label></div>
+    <div class="line"><label class="chk"><input type="checkbox" id="exOnlyDl" checked> Chỉ nguồn được phép tải</label>
+      <label class="chk" id="exVnL" title="Loại video tiếng Indonesia, Philippines, Thái, Anh… lẫn trong kho. Giữ lại: nguồn do anh thêm tay, nguồn có ⭐, và bài có chữ Việt trong tiêu đề hoặc tên kênh."><input type="checkbox" id="exVn" checked> Chỉ bài tiếng Việt (loại video nước ngoài)</label></div>
+    <div class="line"><button class="ghost" id="exPrev" type="button">Xem trước</button> <button id="exCsv" type="button"><svg class="i"><use href="#i-dl"/></svg>Tải CSV</button></div>
+    <div id="exOut" class="hint"></div>
+    <div class="tbl"><table id="exTable"></table></div>
+    <details class="help"><summary>Giải thích cách xếp hạng</summary>
+      <div class="hint"><b>Theo lượt xem YouTube</b> dùng khi các quán mới chạy thử (lượt chọn lúc này chỉ là bài bấm thử, chưa phản ánh khách); <b>Trộn</b> khi đã có khách thật: bài được chọn từ k lượt trở lên xếp trước, còn lại theo lượt xem; <b>Lượt chọn + hot</b> khi quán chạy đông.</div>
+      <div class="hint">Điểm của bài = lượt xem của bản nhiều xem nhất; một phần số chỗ (mặc định 20%) dành cho bài <b>đang lên</b> (tốc độ tăng lượt xem) để không bỏ sót bài mới. Mỗi bài lấy tối đa N bản: bản <b>nam</b> tốt nhất, bản <b>nữ</b> tốt nhất, bản <b>song ca</b>, rồi các bản tiếp theo.</div>
+    </details>
+  </section>
+
+  <section>
+    <h2>Sao lưu kho</h2>
+    <div class="line"><button class="ghost" id="dumpBtn" type="button"><svg class="i"><use href="#i-dl"/></svg>Tải toàn bộ kho (CSV)</button> <span class="hint" id="dumpOut">Nên tải trước khi dọn thật (dọn xong không hoàn tác được). Tải lại sau khi dọn để so trước/sau.</span></div>
+  </section>
+
+  <section class="zone-danger">
+    <h2>Dọn kho <span class="pill">thủ công — kho không bao giờ tự dọn</span></h2>
+    <div class="hint">Mỗi bài chỉ giữ lại các bản tốt nhất, bỏ bớt bản thừa và bản quá ít người xem. Luôn bấm <b>Xem trước</b> trước (chưa xoá gì); mỗi lần dọn thật xoá 2.000 bản rồi gọi lặp.</div>
+    <div class="line"><label class="chk">Giữ tối đa <input id="clKeep" type="number" min="3" max="30" value="8" style="width:64px"> bản/bài</label>
+      <label class="chk">luôn giữ <input id="clTone" type="number" min="1" max="5" value="2" style="width:56px"> bản mỗi giọng</label></div>
+    <div class="line"><label class="chk">Bản dưới <input id="clViews" type="number" min="0" value="500" style="width:90px"> lượt xem coi là ít xem</label>
+      <label class="chk">(luôn giữ ít nhất <input id="clMin" type="number" min="1" max="5" value="2" style="width:56px"> bản/bài)</label></div>
+    <div class="line"><button class="ghost" id="clPrev" type="button">Xem trước</button> <button class="danger" id="clGo" type="button" disabled>Dọn thật…</button> <button class="ghost" id="clStop" type="button" style="display:none">⏹ Dừng</button></div>
+    <pre id="clOut">Chưa xem trước.</pre>
+    <details class="help"><summary>Quy tắc dọn</summary>
+      <div class="hint">Xếp hạng: bản anh từng chọn trước, rồi kênh gắn ⭐, rồi lượt xem. <b>Không bao giờ dọn</b> bản anh từng chọn, bản của kênh ⭐ và bản ưu tiên của bài hot. Bản đã dọn được nhớ lại nên lần quét sau không nạp lại. Tốn khoảng 10 dòng ghi D1 cho mỗi bản.</div>
+    </details>
+  </section>
+</div>
 </main>
 
 <script>
 const $ = id => document.getElementById(id);
 function el(tag, cls, text){ const e = document.createElement(tag); if(cls) e.className = cls; if(text != null) e.textContent = text; return e; }
-function btn(label, cls, fn){ const b = el('button', cls, label); b.onclick = fn; return b; }
+function btn(label, cls, fn){ const b = el('button', cls, label); b.type = 'button'; b.onclick = fn; return b; }
+function ico(name, cls){ const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); s.setAttribute('class', 'i' + (cls ? ' ' + cls : '')); s.setAttribute('aria-hidden', 'true');
+  const u = document.createElementNS('http://www.w3.org/2000/svg', 'use'); u.setAttribute('href', '#i-' + name); s.append(u); return s; }
 const lsGet = k => { try{ return localStorage.getItem(k); }catch(e){ return null; } };
 const lsSet = (k, v) => { try{ localStorage.setItem(k, v); }catch(e){} };
 const DEFAULT_KHO = 'https://kho-karaoke.vumanhhung85.workers.dev', DEFAULT_KHO_EN = 'https://kho-karaoke-en.vumanhhung85.workers.dev';
-/* Hai kho (Việt / Anh) là hai Worker riêng, quản trị chung trang này: nút "Kho Việt / Kho Anh" chọn kho đang làm việc */
+/* Hai kho (Việt / Anh) là hai Worker riêng, quản trị chung trang này: nút "Kho Việt / Kho quốc tế" chọn kho đang làm việc */
 const K = { vi: lsGet('kho_api') || DEFAULT_KHO, en: lsGet('kho_api_en') || DEFAULT_KHO_EN, pass: lsGet('np_pass') || '', passEn: lsGet('kho_pass_en') || '' };
 let CUR = lsGet('kho_cur') === 'en' ? 'en' : 'vi';
 const cfg = { get kho(){ return CUR === 'en' ? K.en : K.vi; }, get pass(){ return CUR === 'en' ? (K.passEn || K.pass) : K.pass; } };
 const CLEAN_DEF = { vi:{ keep:8, tone:2 }, en:{ keep:4, tone:1 } };
+
+/* ---------- Thẻ (tab) ---------- */
+const TABS = ['home', 'src', 'grow', 'hot', 'tool'], HASH = { nguon:'src', mo:'grow', hot:'hot', xuat:'tool', home:'home' };
+function showTab(name, focus){
+  if(!TABS.includes(name)) name = 'home';
+  TABS.forEach(t => { const on = t === name; $('p-' + t).hidden = !on; const b = document.querySelector('#tabs [data-tab="' + t + '"]'); b.setAttribute('aria-selected', on ? 'true' : 'false'); b.tabIndex = on ? 0 : -1; if(on && focus) b.focus(); });
+  lsSet('kho_tab', name);
+  window.scrollTo({ top:0 });
+}
+document.querySelectorAll('#tabs [data-tab]').forEach((b, i, all) => {
+  b.onclick = () => showTab(b.dataset.tab);
+  b.onkeydown = e => { if(e.key === 'ArrowRight' || e.key === 'ArrowLeft'){ e.preventDefault(); showTab(all[(i + (e.key === 'ArrowRight' ? 1 : all.length - 1)) % all.length].dataset.tab, true); } };
+});
+function setBadge(id, n){ const e = $(id); e.textContent = n ? String(n) : ''; e.style.display = n ? '' : 'none'; }
+/* Chấm trạng thái ở đầu trang: nhìn được ở mọi thẻ */
+function setChip(kind, text){ const c = $('chip'); c.className = 'chipst ' + kind; c.textContent = text; }
+function syncAlerts(){
+  const n = [...document.querySelectorAll('#alerts .alert.bad')].filter(e => e.style.display !== 'none' && e.textContent).length;
+  const ln = $('langNote'); const lnBad = ln.style.display !== 'none' && ln.textContent.startsWith('⚠');
+  const t = n + (lnBad ? 1 : 0);
+  if(t) setChip('bad', t + ' cảnh báo'); else setChip('ok', 'Kho ổn');
+}
+$('chip').onclick = () => { showTab('home'); const a = document.querySelector('#alerts .alert.bad:not([style*="none"])'); (a || $('stats')).scrollIntoView({ behavior:'smooth', block:'center' }); };
+
 function paintKho(){
   document.querySelectorAll('#khoSeg button').forEach(b => b.classList.toggle('on', b.dataset.k === CUR));
   document.body.classList.toggle('en', CUR === 'en');
@@ -264,17 +514,20 @@ function paintKho(){
 document.querySelectorAll('#khoSeg button').forEach(b => b.onclick = () => {
   if(b.dataset.k === CUR) return;
   CUR = b.dataset.k; lsSet('kho_cur', CUR); paintKho();
-  ['stats', 'channels', 'discover', 'hotTable', 'rawTable', 'growStats', 'missTable', 'artTable', 'candTable', 'nearBox', 'preview', 'suggest', 'topTable'].forEach(id => { const e = $(id); if(e) e.replaceChildren(); });
-  $('topNote').textContent = '';
+  ['stats', 'statsMore', 'heroStats', 'channels', 'discover', 'hotTable', 'rawTable', 'growStats', 'missTable', 'artTable', 'candTable', 'nearBox', 'preview', 'suggest', 'topTable', 'chChips'].forEach(id => { const e = $(id); if(e) e.replaceChildren(); });
+  $('topNote').textContent = 'Bấm “Xem bảng” để đọc.'; $('chCount').textContent = ''; $('heroLast').textContent = 'Đang tải…';
+  $('mergeOut').style.display = 'none'; $('mergeGo').disabled = true; mergePlanOk = false;
   $('last').textContent = '—'; $('clOut').textContent = 'Chưa xem trước.'; $('clGo').disabled = true; $('langNote').style.display = 'none';
+  setChip('', 'Đang kiểm…'); setBadge('tbSrc', 0); setBadge('tbGrow', 0);
   loadAll();
 });
 const fmt = n => (+n || 0).toLocaleString('vi-VN');
 const until = t => { const m = Math.round((t - Date.now()) / 60000); return m <= 0 ? 'đến hạn' : m < 60 ? 'sau ' + m + ' phút' : m < 1440 ? 'sau ' + Math.round(m / 60) + ' giờ' : 'sau ' + Math.round(m / 1440) + ' ngày'; };
 const ago = t => { if(!t) return 'chưa'; const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'vừa xong' : m < 60 ? m + ' phút trước' : m < 1440 ? Math.round(m / 60) + ' giờ trước' : Math.round(m / 1440) + ' ngày trước'; };
+const fold = s => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd');
 
 function fillCfg(){ $('khoInput').value = K.vi; $('passInput').value = K.pass; $('khoEnInput').value = K.en; $('passEnInput').value = K.passEn; }
-$('gear').onclick = () => { const s = $('settings'); fillCfg(); s.style.display = s.style.display === 'none' ? '' : 'none'; };
+$('gear').onclick = () => { const s = $('settings'); fillCfg(); const open = s.style.display === 'none'; s.style.display = open ? '' : 'none'; if(open) window.scrollTo({ top:0, behavior:'smooth' }); };
 $('saveCfg').onclick = () => {
   K.vi = $('khoInput').value.trim().replace(/\/+$/, '') || DEFAULT_KHO; K.pass = $('passInput').value;
   K.en = $('khoEnInput').value.trim().replace(/\/+$/, '') || DEFAULT_KHO_EN; K.passEn = $('passEnInput').value;
@@ -287,7 +540,7 @@ async function api(path, body){
   const opt = body ? { method:'POST', headers:{ 'x-pass':cfg.pass, 'content-type':'application/json' }, body:JSON.stringify(body) } : { headers:{ 'x-pass':cfg.pass } };
   let res;
   const at = CUR;
-  try{ res = await fetch(cfg.kho + path, opt); }catch(e){ throw new Error('Không kết nối được tới Worker ' + (CUR === 'en' ? 'kho Anh (đã tạo Worker kho-karaoke-en chưa? địa chỉ ở nút ⚙)' : 'kho') + ' (sai địa chỉ, mạng, hoặc CORS)'); }
+  try{ res = await fetch(cfg.kho + path, opt); }catch(e){ throw new Error('Không kết nối được tới Worker ' + (CUR === 'en' ? 'kho Anh (đã tạo Worker kho-karaoke-en chưa? địa chỉ ở nút Kết nối)' : 'kho') + ' (sai địa chỉ, mạng, hoặc CORS)'); }
   let d = {}; try{ d = await res.json(); }catch(e){}
   if(at !== CUR) throw Object.assign(new Error('Đã chuyển kho'), { switched: true });     // trả lời của kho cũ về sau khi đã bấm sang kho kia → bỏ
   if(!res.ok){
@@ -301,7 +554,8 @@ function fail(boxId, e){ if(e && e.switched) return; const b = $(boxId); b.repla
 /* ---------- Tình trạng ---------- */
 const JOB = { scan:'Quét kênh', refresh:'Làm mới', hot:'Cập nhật bài hot', hotsearch:'Tìm bài hot còn thiếu', rehot:'Ghép lại bài hot', gap:'Lấp bài tìm hụt', discover:'Khám phá kênh', plsearch:'Tìm playlist ca sĩ', idle:'Nghỉ', busy:'Đang bận', error:'Lỗi' };
 function showReport(r){
-  if(!r){ $('last').textContent = '—'; return; }
+  if(!r){ $('last').textContent = '—'; $('heroLast').textContent = 'Chưa có lượt chạy nào.'; return; }
+  $('heroLast').textContent = 'Lượt chạy gần nhất: ' + (JOB[r.job] || r.job) + ' · ' + ago(r.at);
   const parts = [(JOB[r.job] || r.job) + ' · ' + ago(r.at)];
   if(r.idle) parts.push('không có việc cần làm' + (r.reason ? ' (' + r.reason + ')' : ''));
   if(r.job === 'scan' && r.list){
@@ -330,60 +584,82 @@ function keyLabel(keys){
   if(b.set && !b.bad) return 'Đang dùng YT_KEY_2';
   return 'YT_KEY ' + st(a) + (b.set ? ' · YT_KEY_2 ' + st(b) : '');
 }
+/* Một ô số liệu; ratio (0..1) vẽ thêm thanh đầy; hiBad = tỉ lệ càng cao càng xấu (tìm hụt), còn lại càng gần trần càng xấu */
+function tile(label, v, ratio, hiBad, tone){
+  const d = el('div', 'stat'), arr = Array.isArray(v), b = el('b', !arr && String(v).length > 12 ? 'sm' : null, arr ? v[0] : String(v));
+  if(arr && v[1]) b.append(el('small', null, v[1]));
+  d.append(b, el('span', null, label));
+  let lvl = tone || '';
+  if(ratio != null && isFinite(ratio)){
+    const r = Math.max(0, Math.min(1, ratio));
+    if(!tone) lvl = hiBad ? (r >= .5 ? 'bad' : r >= .3 ? 'warn' : '') : (r >= .9 ? 'bad' : r >= .7 ? 'warn' : '');
+    const bar = el('div', 'bar'), i = el('i'); i.style.width = Math.round(r * 100) + '%'; if(lvl) i.className = lvl; bar.append(i); d.append(bar);
+  }
+  if(lvl) d.classList.add(lvl);
+  return d;
+}
 async function loadStats(){
   try{
     const s = await api('/api/kho/stats');
-    const g = $('stats'); g.replaceChildren();
+    const hero = $('heroStats'), g = $('stats'), more = $('statsMore'); hero.replaceChildren(); g.replaceChildren(); more.replaceChildren();
     const ln = $('langNote'), sl = s.lang || 'vi';
     if(sl !== CUR){
       ln.textContent = '⚠ Địa chỉ đang dùng cho ' + (CUR === 'en' ? 'Kho quốc tế' : 'Kho Việt') + ' lại trỏ vào một kho ' + (sl === 'en' ? 'tiếng Anh' : 'tiếng Việt') +
-        '. Kiểm tra địa chỉ ở nút ⚙' + (CUR === 'en' ? ' và biến KHO_LANG=en của Worker kho Anh.' : '.');
+        '. Kiểm tra địa chỉ ở nút Kết nối' + (CUR === 'en' ? ' và biến KHO_LANG=en của Worker kho Anh.' : '.');
       ln.style.display = '';
     } else if(sl === 'en'){
       ln.textContent = 'Kho quốc tế (tiếng Anh + K-pop) · hạn chế: tối đa ' + (s.maxVideos ? fmt(s.maxVideos) + ' bản' : 'không giới hạn') + ' · ' + (s.expand ? 'có' : 'không') + ' tự khám phá kênh/playlist · bảng thịnh hành ' +
         (s.hotRegion || 'tắt') + ' · bài thiếu được tìm dần từ danh sách tay và bài khách tìm hụt. Kênh karaoke tiếng Anh thường đặt “Ca sĩ – Tên bài”: khi thêm kênh nhớ chọn Ca sĩ trước.';
       ln.style.display = '';
     } else ln.style.display = 'none';
-    [['Bản karaoke', fmt(s.videos)], ['Bài (đã gom)', fmt(s.songs)], ['Nguồn đang bật', s.channelsOn + '/' + s.channels + (s.playlists ? ' (' + s.playlists + ' PL)' : '')],
-     ['Chờ quét toàn bộ', s.pendingFull || 0], ['Đến hạn kiểm', s.dueNow || 0], ['Bài hot', s.hotSongs],
-     ['Hot chờ tìm', s.hotPending], ['Lượt chọn 30 ngày', fmt(s.picks30)], ['Đơn vị hôm nay', fmt(s.unitsToday) + '/' + fmt(s.budget)],
-     ['Lượt tìm hôm nay', s.searchesToday + '/' + (s.searchLimit || 100)], ['Bài hot cập nhật', ago(s.hotAt)],
-     ['Bài mới 7 ngày', fmt(s.newSongs7 || 0) + ' bài · ' + fmt(s.newVersions7 || 0) + ' bản'],
-     ['Chờ làm mới', fmt(s.refreshDue || 0) + (s.refreshOldest ? ' · cũ nhất ' + ago(s.refreshOldest) : '')], ['Đơn vị dành cho làm mới', fmt(s.refreshReserve || 0) + '/ngày'],
-     ['Tìm hụt 7 ngày', s.q7 ? (s.miss7 || 0) + '/' + s.q7 + ' (' + Math.round((s.miss7 || 0) * 100 / s.q7) + '%)' : 'chưa có'],
-     ['Dòng ghi D1 hôm nay', s.writeLimit ? fmt(s.writesToday) + '/' + fmt(s.writeLimit) : '—'], ['Khoá YouTube', keyLabel(s.keys)]]
+
+    [['Bản karaoke', fmt(s.videos)], ['Bài (đã gom)', fmt(s.songs)], ['Nguồn đang bật', [s.channelsOn + '/' + s.channels, s.playlists ? '· ' + s.playlists + ' playlist' : '']]]
+      .forEach(([l, v]) => { const d = el('div', 'hn'), b = el('b', null, Array.isArray(v) ? v[0] : v); if(Array.isArray(v) && v[1]) b.append(el('small', null, v[1])); d.append(b, el('span', null, l)); hero.append(d); });
+
+    const kl = keyLabel(s.keys), keyBad = /hỏng|chưa đặt/.test(kl);
+    g.append(
+      tile('Đơn vị hôm nay', [fmt(s.unitsToday), '/ ' + fmt(s.budget)], s.budget ? s.unitsToday / s.budget : null),
+      tile('Lượt tìm hôm nay', [String(s.searchesToday), '/ ' + (s.searchLimit || 100)], s.searchesToday / (s.searchLimit || 100)),
+      tile('Dòng ghi D1 hôm nay', s.writeLimit ? [fmt(s.writesToday), '/ ' + fmt(s.writeLimit)] : '—', s.writeLimit ? s.writesToday / s.writeLimit : null),
+      tile('Tìm hụt 7 ngày', s.q7 ? [String(s.miss7 || 0), '/ ' + s.q7 + ' (' + Math.round((s.miss7 || 0) * 100 / s.q7) + '%)'] : 'chưa có', s.q7 ? (s.miss7 || 0) / s.q7 : null, true),
+      tile('Bài mới 7 ngày', [fmt(s.newSongs7 || 0), 'bài · ' + fmt(s.newVersions7 || 0) + ' bản']),
+      tile('Khoá YouTube', kl, null, false, keyBad ? 'bad' : 'good'));
+    [['Chờ quét toàn bộ', s.pendingFull || 0], ['Đến hạn kiểm', s.dueNow || 0], ['Bài hot', s.hotSongs], ['Hot chờ tìm', s.hotPending], ['Lượt chọn 30 ngày', fmt(s.picks30)],
+     ['Bài hot cập nhật', ago(s.hotAt)], ['Chờ làm mới', fmt(s.refreshDue || 0) + (s.refreshOldest ? ' · cũ nhất ' + ago(s.refreshOldest) : '')], ['Đơn vị dành cho làm mới', fmt(s.refreshReserve || 0) + '/ngày']]
       .concat(s.maxVideos ? [['Trần số bản', fmt(s.videos) + '/' + fmt(s.maxVideos)]] : [])
-      .forEach(([l, v]) => { const d = el('div', 'stat'); d.append(el('b', String(v).length > 12 ? 'sm' : null, String(v)), el('span', null, l)); g.append(d); });
+      .forEach(([l, v]) => more.append(tile(l, v)));
+    $('scanInfo').textContent = 'Chờ quét toàn bộ ' + (s.pendingFull || 0) + ' nguồn · đến hạn kiểm ' + (s.dueNow || 0) + ' nguồn';
     showReport(s.last);
+
     const w = $('cronWarn');
     if(s.last && Date.now() - s.last.at > 30 * 60000){
-      w.textContent = '⚠ Lượt chạy gần nhất cách đây ' + ago(s.last.at) + ' nên lịch tự chạy 10 phút/lần (Cron Trigger) đang KHÔNG hoạt động. Vào Cloudflare → Worker ' + (CUR === 'en' ? 'kho-karaoke-en' : 'kho-karaoke') + ' → Settings → Triggers → thêm Cron Trigger */10 * * * * .';
+      w.textContent = 'Lượt chạy gần nhất cách đây ' + ago(s.last.at) + ' nên lịch tự chạy 10 phút/lần (Cron Trigger) đang KHÔNG hoạt động. Vào Cloudflare → Worker ' + (CUR === 'en' ? 'kho-karaoke-en' : 'kho-karaoke') + ' → Settings → Triggers → thêm Cron Trigger */10 * * * * .';
       w.style.display = '';
     } else w.style.display = 'none';
     const kw = $('keyWarn'), bad = (s.keys || []).filter(k => k.set && k.bad);
     if(bad.length){
       const k2 = (s.keys || [])[1] || {};
-      kw.textContent = '⚠ ' + bad.map(k => k.name + ' hỏng (' + (k.bad.reason || '') + ', ' + ago(k.bad.at) + ')').join(' · ') +
+      kw.textContent = bad.map(k => k.name + ' hỏng (' + (k.bad.reason || '') + ', ' + ago(k.bad.at) + ')').join(' · ') +
         (bad.length >= (s.keys || []).filter(k => k.set).length ? ' — kho KHÔNG gọi được YouTube. Tạo khoá mới trong cùng project Google rồi cập nhật secret trong Cloudflare.'
           : (k2.set && !k2.bad ? ' — kho đang tự chạy bằng YT_KEY_2. Anh thay YT_KEY mới (cùng project) khi tiện.' : ''));
-      kw.style.display = '';
+      kw.className = 'alert bad'; kw.style.display = '';
     } else if(s.keys && !s.keys[1].set){
-      kw.className = 'hint'; kw.textContent = 'Gợi ý: thêm secret YT_KEY_2 (khoá thứ hai tạo trong CÙNG project Google) để kho tự chuyển sang khi YT_KEY bị hỏng.';
+      kw.className = 'alert info'; kw.textContent = 'Gợi ý: thêm secret YT_KEY_2 (khoá thứ hai tạo trong CÙNG project Google) để kho tự chuyển sang khi YT_KEY bị hỏng.';
       kw.style.display = '';
     } else kw.style.display = 'none';
-    if(bad.length) kw.className = 'hint err';
     const ww = $('writeWarn');
     if(s.writeLimit && s.writesToday >= s.writeLimit * 0.8){
-      ww.textContent = (s.writesToday >= s.writeLimit ? '⛔ Kho đã chạm trần ' : '⚠ Kho sắp chạm trần ') + fmt(s.writeLimit) + ' dòng ghi D1 hôm nay (' + fmt(s.writesToday) +
+      ww.textContent = (s.writesToday >= s.writeLimit ? 'Kho đã chạm trần ' : 'Kho sắp chạm trần ') + fmt(s.writeLimit) + ' dòng ghi D1 hôm nay (' + fmt(s.writesToday) +
         '). Khi chạm trần kho tự dừng ghi tới ngày mới. Nếu không phải đang quét kênh lớn thì có thể Worker đang lỗi ghi lặp — báo em kiểm tra.';
       ww.style.display = '';
     } else ww.style.display = 'none';
     const lw = $('lagWarn');
     if(s.late > 0){
-      lw.textContent = '⚠ ' + s.late + ' nguồn trễ hạn kiểm bài mới hơn 3 ngày (trễ nhất ' + ago(s.oldestDue) + '). Thường do quá nhiều nguồn so với số lượt chạy, hoặc hết đơn vị mỗi ngày. Bấm ⚡ Quét nhanh để kiểm bù; nếu lặp lại thì tắt bớt nguồn có “bài riêng” thấp.';
+      lw.textContent = s.late + ' nguồn trễ hạn kiểm bài mới hơn 3 ngày (trễ nhất ' + ago(s.oldestDue) + '). Thường do quá nhiều nguồn so với số lượt chạy, hoặc hết đơn vị mỗi ngày. Bấm Quét nhanh để kiểm bù; nếu lặp lại thì tắt bớt nguồn có “bài riêng” thấp.';
       lw.style.display = '';
     } else lw.style.display = 'none';
-  }catch(e){ fail('stats', e); }
+    syncAlerts();
+  }catch(e){ if(!(e && e.switched)) setChip('bad', 'Chưa đọc được kho'); fail('stats', e); }
 }
 async function runJob(job, b){
   const all = document.querySelectorAll('[data-job], #runAuto'); all.forEach(x => x.disabled = true);
@@ -397,10 +673,14 @@ document.querySelectorAll('[data-job]').forEach(b => b.onclick = () => runJob(b.
 $('reloadStats').onclick = loadStats;
 
 /* ---------- Nguồn (kênh & playlist) ---------- */
-let chData = [], chSort = lsGet('kho_chsort') || 'added';
+let chData = [], chSort = lsGet('kho_chsort') || 'added', chF = 'all', chQ = '';
 $('chSort').value = chSort;
 $('chSort').onchange = () => { chSort = $('chSort').value; lsSet('kho_chsort', chSort); renderChannels(); };
+$('chFilter').oninput = () => { chQ = fold($('chFilter').value.trim()); renderChannels(); };
+const CH_FILTERS = [['all', 'Tất cả'], ['on', 'Bật'], ['off', 'Tắt'], ['star', '⭐ Tin dùng'], ['dl', '⬇ Được tải'], ['auto', 'Tự thêm'], ['run', 'Đang quét']];
+const chPass = (c, f) => f === 'on' ? !!c.enabled : f === 'off' ? !c.enabled : f === 'star' ? !!c.star : f === 'dl' ? !!c.dl : f === 'auto' ? !!c.auto : f === 'run' ? !c.fullDone : true;
 const ytLink = c => c.kind === 'playlist' ? 'https://www.youtube.com/playlist?list=' + c.id : 'https://www.youtube.com/channel/' + c.id;
+document.addEventListener('click', e => { document.querySelectorAll('details.more[open]').forEach(d => { if(!d.contains(e.target)) d.open = false; }); });
 async function loadChannels(){
   try{
     const d = await api('/api/kho/channels');
@@ -409,8 +689,18 @@ async function loadChannels(){
 }
 function renderChannels(){
   const box = $('channels'); box.replaceChildren();
-  if(!chData.length){ box.append(el('div', 'hint', 'Chưa có nguồn nào. Dán link kênh/playlist karaoke ở trên, hoặc thêm từ Gợi ý từ kho.')); return; }
-  const list = chData.slice();
+  setBadge('tbSrc', chData.length);
+  const chips = $('chChips'); chips.replaceChildren();
+  CH_FILTERS.forEach(([k, t]) => {
+    const n = chData.filter(c => chPass(c, k)).length;
+    if(k !== 'all' && k !== chF && !n) return;
+    const b = el('button', chF === k ? 'on' : '', t + ' '); b.type = 'button'; b.append(el('small', null, String(n))); b.onclick = () => { chF = k; renderChannels(); }; chips.append(b);
+  });
+  if(!chData.length){ $('chCount').textContent = ''; box.append(el('div', 'hint', 'Chưa có nguồn nào. Dán link kênh/playlist karaoke ở trên, hoặc thêm từ Gợi ý từ kho.')); return; }
+  let list = chData.filter(c => chPass(c, chF) && (!chQ || fold(c.title + ' ' + (c.handle || '')).includes(chQ)));
+  $('chCount').textContent = 'hiện ' + list.length + '/' + chData.length;
+  if(!list.length){ box.append(el('div', 'hint', 'Không có nguồn nào khớp bộ lọc.')); return; }
+  list = list.slice();
   if(chSort === 'uniq') list.sort((a, b) => (a.fullDone ? 0 : 1) - (b.fullDone ? 0 : 1) || (a.uniq || 0) - (b.uniq || 0) || (a.picks30 || 0) - (b.picks30 || 0));
   else if(chSort === 'picks') list.sort((a, b) => (b.picks30 || 0) - (a.picks30 || 0) || (b.uniq || 0) - (a.uniq || 0));
   else if(chSort === 'star') list.sort((a, b) => (b.star ? 1 : 0) - (a.star ? 1 : 0) || (a.addedAt || 0) - (b.addedAt || 0));
@@ -422,7 +712,6 @@ function renderChannels(){
     a.href = ytLink(c); a.target = '_blank'; a.rel = 'noopener'; a.style.color = 'inherit';
     name.append(a); if(c.handle) name.append(document.createTextNode('  ' + (c.kind === 'playlist' ? '· ' : '') + c.handle));
     const st = el('div', 'sub');
-    st.append(el('span', 'pill ' + (c.enabled ? 'on' : 'off'), c.enabled ? 'Bật' : 'Tắt'));
     if(c.kind === 'playlist') st.append(el('span', 'pill pl', 'Playlist'));
     if(c.auto) st.append(el('span', 'pill auto', 'Tự thêm'));
     if(c.dl) st.append(el('span', 'pill dl', '⬇ Được phép tải'));
@@ -451,7 +740,7 @@ function renderChannels(){
       db.disabled = true;
       try{ await api('/api/kho/channel/update', { id:c.id, dl:!c.dl }); c.dl = !c.dl; renderChannels(); exDlCount(); }catch(e){ alert(e.message); db.disabled = false; }
     });
-    const sel = document.createElement('select');
+    const sel = document.createElement('select'); sel.title = 'Kiểu tiêu đề của kênh'; sel.setAttribute('aria-label', 'Kiểu tiêu đề');
     [['song', 'Tên bài trước'], ['artist', 'Ca sĩ trước']].forEach(([v, t]) => { const o = document.createElement('option'); o.value = v; o.textContent = t; sel.append(o); });
     sel.value = c.order;
     sel.onchange = async () => { try{ await api('/api/kho/channel/update', { id:c.id, order:sel.value }); c.order = sel.value; showSamples(); }catch(e){ alert(e.message); } };
@@ -465,20 +754,28 @@ function renderChannels(){
         r.items.forEach(x => { const d2 = el('div'); d2.append(document.createTextNode(x.title + '  →  '), el('b', null, x.song_key)); s.append(d2); });
       }catch(e){ s.replaceChildren(el('div', 'err', e.message)); }
     };
-    acts.append(sb, db, sel,
-      btn('Xem mẫu', 'ghost', showSamples),
-      btn(c.enabled ? 'Tắt' : 'Bật', 'ghost', async () => { try{ await api('/api/kho/channel/update', { id:c.id, enabled:!c.enabled }); loadChannels(); loadStats(); }catch(e){ alert(e.message); } }),
-      btn('Quét lại', 'ghost', async () => { if(!confirm('Quét lại toàn bộ “' + c.title + '”? Chỉ tốn khoảng 1 đơn vị cho mỗi 50 video.')) return; try{ await api('/api/kho/channel/update', { id:c.id, rescan:true }); loadChannels(); }catch(e){ alert(e.message); } }),
-      btn('Xoá', 'danger', async () => {
+    const sw = btn(c.enabled ? '● Bật' : '○ Tắt', 'sw ' + (c.enabled ? 'on' : 'off'), async () => { try{ await api('/api/kho/channel/update', { id:c.id, enabled:!c.enabled }); loadChannels(); loadStats(); }catch(e){ alert(e.message); } });
+    sw.title = c.enabled ? 'Đang bật — bấm để tắt' : 'Đang tắt — bấm để bật';
+    const more = el('details', 'more'), sm = el('summary'), menu = el('div', 'menu');
+    sm.append(ico('more')); sm.title = 'Thêm thao tác'; sm.setAttribute('aria-label', 'Thêm thao tác');
+    const mi = (label, cls, fn) => btn(label, cls, () => { more.open = false; fn(); });
+    menu.append(
+      mi('Xem mẫu tiêu đề', null, showSamples),
+      mi('Quét lại toàn bộ', null, async () => { if(!confirm('Quét lại toàn bộ “' + c.title + '”? Chỉ tốn khoảng 1 đơn vị cho mỗi 50 video.')) return; try{ await api('/api/kho/channel/update', { id:c.id, rescan:true }); loadChannels(); }catch(e){ alert(e.message); } }),
+      el('hr'),
+      mi('Xoá nguồn…', 'danger', async () => {
         if(!confirm('Xoá “' + c.title + '” khỏi danh sách nguồn?')) return;
         const purge = confirm('Xoá luôn ' + fmt(c.videos) + ' bản của nguồn này khỏi kho?\nOK = xoá cả bản · Huỷ = giữ bản, chỉ ngừng quét');
         try{ await api('/api/kho/channel/remove', { id:c.id, purge }); loadChannels(); loadStats(); }catch(e){ alert(e.message); }
       }));
+    more.append(sm, menu);
+    acts.append(sw, sb, db, sel, more);
     row.append(meta, acts); box.append(row);
   });
 }
 function renderDiscover(items){
   const box = $('discover'); box.replaceChildren();
+  $('discCount').textContent = String(items.length); $('discCount').classList.toggle('on', items.length > 0);
   if(!items.length){ box.append(el('div', 'hint', 'Chưa có gợi ý. Gợi ý xuất hiện khi kênh chưa thêm có từ 3 bản trong kho, hoặc có bản được chọn hát.')); return; }
   items.forEach(x => {
     const row = el('div', 'row'), meta = el('div', 'meta');
@@ -501,7 +798,7 @@ const linesOf = t => [...new Set(String(t || '').split(/[\r\n]+/).map(s => s.tri
 $('chPreview').onclick = () => previewLinks(linesOf($('chInput').value));
 $('chAdd').onclick = async e => {
   const lines = linesOf($('chInput').value); if(!lines.length) return;
-  const b = e.target; b.disabled = true;
+  const b = e.currentTarget; b.disabled = true;
   const ok = [], bad = [];
   for(const [i, input] of lines.entries()){
     b.textContent = 'Đang thêm ' + (i + 1) + '/' + lines.length + '…';
@@ -510,7 +807,7 @@ $('chAdd').onclick = async e => {
   }
   b.disabled = false; b.textContent = '＋ Thêm ngay';
   if(!bad.length) $('chInput').value = '';
-  alert((ok.length ? 'Đã thêm ' + ok.length + ' nguồn:\n• ' + ok.join('\n• ') : '') + (bad.length ? '\n\nKhông thêm được:\n• ' + bad.join('\n• ') : '') + (ok.length ? '\n\nKho sẽ quét dần trong các lượt tự chạy, hoặc bấm ⚡ Quét nhanh.' : ''));
+  alert((ok.length ? 'Đã thêm ' + ok.length + ' nguồn:\n• ' + ok.join('\n• ') : '') + (bad.length ? '\n\nKhông thêm được:\n• ' + bad.join('\n• ') : '') + (ok.length ? '\n\nKho sẽ quét dần trong các lượt tự chạy, hoặc vào Tổng quan bấm Quét nhanh.' : ''));
   loadChannels(); loadStats();
 };
 async function previewLinks(lines){
@@ -603,14 +900,14 @@ async function loadGrow(){
     const [g, s] = await Promise.all([api('/api/kho/grow'), api('/api/kho/stats')]);
     const box = $('growStats'); box.replaceChildren();
     const c = s.cat || {}, L = s.catLimit || {};
-    [['Tìm lấp bài hụt hôm nay', (c.gap || 0) + '/' + (L.gap || 0)], ['Tìm playlist hôm nay', (c.pl || 0) + '/' + (L.pl || 0)], ['Tìm bài hot hôm nay', (c.hot || 0) + '/' + (L.hot || 0)],
-     ['Kênh khám phá hôm nay', (c.disc || 0) + '/' + (L.disc || 0)], ['Chừa cho anh tìm tay', s.reserve != null ? s.reserve + ' lượt' : '—'],
-     ['Nguồn tự thêm', g.autoOn + '/' + g.autoSources + ' đang bật'], ['Bản từ nguồn tự thêm', fmt(g.autoVideos)]]
-      .forEach(([l, v]) => { const d = el('div', 'stat'); d.append(el('b', String(v).length > 12 ? 'sm' : null, String(v)), el('span', null, l)); box.append(d); });
+    const qt = (l, used, lim) => tile(l, [String(used || 0), '/ ' + (lim || 0)], lim ? (used || 0) / lim : null);
+    box.append(qt('Tìm lấp bài hụt hôm nay', c.gap, L.gap), qt('Tìm playlist hôm nay', c.pl, L.pl), qt('Tìm bài hot hôm nay', c.hot, L.hot), qt('Kênh khám phá hôm nay', c.disc, L.disc),
+      tile('Chừa cho anh tìm tay', s.reserve != null ? [String(s.reserve), 'lượt'] : '—'), tile('Nguồn tự thêm · ' + fmt(g.autoVideos) + ' bản', [g.autoOn + '/' + g.autoSources, 'đang bật']));
     $('missHint').textContent = g.missWait + ' bài chờ tìm · tổng ' + g.missTotal;
+    setBadge('tbGrow', g.missWait || 0);
     table('missTable', [['Anh đã tìm'], ['Số lần', 'n'], ['Trạng thái'], ['']], g.misses.map(m => {
       const st = m.searched ? (m.added ? 'đã tìm, thêm ' + m.added + ' bản' : 'đã tìm, YouTube không có bản karaoke') : 'chờ tìm';
-      const act = el('td'); act.append(btn('Bỏ', 'ghost', async () => { try{ await api('/api/kho/grow/miss/drop', { q:m.q }); loadGrow(); }catch(e){ alert(e.message); } }));
+      const act = el('td'); act.append(btn('Bỏ', 'ghost ic', async () => { try{ await api('/api/kho/grow/miss/drop', { q:m.q }); loadGrow(); }catch(e){ alert(e.message); } }));
       return [td(m.label || m.q), td(String(m.n), 'n'), td(st, m.searched ? (m.added ? 'ok' : 'hint') : 'hint'), act];
     }));
     $('artHint').textContent = g.artistDone + '/' + g.artistTotal + ' đã tìm · thêm ' + fmt(g.artistAdded) + ' playlist' + (g.artistMine ? ' · ' + g.artistMine + ' tên anh ưu tiên' : '') + (g.artistHidden ? ' · đã xoá ' + g.artistHidden : '');
@@ -642,14 +939,43 @@ async function loadGrow(){
 $('reloadGrow').onclick = loadGrow;
 $('kwSave').onclick = async e => {
   const words = [...document.querySelectorAll('#kwBox input:checked')].map(x => x.value);
-  e.target.disabled = true;
+  e.currentTarget.disabled = true;
   try{ const d = await api('/api/kho/grow/kw', { words }); alert('Đã lưu. Kiểm lại ' + d.rechecked + ' bài đã bị loại, nhận thêm ' + d.accepted + ' bản vào kho.'); loadGrow(); loadStats(); }
-  catch(err){ alert(err.message); } finally{ e.target.disabled = false; }
+  catch(err){ alert(err.message); } finally{ $('kwSave').disabled = false; }
 };
 $('artSave').onclick = async () => {
   const text = $('artInput').value.trim(); if(!text) return;
   try{ const d = await api('/api/kho/grow/artists', { text }); $('artInput').value = ''; alert('Đã đưa ' + d.added + ' tên lên đầu hàng chờ tìm playlist.'); loadGrow(); }
   catch(e){ alert(e.message); }
+};
+
+/* ----- Gộp các dòng tìm hụt gần giống nhau (khách gõ sai chính tả): xem trước rồi gộp ----- */
+let mergePlanOk = false;
+const mergeErr = e => /404|not found|không có|Lỗi 4/i.test(e.message || '') ? 'Worker kho chưa có chức năng gộp — dán kho-worker.js bản mới vào Cloudflare rồi Deploy. (' + e.message + ')' : e.message;
+$('mergePrev').onclick = async () => {
+  const b = $('mergePrev'), out = $('mergeOut'); b.disabled = true; $('mergeGo').disabled = true; mergePlanOk = false;
+  out.style.display = ''; out.replaceChildren(el('div', null, 'Đang so các dòng hụt…'));
+  try{
+    const d = await api('/api/kho/grow/miss/merge', { mode:'preview' });
+    out.replaceChildren(el('div', null, 'Có ' + fmt(d.before) + ' dòng hụt: ' + fmt(d.clusters) + ' nhóm gần giống nhau → bỏ ' + fmt(d.removed) + ' dòng, còn ' + fmt(d.after) + ' dòng.'));
+    (d.sample || []).forEach(x => { const r = el('div'); r.append(el('b', null, '“' + x.keep + '” '), document.createTextNode('(' + fmt(x.n) + ' lần) ← ' + (x.merged || []).join(' · '))); out.append(r); });
+    if(d.clusters > (d.sample || []).length) out.append(el('div', null, '… và ' + fmt(d.clusters - d.sample.length) + ' nhóm khác.'));
+    mergePlanOk = d.removed > 0; $('mergeGo').disabled = !mergePlanOk;
+    if(!d.removed) out.append(el('div', 'ok', 'Không có dòng nào cần gộp.'));
+  }catch(e){ if(e && e.switched) return; out.replaceChildren(el('div', 'err', mergeErr(e))); }
+  finally{ b.disabled = false; }
+};
+$('mergeGo').onclick = async () => {
+  if(!mergePlanOk) return;
+  if(!confirm('Gộp các dòng hụt gần giống nhau? Dòng nhiều lượt nhất được giữ, số lần được cộng dồn, các dòng còn lại bị bỏ.')) return;
+  const b = $('mergeGo'), out = $('mergeOut'); b.disabled = true; $('mergePrev').disabled = true;
+  try{
+    const d = await api('/api/kho/grow/miss/merge', { mode:'apply' });
+    mergePlanOk = false;
+    out.replaceChildren(el('div', 'ok', 'Đã gộp: bỏ ' + fmt(d.removed) + ' dòng, còn ' + fmt(d.after) + ' dòng hụt.'));
+    loadGrow(); loadStats();
+  }catch(e){ if(!(e && e.switched)) out.replaceChildren(el('div', 'err', mergeErr(e))); b.disabled = false; }
+  finally{ $('mergePrev').disabled = false; }
 };
 
 /* ---------- Bài hot ---------- */
@@ -722,9 +1048,10 @@ $('manualSave').onclick = async () => {
 /* ---------- Quét nhanh: gọi quét liên tục từ trình duyệt (mỗi lần là một lượt chạy riêng của Worker) ---------- */
 let fastRun = false;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+const FAST_IDLE = 'Quét nhanh đến khi xong';
 $('fastScan').onclick = async () => {
-  if(fastRun){ fastRun = false; $('fastScan').textContent = '⏹ Đang dừng…'; return; }
-  fastRun = true; $('fastScan').textContent = '⏹ Dừng quét nhanh';
+  if(fastRun){ fastRun = false; $('fastLbl').textContent = 'Đang dừng…'; return; }
+  fastRun = true; $('fastLbl').textContent = 'Dừng quét nhanh';
   document.querySelectorAll('[data-job], #runAuto').forEach(x => x.disabled = true);
   let addedTotal = 0, rounds = 0, fails = 0, endMsg = '';
   const t0 = Date.now();
@@ -744,6 +1071,7 @@ $('fastScan').onclick = async () => {
       $('last').textContent = '⚡ Quét nhanh: lượt ' + rounds + ' · ' + (r.sources > 1 ? r.sources + ' nguồn' : '“' + r.channel + '”') + ' +' + (r.added || 0) + ' bài' + (r.done ? ' (xong)' : '') +
         '\nKho hiện có ' + fmt(d.videos) + ' bản · còn ' + d.pending + ' nguồn chưa quét hết, ' + (d.due || 0) + ' nguồn đến hạn kiểm · đã thêm ' + fmt(addedTotal) + ' bài trong ' + min + ' phút' +
         '\nĐơn vị hôm nay: ' + fmt(d.units) + '/' + fmt(d.budget) + (d.writeLimit ? ' · dòng ghi D1: ' + fmt(d.writes) + '/' + fmt(d.writeLimit) : '');
+      $('heroLast').textContent = 'Đang quét nhanh: lượt ' + rounds + ' · đã thêm ' + fmt(addedTotal) + ' bài';
       if(r.done || rounds % 10 === 0){ loadStats(); loadChannels(); }
       if(d.units >= d.budget){ endMsg = 'Dừng vì đã chạm trần đơn vị hôm nay.'; break; }
       if(d.writeLimit && d.writes >= d.writeLimit){ endMsg = 'Dừng vì đã chạm trần dòng ghi D1 hôm nay.'; break; }
@@ -751,7 +1079,7 @@ $('fastScan').onclick = async () => {
     }
     if(addedTotal){ try{ await api('/api/kho/run', { job:'rehot' }); }catch(e){} }
   }finally{
-    fastRun = false; $('fastScan').textContent = '⚡ Quét nhanh đến khi xong';
+    fastRun = false; $('fastLbl').textContent = FAST_IDLE;
     document.querySelectorAll('[data-job], #runAuto').forEach(x => x.disabled = false);
     const sum = '⚡ Quét nhanh xong ' + rounds + ' lượt. ' + (endMsg || 'Đã dừng.') + '\nTổng thêm ' + fmt(addedTotal) + ' bài vào kho' + (addedTotal ? ', đã ghép lại bài hot.' : '.');
     await loadStats(); loadChannels(); loadHot();
@@ -810,7 +1138,7 @@ $('clGo').onclick = async () => {
 const TONE_VN = { 'nam':'Nam', 'nu':'Nữ', 'song-ca':'Song ca', 'thieu-nam':'Thiếu nam', 'thieu-nu':'Thiếu nữ', '':'—' };
 function exDlCount(){
   const n = chData.filter(c => c.dl).length;
-  $('exDl').textContent = n ? ' Đang có ' + n + ' nguồn được phép tải.' : ' Chưa có nguồn nào bật “⬇ Được phép tải” (bật ở danh sách Nguồn đang dùng).';
+  $('exDl').textContent = n ? 'Đang có ' + n + ' nguồn được phép tải.' : 'Chưa có nguồn nào bật “⬇ Được phép tải” (bật ở thẻ Nguồn, danh sách Nguồn đang dùng).';
   $('exDl').className = n ? '' : 'warn';
 }
 function exParams(){ return { top: +$('exTop').value || 2000, per: +$('exPer').value || 4, days: +$('exDays').value || 90, onlyDl: $('exOnlyDl').checked,
@@ -868,6 +1196,7 @@ $('dumpBtn').onclick = async () => {
 function loadAll(){ loadStats(); loadGrow(); loadChannels(); loadHot(); }
 fillCfg(); paintKho();     // địa chỉ Worker điền sẵn, chỉ cần nhập mật khẩu
 if(!cfg.pass) $('settings').style.display = '';
+showTab(HASH[location.hash.replace('#', '')] || lsGet('kho_tab') || 'home');
 loadAll();
 </script>
 </body>
