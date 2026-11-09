@@ -9,6 +9,7 @@ wrangler.toml
 bmbplayer-worker.js
 nhac-playlist-worker.js
 kho-worker.js
+kho-nghe-worker.js
 *.sql
 *.md
 CNAME

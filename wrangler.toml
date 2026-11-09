@@ -28,6 +28,12 @@ service = "kho-karaoke"
 binding = "KHO_EN"
 service = "kho-karaoke-en"
 
+# Kho nghe (11/2026): Worker riêng "kho-nghe" giữ danh sách mix của chế độ 🎧 Nghe nhạc (kho.html → Kho nghe). Worker này đồng bộ bản sao mỗi phút.
+# PHẢI tạo Worker kho-nghe trong Dash TRƯỚC khi deploy bản có dòng này, nếu không deploy lỗi. Cần thêm Secret KHO_NGHE_PASS (= APP_PASS của kho-nghe).
+[[services]]
+binding = "KHO_NGHE"
+service = "kho-nghe"
+
 # Cron Trigger: 00:55 UTC = 07:55 giờ Việt Nam → báo cáo sáng (hàm scheduled)
 [triggers]
 crons = ["55 0 * * *"]
