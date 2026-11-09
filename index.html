@@ -1269,22 +1269,54 @@ function mixCmd(c){
     listen = true;
   }
   mixQ = (Array.isArray(c.list) ? c.list : []).filter(x => x && (+x.mid | 0) > 0 && (x.kind === 'playlist' ? /^[\w-]{10,64}$/ : /^[\w-]{11}$/).test(String(x.yt || ''))).slice(0, 30)
-    .map(x => ({ mid: +x.mid | 0, kind: x.kind === 'playlist' ? 'playlist' : 'video', yt: String(x.yt), title: String(x.title || '').slice(0, 120) }));
+    .map(x => ({ mid: +x.mid | 0, kind: x.kind === 'playlist' ? 'playlist' : 'video', yt: String(x.yt), title: String(x.title || '').slice(0, 120), r2: x.r2 === true && x.kind !== 'playlist' }));
   mixFail = 0;
-  mixPlay({ mid, kind: c.kind === 'playlist' ? 'playlist' : 'video', yt, title: String(c.title || 'Mix').slice(0, 120), nx: c.nx === 'karaoke' ? 'karaoke' : 'mix', dur: +c.dur || 0 });
+  mixPlay({ mid, kind: c.kind === 'playlist' ? 'playlist' : 'video', yt, title: String(c.title || 'Mix').slice(0, 120), nx: c.nx === 'karaoke' ? 'karaoke' : 'mix', dur: +c.dur || 0, r2: c.r2 === true && c.kind !== 'playlist' });
 }
 function mixPlay(m){
-  mix = m; src = 'yt'; loadSeq++;
+  mix = m; src = 'yt'; const seq = ++loadSeq;
   VP.stopVideo(); document.body.classList.remove('vsrc'); $('idle').style.display = 'none';
-  try{
-    if(m.kind === 'playlist') player.loadPlaylist({ list: m.yt, listType: 'playlist', index: 0 });
-    else player.loadVideoById(m.yt);
-    if(!userMuted && lock !== 'muted') player.unMute();
-  }catch(e){ toast('Không mở được trình phát YouTube.'); }
+  try{ player.stopVideo(); }catch(e){}
   swapOn(); paintListen();
   $('ovTitle').querySelector('.lbl').textContent = '🎧 NGHE NHẠC'; $('ovTitleT').textContent = m.title; flash('ovTitle', 9000); hide('ovNext'); hide('ovCount');
+  clearTimeout(wd); clearTimeout(mixDurT);
+  if(m.r2 && m.kind === 'video' && LIB.t && bc.ws){          // cửa R2 (admin bật 'nghe_r2', mặc định TẮT): có file bản lưu thì phát file, không có / lỗi thì YouTube
+    mixAsk(m.yt).then(r => { if(!listen || mix !== m || seq !== loadSeq) return; if(r) mixFile(m, r, 0); else mixYt(m, 0); });
+  } else mixYt(m, 0);
+  push();
+}
+function mixYt(m, t){                                          // phát bằng YouTube nhúng (mặc định), t = giây bắt đầu (khi file lỗi giữa chừng thì tiếp từ giây đang nghe)
+  src = 'yt'; VP.stopVideo(); document.body.classList.remove('vsrc');
+  try{
+    if(m.kind === 'playlist') player.loadPlaylist({ list: m.yt, listType: 'playlist', index: 0 });
+    else player.loadVideoById(t > 1 ? { videoId: m.yt, startSeconds: Math.floor(t) } : m.yt);
+    if(!userMuted && lock !== 'muted') player.unMute();
+  }catch(e){ toast('Không mở được trình phát YouTube.'); }
   clearTimeout(wd); wd = setTimeout(() => guard(m.mid, 1), 3500);
   clearTimeout(mixDurT); if(m.kind === 'video' && !m.dur) mixDurT = setTimeout(() => mixDurSend(m), 20000);
+  push();
+}
+function mixAsk(yt){                                           // hỏi Worker: mix này có bản lưu trong R2 không (tối đa LIB_ASK_MS, quá hạn / lỗi = coi như không có)
+  return new Promise(res => {
+    let ctl = null; try{ ctl = new AbortController(); }catch(e){}
+    const to = setTimeout(() => { try{ if(ctl) ctl.abort(); }catch(e){} res(null); }, LIB_ASK_MS);
+    fetch(phongApi() + '/api/lib/src?nghe=1&id=' + encodeURIComponent(yt) + '&t=' + encodeURIComponent(LIB.t), { cache:'no-store', signal: ctl ? ctl.signal : undefined })
+      .then(r => r.ok ? r.json() : null).then(d => { clearTimeout(to); res(d && d.rel && d.url ? { url: d.url } : null); })
+      .catch(() => { clearTimeout(to); res(null); });
+  });
+}
+function mixFile(m, r, t){
+  src = 'r2';
+  try{ if(player) player.stopVideo(); }catch(e){}
+  document.body.classList.add('vsrc');
+  VP.setVolume(NATIVE ? 100 : vol);
+  if(userMuted || lock === 'muted') VP.mute(); else VP.unMute();
+  VP.open(r.url, t, R2_TRY_MS, (why, at) => {                  // file không mở được / lỗi / đứng hình: quay về YouTube, tiếp từ giây đang nghe
+    if(!listen || mix !== m || src !== 'r2') return;
+    mixYt(m, at);
+  });
+  clearTimeout(wd); wd = setTimeout(() => guard(m.mid, 1), 3500);
+  clearTimeout(mixDurT); if(!m.dur) mixDurT = setTimeout(() => mixDurSend(m), 20000);
   push();
 }
 let mixDurT = 0;
@@ -1302,13 +1334,14 @@ function mixEnded(){
 function mixNext(auto){
   if(!listen || !mix) return;
   if(auto && mix.nx === 'karaoke'){ mixStop(); return; }            // cài đặt admin: hết mix thì về hàng chờ karaoke
-  const prev = mix, nx = mixQ.shift() || { mid: prev.mid, kind: prev.kind, yt: prev.yt, title: prev.title };   // nhóm chỉ có 1 mix: phát lại chính nó
-  mixQ.push({ mid: prev.mid, kind: prev.kind, yt: prev.yt, title: prev.title });                                  // xoay vòng cả nhóm
+  const prev = mix, nx = mixQ.shift() || { mid: prev.mid, kind: prev.kind, yt: prev.yt, title: prev.title, r2: prev.r2 };   // nhóm chỉ có 1 mix: phát lại chính nó
+  mixQ.push({ mid: prev.mid, kind: prev.kind, yt: prev.yt, title: prev.title, r2: prev.r2 });                                  // xoay vòng cả nhóm
   mixPlay(Object.assign({}, nx, { nx: prev.nx }));
 }
 function mixStop(){                // thoát Nghe nhạc, hát hàng chờ karaoke (rỗng thì về màn chờ)
   if(!listen) return;
   listen = false; mix = null; mixQ = []; mixFail = 0; clearTimeout(wd); clearTimeout(mixDurT); loadSeq++;
+  VP.stopVideo(); document.body.classList.remove('vsrc'); src = 'yt';
   $('ovTitle').querySelector('.lbl').textContent = 'ĐANG HÁT'; paintListen();
   cur = queue.length ? 0 : -1;
   load();

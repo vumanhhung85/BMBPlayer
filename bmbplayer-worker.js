@@ -1129,7 +1129,10 @@ async function adminScoreSet(env, body) {
    Worker tự dựng lệnh phát (mã YouTube lấy từ D1) nên điện thoại không thể gửi mã video lạ lên TV.
    Cài đặt ở order_meta: 'nghe_on' ('1' mặc định | '0' = ẩn hẳn mục Nghe nhạc), 'nghe_next' ('mix' mặc định = hết mix tự phát mix kế | 'karaoke' = quay lại hàng chờ karaoke),
    'nghe_groups' (JSON thứ tự nhóm). Bảng nghe_mix (danh sách duyệt) + nghe_chon (lượt chọn theo ngày/chi nhánh/mix, dùng xếp "chọn nhiều lên đầu").
-   Mix lỗi nhúng: admin bấm "Kiểm tra" (oEmbed của YouTube, không cần khoá API; 401 = chủ video tắt nhúng) hoặc TV tự báo mã lỗi 100/101/150 khi phát → bad=1, khách không thấy nữa. */
+   Mix lỗi nhúng: admin bấm "Kiểm tra" (oEmbed của YouTube, không cần khoá API; 401 = chủ video tắt nhúng) hoặc TV tự báo mã lỗi 100/101/150 khi phát → bad=1, khách không thấy nữa.
+   Kiểm tra định kỳ (cron 07:55 hằng ngày, công tắc 'nghe_kt', mặc định BẬT): mỗi ngày kiểm tối đa 40 mix lâu chưa kiểm nhất bằng oEmbed, tự ẩn mix hỏng, báo trong báo cáo sáng Telegram.
+   Cửa R2 (công tắc 'nghe_r2', mặc định TẮT): BẬT → TV hỏi /api/lib/src?nghe=1 trước mỗi mix video; có file videos/nghe/<mã YouTube>.mp4 trong bucket thư viện (binding LIB) thì phát file (không quảng cáo,
+   không lỗi nhúng), không có / lỗi thì YouTube nhúng như cũ. Worker này CHỈ ĐỌC bucket: file do admin tự đưa vào (app Tải Video / NAS), không tải gì từ YouTube. */
 const NGHE_NEXT_OK = ['mix', 'karaoke'], NGHE_NHOM_MAC_DINH = ['Nonstop', 'Remix TikTok', 'Chill'];
 let ngheSan = false, ngheCfgC = { v: null, at: 0 }, ngheListC = { v: null, at: 0 };
 async function ngheBang(env) {
@@ -1148,11 +1151,13 @@ async function ngheBang(env) {
 /** Cài đặt Nghe nhạc (đệm 20 giây mỗi isolate; chưa có bảng = mặc định BẬT, tự phát mix kế) */
 async function ngheCfg(env) {
   if (ngheCfgC.v && Date.now() - ngheCfgC.at < 20000) return ngheCfgC.v;
-  const v = { on: true, next: 'mix', groups: NGHE_NHOM_MAC_DINH.slice() };
+  const v = { on: true, next: 'mix', groups: NGHE_NHOM_MAC_DINH.slice(), r2: false, kt: true };
   try {
-    const { results } = await env.DB.prepare(`SELECT k, v FROM order_meta WHERE k IN ('nghe_on', 'nghe_next', 'nghe_groups')`).all();
+    const { results } = await env.DB.prepare(`SELECT k, v FROM order_meta WHERE k IN ('nghe_on', 'nghe_next', 'nghe_groups', 'nghe_r2', 'nghe_kt')`).all();
     for (const r of results || []) {
       if (r.k === 'nghe_on') v.on = r.v !== '0';
+      else if (r.k === 'nghe_r2') v.r2 = r.v === '1';
+      else if (r.k === 'nghe_kt') v.kt = r.v !== '0';
       else if (r.k === 'nghe_next' && NGHE_NEXT_OK.includes(r.v)) v.next = r.v;
       else if (r.k === 'nghe_groups') { try { const g = JSON.parse(r.v); if (Array.isArray(g)) v.groups = g.map(x => s(x, 30)).filter(Boolean).slice(0, 20); } catch (e) { /* hỏng → mặc định */ } }
     }
@@ -1201,13 +1206,13 @@ async function ngheLenh(env, mid, cn, ctx) {
   if (!cfg.on) return null;
   const all = (await ngheTatCa(env)).filter(ngheHienDuoc), i = all.findIndex(m => m.id === mid);
   if (i < 0) return null;
-  const m = all[i], cung = all.filter(x => x.grp === m.grp), j = cung.findIndex(x => x.id === mid);
+  const m = all[i], cung = all.filter(x => x.grp === m.grp), j = cung.findIndex(x => x.id === mid), r2 = !!cfg.r2 && !!env.LIB;
   const list = [];
-  for (let k = 1; k < cung.length && list.length < 20; k++) { const x = cung[(j + k) % cung.length]; list.push({ mid: x.id, kind: x.kind, yt: x.yt, title: x.title.slice(0, 120) }); }
+  for (let k = 1; k < cung.length && list.length < 20; k++) { const x = cung[(j + k) % cung.length]; list.push({ mid: x.id, kind: x.kind, yt: x.yt, title: x.title.slice(0, 120), r2: r2 && x.kind === 'video' }); }
   const pr = env.DB.prepare(`INSERT INTO nghe_chon (ngay, cn, mid, n) VALUES (?,?,?,1) ON CONFLICT(ngay, cn, mid) DO UPDATE SET n = n + 1`)
     .bind(ngayKinhDoanh(), String(cn || '').slice(0, 40), mid).run().catch(err => console.error('ngheChon', err));
   try { ctx.waitUntil(pr); } catch (e) { /* không có ctx */ }
-  return { mid: m.id, kind: m.kind, yt: m.yt, title: m.title.slice(0, 120), dur: m.dur | 0, nx: cfg.next, list };
+  return { mid: m.id, kind: m.kind, yt: m.yt, title: m.title.slice(0, 120), dur: m.dur | 0, nx: cfg.next, r2: r2 && m.kind === 'video', list };
 }
 /** TV báo: mix phát lỗi (mã YouTube 100/101/150) hoặc độ dài thật của mix (để hiện "2:15:00" cho khách) */
 async function ngheTvBao(env, m) {
@@ -1263,8 +1268,19 @@ async function adminNgheGet(env, body) {
   if (loi) return loi;
   ngheXoaDem();
   const cfg = await ngheCfg(env), mixes = await ngheTatCa(env);
-  return ok({ on: cfg.on, next: cfg.next, groups: ngheNhom(cfg, mixes), mixes: mixes.map(m => ({ id: m.id, grp: m.grp, kind: m.kind, yt: m.yt, title: m.title, author: m.author, thumb: m.thumb,
-    dur: m.dur, hidden: !!m.hidden, bad: !!m.bad, why: m.bad_why, pin: !!m.pin, chk: m.chk, added: m.added, n: m.n })) });
+  let co = null;                       // mã YouTube đã có file trong thư viện (videos/nghe/<mã>.mp4); null = không đọc được / chưa gắn thư viện
+  if (env.LIB) {
+    try {
+      const pre = libKey(env, 'nghe/'); co = new Set(); let cursor;
+      for (let i = 0; i < 5; i++) {
+        const r = await env.LIB.list({ prefix: pre, limit: 1000, cursor });
+        for (const o of r.objects || []) { const m = /^([\w-]{11})\.mp4$/i.exec(o.key.slice(pre.length)); if (m) co.add(m[1]); }
+        if (!r.truncated) break; cursor = r.cursor;
+      }
+    } catch (e) { co = null; }
+  }
+  return ok({ on: cfg.on, next: cfg.next, r2: cfg.r2, kt: cfg.kt, lib: !!env.LIB, last: await ngheKtLast(env), groups: ngheNhom(cfg, mixes), mixes: mixes.map(m => ({ id: m.id, grp: m.grp, kind: m.kind, yt: m.yt, title: m.title, author: m.author, thumb: m.thumb,
+    dur: m.dur, hidden: !!m.hidden, bad: !!m.bad, why: m.bad_why, pin: !!m.pin, chk: m.chk, added: m.added, n: m.n, file: co ? (m.kind === 'video' && co.has(m.yt)) : null })) });
 }
 async function adminNgheSet(env, body) {
   const [, loi] = await ngheAdmin(env, body);
@@ -1275,10 +1291,12 @@ async function adminNgheSet(env, body) {
     if (!NGHE_NEXT_OK.includes(body.next)) return fail('bad_next', 400, 'Giá trị không hợp lệ.');
     st.push(ngheMeta(env, 'nghe_next', body.next));
   }
+  if (body.r2 !== undefined) st.push(ngheMeta(env, 'nghe_r2', body.r2 === true || body.r2 === 1 || body.r2 === '1' ? '1' : '0'));
+  if (body.kt !== undefined) st.push(ngheMeta(env, 'nghe_kt', body.kt === true || body.kt === 1 || body.kt === '1' ? '1' : '0'));
   if (st.length) await env.DB.batch(st);
   ngheXoaDem();
   const cfg = await ngheCfg(env);
-  return ok({ on: cfg.on, next: cfg.next });
+  return ok({ on: cfg.on, next: cfg.next, r2: cfg.r2, kt: cfg.kt });
 }
 async function adminNgheThem(env, body) {
   const [, loi] = await ngheAdmin(env, body);
@@ -1323,27 +1341,48 @@ async function adminNgheXoa(env, body) {
   ngheXoaDem();
   return ok({});
 }
-/** Kiểm tra nhúng một mix (id) hoặc tất cả (all:true, tối đa 40 mix mỗi lần, cũ nhất trước). Chỉ đổi cờ lỗi khi YouTube trả lời rõ ràng. */
-async function adminNgheKiemTra(env, body) {
-  const [, loi] = await ngheAdmin(env, body);
-  if (loi) return loi;
-  const ds = body.all === true
-    ? (await env.DB.prepare('SELECT id, kind, yt FROM nghe_mix ORDER BY chk ASC LIMIT 40').all()).results || []
-    : [await env.DB.prepare('SELECT id, kind, yt FROM nghe_mix WHERE id = ?').bind(+body.id | 0).first()].filter(Boolean);
-  if (!ds.length) return fail('not_found', 404, 'Không có mix để kiểm tra.');
+/** Hỏi oEmbed cho một lô mix {id, kind, yt, bad}: chỉ đổi cờ lỗi khi YouTube trả lời rõ ràng (ok → bỏ cờ lỗi, noembed/gone → đánh dấu lỗi, err → giữ nguyên). Trả [{id, st, moiHong, hetHong}] */
+async function ngheKiemLo(env, ds) {
   const kq = [], now = Date.now();
   for (let i = 0; i < ds.length; i += 5) {
     const lo = await Promise.all(ds.slice(i, i + 5).map(async m => ({ m, o: await ngheOembed(m.kind, m.yt) })));
     const st = [];
     for (const { m, o } of lo) {
-      kq.push({ id: m.id, st: o.st });
+      kq.push({ id: m.id, st: o.st, moiHong: (o.st === 'noembed' || o.st === 'gone') && !m.bad, hetHong: o.st === 'ok' && !!m.bad });
       if (o.st === 'ok') st.push(env.DB.prepare(`UPDATE nghe_mix SET bad = 0, bad_why = '', chk = ?, thumb = CASE WHEN ? != '' THEN ? ELSE thumb END WHERE id = ?`).bind(now, o.thumb || '', o.thumb || '', m.id));
       else if (o.st === 'noembed' || o.st === 'gone') st.push(env.DB.prepare('UPDATE nghe_mix SET bad = 1, bad_why = ?, chk = ? WHERE id = ?').bind(NGHE_WHY[o.st], now, m.id));
     }
     if (st.length) await env.DB.batch(st);
   }
   ngheXoaDem();
-  return ok({ kq });
+  return kq;
+}
+/** Kiểm tra nhúng một mix (id) hoặc tất cả (all:true, tối đa 40 mix mỗi lần, cũ nhất trước). */
+async function adminNgheKiemTra(env, body) {
+  const [, loi] = await ngheAdmin(env, body);
+  if (loi) return loi;
+  const ds = body.all === true
+    ? (await env.DB.prepare('SELECT id, kind, yt, bad FROM nghe_mix ORDER BY chk ASC LIMIT 40').all()).results || []
+    : [await env.DB.prepare('SELECT id, kind, yt, bad FROM nghe_mix WHERE id = ?').bind(+body.id | 0).first()].filter(Boolean);
+  if (!ds.length) return fail('not_found', 404, 'Không có mix để kiểm tra.');
+  return ok({ kq: (await ngheKiemLo(env, ds)).map(k => ({ id: k.id, st: k.st })) });
+}
+/** Kiểm tra định kỳ (Cron hằng ngày, trước báo cáo sáng): 40 mix lâu chưa kiểm nhất; lưu kết quả ở order_meta 'nghe_kt_last' cho báo cáo sáng và quầy. */
+const NGHE_KT_MOI_NGAY = 40;
+async function ngheDinhKy(env) {
+  const cfg = await ngheCfg(env);
+  if (!cfg.on || !cfg.kt || !env.DB) return null;
+  await ngheBang(env);
+  const ds = (await env.DB.prepare('SELECT id, kind, yt, title, bad FROM nghe_mix WHERE hidden = 0 ORDER BY chk ASC LIMIT ?').bind(NGHE_KT_MOI_NGAY).all()).results || [];
+  if (!ds.length) return null;
+  const kq = await ngheKiemLo(env, ds), tt = new Map(ds.map(m => [m.id, m.title]));
+  const last = { at: Date.now(), n: ds.length, err: kq.filter(k => k.st === 'err').length,
+    hong: kq.filter(k => k.moiHong).map(k => ({ id: k.id, t: String(tt.get(k.id) || '').slice(0, 80) })).slice(0, 10), khoi: kq.filter(k => k.hetHong).length };
+  await ngheMeta(env, 'nghe_kt_last', JSON.stringify(last)).run();
+  return last;
+}
+async function ngheKtLast(env) {
+  try { const r = await env.DB.prepare(`SELECT v FROM order_meta WHERE k = 'nghe_kt_last'`).first(); return r && r.v ? JSON.parse(r.v) : null; } catch (e) { return null; }
 }
 /** Nhóm: đặt thứ tự / thêm nhóm trống (groups) và đổi tên nhóm (rename {from,to}); nhóm còn mix thì không bỏ khỏi danh sách được */
 async function adminNgheNhom(env, body) {
@@ -1481,16 +1520,18 @@ async function libSrc(env, u) {
   const cn = await libTicketOk(env, u.searchParams.get('t'));
   if (!cn) return [403, { rel: '', error: 'ticket' }];
   if (!env.LIB) return [200, { rel: '', error: 'no_lib' }];
+  const nghe = u.searchParams.get('nghe') === '1';          // mix Nghe nhạc: chỉ tìm videos/nghe/<mã>.mp4, theo công tắc riêng 'nghe_r2' (mặc định TẮT), không phụ thuộc công tắc thư viện của chi nhánh
   const c = libCn(await libCfg(env), cn);
-  if (!c.on) return [200, { rel: '', off: true }];
+  if (nghe) { const g = await ngheCfg(env); if (!g.on || !g.r2) return [200, { rel: '', off: true }]; }
+  else if (!c.on) return [200, { rel: '', off: true }];
   const id = u.searchParams.get('id') || '';
   if (!/^[\w-]{11}$/.test(id)) return [400, { rel: '', error: 'id' }];
-  for (const d of libDirs(env)) {
+  for (const d of nghe ? ['nghe'] : libDirs(env)) {
     const rel = (d === '.' ? '' : d + '/') + id + '.mp4';
     const h = await env.LIB.head(libKey(env, rel));
     if (!h) continue;
     const exp = Date.now() + LIB_URL_MS, sig = await hmac(env.SECRET, 'libf|' + rel + '|' + exp);
-    return [200, { rel, size: h.size, url: u.origin + '/lib/' + rel + '?e=' + exp + '&s=' + sig, nas: c.nas ? c.nas + '/' + rel : '' }];
+    return [200, { rel, size: h.size, url: u.origin + '/lib/' + rel + '?e=' + exp + '&s=' + sig, nas: !nghe && c.nas ? c.nas + '/' + rel : '' }];
   }
   return [200, { rel: '' }];
 }
@@ -4207,6 +4248,28 @@ function bcKhoPhanTich(d, truoc, now, workerTen) {
   return o;
 }
 
+/* 🎧 Nghe nhạc trong báo cáo sáng: số mix dùng được, mix vừa bị phát hiện hỏng nhúng (kiểm định kỳ hoặc TV báo trong 30 giờ qua) và đã tự ẩn khỏi khách */
+async function bcNghe(env, now) {
+  const o = { mau: 0, viec: [], dong: [] };
+  const cfg = await ngheCfg(env);
+  if (!cfg.on) return o;
+  await ngheBang(env);
+  const [tong, hong] = await Promise.all([
+    env.DB.prepare('SELECT COUNT(*) AS n, SUM(CASE WHEN bad = 0 AND hidden = 0 THEN 1 ELSE 0 END) AS dung FROM nghe_mix').first(),
+    env.DB.prepare('SELECT title, bad_why FROM nghe_mix WHERE bad = 1 AND hidden = 0 AND chk >= ? ORDER BY chk DESC LIMIT 6').bind(now - 30 * 3600000).all()
+  ]);
+  if (!tong || !tong.n) return o;
+  const kt = await ngheKtLast(env);
+  o.dong.push('• ' + tong.n + ' mix · khách nghe được ' + (tong.dung || 0) + (kt && now - kt.at < 36 * 3600000 ? ' · vừa kiểm nhúng ' + kt.n + ' mix' + (kt.err ? ' (' + kt.err + ' lần YouTube không trả lời)' : '') : cfg.kt ? '' : ' · kiểm nhúng định kỳ đang TẮT'));
+  const ds = (hong.results || []).map(r => '«' + escHtml(String(r.title).slice(0, 50)) + '»');
+  if (ds.length) {
+    o.mau = 1; o.dong.push('• 🟡 Mix không còn nhúng được (đã tự ẩn khỏi khách): ' + ds.join(', '));
+    o.viec.push([1, 'Nghe nhạc: ' + ds.length + ' mix không còn nhúng được → ' + ds.join(', ') + ' — thay bằng mix khác (Quầy → Cài đặt → Nghe nhạc), hoặc bấm ↺ nếu YouTube báo nhầm']);
+  }
+  if ((tong.dung || 0) === 0) { o.mau = Math.max(o.mau, 1); o.viec.push([1, 'Nghe nhạc: không còn mix nào dùng được → khách không thấy ô Nghe nhạc. Thêm mix mới ở Quầy → Cài đặt → Nghe nhạc']); }
+  return o;
+}
+
 async function bcLap(env, opt = {}) {
   const now = Date.now();
   await bcBang(env);
@@ -4214,14 +4277,15 @@ async function bcLap(env, opt = {}) {
   const ngay = new Date(now + VN_MS).toISOString().slice(0, 10), hom = new Date(now + VN_MS - 86400000).toISOString().slice(0, 10);
   const truocRow = await env.DB.prepare('SELECT gia_tri FROM bc_ngay WHERE ngay = ?').bind(hom).first().catch(() => null);
   let truoc = {}; try { truoc = JSON.parse((truocRow && truocRow.gia_tri) || '{}'); } catch (e) {}
-  const [bmb, dvi, den, nas] = await Promise.all([
+  const [bmb, dvi, den, nas, ng] = await Promise.all([
     bcBmb(env, now, ten).catch(e => ({ mau: 1, viec: [[1, 'BMBPlayer: không lập được mục này (' + escHtml(e && e.message) + ')']], dong: ['• ⚠ Lỗi khi đọc dữ liệu BMBPlayer'] })),
     bcKhoDoc(env, 'VI', 'Kho Việt'), bcKhoDoc(env, 'EN', 'Kho quốc tế'),
-    bcNas(env, now, ten).catch(e => ({ mau: 0, viec: [], dong: ['• ⚠ Không đọc được số liệu NAS (' + escHtml(e && e.message) + ')'] }))
+    bcNas(env, now, ten).catch(e => ({ mau: 0, viec: [], dong: ['• ⚠ Không đọc được số liệu NAS (' + escHtml(e && e.message) + ')'] })),
+    bcNghe(env, now).catch(e => ({ mau: 0, viec: [], dong: ['• ⚠ Không đọc được số liệu Nghe nhạc (' + escHtml(e && e.message) + ')'] }))
   ]);
   const vi = bcKhoPhanTich(dvi, truoc.vi, now, 'kho-karaoke'), en = bcKhoPhanTich(den, truoc.en, now, 'kho-karaoke-en');
-  const mau = Math.max(bmb.mau, nas.mau, vi.mau, en.mau);
-  const viec = [...bmb.viec, ...nas.viec, ...vi.viec, ...en.viec].sort((a, b) => b[0] - a[0]);
+  const mau = Math.max(bmb.mau, nas.mau, ng.mau, vi.mau, en.mau);
+  const viec = [...bmb.viec, ...nas.viec, ...ng.viec, ...vi.viec, ...en.viec].sort((a, b) => b[0] - a[0]);
   const viecCan = viec.filter(v => v[0] >= 1), viecGoiY = viec.filter(v => v[0] === 0);
   const dm = new Date(now + VN_MS).toISOString(), nhan = dm.slice(8, 10) + '/' + dm.slice(5, 7);
   const L = [];
@@ -4234,6 +4298,7 @@ async function bcLap(env, opt = {}) {
   if (viecGoiY.length) { L.push('', '<i>Gợi ý:</i>'); viecGoiY.slice(0, 3).forEach(v => L.push('• ' + v[1])); }
   L.push('', '<b>📺 BMBPlayer — 24 giờ qua</b>', ...bmb.dong);
   if (nas.dong.length) L.push('', '<b>📀 NAS quán — 24 giờ qua</b>', ...nas.dong);
+  if (ng.dong.length) L.push('', '<b>🎧 Nghe nhạc</b>', ...ng.dong);
   L.push('', '<b>🎵 ' + vi.nhan + '</b>', ...vi.dong);
   L.push('', '<b>🌐 ' + en.nhan + '</b>', ...en.dong);
   L.push('', '<i>Chi tiết: Quầy → 🔌 Kết nối · kho.html. Chỉ nêu điều bất thường so với những ngày trước (tối đa 7 ngày); màu đỏ chỉ dành cho TV rớt.</i>');
@@ -4280,7 +4345,10 @@ async function adminBaoCaoThu(env, body) {
 
 export default {
   async scheduled(event, env, ctx){      // Cron Trigger (wrangler.toml → [triggers]): báo cáo sáng 07:55 giờ Việt Nam
-    ctx.waitUntil(baoCaoSang(env).catch(e => console.error('baoCaoSang', e)));
+    ctx.waitUntil((async () => {
+      await ngheDinhKy(env).catch(e => console.error('ngheDinhKy', e));      // kiểm nhúng mix Nghe nhạc trước, để báo cáo sáng có kết quả mới nhất
+      await baoCaoSang(env).catch(e => console.error('baoCaoSang', e));
+    })());
   },
   async fetch(req, env, ctx){
     const u = new URL(req.url);

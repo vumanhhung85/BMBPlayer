@@ -521,7 +521,11 @@ svg.sic{width:1.1em;height:1.1em;stroke:currentColor;fill:none;stroke-width:2;st
 
 /* 🎧 Nghe nhạc (Cài đặt): danh sách mix admin duyệt */
 .ngAdd{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 10px}
-.ngAdd input{flex:1 1 260px;min-width:0;padding:10px 12px;border-radius:10px;background:var(--field);border:1px solid var(--line);font-size:14px}
+.ngAdd input,.ngAdd textarea{flex:1 1 260px;min-width:0;padding:10px 12px;border-radius:10px;background:var(--field);border:1px solid var(--line);font:inherit;font-size:14px;resize:vertical;min-height:44px}
+.ngopt{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:2px 0 8px}
+.ngopt .btn{flex:0 0 auto}
+.ngopt small{flex:1 1 220px;color:var(--txt-mute);font-size:12.5px;line-height:1.4}
+.ngst.r2{color:#6b3fb0}
 #ngheNext{background:#fff;border:1px solid #CDB8E3;border-radius:10px;padding:9px 12px;font:inherit;font-size:13.5px;color:var(--txt);max-width:100%;margin:2px 0 12px}
 #ngheAddMsg:empty{display:none}
 .ngAdd select,.ngrow select{background:#fff;border:1px solid #CDB8E3;border-radius:10px;padding:8px 10px;font:inherit;font-size:13px;color:var(--txt);max-width:100%}
@@ -712,9 +716,11 @@ svg.sic{width:1.1em;height:1.1em;stroke:currentColor;fill:none;stroke-width:2;st
         <option value="mix">Tự phát mix kế tiếp trong nhóm (mặc định)</option>
         <option value="karaoke">Quay lại hàng chờ karaoke</option>
       </select></div>
+      <div class="ngopt"><button class="btn btn-ghost btn-sm" id="ngheKtBtn" disabled>…</button><small id="ngheKtInfo"></small></div>
+      <div class="ngopt"><button class="btn btn-ghost btn-sm" id="ngheR2Btn" disabled>…</button><small id="ngheR2Info"></small></div>
       <div class="hint" id="ngheMsg">Khách chỉ chọn trong danh sách bên dưới (không tìm tự do trên YouTube). Mix được chọn nhiều nằm trên cùng; bấm 📌 để đề cử mix mới lên đầu. Lúc đang nghe, khách vẫn thêm bài karaoke vào hàng chờ và bấm «Hát karaoke» khi muốn hát.</div>
       <div class="sect-lbl" style="margin-top:14px">➕ Thêm mix</div>
-      <div class="ngAdd"><input id="ngheLink" type="text" placeholder="Dán link YouTube (video mix hoặc playlist)" autocomplete="off"><select id="ngheGrp" aria-label="Nhóm"></select><button class="btn btn-y btn-sm" id="ngheThem">＋ Thêm</button></div>
+      <div class="ngAdd"><textarea id="ngheLink" rows="2" placeholder="Dán link YouTube (video mix hoặc playlist). Nhiều link: mỗi dòng một link" autocomplete="off"></textarea><select id="ngheGrp" aria-label="Nhóm"></select><button class="btn btn-y btn-sm" id="ngheThem">＋ Thêm</button></div>
       <div class="hint" id="ngheAddMsg" style="min-height:18px"></div>
       <div class="sect-lbl" style="margin-top:6px">Nhóm (thứ tự khách thấy)</div>
       <div class="nggrp" id="ngheGroups"></div>
@@ -2648,6 +2654,14 @@ function ngheVe2(){
   var r = NGHE; if(!r) return;
   var b = $('ngheBtn'); b.disabled = false; b.dataset.on = r.on ? '1' : '0'; b.textContent = r.on ? 'Tắt Nghe nhạc' : 'Bật Nghe nhạc';
   $('ngheNext').value = r.next; $('ngheNext').disabled = false;
+  var kb = $('ngheKtBtn'); kb.disabled = false; kb.dataset.on = r.kt ? '1' : '0'; kb.textContent = 'Kiểm nhúng tự động mỗi ngày: ' + (r.kt ? 'BẬT' : 'TẮT');
+  var kl = r.last; $('ngheKtInfo').textContent = !r.kt ? 'Đang tắt: chỉ kiểm khi bạn bấm 🔎 hoặc khi TV gặp lỗi lúc phát.'
+    : 'Mỗi sáng (cùng giờ báo cáo 07:55) kiểm tối đa 40 mix lâu chưa kiểm, mix hỏng tự ẩn khỏi khách và được báo trong Telegram.' + (kl ? ' Lần gần nhất ' + knTgN(kl.at) + ': ' + kl.n + ' mix' + (kl.hong && kl.hong.length ? ', ' + kl.hong.length + ' mix mới hỏng' : ', không có mix mới hỏng') + '.' : ' Chưa chạy lần nào.');
+  var rb = $('ngheR2Btn'); rb.disabled = !r.lib; rb.dataset.on = r.r2 ? '1' : '0'; rb.textContent = 'Phát bản lưu R2: ' + (r.r2 ? 'BẬT' : 'TẮT');
+  var nf = r.mixes.filter(function(m){ return m.file; }).length;
+  $('ngheR2Info').innerHTML = !r.lib ? 'Worker chưa gắn thư viện R2 (binding LIB) nên chưa dùng được.'
+    : (r.r2 ? 'Mix nào có file <code>videos/nghe/&lt;mã YouTube&gt;.mp4</code> trong thư viện R2 thì TV phát file (không quảng cáo, không lỗi nhúng, tua mượt); mix chưa có file hoặc file lỗi vẫn phát YouTube. Hiện có <b>' + nf + '</b> mix có bản lưu.'
+      : 'Đang tắt: tất cả mix phát bằng YouTube. Bật khi muốn ưu tiên file đã lưu (ví dụ YouTube chèn quảng cáo quá nhiều). Hệ thống chỉ ĐỌC thư viện R2, không tự tải gì từ YouTube: file do bạn tự đưa vào (app Tải Video / NAS) đúng tên <code>videos/nghe/&lt;mã YouTube&gt;.mp4</code>.');
   var soMix = r.mixes.length, ok = r.mixes.filter(function(m){ return !m.hidden && !m.bad; }).length;
   $('ngheInfo').innerHTML = 'Hiện đang <b>' + (r.on ? 'BẬT' : 'TẮT') + '</b> cho mọi chi nhánh. Bật: điện thoại / máy tính bảng của khách có ô <b>🎧 Nghe nhạc</b> cạnh «Quốc tế» (chỉ hiện khi có ít nhất 1 mix dùng được). Tắt: ô này ẩn hẳn, ai đang nghe thì tivi quay về karaoke. <b>' + ok + '/' + soMix + '</b> mix đang dùng được.';
   var g = $('ngheGrp'), cur = g.value;
@@ -2669,6 +2683,8 @@ function ngheVe2(){
       var st = m.bad ? '<span class="ngst bad">⛔ Lỗi: ' + esc(m.why || 'không phát được') + ' — khách không thấy</span>'
         : m.hidden ? '<span class="ngst off">🙈 Đang ẩn khỏi khách</span>'
         : '<span class="ngst ok">✅ Nhúng được' + (m.chk ? ' · kiểm tra ' + knTgN(m.chk) : ' · chưa kiểm tra') + '</span>';
+      if(m.file) st += ' <span class="ngst r2">📀 Có bản lưu R2' + (r.r2 ? '' : ' (chưa dùng vì công tắc đang TẮT)') + '</span>';
+      else if(r.r2 && m.file === false && m.kind === 'video') st += ' <span class="ngst off">chưa có bản lưu → phát YouTube</span>';
       h += '<div class="ngrow' + (m.bad ? ' bad' : '') + (m.hidden ? ' hid' : '') + '" data-id="' + m.id + '"><img alt="" loading="lazy" src="' + esc(th) + '">'
         + '<div class="ngi"><b>' + esc(m.title) + '</b><small>' + esc(m.author || '') + (m.kind === 'playlist' ? ' · playlist' : '') + (ngheDur(m.dur) ? ' · ' + ngheDur(m.dur) : '') + ' · 🔥 ' + m.n + ' lượt (60 ngày)</small>' + st + '</div>'
         + '<div class="ngb"><select data-a="grp" aria-label="Chuyển nhóm">' + r.groups.map(function(y){ return '<option' + (y === m.grp ? ' selected' : '') + '>' + esc(y) + '</option>'; }).join('') + '</select>'
@@ -2686,6 +2702,16 @@ $('ngheBtn').onclick = function(){
   var b = $('ngheBtn'), want = b.dataset.on !== '1'; b.disabled = true;
   api('admin.ngheSet', {on:want}).then(function(r){ if(!r || !r.ok){ b.disabled = false; return ngheLoi(r); } ngheVe(); }).catch(function(){ b.disabled = false; alert('Không kết nối được máy chủ.'); });
 };
+function ngheCongTac(btn, key){
+  var want = btn.dataset.on !== '1', body = {}; body[key] = want; btn.disabled = true;
+  api('admin.ngheSet', body).then(function(r){ if(!r || !r.ok){ btn.disabled = false; return ngheLoi(r); } ngheVe(); }).catch(function(){ btn.disabled = false; alert('Không kết nối được máy chủ.'); });
+}
+$('ngheKtBtn').onclick = function(){ ngheCongTac($('ngheKtBtn'), 'kt'); };
+$('ngheR2Btn').onclick = function(){
+  var b = $('ngheR2Btn');
+  if(b.dataset.on !== '1' && !confirm('Bật phát bản lưu R2 cho Nghe nhạc?\nMix có file videos/nghe/<mã>.mp4 sẽ phát từ file, mix khác vẫn phát YouTube. Tắt lại bất cứ lúc nào.')) return;
+  ngheCongTac(b, 'r2');
+};
 $('ngheNext').onchange = function(){
   var s = $('ngheNext'); s.disabled = true;
   api('admin.ngheSet', {next:s.value}).then(function(r){ s.disabled = false; if(!r || !r.ok) return ngheLoi(r); $('ngheMsg').textContent = 'Đã lưu. Áp dụng từ lần khách chọn mix kế tiếp.'; }).catch(function(){ s.disabled = false; alert('Không kết nối được máy chủ.'); });
@@ -2697,15 +2723,25 @@ $('ngheGrp').onchange = function(){
   var o = document.createElement('option'); o.value = o.textContent = n; $('ngheGrp').insertBefore(o, $('ngheGrp').lastChild); $('ngheGrp').value = n;
 };
 $('ngheThem').onclick = function(){
-  var link = $('ngheLink').value.trim(), grp = $('ngheGrp').value, m = $('ngheAddMsg');
-  if(!link){ m.textContent = 'Dán link YouTube trước.'; return; }
+  var raw = $('ngheLink').value, grp = $('ngheGrp').value, m = $('ngheAddMsg');
+  var links = raw.split(/[\s,;]+/).filter(Boolean).filter(function(x, i, a){ return a.indexOf(x) === i; });
+  if(!links.length){ m.textContent = 'Dán link YouTube trước.'; return; }
+  if(links.length > 40){ m.textContent = 'Tối đa 40 link mỗi lần (đang có ' + links.length + ').'; return; }
   if(!grp || grp === '__new'){ m.textContent = 'Chọn nhóm cho mix.'; return; }
-  var b = $('ngheThem'); b.disabled = true; m.textContent = 'Đang hỏi YouTube…';
-  api('admin.ngheThem', {link:link, grp:grp}).then(function(r){
-    b.disabled = false;
-    if(!r || !r.ok){ m.innerHTML = '<b style="color:var(--bad)">' + esc((r && r.msg) || 'Không thêm được.') + '</b>'; return; }
-    m.innerHTML = '✅ Đã thêm: <b>' + esc(r.title || '') + '</b>'; $('ngheLink').value = ''; ngheVe();
-  }).catch(function(){ b.disabled = false; m.textContent = 'Không kết nối được máy chủ.'; });
+  var b = $('ngheThem'); b.disabled = true;
+  var okN = 0, loi = [], i = 0;
+  (function buoc(){
+    if(i >= links.length){
+      b.disabled = false; $('ngheLink').value = loi.map(function(x){ return x.l; }).join('\n');         // chỉ giữ lại link chưa thêm được để sửa / thử lại
+      m.innerHTML = (okN ? '✅ Đã thêm <b>' + okN + '</b> mix.' : '') + (loi.length ? ' <b style="color:var(--bad)">' + loi.length + ' link chưa thêm được:</b><br>' + loi.map(function(x){ return esc(x.l.slice(0, 60)) + ' — ' + esc(x.why); }).join('<br>') : '');
+      if(okN) ngheVe(); return;
+    }
+    var l = links[i++]; m.textContent = 'Đang thêm ' + i + '/' + links.length + '…';
+    api('admin.ngheThem', {link:l, grp:grp}).then(function(r){
+      if(r && r.ok) okN++; else loi.push({l:l, why:(r && r.msg) || 'không thêm được'});
+      buoc();
+    }).catch(function(){ loi.push({l:l, why:'mất kết nối máy chủ'}); buoc(); });
+  })();
 };
 $('ngheTai').onclick = ngheVe;
 $('ngheChkAll').onclick = function(){
