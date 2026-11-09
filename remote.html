@@ -696,11 +696,15 @@ const pacificDay = () => new Intl.DateTimeFormat('en-CA', { timeZone:'America/Lo
 function getCount(){ try{ const o = JSON.parse(lsGet(COUNT_KEY) || '{}'); return o.d === pacificDay() ? (+o.n || 0) : 0; }catch(e){ return 0; } }
 function setCount(n){ lsSet(COUNT_KEY, JSON.stringify({ d:pacificDay(), n })); showQuota(); }
 let quota = null;   // { used, limit } do Worker kho đếm, chung cho mọi máy
+/* Nhân viên (đã nhập mật khẩu ở nút ⚙) thấy số lượt tìm YouTube và lý do; khách và máy tính bảng phòng thì KHÔNG: hết lượt thì im lặng, hiện bài gần giống trong kho.
+   Có try/catch vì được gọi sớm hơn khai báo passBad/guestTok → mặc định coi là khách (im lặng). */
+function staffView(){ try{ return !!cfg.pass && !(passBad && guestTok); }catch(e){ return false; } }
 function setQuota(q){ if(q && typeof q.used === 'number'){ quota = q; showQuota(); } }
 function showQuota(){
   const line = $('quotaLine');
   line.textContent = ''; line.style.display = 'none'; line.classList.remove('low');
   if(!hasKho()) return;
+  if(!staffView()) return;                    // khách không cần biết lượt tìm YouTube (chỉ nhân viên có mật khẩu mới thấy)
   if(!quota) return;
   const left = Math.max(0, quota.limit - quota.used);
   if(left > 10) return;                       // chỉ nhắc khi sắp hết lượt tìm YouTube
@@ -888,7 +892,7 @@ async function searchViaKho(raw, term, force){
     if(n > 0) return showGate(raw, n);
   }
   gateFor = '';
-  msg('Đang tìm “' + term + '” trên YouTube…');
+  msg(staffView() ? 'Đang tìm “' + term + '” trên YouTube…' : 'Đang tìm “' + term + '”…');
   let d;
   try{ d = await kapi('/api/kho/ytsearch?q=' + encodeURIComponent(term), null, en); }
   catch(e){
@@ -918,13 +922,13 @@ const useEnFor = raw => enOk && (looksEnglish(raw) || (lastKho.q === raw && last
 function quotaLeft(){ return quota ? Math.max(0, quota.limit - quota.used) : null; }
 function ytBtn(label){
   const left = quotaLeft();
-  return btn(label + (left != null && left <= 10 ? ' (còn ' + left + ' lượt)' : ''), 'ghost', () => search(true));
+  return btn(label + (staffView() && left != null && left <= 10 ? ' (còn ' + left + ' lượt)' : ''), 'ghost', () => search(true));
 }
 function showGate(raw, n){
   gateFor = raw;
   const box = $('results'); box.replaceChildren();
   if(quotaLeft() !== 0){
-    const act = el('div', 'secAct'); act.append(ytBtn('🔎 Tìm thêm trên YouTube'));
+    const act = el('div', 'secAct'); act.append(ytBtn(staffView() ? '🔎 Tìm thêm trên YouTube' : '🔎 Tìm thêm bài'));
     box.append(act);
   }
   $('khoSec').scrollIntoView({ behavior:'smooth', block:'start' });
@@ -936,10 +940,10 @@ function resultsHead(title){
 }
 function renderYT(d, term, fromCache, en){
   const box = $('results'); box.replaceChildren();
-  box.append(resultsHead('YouTube: “' + term + '”'));
+  box.append(resultsHead(staffView() ? 'YouTube: “' + term + '”' : 'Kết quả: “' + term + '”'));
   const items = d.items || [];
   if(items.length) items.forEach(v => box.append(khoRow(v, { en })));
-  else box.append(el('div', 'hint', 'YouTube không có bản phát được cho từ khoá này.'));
+  else box.append(el('div', 'hint', staffView() ? 'YouTube không có bản phát được cho từ khoá này.' : 'Chưa tìm thấy bài phù hợp với từ khoá này.'));
   const g = d.groups || [];
   if(!items.length && g.length){
     box.append(el('div', 'secHead', 'Bài gần giống trong kho'));
@@ -955,9 +959,18 @@ const FALLBACK_MSG = {
 };
 function renderFallback(d, raw, term, en){
   const box = $('results'); box.replaceChildren();
-  const nt = el('div', 'notice'); nt.append(el('div', null, FALLBACK_MSG[d.reason] || FALLBACK_MSG.error));
-  if(d.reason === 'timeout' || d.reason === 'error' || d.reason === 'offline'){ const act = el('div', 'secAct'); act.append(btn('↻ Thử tìm lại', 'ghost', () => search(true))); nt.append(act); }
-  box.append(nt);
+  // hết lượt: nhớ lại để ẩn nút "Tìm thêm" (không để khách bấm rồi nhận lại đúng danh sách kho)
+  if(d.reason === 'limit' && quotaLeft() !== 0){ const lim = (quota && quota.limit) || 100; setQuota({ used:lim, limit:lim }); }
+  if(staffView()){
+    const nt = el('div', 'notice'); nt.append(el('div', null, FALLBACK_MSG[d.reason] || FALLBACK_MSG.error));
+    if(d.reason === 'timeout' || d.reason === 'error' || d.reason === 'offline'){ const act = el('div', 'secAct'); act.append(btn('↻ Thử tìm lại', 'ghost', () => search(true))); nt.append(act); }
+    box.append(nt);
+  }else if(d.reason === 'offline'){
+    // Khách: chỉ báo khi mạng của chính họ chập chờn (không nhắc YouTube hay lượt tìm); hết lượt / YouTube chậm / lỗi → im lặng, hiện bài gần giống như kết quả bình thường
+    const nt = el('div', 'notice'); nt.append(el('div', null, FALLBACK_MSG.offline));
+    const act = el('div', 'secAct'); act.append(btn('↻ Thử tìm lại', 'ghost', () => search(true))); nt.append(act);
+    box.append(nt);
+  }else box.append(resultsHead('Gợi ý gần giống'));
   let n = 0;
   (d.groups || []).forEach(x => { box.append(khoRow(x.best, { versions:x.versions, key:x.key, tone:x.tone, en })); n++; });
   if(!n && (d.hot || []).length){ box.append(el('div', 'hint', 'Chưa có bài gần giống, bạn thử các bài đang hot:')); d.hot.forEach((h, i) => { box.append(khoRow(h.best, { rank:i + 1, versions:h.versions, key:h.key, tone:null, en })); n++; }); }
@@ -966,7 +979,7 @@ function renderFallback(d, raw, term, en){
     // không gọi được Worker: dùng bài hot đã tải
     if(hotCache && hotCache.length){ box.append(el('div', 'hint', 'Các bài đang hot:')); hotCache.slice(0, 20).forEach((h, i) => { box.append(khoRow(h.best, { rank:i + 1, versions:h.versions, key:h.key, tone:null })); n++; }); }
   }
-  if(!n) box.append(el('div', 'hint', 'Chưa có bài nào gần giống. Anh thử gõ tên ngắn hơn hoặc tên ca sĩ để tìm trong kho.'));
+  if(!n) box.append(el('div', 'hint', 'Chưa có bài nào gần giống. ' + (staffView() ? 'Anh' : 'Bạn') + ' thử gõ tên ngắn hơn hoặc tên ca sĩ để tìm trong kho.'));
 }
 function khoWhy(e){ return e.status === 401 ? (e.reason === 'guest' ? 'vé khách bị kho từ chối (GUEST_SECRET của Worker bmbplayer và kho-karaoke không giống nhau)' : 'sai mật khẩu') : e.reason === 'origin' ? 'Worker kho chưa cho phép địa chỉ ' + location.origin : e instanceof TypeError ? 'không kết nối được tới Worker kho' : (e.message || 'lỗi'); }
 
@@ -1216,7 +1229,7 @@ async function renderKho(){
     const gv = d.groups || [], ge = (de.groups || []).map(x => Object.assign({}, x, { en:true, best:Object.assign({}, x.best, { en:true }) }));
     const g = (looksEnglish(raw) ? ge.concat(gv) : gv.concat(ge)).slice(0, 30);
     lastKho = { q:raw, n:g.length, vi:gv.length, en:ge.length };
-    if(!g.length){ box.replaceChildren(khoHead('Kho karaoke (0 bài)'), el('div', 'msg', quotaLeft() === 0 ? 'Kho chưa có bài khớp. Hôm nay đã hết lượt tìm YouTube, bấm Tìm để xem bài gần giống trong kho.' : 'Kho chưa có bài khớp. Bấm Tìm để tìm trên YouTube; bài tìm được sẽ tự vào kho.')); return 0; }
+    if(!g.length){ box.replaceChildren(khoHead('Kho karaoke (0 bài)'), el('div', 'msg', !staffView() ? 'Kho chưa có bài khớp. Bấm Tìm để xem thêm bài gần giống.' : quotaLeft() === 0 ? 'Kho chưa có bài khớp. Hôm nay đã hết lượt tìm YouTube, bấm Tìm để xem bài gần giống trong kho.' : 'Kho chưa có bài khớp. Bấm Tìm để tìm trên YouTube; bài tìm được sẽ tự vào kho.')); return 0; }
     await showGroups(box, g, seq, '');
     return g.length;
   }catch(e){
