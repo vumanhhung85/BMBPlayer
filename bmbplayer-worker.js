@@ -389,6 +389,7 @@ async function handleApi(request, env, ctx) {
         case 'quay.don':                 res = await quayDon(env, body, ctx); break;
         case 'quay.phong':               res = await quayPhong(env, body, ctx); break;
         case 'quay.hg':                  res = await quayHg(env, body); break;
+        case 'quay.baoLag':              res = await quayBaoLag(env, body); break;
         case 'quay.hgSet':               res = await quayHgSet(env, body); break;
         case 'quay.tv':                  res = await quayTv(env, body); break;
         case 'quay.nhatKy':              res = await quayNhatKy(env, body); break;
@@ -1382,6 +1383,15 @@ async function quayHgSet(env, body) {
   hgCache = { v: cfg, at: Date.now() };
   return ok({ on: !!cfg[ss.b].on });
 }
+// quay.baoLag {roomId} — nhân viên quầy báo "phòng này đang lag": ghi mốc (phòng, giờ, ai báo) vào nhật ký Kết nối + xin TV gửi ngay số đo lúc đó (11/2026)
+async function quayBaoLag(env, body) {
+  const [ss, loi] = await canPhien(env, body);
+  if (loi) return loi;
+  const [p, loi2] = await phongCuaChiNhanh(env, ss, s(body.roomId, 60));
+  if (loi2) return loi2;
+  const r = await call(roomStub(env, p.id), '/lag', { id: p.id, by: ss.u });
+  return ok({ tv: r.tv || 0, lap: r.lap ? 1 : 0 });
+}
 // quay.hg {roomId, min | add} — nhân viên đặt / thêm / tắt nhắc giờ cho phòng đang mở (min = 0 → tắt; tính từ bây giờ)
 async function quayHg(env, body) {
   const [ss, loi] = await canPhien(env, body);
@@ -2161,7 +2171,7 @@ async function knGhi(env, c, e) {
   if (!env.DB) return;
   await knBang(env);
   const ngay = ngayKinhDoanh(e.t), cn = c.branch || '', pid = c.rid || '', ph = c.name || '';
-  if (e.ev === 'tai' || e.ev === 'phat') {                 // báo cáo từ phía máy (nối lại / chất lượng phát 1 bài): chỉ lưu chi tiết, không cộng vào số đếm
+  if (e.ev === 'tai' || e.ev === 'phat' || e.ev === 'lag' || e.ev === 'lagtv') {                 // báo cáo từ phía máy (nối lại / chất lượng phát 1 bài): chỉ lưu chi tiết, không cộng vào số đếm
     await env.DB.prepare(`INSERT INTO kn_sk (t, cn, phong_id, phong, ev, role, ip, isp, dev, ua, dg) VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
       .bind(e.t, cn, pid, ph, e.ev, e.role || '', String(e.ip || ''), e.isp || null, e.dev || null, e.ua || null, JSON.stringify(e.dg || {})).run();
     return;
@@ -2290,6 +2300,7 @@ async function adminKnNhatKy(env, body) {
   if (['tv', 'tablet', 'remote'].includes(role)) { sql += ' AND role = ?'; b.push(role); }
   if (ev === 'rot') sql += ` AND (ev = 'dut' OR (ev = 'cat' AND code = 4007))`;
   else if (['noi', 'dut', 'cat', 'tuchoi', 'mo', 'dong', 'loi', 'xoa', 'tai', 'phat', 'hg'].includes(ev)) { sql += ' AND ev = ?'; b.push(ev); }
+  else if (ev === 'lag') sql += ` AND ev IN ('lag', 'lagtv')`;         // nhân viên báo lag + số đo TV gửi ngay lúc đó
   else sql += ` AND ev <> 'phat'`;                                  // báo cáo từng bài hát nhiều → chỉ hiện khi lọc "Phát nhạc trên TV"
   if (ip) { sql += ' AND ip = ?'; b.push(ip); }
   if (quanh) { sql += ' AND t BETWEEN ? AND ?'; b.push(quanh - 120000, quanh + 120000); }     // ±2 phút quanh 1 sự cố
@@ -2323,7 +2334,27 @@ async function adminKnIpLs(env, body) {
 }
 /* Chất lượng phát nhạc trên TV (TV tự báo, xem index.html → pq): bài "có vấn đề" = đứng hình chờ tải, mở bài > 6 giây, hoặc máy bận (CPU) > 3 giây.
    TV luôn báo 5 bài đầu sau khi bật + mọi bài có vấn đề; bài êm từ bài thứ 6 chỉ đếm (sk) và gửi kèm lần báo sau → tỉ lệ vẫn tính đúng. */
-const knPhatXau = g => (g.bn || 0) > 0 || (g.st || 0) > 6000 || (g.ltms || 0) > 3000;
+const knPhatXau = g => (g.bn || 0) > 0 || (g.st || 0) > 6000 || (g.ltms || 0) > 3000 || (g.lag || 0) > 0;
+/* Lọc các số đo thêm của tin 'pq' / 'lags' từ TV (11/2026): bs mốc đứng hình [[giây từ lúc mở bài, độ dài ×0,1 giây]…], bfm/bfa/bfl/bfn bộ đệm video (giây),
+   rt/rtx/rtl ping TV ↔ Cloudflare (TB / cao nhất ms / số ping mất), net/nrtt/dl mạng do trình duyệt báo, lag số lần quầy báo lag trong bài, skq/skp bài êm theo nguồn:độ nét / tổng giây. */
+const pqN1 = (v, mx) => Number.isFinite(+v) && v !== '' && v !== null ? Math.max(0, Math.min(mx, Math.round(+v * 10) / 10)) : undefined;
+function pqThem(g) {
+  const nu = (v, mx) => Number.isFinite(+v) && v !== '' && v !== null ? Math.max(0, Math.min(mx, Math.round(+v))) : undefined, o = {};
+  if (Array.isArray(g.bs) && g.bs.length) {
+    const bs = g.bs.slice(0, 10).map(x => Array.isArray(x) ? [nu(x[0], 36000), nu(x[1], 36000)] : null).filter(x => x && x[0] !== undefined && x[1] !== undefined);
+    if (bs.length) o.bs = bs;
+  }
+  o.bfn = nu(g.bfn, 99999); o.bfm = pqN1(g.bfm, 36000); o.bfa = pqN1(g.bfa, 36000); o.bfl = nu(g.bfl, 99999);
+  o.rt = nu(g.rt, 60000); o.rtx = nu(g.rtx, 60000); o.rtl = nu(g.rtl, 9999);
+  o.net = String(g.net == null ? '' : g.net).replace(/[^\w-]/g, '').slice(0, 8) || undefined; o.nrtt = nu(g.nrtt, 60000); o.dl = pqN1(g.dl, 100000);
+  o.lag = nu(g.lag, 99) || undefined; o.skp = nu(g.skp, 400000) || undefined;
+  if (g.skq && typeof g.skq === 'object' && !Array.isArray(g.skq)) {
+    const q = {}; let i = 0;
+    for (const k of Object.keys(g.skq)) { if (i >= 12) break; const n = nu(g.skq[k], 999); if (/^(yt|r2|nas):[a-z0-9]{1,10}$/.test(k) && n) { q[k] = n; i++; } }
+    if (i) o.skq = q;
+  }
+  return o;
+}
 function knPhatTk(rows) {
   const o = { n: 0, xau: 0, dau: 0, dauXau: 0, sau: 0, sauXau: 0, bn: 0, bms: 0, st: [], q: {}, lt: 0, man: '', cl: 0 };
   for (const r of rows) {
@@ -2334,6 +2365,7 @@ function knPhatTk(rows) {
     o.sau += sk;
     if (g.st != null) o.st.push(g.st);
     if (g.q) o.q[g.q] = (o.q[g.q] || 0) + 1;
+    if (g.skq) for (const k of Object.keys(g.skq)) { const q = k.split(':')[1]; if (q && q !== 'x') o.q[q] = (o.q[q] || 0) + (+g.skq[k] || 0); }   // 11/2026: bài êm cũng tính vào phân bố độ nét
     if (!o.man && g.vw) { o.man = g.vw + '×' + g.vh + (g.dpr ? '@' + g.dpr + 'x' : '') + (g.hc ? ' · ' + g.hc + ' nhân' : '') + (g.mem ? ' · ' + g.mem + 'GB' : ''); o.cl = g.cl || 0; }
   }
   o.st.sort((a, b) => a - b);
@@ -2808,7 +2840,7 @@ export class Room extends DurableObject {
     const e = Object.assign({ t: Date.now(), ev }, o || {});
     try{ console.log('nk', this.nkRid || '', JSON.stringify(e)); }catch(x){}
     this.nkQ = (this.nkQ || Promise.resolve()).then(async () => {          // xếp hàng: nhiều sự kiện cùng lúc không ghi đè nhau
-      if(ev !== 'phat'){                                                   // báo cáo phát nhạc từng bài không chiếm chỗ 60 dòng nhật ký của phòng
+      if(ev !== 'phat' && ev !== 'lagtv'){                                 // báo cáo phát nhạc từng bài / số đo TV lúc báo lag không chiếm chỗ 60 dòng nhật ký của phòng
         let l = (await this.ctx.storage.get('nk')) || [];
         const e2 = Object.assign({}, e); delete e2.ua; delete e2.asn; delete e2.colo;     // 60 dòng trong phòng: gọn, chi tiết máy nằm ở D1
         l.push(e2); if(l.length > 60) l = l.slice(-60);
@@ -3018,6 +3050,15 @@ export class Room extends DurableObject {
       await this.broadcastRoom();
       return jres({ ok: true, cl });
     }
+    if(u.pathname === '/lag'){                           // nhân viên quầy báo lag: ghi mốc + hỏi TV số đo lúc này (TV trả tin 'lags'); 20 giây mới nhận một lần
+      const now = Date.now(), tvs = this.sockets('tv');
+      if(now - ((await this.ctx.storage.get('lagT')) || 0) < 20000) return jres({ ok: true, lap: 1, tv: tvs.length });
+      await this.ctx.storage.put('lagT', now);
+      await this.ghi('lag', { role: 'quay', dg: { by: String(body.by || '').replace(/[^\w.@-]/g, '').slice(0, 40) || undefined, tv: tvs.length, k: now } });
+      const msg = JSON.stringify({ type: 'lagq', k: now });
+      for(const w of tvs){ try{ w.send(msg); }catch(e){} }
+      return jres({ ok: true, tv: tvs.length });
+    }
     if(u.pathname === '/svc'){ await this.svcPut(body.don || {}); return jres({ ok: true }); }
     if(u.pathname === '/hg') return jres(await this.hgDat(body));
     if(u.pathname === '/rotate'){
@@ -3136,7 +3177,7 @@ export class Room extends DurableObject {
     }
 
     if(m.type === 'pq'){                                 // TV báo chất lượng phát 1 bài (mở bài bao lâu, đứng hình, độ phân giải, CPU bận) — xem index.html
-      if(a.role !== 'tv' || now - (a.pqT || 0) < 8000 || data.length > 1100) return;      // 11/2026: 700 → 1100 byte vì tin có thêm số đo khung hình / đổi độ nét
+      if(a.role !== 'tv' || now - (a.pqT || 0) < 8000 || data.length > 1800) return;      // 11/2026: 700 → 1800 byte vì tin có thêm số đo khung hình / đổi độ nét / bộ đệm / ping / mốc đứng hình
       a.pqT = now; try{ ws.serializeAttachment(a); }catch(e){}
       const g = m.d || {}, nu = (v, mx) => Number.isFinite(+v) && v !== '' && v !== null ? Math.max(0, Math.min(mx, Math.round(+v))) : undefined, tx = (v, n) => String(v == null ? '' : v).replace(/[^\w.-]/g, '').slice(0, n) || undefined;
       const dg = { n: nu(g.n, 9999), st: nu(g.st, 600000), bn: nu(g.bn, 999), bms: nu(g.bms, 3600000), q: tx(g.q, 10), qmx: tx(g.qmx, 10), ltn: nu(g.ltn, 99999), ltms: nu(g.ltms, 3600000),
@@ -3145,7 +3186,21 @@ export class Room extends DurableObject {
         src: ['yt', 'r2', 'nas'].includes(g.src) ? g.src : undefined, fb: tx(g.fb, 12),
         // 11/2026: ac = cl do TV tự đặt (box yếu); df/tf khung rớt/tổng của file; qc/qd số lần đổi / hạ độ nét YouTube; fn fs fj fjj fmx nhịp khung hình của trang (xem index.html, pqFrames)
         ac: nu(g.ac, 1), df: nu(g.df, 10000000), tf: nu(g.tf, 10000000), qc: nu(g.qc, 999), qd: nu(g.qd, 999), fn: nu(g.fn, 1000000), fs: nu(g.fs, 3600000), fj: nu(g.fj, 1000000), fjj: nu(g.fjj, 1000000), fmx: nu(g.fmx, 60000) };
+      Object.assign(dg, pqThem(g));                        // 11/2026: mốc đứng hình, bộ đệm, ping, báo lag, bài êm theo độ nét (xem pqThem)
       await this.ghi('phat', { role: 'tv', ip: netKey(a.ip), isp: a.isp, ua: a.ua, dg });
+      return;
+    }
+
+    if(m.type === 'lags'){                               // TV trả lời "Báo lag" của quầy: số đo ngay lúc đó (bài, giây thứ mấy, trạng thái, bộ đệm, ping…) — xem index.html lagSnap
+      if(a.role !== 'tv' || now - (a.lgT || 0) < 15000 || data.length > 1200) return;
+      a.lgT = now; try{ ws.serializeAttachment(a); }catch(e){}
+      const g = m.d || {}, nu = (v, mx) => Number.isFinite(+v) && v !== '' && v !== null ? Math.max(0, Math.min(mx, Math.round(+v))) : undefined, tx = (v, n) => String(v == null ? '' : v).replace(/[^\w.-]/g, '').slice(0, n) || undefined;
+      const dg = Object.assign({ k: nu(g.k, 9e15), ps: Number.isFinite(+g.ps) ? Math.max(-9, Math.min(9, Math.round(+g.ps))) : undefined, t: nu(g.t, 86400), dur: nu(g.dur, 86400), q: tx(g.q, 10),
+        src: ['yt', 'r2', 'nas'].includes(g.src) ? g.src : undefined, cl: nu(g.cl, 4320), on: g.on === 0 ? 0 : 1, hid: g.hid ? 1 : 0, up: nu(g.up, 30 * 86400), ls: g.ls ? 1 : undefined,
+        ba: pqN1(g.ba, 36000), id: /^[\w-]{11}$/.test(g.id || '') ? g.id : undefined, n: nu(g.n, 9999), st: nu(g.st, 600000), bn: nu(g.bn, 999), bms: nu(g.bms, 3600000), bnow: nu(g.bnow, 3600000),
+        qd: nu(g.qd, 999), df: nu(g.df, 10000000), tf: nu(g.tf, 10000000), fj: nu(g.fj, 1000000), fjj: nu(g.fjj, 1000000), fmx: nu(g.fmx, 60000), ltms: nu(g.ltms, 3600000), pl: nu(g.pl, 36000),
+        rtn: nu(g.rtn, 60000) }, pqThem(g));
+      await this.ghi('lagtv', { role: 'tv', ip: netKey(a.ip), isp: a.isp, ua: a.ua, dg });
       return;
     }
 

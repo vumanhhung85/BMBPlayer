@@ -1619,6 +1619,13 @@ function tvAct(act, id){
     if(!confirm('Đổi QR khách phòng '+x.roomName+'? Điện thoại đang nối bị ngắt, khách quét lại mã mới trên TV.')) return;
     api('quay.doiQr', {roomId:id}).then(function(r){ if(!r || !r.ok) alert((r&&r.msg)||'Không đổi được.'); sauTv(); }); return;
   }
+  if(act==='baolag'){
+    api('quay.baoLag', {roomId:id}).then(function(r){
+      if(!r || !r.ok) alert((r&&r.msg)||'Chưa ghi được, thử lại.');
+      else if(r.lap) toast('Phòng '+x.roomName+' vừa được báo lag rồi — cảm ơn, đã ghi nhận.');
+      else toast(r.tv ? 'Đã ghi nhận lag phòng '+x.roomName+' — TV đang gửi số đo về cho admin.' : 'Đã ghi mốc lag phòng '+x.roomName+', nhưng TV đang không nối nên chưa có số đo.');
+    }); return;
+  }
   if(act==='gotv'){
     if(!confirm('Gỡ TV khỏi phòng '+x.roomName+'? TV sẽ hiện mã 6 số để gán vào phòng khác (hoặc gán lại phòng này).')) return;
     api('quay.goTv', {roomId:id}).then(function(r){ if(!r || !r.ok) alert((r&&r.msg)||'Không gỡ được.'); sauTv(); }); return;
@@ -2792,6 +2799,16 @@ function knLyDo(g){
   if(g.why==='close:1006') return '<b>đường truyền bị ngắt</b> (mã 1006)';
   return esc(g.why||'không rõ');
 }
+/* 11/2026: số đo giúp tách lag do MẠNG và lag do MÁY. Bộ đệm = số giây video đã tải trước so với chỗ đang hát. */
+function knBuf(g){ if(g.bfn==null && g.ba==null) return ''; var lo = g.bfm!=null ? g.bfm : g.ba, tb = g.bfa!=null ? g.bfa : g.ba;
+  var bad = lo!=null && lo < 3; return ' · bộ đệm '+(g.bfn!=null ? 'thấp nhất <b>'+lo+'s</b>, TB '+tb+'s'+(g.bfl?' ('+g.bfl+'/'+g.bfn+' lần dưới 3s)':'') : '<b>'+g.ba+'s</b>')+(bad?' ⚠️ cạn → nghiêng về MẠNG':''); }
+function knPing(g){ if(g.rt==null) return ''; return ' · ping '+g.rt+'ms'+(g.rtx!=null?' (cao nhất '+g.rtx+'ms)':'')+(g.rtl?' · <b>mất '+g.rtl+' ping</b>':''); }
+function knDoNet(g){ var s = (g.bn?' đứng hình '+g.bn+' lần ('+knDown(g.bms)+')':' chưa đứng hình trong bài này')+(g.bnow?' · <b>đang đứng '+knDown(g.bnow)+'</b>':'')+knBuf(g)+knPing(g); return s; }
+function knLagDong(g){ var ps = { '-1':'chưa bắt đầu', '0':'đã hết bài', '1':'đang phát', '2':'đang dừng', '3':'đang chờ tải', '5':'chưa phát' }[String(g.ps)] || ('mã '+g.ps);
+  return (g.id?'bài '+esc(g.id)+' (thứ '+(g.n||'?')+') · ':'')+(g.src&&g.src!=='yt'?(g.src==='nas'?'NAS quán':'thư viện R2'):'YouTube')+(g.q?' '+knQ(g.q):'')+' · '+ps+(g.t!=null?' ở giây '+g.t+(g.dur?'/'+g.dur:''):'')
+    +(g.on===0?' · <b>TV báo mất mạng</b>':'')+(g.net?' · mạng '+esc(g.net)+(g.dl!=null?' '+g.dl+'Mb/s':'')+(g.nrtt!=null?' RTT '+g.nrtt+'ms':''):'')
+    +(g.fjj?' · trang giật '+g.fjj+' nhịp':'')+(g.ltms>=1000?' · máy bận '+knDown(g.ltms):'')+(g.tf>=100?' · file rớt '+g.df+'/'+g.tf+' khung':'')+(g.qd?' · YouTube hạ nét '+g.qd+' lần':'')
+    +(g.bs&&g.bs.length?' · các lần đứng gần nhất (giây thứ…/dài): '+g.bs.map(function(x){ return x[0]+'/'+(x[1]/10)+'s'; }).join(', '):''); }
 function knSuKien(e){
   var c = e.code, tx, cls = '';
   if(e.ev==='noi'){ tx = 'nối vào'; cls = 'kn-ev-noi'; }
@@ -2802,11 +2819,17 @@ function knSuKien(e){
     tx = '🔁 nối lại — <b>mất '+knDown(g.down)+'</b> · '+knLyDo(g)+(g.tries?' · thử '+g.tries+' lần':'')
       + (g.rtt!=null ? '<div class="knsm">ping trước khi rớt: TB '+g.rtt+'ms, cao nhất '+(g.rttMax!=null?g.rttMax:'?')+'ms'+(g.net?' · mạng '+esc(g.net):'')+(g.ty?' ('+esc(g.ty)+')':'')+(g.nrtt!=null?' · RTT '+g.nrtt+'ms':'')+(g.dl!=null?' · '+g.dl+'Mb/s':'')+'</div>' : (g.net?'<div class="knsm">mạng '+esc(g.net)+(g.ty?' ('+esc(g.ty)+')':'')+'</div>':'')); cls = 'kn-ev-noi'; }
   else if(e.ev==='phat'){ var p = {}; try{ p = JSON.parse(e.dg||'{}'); }catch(x){}
-    var xau = (p.bn||0)>0 || (p.st||0)>6000 || (p.ltms||0)>3000 || p.err || p.fb;
+    var xau = (p.bn||0)>0 || (p.st||0)>6000 || (p.ltms||0)>3000 || p.err || p.fb || p.lag;
     tx = '🎵 bài thứ '+(p.n||'?')+' từ lúc bật'+(p.src&&p.src!=='yt'?' · 📀 '+(p.src==='nas'?'NAS quán':'thư viện R2'):'')+(p.fb?' · <b>'+knFb(p.fb)+'</b>':'')+(p.q?' · <b>'+knQ(p.q)+'</b>':'')+(p.st!=null?' · mở bài '+knDown(p.st):'')
       + ((p.bn||0)>0?' · <b>đứng hình chờ tải '+p.bn+' lần ('+knDown(p.bms)+')</b>':'')+((p.ltms||0)>=1000?' · <b>máy bận '+knDown(p.ltms)+'</b>':'')+(p.err?' · <b>lỗi '+p.err+'</b>':'')
-      + '<div class="knsm">'+(p.vw?'màn '+p.vw+'×'+p.vh+(p.dpr?' @'+p.dpr+'x':''):'')+(p.cl?' · giới hạn '+p.cl+'p':' · chất lượng tự động')+(p.qmx&&p.qmx!==p.q?' · cao nhất '+knQ(p.qmx):'')+(p.hc?' · '+p.hc+' nhân CPU':'')+(p.mem?' · '+p.mem+'GB':'')+(p.up!=null?' · trang chạy '+knTuoi(p.up):'')+(p.sk?' · +'+p.sk+' bài êm trước đó':'')+'</div>';
-    cls = xau ? 'kn-ev-cat' : 'kn-ev-noi'; }
+      + '<div class="knsm">'+(p.vw?'màn '+p.vw+'×'+p.vh+(p.dpr?' @'+p.dpr+'x':''):'')+(p.cl?' · giới hạn '+p.cl+'p':' · chất lượng tự động')+(p.qmx&&p.qmx!==p.q?' · cao nhất '+knQ(p.qmx):'')+(p.hc?' · '+p.hc+' nhân CPU':'')+(p.mem?' · '+p.mem+'GB':'')+(p.up!=null?' · trang chạy '+knTuoi(p.up):'')+(p.sk?' · +'+p.sk+' bài êm trước đó'+(p.skq?' ('+Object.keys(p.skq).map(function(k){ var a = k.split(':'); return p.skq[k]+'× '+(a[0]==='yt'?'YouTube':a[0]==='nas'?'NAS':'R2')+' '+(a[1]==='x'?'?':knQ(a[1])); }).join(', ')+')':''):'')+'</div>'
+      + ((p.bfn!=null||p.rt!=null||(p.bs&&p.bs.length))?'<div class="knsm">'+(knBuf(p)+knPing(p)+(p.net?' · mạng '+esc(p.net):'')+((p.bs&&p.bs.length)?' · đứng hình lúc giây '+p.bs.map(function(x){ return x[0]+' ('+(x[1]/10)+'s)'; }).join(', '):'')).replace(/^ · /,'')+'</div>':'')
+      + (p.lag?'<div class="knsm"><b>🐌 quầy đã báo lag '+p.lag+' lần trong bài này</b></div>':'');
+    cls = (xau || p.lag) ? 'kn-ev-cat' : 'kn-ev-noi'; }
+  else if(e.ev==='lag'){ var lg = {}; try{ lg = JSON.parse(e.dg||'{}'); }catch(x){}
+    tx = '🐌 <b>QUẦY BÁO LAG</b>'+(lg.by?' · '+esc(lg.by):'')+(lg.tv?'':' · TV không nối lúc báo'); cls = 'kn-ev-rot'; }
+  else if(e.ev==='lagtv'){ var l2 = {}; try{ l2 = JSON.parse(e.dg||'{}'); }catch(x){}
+    tx = '↳ số đo TV lúc báo lag:'+knDoNet(l2)+'<div class="knsm">'+knLagDong(l2)+'</div>'; cls = 'kn-ev-rot'; }
   else if(e.ev==='hg'){ tx = '⏱ Nhắc giờ: '+esc(e.why||'đổi'); cls = 'kn-ev-cat'; }
   else if(e.ev==='mo') tx = '<b>Phòng MỞ</b>';
   else if(e.ev==='dong') tx = '<b>Phòng ĐÓNG</b>';
@@ -3007,7 +3030,7 @@ function knMay(){
 function knNkLoc(){
   var L = KN.loc, h = '<div class="knf">'
     + '<select id="knfRole"><option value="">Mọi thiết bị</option><option value="tv">TV</option><option value="tablet">Máy tính bảng</option><option value="remote">Điện thoại khách</option></select>'
-    + '<select id="knfEv"><option value="">Mọi sự kiện</option><option value="rot">Chỉ RỚT</option><option value="noi">Nối vào</option><option value="tai">Nối lại (máy tự báo)</option><option value="phat">🎵 Phát nhạc trên TV (giật/đứng hình)</option><option value="cat">Server cắt</option><option value="tuchoi">Bị từ chối</option><option value="hg">⏱ Nhắc giờ (khách đổi)</option><option value="mo">Mở phòng</option><option value="dong">Đóng phòng</option></select>'
+    + '<select id="knfEv"><option value="">Mọi sự kiện</option><option value="rot">Chỉ RỚT</option><option value="noi">Nối vào</option><option value="tai">Nối lại (máy tự báo)</option><option value="phat">🎵 Phát nhạc trên TV (giật/đứng hình)</option><option value="lag">🐌 Quầy báo lag</option><option value="cat">Server cắt</option><option value="tuchoi">Bị từ chối</option><option value="hg">⏱ Nhắc giờ (khách đổi)</option><option value="mo">Mở phòng</option><option value="dong">Đóng phòng</option></select>'
     + '<input id="knfIp" placeholder="Lọc IP" style="width:150px" value="'+esc(L.ip)+'">'
     + (L.phong ? '<span class="knchip">Phòng '+esc(L.phongTen)+'<button data-bo="phong" title="Bỏ lọc">✕</button></span>' : '')
     + (L.quanh ? '<span class="knchip">±2 phút quanh '+knTg(L.quanh)+'<button data-bo="quanh" title="Bỏ lọc">✕</button></span>' : '')
@@ -3487,6 +3510,7 @@ function drawerHtml(x){
   h += '<div class="row">';
   if(canGan) h += b('gan', GANNET.same === false ? 'btn-bad' : 'btn-y', GANNET.same === false ? 'Vẫn gán (chắc chắn '+tenMayT()+' ở đây)' : 'Gán '+tenMayT()+' này vào đây');
   if(!GAN) h += b('quet', 'btn-ghost', sic('tv')+' Gán TV &amp; MTB');
+  if(x.tv && x.open) h += b('baolag', 'btn-ghost', '🐌 Báo lag');
   if(x.tv) h += b('gotv', 'btn-ghost', 'Gỡ TV');
   if(S.quanLy && x.tablets) h += b('gomtb', 'btn-ghost', 'Gỡ MTB');
   if(S.vaiTro === 'admin' && x.tokTv) h += b('lktv', 'btn-ghost', 'Chép liên kết TV');

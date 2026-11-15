@@ -37,6 +37,9 @@
     /* Chẩn đoán phía máy: máy tự biết vì sao mất kết nối (thiết bị báo offline? tab ẩn? socket chết ngầm?), mất bao lâu, ping bao nhiêu ms, loại mạng.
        Lần nối lại thành công kế tiếp, máy gửi 1 tin {type:'dg'} → Worker ghi vào nhật ký (tab 🔌 Kết nối của admin). Không gửi lúc kết nối bình thường. */
     let loss = null, pingT = 0; const rtts = [];
+    /* 11/2026: bộ đếm ping cộng dồn cho trang TV đọc (đo theo từng bài, xem index.html pqNet): n lần đo, sum tổng ms, max cao nhất từ lần trang đặt lại,
+       last lần gần nhất, lost số ping không thấy trả lời trước nhịp kế. Ping đi tới máy chủ Cloudflare gần nhất (không phải tới YouTube). Không gửi thêm gói nào. */
+    const R = { n: 0, sum: 0, max: 0, last: 0, lost: 0 };
     const markLoss = (why, at) => { if(loss) return; loss = { at: at || Date.now(), why, on: navigator.onLine !== false, hid: !!document.hidden, tries: 0 }; };
     const netInfo = () => { const c = navigator.connection || {}; return { net: c.effectiveType || '', nrtt: c.rtt, dl: c.downlink, ty: c.type || '' }; };
     const sendDiag = () => {
@@ -71,11 +74,12 @@
       sock.onopen = () => { if(loss) loss.tries = tries; tries = 0; lastRx = Date.now(); try{ sock.send('sync'); }catch(e){} sendDiag(); clearInterval(ping);
         ping = setInterval(() => {
           if(Date.now() - lastRx > 100000) return recycle();             // 100 giây không nhận được gì (kể cả 'pong' 25 giây/lần): socket đã chết ngầm → nối lại
+          if(pingT) R.lost++;
           pingT = Date.now(); try{ sock.send('ping'); }catch(e){}
         }, 25000); };
       sock.onmessage = ev => {
         lastRx = Date.now();
-        if(ev.data === 'pong'){ if(pingT){ rtts.push(Date.now() - pingT); if(rtts.length > 12) rtts.shift(); pingT = 0; } return; }
+        if(ev.data === 'pong'){ if(pingT){ const d = Date.now() - pingT; rtts.push(d); if(rtts.length > 12) rtts.shift(); pingT = 0; R.n++; R.sum += d; R.last = d; if(d > R.max) R.max = d; } return; }
         let m; try{ m = JSON.parse(ev.data); }catch(e){ return; }
         if(m.type === 'room'){
           ch.last = m; setStatus(m.open ? 'open' : 'closed', m);
@@ -118,6 +122,7 @@
     }
     window.addEventListener('online', probe);
     ch.postMessage = msg => { if(sock && sock.readyState === 1) sock.send(JSON.stringify(msg)); };
+    ch.rtt = R; ch.netInfo = netInfo;
     ch.close = () => { stopped = true; try{ sock.close(); }catch(e){} };
     document.addEventListener('visibilitychange', () => {   // điện thoại ngủ máy rồi mở lại: nối lại ngay (hoặc làm tươi trạng thái nếu còn nối)
       if(document.visibilityState === 'visible') probe();

@@ -507,19 +507,73 @@ addEventListener('resize', fitYt);
 /* ---------- Đo chất lượng phát từng bài (gửi Worker → tab 🔌 Kết nối của admin) ----------
    Mỗi bài: mở bài mất bao lâu, đứng hình chờ tải mấy lần, độ phân giải YouTube đang phát, trang/máy bận (long task) bao lâu.
    Luôn báo 5 bài đầu sau khi mở trang + mọi bài có vấn đề; bài êm còn lại chỉ đếm (sk) và gửi kèm lần báo sau → ít ghi D1. */
-const PQ = { n: 0, sk: 0, c: null }, LT = { n: 0, ms: 0 };
+const PQ = { n: 0, sk: 0, skq: {}, skp: 0, c: null }, LT = { n: 0, ms: 0 };
 try{ new PerformanceObserver(l => { for(const e of l.getEntries()){ if(e.duration >= 100){ LT.n++; LT.ms += e.duration; } } }).observe({ type: 'longtask' }); }catch(e){}
 function pqStart(id){
   pqEnd('next');
   PQ.n++; PQ.c = { id, n: PQ.n, t0: Date.now(), st: null, bn: 0, bms: 0, bT: 0, bLast: 0, q: {}, ltN: LT.n, ltMs: LT.ms, seekT: 0, lock: false, src: 'yt', fb: '',
-    df: 0, tf: 0, qc: 0, qd: 0, qp: -1, fn: 0, fs: 0, fj: 0, fjj: 0, fmx: 0 };
+    df: 0, tf: 0, qc: 0, qd: 0, qp: -1, fn: 0, fs: 0, fj: 0, fjj: 0, fmx: 0,
+    bs: [], bfn: 0, bfs: 0, bfm: 1e9, bfl: 0, lag: 0, r0: null };
+  const R = bc.rtt; if(R){ PQ.c.r0 = { n: R.n, sum: R.sum, lost: R.lost }; R.max = 0; }
 }
 function pqState(st){
   const c = PQ.c; if(!c) return;
   const now = Date.now();
-  if(st === 1){ if(c.st === null) c.st = now - c.t0; if(c.bT){ c.bms += now - c.bT; c.bT = 0; } pqQ(); }
+  if(st === 1){ if(c.st === null) c.st = now - c.t0; pqBEnd(c, now); pqQ(); }
   else if(st === 3){ if(c.st !== null && !c.bT && now - c.seekT > 2500){ c.bn++; c.bT = now; c.bLast = now; } }
-  else if(c.bT){ c.bms += now - c.bT; c.bT = 0; }
+  else pqBEnd(c, now);
+}
+/* 11/2026 — số đo để tách "lag do mạng" khỏi "lag do máy" (báo kèm tin 'pq'; không tải thêm gì, chỉ đọc số có sẵn mỗi 5 giây):
+   bs  = mốc từng lần đứng hình [giây tính từ lúc mở bài, độ dài ×0,1 giây] (tối đa 10) → ghép giờ giữa các phòng: nhiều phòng đứng cùng phút = đường truyền quán
+   bfm/bfa/bfl/bfn = bộ đệm video (số giây đã tải trước so với chỗ đang hát): thấp nhất / trung bình / số lần đo dưới 3 giây / số lần đo.
+                     Bộ đệm cạn dần rồi đứng = mạng; bộ đệm còn đầy mà vẫn giật = máy.
+   rt/rtx/rtl = ping TV ↔ máy chủ Cloudflare trong lúc hát bài này: trung bình / cao nhất (ms) / số ping mất; net, nrtt, dl = loại mạng trình duyệt tự báo
+   lag = số lần nhân viên quầy bấm "Báo lag" trong bài này; skq/skp = các bài êm không báo riêng, đếm theo nguồn:độ nét / tổng giây đã phát */
+function pqBEnd(c, now){
+  if(!c.bT) return;
+  const d = now - c.bT; c.bms += d;
+  if(c.bs.length < 10) c.bs.push([Math.round((c.bT - c.t0) / 1000), Math.round(d / 100)]);
+  c.bT = 0;
+}
+function bufAhead(){
+  try{
+    if(src === 'yt' && player){ const d = player.getDuration(), f = player.getVideoLoadedFraction(); return d > 0 && f >= 0 ? Math.max(0, f * d - player.getCurrentTime()) : null; }
+    const v = VP.el, t = v.currentTime, b = v.buffered;
+    for(let i = 0; i < b.length; i++) if(b.start(i) <= t + 0.3 && b.end(i) >= t) return b.end(i) - t;
+    return b.length ? 0 : null;
+  }catch(e){ return null; }
+}
+function pqBuf(){
+  const c = PQ.c; if(!c) return;
+  let d = 0, t = 0; try{ d = P().getDuration(); t = P().getCurrentTime(); }catch(e){ return; }
+  if(!(d > 0) || t < 8 || d - t < 25) return;                          // đầu bài bộ đệm chưa kịp đầy, cuối bài hết thứ để tải: không tính
+  const a = bufAhead(); if(a === null || !isFinite(a)) return;
+  c.bfn++; c.bfs += a; if(a < c.bfm) c.bfm = a; if(a < 3) c.bfl++;
+}
+function pqNet(c){
+  const o = {}, R = bc.rtt;
+  try{
+    if(R){ const r0 = (c && c.r0) || { n: R.n, sum: R.sum, lost: R.lost }, n = R.n - r0.n;
+      o.rt = n > 0 ? Math.round((R.sum - r0.sum) / n) : (R.last || undefined); o.rtx = n > 0 ? R.max : undefined; o.rtl = Math.max(0, R.lost - r0.lost); }
+    if(bc.netInfo){ const i = bc.netInfo(); o.net = i.net || undefined; o.nrtt = i.nrtt; o.dl = i.dl; }
+  }catch(e){}
+  return o;
+}
+/* Nhân viên quầy bấm "Báo lag" → Worker hỏi TV ({type:'lagq'}) → TV gửi ngay số đo lúc này ({type:'lags'}); bài đang hát được đánh dấu để chắc chắn có báo cáo riêng */
+function lagSnap(k){
+  if(!bc.ws) return;
+  const c = PQ.c, now = Date.now(), r1 = v => Math.round(v * 10) / 10;
+  const d = { k: +k || 0, src, cl: clCap, on: navigator.onLine === false ? 0 : 1, hid: document.hidden ? 1 : 0, up: Math.round(performance.now() / 1000), ls: listen ? 1 : 0 };
+  try{ d.ps = ready ? P().getPlayerState() : -9; d.t = Math.round(curT()); d.dur = Math.round(P().getDuration() || 0); d.q = P().getPlaybackQuality(); }catch(e){}
+  const a = bufAhead(); if(a !== null && isFinite(a)) d.ba = r1(a);
+  if(c){
+    c.lag++; pqFrames(c);
+    Object.assign(d, { id: c.id, n: c.n, st: c.st, bn: c.bn, bms: Math.round(c.bms + (c.bT ? now - c.bT : 0)), bnow: c.bT ? now - c.bT : 0, bs: c.bs.slice(-5), qd: c.qd, df: c.df, tf: c.tf,
+      fj: c.fj, fjj: c.fjj, fmx: Math.round(c.fmx), ltms: Math.round(LT.ms - c.ltMs), pl: Math.round((now - c.t0) / 1000) });
+    if(c.bfn){ d.bfm = r1(c.bfm); d.bfa = r1(c.bfs / c.bfn); }
+  }
+  Object.assign(d, pqNet(c)); if(bc.rtt) d.rtn = bc.rtt.last || undefined;
+  bc.postMessage({ type: 'lags', d });
 }
 function pqQ(){ const c = PQ.c; if(!c || !ready) return; try{ const q = P().getPlaybackQuality(); if(q && q !== 'unknown') c.q[q] = (c.q[q] || 0) + 1; }catch(e){} pqFrames(c); }
 const PQ_RANK = ['tiny', 'small', 'medium', 'large', 'hd720', 'hd1080', 'hd1440', 'hd2160', 'highres'];
@@ -552,23 +606,27 @@ function fjFrame(t){
   const c = f.c; c.fn += f.n; c.fs += Math.max(0, f.last - f.first); c.fj += f.j; c.fjj += f.jj; if(f.mx > c.fmx) c.fmx = f.mx;
   FJ = null;
 }
-setInterval(() => { try{ if(PQ.c && ready && P().getPlayerState() === 1){ pqQ(); fjMaybe(); pfTick(); } }catch(e){} }, 5000);
+setInterval(() => { try{ if(PQ.c && ready && P().getPlayerState() === 1){ pqQ(); pqBuf(); fjMaybe(); pfTick(); } }catch(e){} }, 5000);
 function pqEnd(why, err){
   const c = PQ.c; if(!c) return;
   PQ.c = null;
   const now = Date.now();
-  if(c.bT) c.bms += now - c.bT;
+  pqBEnd(c, now);
   pqFrames(c);
   if(c.st === null && !err && now - c.t0 < 4000) return;              // bấm qua bài trước khi kịp phát: không tính
   const qk = Object.keys(c.q), q = qk.sort((a, b) => c.q[b] - c.q[a])[0] || '', qmx = qk.sort((a, b) => PQ_RANK.indexOf(b) - PQ_RANK.indexOf(a))[0] || '';
   const ltms = Math.round(LT.ms - c.ltMs), xau = c.bn > 0 || (c.st !== null && c.st > 6000 && !c.lock) || ltms > 3000 || !!err || !!c.fb
-    || c.qd > 0 || c.fjj >= 3 || (c.tf >= 300 && c.df / c.tf > 0.03);      // 11/2026: YouTube tự hạ độ nét, trang giật nhịp, file rớt >3% khung cũng là bài có vấn đề → báo luôn
-  if(c.n > 5 && !xau){ PQ.sk++; if(PQ.sk < 40) return; }
+    || c.qd > 0 || c.fjj >= 3 || (c.tf >= 300 && c.df / c.tf > 0.03) || c.lag > 0;      // 11/2026: YouTube tự hạ độ nét, trang giật nhịp, file rớt >3% khung cũng là bài có vấn đề → báo luôn
+  const pl = Math.round((now - c.t0) / 1000);
+  if(c.n > 5 && !xau && PQ.sk < 39){                                    // bài êm: chỉ đếm (theo nguồn:độ nét) rồi gửi kèm lần báo sau; đủ 39 bài êm thì bài thứ 40 tự báo
+    PQ.sk++; PQ.skp += pl; const k = (c.src || 'yt') + ':' + (qmx || 'x'); PQ.skq[k] = (PQ.skq[k] || 0) + 1; return; }
   if(!bc.ws) return;
   let mem; try{ mem = navigator.deviceMemory; }catch(e){}
-  bc.postMessage({ type: 'pq', d: { n: c.n, st: c.lock ? null : c.st, bn: c.bn, bms: Math.round(c.bms), q, qmx, ltn: LT.n - c.ltN, ltms, pl: Math.round((now - c.t0) / 1000),
-    up: Math.round(performance.now() / 1000), sk: PQ.sk, cl: clCap, ac: clAdmin ? 0 : (clCap ? 1 : 0), df: c.df, tf: c.tf, qc: c.qc, qd: c.qd, fn: c.fn, fs: Math.round(c.fs), fj: c.fj, fjj: c.fjj, fmx: Math.round(c.fmx), vw: innerWidth, vh: innerHeight, dpr: devicePixelRatio || 1, hc: navigator.hardwareConcurrency || null, mem, err: err || null, why, id: c.id, src: c.src || 'yt', fb: c.fb || null } });
-  PQ.sk = 0;
+  bc.postMessage({ type: 'pq', d: Object.assign({ n: c.n, st: c.lock ? null : c.st, bn: c.bn, bms: Math.round(c.bms), q, qmx, ltn: LT.n - c.ltN, ltms, pl,
+    up: Math.round(performance.now() / 1000), sk: PQ.sk, cl: clCap, ac: clAdmin ? 0 : (clCap ? 1 : 0), df: c.df, tf: c.tf, qc: c.qc, qd: c.qd, fn: c.fn, fs: Math.round(c.fs), fj: c.fj, fjj: c.fjj, fmx: Math.round(c.fmx), vw: innerWidth, vh: innerHeight, dpr: devicePixelRatio || 1, hc: navigator.hardwareConcurrency || null, mem, err: err || null, why, id: c.id, src: c.src || 'yt', fb: c.fb || null,
+    bs: c.bs.length ? c.bs : undefined, bfn: c.bfn || undefined, bfm: c.bfn ? Math.round(c.bfm * 10) / 10 : undefined, bfa: c.bfn ? Math.round(c.bfs / c.bfn * 10) / 10 : undefined, bfl: c.bfn ? c.bfl : undefined,
+    lag: c.lag || undefined, skq: PQ.sk ? PQ.skq : undefined, skp: PQ.sk ? PQ.skp : undefined }, pqNet(c)) });
+  PQ.sk = 0; PQ.skq = {}; PQ.skp = 0;
 }
 
 /* ---------- Khởi tạo trình phát ---------- */
@@ -1428,6 +1486,7 @@ const idOk = c => { if(!c.id || (queue[+c.index] || {}).id === c.id) return true
 bc.onmessage = ev => {
   const m = ev.data || {};
   if(m.type === 'svc'){ svcSet(m.list); return; }                 // trạng thái yêu cầu gọi lễ tân của phòng
+  if(m.type === 'lagq'){ lagSnap(m.k); return; }                  // nhân viên quầy báo lag → gửi ngay số đo lúc này
   if(m.type !== 'cmd') return;
   if(!roomOpen) return;
   const c = m.payload || {};
