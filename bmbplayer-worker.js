@@ -3136,13 +3136,15 @@ export class Room extends DurableObject {
     }
 
     if(m.type === 'pq'){                                 // TV báo chất lượng phát 1 bài (mở bài bao lâu, đứng hình, độ phân giải, CPU bận) — xem index.html
-      if(a.role !== 'tv' || now - (a.pqT || 0) < 8000 || data.length > 700) return;
+      if(a.role !== 'tv' || now - (a.pqT || 0) < 8000 || data.length > 1100) return;      // 11/2026: 700 → 1100 byte vì tin có thêm số đo khung hình / đổi độ nét
       a.pqT = now; try{ ws.serializeAttachment(a); }catch(e){}
       const g = m.d || {}, nu = (v, mx) => Number.isFinite(+v) && v !== '' && v !== null ? Math.max(0, Math.min(mx, Math.round(+v))) : undefined, tx = (v, n) => String(v == null ? '' : v).replace(/[^\w.-]/g, '').slice(0, n) || undefined;
       const dg = { n: nu(g.n, 9999), st: nu(g.st, 600000), bn: nu(g.bn, 999), bms: nu(g.bms, 3600000), q: tx(g.q, 10), qmx: tx(g.qmx, 10), ltn: nu(g.ltn, 99999), ltms: nu(g.ltms, 3600000),
         pl: nu(g.pl, 36000), up: nu(g.up, 30 * 86400), sk: nu(g.sk, 999), cl: nu(g.cl, 4320), vw: nu(g.vw, 10000), vh: nu(g.vh, 10000), dpr: Number.isFinite(+g.dpr) ? Math.round(+g.dpr * 100) / 100 : undefined,
         hc: nu(g.hc, 256), mem: Number.isFinite(+g.mem) ? +g.mem : undefined, err: nu(g.err, 999), why: tx(g.why, 6), id: /^[\w-]{11}$/.test(g.id || '') ? g.id : undefined,
-        src: ['yt', 'r2', 'nas'].includes(g.src) ? g.src : undefined, fb: tx(g.fb, 12) };
+        src: ['yt', 'r2', 'nas'].includes(g.src) ? g.src : undefined, fb: tx(g.fb, 12),
+        // 11/2026: ac = cl do TV tự đặt (box yếu); df/tf khung rớt/tổng của file; qc/qd số lần đổi / hạ độ nét YouTube; fn fs fj fjj fmx nhịp khung hình của trang (xem index.html, pqFrames)
+        ac: nu(g.ac, 1), df: nu(g.df, 10000000), tf: nu(g.tf, 10000000), qc: nu(g.qc, 999), qd: nu(g.qd, 999), fn: nu(g.fn, 1000000), fs: nu(g.fs, 3600000), fj: nu(g.fj, 1000000), fjj: nu(g.fjj, 1000000), fmx: nu(g.fmx, 60000) };
       await this.ghi('phat', { role: 'tv', ip: netKey(a.ip), isp: a.isp, ua: a.ua, dg });
       return;
     }

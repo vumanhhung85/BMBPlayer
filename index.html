@@ -208,7 +208,7 @@
   #hgMsg .b{font:600 clamp(12px,2vh,26px)/1.3 "Segoe UI",Roboto,Arial,sans-serif; color:#e5e7eb; margin-top:.4vh}
 
   #progress{position:absolute; left:0; right:0; bottom:0; height:3px; z-index:9; background:rgba(255,255,255,.08); pointer-events:none}
-  #progress i{display:block; height:100%; width:0; background:linear-gradient(90deg,var(--accent),var(--accent2))}
+  #progress i{display:block; height:100%; width:100%; transform-origin:0 50%; transform:scaleX(0); will-change:transform; background:linear-gradient(90deg,var(--accent),var(--accent2))}   /* 11/2026: scaleX thay width (không bắt trang tính lại bố cục mỗi 0,5 giây) */
 
   /* ===== Bảng điều khiển: ẩn mặc định, hiện khi di chuột / bấm phím (để thử trên máy tính) ===== */
   #panel{position:absolute; left:0; right:0; bottom:0; z-index:15; background:var(--panel); border-top:1px solid var(--line);
@@ -491,14 +491,17 @@ function paintReady(){
 /* ---------- Giới hạn chất lượng video (admin đặt cho từng TV trong quầy → 🔌 Kết nối → Thiết bị từng phòng) ----------
    YouTube tự chọn độ phân giải theo KÍCH THƯỚC khung phát. Box yếu + màn to → YouTube chọn 1080p/4K, giải mã không nổi → giật vài bài đầu
    (tới khi YouTube tự hạ). Đặt khung phát nhỏ đúng cỡ (vd 720 điểm ảnh chiều cao) rồi phóng to bằng CSS → YouTube phát 720p ngay từ bài đầu. */
-let clCap = 0;
+/* 11/2026: box yếu (trình duyệt báo RAM ≤ 2GB) để "Tự động" thì TV tự giữ 720p: số đo Tây Hòa cho thấy YouTube chọn 1080p trên box 2GB làm đứng hình nhiều gấp ~15 lần.
+   Admin chọn "Tối đa 1080p" để bỏ giới hạn tự động này. Máy RAM lớn (PC, box 4GB+) vẫn để YouTube tự chọn. */
+const WEAK_BOX = (() => { try{ const m = navigator.deviceMemory; return !!m && m <= 2; }catch(e){ return false; } })();
+let clAdmin = 0, clCap = WEAK_BOX ? 720 : 0;
 function fitYt(){
   const el = $('yt'); if(!el) return;
   const W = innerWidth, H = innerHeight, dpr = devicePixelRatio || 1, k = clCap ? (H * dpr) / clCap : 1;
   if(k > 1.05){ el.style.width = (W / k) + 'px'; el.style.height = (H / k) + 'px'; el.style.transformOrigin = '0 0'; el.style.transform = 'scale(' + k + ')'; }
   else { el.style.width = ''; el.style.height = ''; el.style.transform = ''; }
 }
-function applyCl(v){ v = [1080, 720, 480, 360].includes(+v) ? +v : 0; if(v === clCap) return; clCap = v; fitYt(); }
+function applyCl(v){ v = [1080, 720, 480, 360].includes(+v) ? +v : 0; clAdmin = v; const eff = v || (WEAK_BOX ? 720 : 0); if(eff === clCap) return; clCap = eff; fitYt(); }
 addEventListener('resize', fitYt);
 
 /* ---------- Đo chất lượng phát từng bài (gửi Worker → tab 🔌 Kết nối của admin) ----------
@@ -508,31 +511,63 @@ const PQ = { n: 0, sk: 0, c: null }, LT = { n: 0, ms: 0 };
 try{ new PerformanceObserver(l => { for(const e of l.getEntries()){ if(e.duration >= 100){ LT.n++; LT.ms += e.duration; } } }).observe({ type: 'longtask' }); }catch(e){}
 function pqStart(id){
   pqEnd('next');
-  PQ.n++; PQ.c = { id, n: PQ.n, t0: Date.now(), st: null, bn: 0, bms: 0, bT: 0, q: {}, ltN: LT.n, ltMs: LT.ms, seekT: 0, lock: false, src: 'yt', fb: '' };
+  PQ.n++; PQ.c = { id, n: PQ.n, t0: Date.now(), st: null, bn: 0, bms: 0, bT: 0, bLast: 0, q: {}, ltN: LT.n, ltMs: LT.ms, seekT: 0, lock: false, src: 'yt', fb: '',
+    df: 0, tf: 0, qc: 0, qd: 0, qp: -1, fn: 0, fs: 0, fj: 0, fjj: 0, fmx: 0 };
 }
 function pqState(st){
   const c = PQ.c; if(!c) return;
   const now = Date.now();
   if(st === 1){ if(c.st === null) c.st = now - c.t0; if(c.bT){ c.bms += now - c.bT; c.bT = 0; } pqQ(); }
-  else if(st === 3){ if(c.st !== null && !c.bT && now - c.seekT > 2500){ c.bn++; c.bT = now; } }
+  else if(st === 3){ if(c.st !== null && !c.bT && now - c.seekT > 2500){ c.bn++; c.bT = now; c.bLast = now; } }
   else if(c.bT){ c.bms += now - c.bT; c.bT = 0; }
 }
-function pqQ(){ const c = PQ.c; if(!c || !ready) return; try{ const q = P().getPlaybackQuality(); if(q && q !== 'unknown') c.q[q] = (c.q[q] || 0) + 1; }catch(e){} }
-setInterval(() => { try{ if(PQ.c && ready && P().getPlayerState() === 1) pqQ(); }catch(e){} }, 5000);
+function pqQ(){ const c = PQ.c; if(!c || !ready) return; try{ const q = P().getPlaybackQuality(); if(q && q !== 'unknown') c.q[q] = (c.q[q] || 0) + 1; }catch(e){} pqFrames(c); }
 const PQ_RANK = ['tiny', 'small', 'medium', 'large', 'hd720', 'hd1080', 'hd1440', 'hd2160', 'highres'];
+/* 11/2026 — số đo thêm cho phân tích giật lag về sau (báo kèm tin 'pq', lưu ở kn_sk.dg):
+   df/tf  = số khung rớt / tổng khung của bài phát từ FILE (R2/NAS) do chính trình phát <video> đếm (YouTube trong khung iframe khác nguồn nên không đọc được)
+   qc/qd  = số lần YouTube đổi độ nét trong bài / trong đó số lần tự HẠ độ nét (mạng hoặc máy không kịp)
+   fn/fs/fj/fjj/fmx = nhịp khung hình CỦA TRANG TV (rAF), đo 4 giây mỗi 20 giây lúc đang hát: fn số khung, fs tổng ms đã đo, fj số khung cách nhau >50ms,
+                      fjj >100ms, fmx khoảng cách lớn nhất (ms). Đây là số đo GIÁN TIẾP (trang/GPU bận thì rAF thưa theo), không thấy được khung rớt bên trong video YouTube. */
+function pqFrames(c){
+  if(!c || c.src === 'yt') return;
+  try{ const f = VP.el.getVideoPlaybackQuality && VP.el.getVideoPlaybackQuality(); if(f && (f.totalVideoFrames || 0) >= c.tf){ c.df = f.droppedVideoFrames || 0; c.tf = f.totalVideoFrames || 0; } }catch(e){}
+}
+function pqQc(q){
+  const c = PQ.c, r = PQ_RANK.indexOf(q); if(!c || r < 0) return;
+  c.qc++; if(c.qp >= 0 && r < c.qp) c.qd++; c.qp = r;
+}
+let FJT = 0, FJ = null;
+function fjMaybe(){
+  if(document.hidden || FJ || !PQ.c) return;
+  if(++FJT % 4 !== 1) return;                                        // mỗi nhịp 5 giây gọi một lần → 20 giây đo 4 giây (nhẹ máy yếu)
+  FJ = { c: PQ.c, first: 0, last: 0, end: performance.now() + 4000, n: 0, j: 0, jj: 0, mx: 0 };
+  requestAnimationFrame(fjFrame);
+}
+function fjFrame(t){
+  const f = FJ; if(!f) return;
+  if(!f.first) f.first = t;
+  if(f.last){ const d = t - f.last; f.n++; if(d > 50) f.j++; if(d > 100) f.jj++; if(d > f.mx) f.mx = d; }
+  f.last = t;
+  if(t < f.end && !document.hidden && PQ.c === f.c){ requestAnimationFrame(fjFrame); return; }
+  const c = f.c; c.fn += f.n; c.fs += Math.max(0, f.last - f.first); c.fj += f.j; c.fjj += f.jj; if(f.mx > c.fmx) c.fmx = f.mx;
+  FJ = null;
+}
+setInterval(() => { try{ if(PQ.c && ready && P().getPlayerState() === 1){ pqQ(); fjMaybe(); pfTick(); } }catch(e){} }, 5000);
 function pqEnd(why, err){
   const c = PQ.c; if(!c) return;
   PQ.c = null;
   const now = Date.now();
   if(c.bT) c.bms += now - c.bT;
+  pqFrames(c);
   if(c.st === null && !err && now - c.t0 < 4000) return;              // bấm qua bài trước khi kịp phát: không tính
   const qk = Object.keys(c.q), q = qk.sort((a, b) => c.q[b] - c.q[a])[0] || '', qmx = qk.sort((a, b) => PQ_RANK.indexOf(b) - PQ_RANK.indexOf(a))[0] || '';
-  const ltms = Math.round(LT.ms - c.ltMs), xau = c.bn > 0 || (c.st !== null && c.st > 6000 && !c.lock) || ltms > 3000 || !!err || !!c.fb;
+  const ltms = Math.round(LT.ms - c.ltMs), xau = c.bn > 0 || (c.st !== null && c.st > 6000 && !c.lock) || ltms > 3000 || !!err || !!c.fb
+    || c.qd > 0 || c.fjj >= 3 || (c.tf >= 300 && c.df / c.tf > 0.03);      // 11/2026: YouTube tự hạ độ nét, trang giật nhịp, file rớt >3% khung cũng là bài có vấn đề → báo luôn
   if(c.n > 5 && !xau){ PQ.sk++; if(PQ.sk < 40) return; }
   if(!bc.ws) return;
   let mem; try{ mem = navigator.deviceMemory; }catch(e){}
   bc.postMessage({ type: 'pq', d: { n: c.n, st: c.lock ? null : c.st, bn: c.bn, bms: Math.round(c.bms), q, qmx, ltn: LT.n - c.ltN, ltms, pl: Math.round((now - c.t0) / 1000),
-    up: Math.round(performance.now() / 1000), sk: PQ.sk, cl: clCap, vw: innerWidth, vh: innerHeight, dpr: devicePixelRatio || 1, hc: navigator.hardwareConcurrency || null, mem, err: err || null, why, id: c.id, src: c.src || 'yt', fb: c.fb || null } });
+    up: Math.round(performance.now() / 1000), sk: PQ.sk, cl: clCap, ac: clAdmin ? 0 : (clCap ? 1 : 0), df: c.df, tf: c.tf, qc: c.qc, qd: c.qd, fn: c.fn, fs: Math.round(c.fs), fj: c.fj, fjj: c.fjj, fmx: Math.round(c.fmx), vw: innerWidth, vh: innerHeight, dpr: devicePixelRatio || 1, hc: navigator.hardwareConcurrency || null, mem, err: err || null, why, id: c.id, src: c.src || 'yt', fb: c.fb || null } });
   PQ.sk = 0;
 }
 
@@ -580,7 +615,7 @@ function makePlayer(){
   if(location.protocol.startsWith('http')) vars.origin = location.origin;
   player = new YT.Player('yt', {
     width:'100%', height:'100%', playerVars: vars,
-    events:{ onReady, onStateChange: e => { if(src === 'yt') onStateChange(e); }, onError: e => { if(src === 'yt') onError(e); } }
+    events:{ onReady, onStateChange: e => { if(src === 'yt') onStateChange(e); }, onError: e => { if(src === 'yt') onError(e); }, onPlaybackQualityChange: e => { if(src === 'yt') pqQc(e.data); } }
   });
 }
 function onReady(){
@@ -745,6 +780,23 @@ function nasReach(u){
   return true;
 }
 function nasUsable(u){ return Date.now() >= nasOffUntil && nasReach(u); }
+/* ---------- Chuẩn bị sẵn bài kế (11/2026) ----------
+   Chỉ chạy khi bài ĐANG HÁT êm (đã phát ≥10 giây, không đứng hình trong 30 giây qua, mạng không phải 2G / tiết kiệm dữ liệu), mỗi bài kế một lần:
+   hỏi trước thư viện (/api/lib/src) → lúc đổi bài không phải chờ Worker ở màn "Sắp hát" (tới 2,5 giây); kết quả nằm sẵn trong libMemo.
+   KHÔNG tải trước phần đầu file: thử trên Chromium cho thấy fetch có Range không vào bộ nhớ đệm để thẻ <video> dùng lại (tải phí), còn nạp trước bằng một thẻ <video> ẩn
+   thì mở thêm bộ giải mã trên box yếu đang giải mã YouTube — đúng thứ không được làm. Bài đang hát luôn được ưu tiên: lỗi gì ở đây cũng im lặng bỏ qua. */
+const PF = { id:'' };
+function pfOk(){
+  if(!LIB.on || !ready || listen || scoring || OFF.on || OFF.wait || document.hidden || navigator.onLine === false) return false;
+  try{ const cn = navigator.connection; if(cn && (cn.saveData || /(^|-)2g$/.test(cn.effectiveType || ''))) return false; }catch(e){}
+  const c = PQ.c; if(!c || c.st === null || c.bT || Date.now() - c.bLast < 30000) return false;
+  try{ return P().getPlayerState() === 1 && curT() >= 10; }catch(e){ return false; }
+}
+function pfTick(){
+  const nx = queue[cur + 1]; if(!nx || PF.id === nx.id || !pfOk()) return;
+  PF.id = nx.id;
+  libFind(nx.id).catch(() => {});
+}
 const nasCfg = () => !!(LIB.on && LIB.nas && nasReach(LIB.nas));        // quán có NAS dùng được: chỉ khi đó mới có chế độ "mất Internet vẫn hát bài trong NAS"
 
 /* ---------- Mất Internet: chạy tiếp bằng NAS của quán (chỉ khi quán có NAS, xem nasCfg) ----------
@@ -1102,12 +1154,14 @@ async function keepAwake(){
 document.addEventListener('visibilitychange', keepAwake); keepAwake();
 
 /* Thanh tiến độ + biểu ngữ "Tiếp theo" trong ~20 giây cuối */
+let barLast = -1;
+function barSet(f){ f = f > 0 ? Math.min(1, f) : 0; const v = Math.round(f * 1000); if(v === barLast) return; barLast = v; $('bar').style.transform = 'scaleX(' + (v / 1000) + ')'; }
 setInterval(()=>{
-  if(listen && ready){ try{ const d = P().getDuration(), t = P().getCurrentTime(); $('bar').style.width = d > 0 ? (t / d * 100) + '%' : '0'; }catch(e){} hide('ovNext'); return; }
-  if(!ready || cur<0 || !queue[cur]){ $('bar').style.width='0'; return; }
+  if(listen && ready){ try{ const d = P().getDuration(), t = P().getCurrentTime(); barSet(d > 0 ? t / d : 0); }catch(e){} hide('ovNext'); return; }
+  if(!ready || cur<0 || !queue[cur]){ barSet(0); return; }
   const d = P().getDuration(), t = P().getCurrentTime();
   if(d > 0){
-    $('bar').style.width = (t/d*100) + '%';
+    barSet(t/d);
     const nx = queue[cur+1];
     if(nx && d - t <= 20 && d - t > 0.5 && P().getPlayerState() === 1){ $('ovNextT').textContent = nx.title; flash('ovNext'); }
     else hide('ovNext');

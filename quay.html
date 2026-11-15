@@ -2970,7 +2970,7 @@ function knChart(rows){
   return '<div style="overflow-x:auto">'+s+'</svg></div>';
 }
 /* ---------- Thiết bị từng phòng ---------- */
-function knClOpt(cur){ return (cur<0?'<option value="">— chọn —</option>':'')+[[0,'Tự động (YouTube chọn)'],[1080,'Tối đa 1080p'],[720,'Tối đa 720p'],[480,'Tối đa 480p'],[360,'Tối đa 360p']].map(function(o){ return '<option value="'+o[0]+'"'+(o[0]===cur?' selected':'')+'>'+o[1]+'</option>'; }).join(''); }
+function knClOpt(cur){ return (cur<0?'<option value="">— chọn —</option>':'')+[[0,'Tự động (box RAM ≤2GB giữ 720p, máy khác YouTube chọn)'],[1080,'Tối đa 1080p (bỏ giới hạn 720p tự động)'],[720,'Tối đa 720p'],[480,'Tối đa 480p'],[360,'Tối đa 360p']].map(function(o){ return '<option value="'+o[0]+'"'+(o[0]===cur?' selected':'')+'>'+o[1]+'</option>'; }).join(''); }
 function knMayDang(x){
   var p = x.ph; if(!x.open || !x.tvOn || !p) return '';
   var t = esc(p.title||''), tx = { phat:'🎵 Đang phát: '+t+(p.left?' · còn '+p.left+' bài':'')+(p.src?' · 📀 '+(p.src==='nas'?'NAS quán':'thư viện R2'):''), dung:'⏸ Đang dừng: '+t, cho:'👆 Chờ chạm / bấm OK để phát', diem:'🏆 Đang hiện điểm', loi:'⚠️ Trình phát YouTube lỗi', chua:'Chưa có bài' }[p.st] || '';
