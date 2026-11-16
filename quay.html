@@ -339,6 +339,62 @@ tbody tr:hover td{background:#FBF8FE}
 .knsub{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 14px}
 .knsub button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:7px 14px;font:inherit;font-size:13px;color:var(--txt-dim);cursor:pointer}
 .knsub button.on{background:var(--yellow);border-color:var(--yellow);color:#3A0F5A;font-weight:700}
+
+/* Cuối ca / Tài khoản: giải thích gập lại, bảng thành thẻ trên điện thoại */
+details.hint > summary{cursor:pointer;font-weight:700;color:var(--grape);min-height:24px}
+details.hint[open] > summary{margin-bottom:8px}
+@media(max-width:640px){
+  table.rsp thead{display:none}
+  table.rsp,table.rsp tbody{display:block;width:100%}
+  table.rsp tr{display:block;margin:8px 4px;padding:4px 12px;border:1px solid var(--line);border-radius:12px;background:#fff}
+  table.rsp td{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:7px 0;border-bottom:1px dashed var(--line);text-align:right}
+  table.rsp td:last-child{border-bottom:0}
+  table.rsp td::before{content:attr(data-l);flex:0 0 36%;text-align:left;font-size:11.5px;font-weight:700;color:var(--txt-mute);text-transform:uppercase;letter-spacing:.03em}
+  table.rsp td[colspan]{display:block;text-align:center;border:0}
+  table.rsp td[colspan]::before{content:none}
+}
+/* tab Menu: trạng thái rỗng + chia Menu chi nhánh / Menu mẫu (admin) */
+#p5.mn-mau #mnBr{display:none}
+#p5:not(.mn-mau) #mauAdmin{display:none}
+.mnempty{background:#fff;border:1px dashed #B99ADB;border-radius:18px;padding:26px 18px;text-align:center;max-width:560px;margin:10px auto}
+.mnempty .ic{font-size:44px;line-height:1;margin-bottom:8px}
+.mnempty b{display:block;font-family:var(--fh);font-size:18px;color:var(--grape);margin-bottom:6px}
+.mnempty p{color:var(--txt-dim);font-size:14px;line-height:1.6;margin:0 0 14px}
+.mnempty .acts{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:10px}
+.mnempty .acts .btn{min-height:46px;padding:0 20px;font-size:15px}
+.mnempty small{display:block;color:var(--txt-mute);font-size:12.5px;line-height:1.5}
+/* ── ⚙️ Cài đặt: chia nhóm chức năng, mỗi mục một thẻ (tên + nhãn phạm vi + trạng thái + nút) ── */
+.hint:empty{display:none}
+.cdnav{margin:0 0 6px}
+.cdnav button{min-height:42px;padding:8px 16px;font-size:13.5px}
+.cdlegend{font-size:12px;color:var(--txt-mute);line-height:2;margin:0 0 14px}
+.cdg{display:none;max-width:860px}
+.cdg.on{display:block}
+.cdsub{font-size:11.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--txt-mute);margin:20px 2px 8px}
+.cdg > .cdsub:first-child,.cdg > div:first-child > .cdsub:first-child{margin-top:4px}
+.scard{background:#fff;border:1px solid var(--line);border-radius:16px;padding:14px 16px 12px;margin-bottom:12px;box-shadow:var(--sh-card)}
+.schd{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.schd > b{font-family:var(--fh);font-size:15.5px;color:var(--grape);line-height:1.3}
+.schd .schip{margin-left:auto}
+.scope{display:inline-block;font-size:10.5px;font-weight:700;padding:2px 9px;border-radius:999px;border:1px solid #CFDDF3;background:#EAF1FC;color:#2D5DA6;white-space:nowrap}
+.scope.all{background:#F1E4FB;color:var(--grape);border-color:#DCC3F0}
+.scope.cn{background:#FFF3D2;color:#8A5200;border-color:#F2D58E}
+.schip{font-size:11.5px;font-weight:800;padding:3px 11px;border-radius:999px;background:#EEE8F6;color:#7B6A91;white-space:nowrap}
+.schip.on{background:#DDF5EA;color:var(--ok)}
+.sdesc{font-size:13.5px;color:var(--txt-dim);line-height:1.6;margin:0 0 10px}
+.scard .hint{background:transparent;border:0;padding:0;margin:0 0 10px;font-size:13px}
+.scard .fld{margin-bottom:10px}
+.scard select{background:#fff;border:1px solid #CDB8E3;border-radius:10px;padding:10px 12px;font:inherit;font-size:14px;color:var(--txt);max-width:100%;min-height:44px}
+.scard .actions{display:flex;gap:8px;flex-wrap:wrap;margin:2px 0 6px}
+.scard details.more{margin-top:8px;font-size:13px;color:var(--txt-dim);line-height:1.6;border-top:1px dashed var(--line);padding-top:4px}
+.scard details.more > summary{cursor:pointer;font-weight:700;color:var(--grape);padding:8px 0;min-height:24px}
+.scard details.more .hint{margin-top:4px}
+.cdopt{margin-top:10px;padding-top:10px;border-top:1px dashed var(--line)}
+.scard .ngkho{margin:10px 0 4px}
+.libtools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 10px}
+.libtools input[type=search]{flex:1 1 180px;min-width:0;padding:9px 12px;border-radius:10px;background:var(--field);border:1px solid var(--line);font:inherit;font-size:14px}
+.libtools input[type=search]:focus{border-color:var(--purple);outline:none;background:#fff}
+.libtools .knseg button{min-height:38px}
 .knf{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
 .knbox{background:#fff;border:1px solid var(--line);border-radius:16px;padding:14px 16px;box-shadow:var(--sh-card);margin-bottom:16px}
 .knbox h3{font-size:15px;margin:0 0 8px;color:var(--grape)}
@@ -405,6 +461,8 @@ svg.sic{width:1.1em;height:1.1em;stroke:currentColor;fill:none;stroke-width:2;st
 #mgMenu .tab{display:block;background:transparent;border:0;color:var(--txt);border-radius:12px;padding:12px 14px;font-weight:600;font-size:14.5px;white-space:nowrap}
 #mgMenu .tab:hover{background:var(--tint);color:var(--grape)}
 #mgMenu .tab.on{background:#EEDDFA;color:var(--grape);box-shadow:none}
+#mgMenu .tab small{display:block;font-weight:400;font-size:11.5px;color:var(--txt-mute);margin-top:1px}
+#mgMenu .mgh ~ .mgh{border-top:1px solid var(--line);margin-top:4px;padding-top:10px}
 
 /* cảnh báo + số liệu nhanh */
 .al{border-radius:14px;padding:11px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-weight:600;font-size:14px}
@@ -577,11 +635,12 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
     </div>
   </header>
   <div id="mgMenu" role="menu" aria-label="Quản lý">
-    <div class="mgh">Quản lý</div>
-    <div class="tab" data-p="p5" id="tabCaiDat" style="display:none">🍺 Menu</div>
-    <div class="tab" data-p="p6" id="tabTaiKhoan" style="display:none">👥 Tài khoản quầy</div>
-    <div class="tab" data-p="p7" id="tabCaiDatApp" style="display:none">⚙️ Cài đặt</div>
-    <div class="tab" data-p="p8" id="tabKetNoi" style="display:none">🔌 Kết nối</div>
+    <div class="mgh">Vận hành chi nhánh</div>
+    <div class="tab" data-p="p5" id="tabCaiDat" style="display:none">🍺 Menu<small>Món nước, dịch vụ khách gọi</small></div>
+    <div class="tab" data-p="p6" id="tabTaiKhoan" style="display:none">👥 Tài khoản quầy<small>Nhân viên quầy của chi nhánh</small></div>
+    <div class="mgh">Hệ thống</div>
+    <div class="tab" data-p="p8" id="tabKetNoi" style="display:none">🔌 Kết nối<small>Theo dõi tivi, máy tính bảng, mạng, NAS</small></div>
+    <div class="tab" data-p="p7" id="tabCaiDatApp" style="display:none">⚙️ Cài đặt<small>Vân tay, tivi &amp; khách, thư viện video, app</small></div>
   </div>
   <nav id="bnav" aria-label="Điều hướng chính">
     <button data-bn="phong" class="on"><svg class="sic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Quầy</button>
@@ -607,19 +666,10 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
             <b>Gán TV</b>: TV chưa gán phòng hiện mã 6 số + QR → bấm vào phòng, chọn Gán TV &amp; MTB rồi quét/nhập mã. Mỗi lần mở phòng là QR khách mới, khách lượt trước không vào lại được.
             <b>Máy tính bảng</b>: máy chưa gán hiện mã 6 số + QR → quét bằng điện thoại này rồi bấm Gán máy tính bảng ở đúng phòng. Đã gán thì máy tự quét QR trên TV để đổi phòng.
           </details>
-          <div class="mrow" id="phongAdmin" style="display:none;background:transparent;border-style:dashed">
-            <input class="lb" id="phongMoi" maxlength="600" placeholder="Thêm phòng — nhiều phòng cách nhau dấu phẩy, vd: P1, P2, P3, VIP1">
-            <button class="btn btn-y btn-sm" id="btnPhongThem">+ Thêm phòng</button>
-          </div>
           <button class="btn btn-ghost btn-sm" id="btnThuHoiMtb" style="display:none;margin:6px 8px 6px 0;border-color:#F5B5C0;color:#D6314F">🔒 Thu hồi mọi máy tính bảng</button>
           <button class="btn btn-ghost btn-sm" id="btnNhatKy" style="display:none;margin:6px 8px 6px 0">🧾 Nhật ký kết nối</button>
-          <button class="btn btn-ghost btn-sm" id="btnPrintRv" style="margin:6px 0 6px;border-color:#A9E0C4;color:#0F7A4D">⭐ In QR ĐÁNH GIÁ (thẻ riêng, không số phòng)</button>
-          <div class="hint" id="rvHint" style="margin:4px 0 6px">Dùng đường dẫn Google Maps của chi nhánh.</div>
-          <div class="mrow" id="hgAdmin" style="display:none">
-            <div style="flex:1;min-width:200px"><b>⏱ Nhắc giờ hát cho khách</b>
-              <div class="hint" style="margin:2px 0 0">Bật: lúc mở phòng hiện hộp hỏi khách hát bao lâu, khách cũng tự đặt được trên remote. TV nhắc ở 15 · 10 · 5 phút còn lại, hết giờ phòng vẫn mở và đồng hồ đếm tăng +phút. Khi phòng hết giờ quầy được báo (chuông + chip) và Telegram (người đã kết nối) để vào hỏi khách. Mặc định tắt, chỉ áp dụng cho chi nhánh này.</div></div>
-            <button class="btn btn-ghost btn-sm" id="btnHgSw">Đang tắt</button>
-          </div>
+          <div class="hint" style="margin:8px 0 6px">Thêm phòng, nhắc giờ hát và in QR đánh giá nằm ở <b>⚙️ Cài đặt → 🏢 Chi nhánh</b>.
+            <button class="btn btn-ghost btn-sm" id="btnToCdCn" style="margin-left:6px">Mở Cài đặt chi nhánh →</button></div>
         </div>
         <div class="rgrid" id="rgrid"><div class="mut">Đang tải…</div></div>
       </section>
@@ -629,8 +679,8 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
   </div>
 
   <div class="pg" id="p2">
-    <div class="hint">Xem lại đơn theo ngày. Dùng cuối ca để đối chiếu với báo cáo của máy tính tiền — cột <b>POS</b> cho biết nhân viên đã nhập món vào máy tính tiền hay chưa.
-      <b>Một ngày tính từ 06:00 sáng đến 06:00 sáng hôm sau</b> (trọn một ca mở cửa), nên đơn lúc 1–2 giờ sáng vẫn thuộc ngày hôm trước.</div>
+    <details class="hint"><summary>Xem lại đơn theo ngày để đối soát cuối ca <span class="tagx">ngày tính 06:00 → 06:00</span></summary>Xem lại đơn theo ngày. Dùng cuối ca để đối chiếu với báo cáo của máy tính tiền — cột <b>POS</b> cho biết nhân viên đã nhập món vào máy tính tiền hay chưa.
+      <b>Một ngày tính từ 06:00 sáng đến 06:00 sáng hôm sau</b> (trọn một ca mở cửa), nên đơn lúc 1–2 giờ sáng vẫn thuộc ngày hôm trước.</details>
     <div class="lsbar">
       <button class="btn btn-ghost btn-sm btn-ic" id="lsTruoc" title="Ngày trước">◀</button>
       <input type="date" id="lsNgay" aria-label="Chọn ngày">
@@ -641,16 +691,22 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
     </div>
     <div class="lsca" id="lsCa"></div>
     <div class="stats" id="lsTong"></div>
-    <div class="tblwrap"><table><thead><tr><th>Giờ</th><th>Phòng</th><th>Nội dung</th><th>Nguồn</th><th>Trạng thái</th><th>POS</th><th>Phản hồi</th><th>Người xử lý</th></tr></thead><tbody id="tbToday"></tbody></table></div>
+    <div class="tblwrap"><table class="rsp"><thead><tr><th>Giờ</th><th>Phòng</th><th>Nội dung</th><th>Nguồn</th><th>Trạng thái</th><th>POS</th><th>Phản hồi</th><th>Người xử lý</th></tr></thead><tbody id="tbToday"></tbody></table></div>
   </div>
 
   <div class="pg" id="p5">
-    <div class="hint" id="menuHint"></div>
-    <div class="toolbar" id="menuTools" style="display:none">
-      <button class="btn btn-y btn-sm" id="btnChonMau">＋ Chọn từ menu mẫu</button>
-      <button class="btn btn-ghost btn-sm" id="btnMonRieng">✏️ Tạo món riêng</button>
+    <div class="knsub" id="mnNav" style="display:none" role="tablist" aria-label="Loại menu">
+      <button type="button" role="tab" data-m="cn" class="on">🍺 Menu chi nhánh</button>
+      <button type="button" role="tab" data-m="mau">📋 Menu mẫu toàn chuỗi</button>
     </div>
-    <div id="menuList"></div>
+    <div id="mnBr">
+      <div class="hint" id="menuHint"></div>
+      <div class="toolbar" id="menuTools" style="display:none">
+        <button class="btn btn-y btn-sm" id="btnChonMau">＋ Chọn từ menu mẫu</button>
+        <button class="btn btn-ghost btn-sm" id="btnMonRieng">✏️ Tạo món riêng</button>
+      </div>
+      <div id="menuList"></div>
+    </div>
 
     <div class="khoi-mau" id="mauAdmin" style="display:none">
       <h3 style="font-size:19px;margin-bottom:6px">Menu mẫu toàn chuỗi <span class="tagx">chỉ admin</span></h3>
@@ -662,14 +718,12 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
   </div>
 
   <div class="pg" id="p6">
-    <div class="hint">
-      Tài khoản <b>nhân viên quầy</b> của chi nhánh này — dùng chung hệ thống tài khoản Boom Music Box.<br>
+    <details class="hint"><summary>Cách dùng: tạo, khoá, đặt lại mật khẩu, cho sửa menu</summary>Tài khoản <b>nhân viên quầy</b> của chi nhánh này — dùng chung hệ thống tài khoản Boom Music Box.<br>
       <b>Khoá</b>: nhân viên bị đăng xuất ngay và không đăng nhập lại được. <b>Đặt lại MK</b>: khi nhân viên quên mật khẩu.
       <b>Sửa menu</b>: cho phép tài khoản quầy tự sửa menu nước/dịch vụ.<br>
-      Tài khoản quản lý, kỹ thuật được tạo và sửa trong app quản lý BMB.
-    </div>
+      Tài khoản quản lý, kỹ thuật được tạo và sửa trong app quản lý BMB.</details>
     <button class="btn btn-y btn-sm" id="btnAccAdd" style="margin-bottom:14px">+ Tạo tài khoản mới</button>
-    <div class="tblwrap"><table><thead><tr><th>Tài khoản</th><th>Họ tên</th><th>Trạng thái</th><th>Sửa menu</th><th>Đăng nhập cuối</th><th>Hành động</th></tr></thead><tbody id="tbAcc"></tbody></table></div>
+    <div class="tblwrap"><table class="rsp"><thead><tr><th>Tài khoản</th><th>Họ tên</th><th>Trạng thái</th><th>Sửa menu</th><th>Đăng nhập cuối</th><th>Hành động</th></tr></thead><tbody id="tbAcc"></tbody></table></div>
   </div>
 
   <!-- ⚙️ Cài đặt (quản lý chi nhánh + admin): vân tay trên máy này; phát hành APK chỉ dành cho admin cao nhất -->
@@ -686,92 +740,175 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
   </div>
 
   <div class="pg" id="p7">
-    <div class="sect-lbl">🖐 Đăng nhập bằng vân tay trên máy này</div>
-    <div class="hint" id="vtNote"></div>
-    <div class="actions wrap" id="vtBtns" style="margin-bottom:22px">
-      <button class="btn btn-y btn-sm" id="vtBat">Bật vân tay</button>
-      <button class="btn btn-ghost btn-sm" id="vtTat" style="display:none">Tắt vân tay</button>
+    <div class="knsub cdnav" id="cdNav" role="tablist" aria-label="Nhóm cài đặt">
+      <button type="button" role="tab" data-g="me">👤 Của tôi</button>
+      <button type="button" role="tab" data-g="cn">🏢 Chi nhánh</button>
+      <button type="button" role="tab" data-g="tv">🎬 Tivi &amp; khách</button>
+      <button type="button" role="tab" data-g="lib">📀 Thư viện video</button>
+      <button type="button" role="tab" data-g="apk">📦 Phát hành app</button>
     </div>
+    <div class="cdlegend"><span class="scope me">📱 Chỉ máy này</span> <span class="scope all">🌐 Toàn chuỗi</span> <span class="scope cn">📍 Từng chi nhánh</span> — nhìn nhãn này để biết chỉnh xong sẽ ảnh hưởng tới đâu.</div>
 
-    <div id="tgSecCd" style="display:none">
-      <div class="sect-lbl">✈️ Telegram của tài khoản quản lý chi nhánh</div>
-      <div id="tgHostCd" style="margin-bottom:22px"></div>
-    </div>
-
-    <div id="seekSec" style="display:none">
-      <div class="sect-lbl">⏩ Thanh tua bài trên điện thoại / máy tính bảng <span class="tagx">chỉ admin</span></div>
-      <div class="hint" id="seekInfo">Đang tải…</div>
-      <div class="actions wrap" style="margin-bottom:22px">
-        <button class="btn btn-y btn-sm" id="seekBtn" disabled>…</button>
-      </div>
-    </div>
-
-    <div id="ngheSec" style="display:none">
-      <div class="sect-lbl">🎧 Nghe nhạc — nghe liền cả mix dài <span class="tagx">chỉ admin</span></div>
-      <div class="hint" id="ngheInfo">Đang tải…</div>
-      <div class="actions wrap" style="margin-bottom:10px">
-        <button class="btn btn-y btn-sm" id="ngheBtn" disabled>…</button>
-      </div>
-      <div class="fld"><span>Khi một mix phát hết</span><select id="ngheNext" disabled>
-        <option value="mix">Tự phát mix kế tiếp trong nhóm (mặc định)</option>
-        <option value="karaoke">Quay lại hàng chờ karaoke</option>
-      </select></div>
-      <div class="ngopt"><button class="btn btn-ghost btn-sm" id="ngheR2Btn" disabled>…</button><small id="ngheR2Info"></small></div>
-      <div class="ngkho" id="ngheKho">
-        <div class="ngkh"><b>Danh sách mix lấy từ 🎧 Kho nghe</b><span id="ngheSyncTt" class="ngsync"></span></div>
-        <div class="hint" id="ngheKhoInfo">Thêm nguồn, duyệt mix, xếp nhóm, ghim, ẩn, đánh dấu lưu R2: làm ở <b>kho.html → 🎧 Kho nghe</b>. Ở đây chỉ xem nhanh những gì khách đang thấy.</div>
-        <div class="actions wrap" style="margin:8px 0 2px">
-          <a class="btn btn-y btn-sm" id="ngheMoKho" href="kho.html#nghe" target="_blank" rel="noopener">🎧 Mở Kho nghe</a>
-          <button class="btn btn-ghost btn-sm" id="ngheTai">↻ Đồng bộ ngay</button>
+    <!-- ===== Nhóm 1: Của tôi (quản lý + admin) ===== -->
+    <div class="cdg" id="cdg-me">
+      <div class="scard">
+        <div class="schd"><b>🖐 Đăng nhập bằng vân tay</b><span class="scope me">📱 Chỉ máy này</span></div>
+        <div class="hint" id="vtNote"></div>
+        <div class="actions wrap" id="vtBtns">
+          <button class="btn btn-y btn-sm" id="vtBat">Bật vân tay</button>
+          <button class="btn btn-ghost btn-sm" id="vtTat" style="display:none">Tắt vân tay</button>
         </div>
       </div>
-      <div class="nggrp" id="ngheGroups"></div>
-      <div id="ngheList" style="margin-bottom:22px"></div>
+
+      <div class="scard" id="tgSecCd" style="display:none">
+        <div class="schd"><b>✈️ Telegram nhận đơn</b><span class="scope me">👤 Tài khoản của tôi</span></div>
+        <div id="tgHostCd"></div>
+      </div>
     </div>
 
-    <div id="decoSec" style="display:none">
-      <div class="sect-lbl">🎉 Trang trí tivi theo dịp lễ <span class="tagx">chỉ admin</span></div>
-      <div class="hint">Hiện trên màn hình tivi: hoa, bí ngô, tuyết… rơi ở màn hình chờ và vài hình nhỏ ở góc khi đang hát (không che lời bài). <b>Tự động</b> = tivi tự đổi theo ngày lễ. Chọn một chủ đề cụ thể để ép dùng cho chương trình riêng của BMB. Áp dụng cho mọi tivi, tivi nhận sau tối đa 10 phút.</div>
-      <div class="fld"><select id="decoSel" disabled>
-        <option value="auto">Tự động theo ngày lễ</option>
-        <option value="off">Tắt (không trang trí)</option>
-        <option value="hoa">🌸 Hoa (8/3 · 20/10 · 20/11)</option>
-        <option value="tim">❤️ Tim (Valentine 14/2)</option>
-        <option value="co">🎆 Cờ hoa, pháo hoa (30/4 · 1/5 · 2/9)</option>
-        <option value="halloween">🎃 Halloween</option>
-        <option value="noel">❄️ Noel, tuyết</option>
-        <option value="namMoi">🥂 Năm mới dương lịch</option>
-        <option value="tet">🧧 Tết Nguyên Đán</option>
-        <option value="trungthu">🏮 Trung thu</option>
-      </select></div>
-      <div class="hint" id="decoMsg" style="margin-bottom:22px"></div>
+    <!-- ===== Nhóm 2: Chi nhánh đang chọn (quản lý + admin) ===== -->
+    <div class="cdg" id="cdg-cn">
+      <div class="scard" id="hgAdmin" style="display:none">
+        <div class="schd"><b>⏱ Nhắc giờ hát cho khách</b><span class="scope cn">📍 Chi nhánh này</span><span class="schip" id="hgChipCd">…</span></div>
+        <p class="sdesc">Bật: lúc mở phòng hiện hộp hỏi khách hát bao lâu; TV nhắc ở 15 · 10 · 5 phút còn lại. Mặc định tắt.</p>
+        <div class="actions wrap"><button class="btn btn-ghost btn-sm" id="btnHgSw">Đang tắt</button></div>
+        <details class="more"><summary>Chi tiết hoạt động</summary>Khách cũng tự đặt được giờ trên remote. Hết giờ phòng vẫn mở và đồng hồ đếm tăng +phút. Khi phòng hết giờ quầy được báo (chuông + chip) và Telegram (người đã kết nối) để vào hỏi khách. Chỉ áp dụng cho chi nhánh đang chọn.</details>
+      </div>
 
-      <div class="sect-lbl">🎤 Điểm vui cuối mỗi bài hát <span class="tagx">chỉ admin</span></div>
-      <div class="hint">Hết bài, tivi hiện màn <b>chấm điểm</b> (số chạy, sao, pháo giấy…) khoảng 8 giây rồi mới sang bài kế. Đây là điểm <b>giải trí ngẫu nhiên</b>, không đo giọng hát thật — đừng quảng cáo là chấm điểm chính xác. Chỉ hiện khi bài được hát gần hết (tua nhảy tới cuối thì không có điểm). Áp dụng cho mọi chi nhánh, tivi nhận sau tối đa 10 phút.</div>
-      <div class="fld"><select id="scoreSel" disabled>
-        <option value="off">Tắt (hết bài sang bài kế ngay)</option>
-        <option value="on">Bật — có tiếng trống và vỗ tay</option>
-        <option value="mute">Bật — im lặng (chỉ hình)</option>
-      </select></div>
-      <div class="hint" id="scoreMsg" style="margin-bottom:22px"></div>
+      <div class="scard">
+        <div class="schd"><b>⭐ In QR đánh giá Google Maps</b><span class="scope cn">📍 Chi nhánh này</span></div>
+        <p class="sdesc">Thẻ riêng (khác màu QR trên tivi), không có số phòng, để khách quét và đánh giá chi nhánh.</p>
+        <div class="hint" id="rvHint">Dùng đường dẫn Google Maps của chi nhánh.</div>
+        <div class="actions wrap"><button class="btn btn-ghost btn-sm" id="btnPrintRv" style="border-color:#A9E0C4;color:#0F7A4D">⭐ In QR ĐÁNH GIÁ</button></div>
+      </div>
+
+      <div class="scard" id="phongAdmin" style="display:none">
+        <div class="schd"><b>➕ Thêm phòng</b><span class="scope cn">📍 Chi nhánh này</span><span class="tagx">chỉ admin</span></div>
+        <p class="sdesc">Nhiều phòng cách nhau dấu phẩy, ví dụ: P1, P2, P3, VIP1.</p>
+        <div class="fld"><input class="lb" id="phongMoi" maxlength="600" placeholder="Tên phòng cần thêm" autocomplete="off"></div>
+        <div class="actions wrap"><button class="btn btn-y btn-sm" id="btnPhongThem">+ Thêm phòng</button></div>
+      </div>
+
+      <div class="scard">
+        <div class="schd"><b>📺 Gán TV, máy tính bảng, nhật ký kết nối</b></div>
+        <p class="sdesc">Các thao tác theo từng phòng làm ngay ở màn <b>Quầy</b> (bấm vào phòng, hoặc nút ⋯ cạnh chữ “Phòng”).</p>
+        <div class="actions wrap"><button class="btn btn-ghost btn-sm" id="btnCdToQuay">Mở màn Quầy →</button></div>
+      </div>
     </div>
 
-    <div id="libSec" style="display:none">
-      <div class="sect-lbl">📀 Phát từ thư viện video lưu sẵn (R2 / NAS của quán) <span class="tagx">chỉ admin</span></div>
-      <div class="hint">Bật cho chi nhánh nào thì tivi ở đó phát những bài <b>đã có trong thư viện</b> (app Tải Video tải về) bằng file của mình; bài chưa có, file lỗi hoặc đứng hình lâu thì <b>tự phát YouTube như cũ</b> (tiếp đúng đoạn đang hát). <b>Tắt</b> = y như hiện nay. Tivi nhận thay đổi khi mở phòng hoặc sau tối đa 10 phút.</div>
-      <div id="libBox" style="margin-bottom:10px"><div class="hint">Đang tải…</div></div>
-      <div class="hint" id="libMsg" style="display:none"></div>
-      <div class="hint" style="margin-bottom:22px"><b>NAS của quán</b> (để trống nếu chưa có): địa chỉ thư mục trên NAS có cùng cấu trúc với R2, ví dụ <code>…/vn/&lt;mã bài&gt;.mp4</code>. Tivi thử NAS trước, NAS không mở được thì dùng R2. Nên dùng địa chỉ <b>https://</b> có chứng chỉ (ví dụ <code>https://nas-cn03.bmb.id.vn/karaoke</code> trỏ về IP trong quán). Địa chỉ <b>http://</b> trong mạng quán (vd <code>http://192.168.1.10:8080/karaoke</code>) chỉ chạy với <b>app BMBPlayer 2.9 trở lên</b>; TV dùng app cũ sẽ bỏ qua NAS.<br>
-        <b>Theo dõi NAS:</b> TV tự kiểm tra NAS 5 phút/lần bằng ảnh nhỏ <code>_bmb/ping.png</code> đặt trong thư mục NAS (cùng chỗ với <code>vn</code>, <code>en</code>) — nhớ chép file này lên NAS. Chip 🟢🟡🔴⚫ cạnh tên chi nhánh; chi tiết từng TV ở <b>🔌 Kết nối → 📀 NAS quán</b>. NAS mất kết nối ≥ 10 phút thì báo Telegram cho admin (cùng công tắc với cảnh báo rớt TV).</div>
+    <!-- ===== Nhóm 3: Tivi & khách (admin) ===== -->
+    <div class="cdg" id="cdg-tv">
+      <div id="decoSec" style="display:none">
+        <div class="cdsub">Trên màn hình tivi</div>
+        <div class="scard">
+          <div class="schd"><b>🎉 Trang trí theo dịp lễ</b><span class="scope all">🌐 Toàn chuỗi</span><span class="schip" id="decoChip">…</span></div>
+          <p class="sdesc">Hoa, bí ngô, tuyết… rơi ở màn hình chờ và vài hình nhỏ ở góc khi đang hát (không che lời bài).</p>
+          <div class="fld"><select id="decoSel" disabled aria-label="Chủ đề trang trí tivi">
+            <option value="auto">Tự động theo ngày lễ</option>
+            <option value="off">Tắt (không trang trí)</option>
+            <option value="hoa">🌸 Hoa (8/3 · 20/10 · 20/11)</option>
+            <option value="tim">❤️ Tim (Valentine 14/2)</option>
+            <option value="co">🎆 Cờ hoa, pháo hoa (30/4 · 1/5 · 2/9)</option>
+            <option value="halloween">🎃 Halloween</option>
+            <option value="noel">❄️ Noel, tuyết</option>
+            <option value="namMoi">🥂 Năm mới dương lịch</option>
+            <option value="tet">🧧 Tết Nguyên Đán</option>
+            <option value="trungthu">🏮 Trung thu</option>
+          </select></div>
+          <div class="hint" id="decoMsg"></div>
+          <details class="more"><summary>Giải thích</summary><b>Tự động</b> = tivi tự đổi theo ngày lễ. Chọn một chủ đề cụ thể để ép dùng cho chương trình riêng của BMB. Tivi nhận thay đổi sau tối đa 10 phút.</details>
+        </div>
+
+        <div class="scard">
+          <div class="schd"><b>🎤 Điểm vui cuối mỗi bài hát</b><span class="scope all">🌐 Toàn chuỗi</span><span class="schip" id="scoreChip">…</span></div>
+          <p class="sdesc">Hết bài, tivi hiện màn <b>chấm điểm</b> (số chạy, sao, pháo giấy…) khoảng 8 giây rồi mới sang bài kế.</p>
+          <div class="fld"><select id="scoreSel" disabled aria-label="Điểm vui cuối bài">
+            <option value="off">Tắt (hết bài sang bài kế ngay)</option>
+            <option value="on">Bật — có tiếng trống và vỗ tay</option>
+            <option value="mute">Bật — im lặng (chỉ hình)</option>
+          </select></div>
+          <div class="hint" id="scoreMsg"></div>
+          <details class="more"><summary>Lưu ý khi dùng</summary>Đây là điểm <b>giải trí ngẫu nhiên</b>, không đo giọng hát thật — đừng quảng cáo là chấm điểm chính xác. Chỉ hiện khi bài được hát gần hết (tua nhảy tới cuối thì không có điểm). Tivi nhận thay đổi sau tối đa 10 phút.</details>
+        </div>
+      </div>
+
+      <div class="cdsub" id="cdSubKhach" style="display:none">Trên điện thoại / máy tính bảng của khách</div>
+
+      <div id="seekSec" style="display:none">
+        <div class="scard">
+          <div class="schd"><b>⏩ Thanh tua bài</b><span class="scope all">🌐 Toàn chuỗi</span><span class="schip" id="seekChip">…</span></div>
+          <p class="sdesc">Bật: remote có thanh trượt và nút tua ±10 giây cho bài đang hát trên tivi.</p>
+          <div class="hint" id="seekInfo">Đang tải…</div>
+          <div class="actions wrap"><button class="btn btn-y btn-sm" id="seekBtn" disabled>…</button></div>
+          <details class="more"><summary>Khi nào có hiệu lực?</summary>Phòng đang mở sẽ nhận thay đổi khi điện thoại / tivi nối lại, hoặc ở lần mở phòng kế tiếp.</details>
+        </div>
+      </div>
+
+      <div id="ngheSec" style="display:none">
+        <div class="scard">
+          <div class="schd"><b>🎧 Nghe nhạc — nghe liền cả mix dài</b><span class="scope all">🌐 Toàn chuỗi</span><span class="schip" id="ngheChip">…</span></div>
+          <p class="sdesc">Bật: khách có ô <b>🎧 Nghe nhạc</b> cạnh «Quốc tế» (chỉ hiện khi có ít nhất 1 mix dùng được). Tắt: ô này ẩn hẳn, ai đang nghe thì tivi quay về karaoke.</p>
+          <div class="hint" id="ngheInfo">Đang tải…</div>
+          <div class="actions wrap"><button class="btn btn-y btn-sm" id="ngheBtn" disabled>…</button></div>
+
+          <div class="cdopt">
+            <div class="fld"><span>Khi một mix phát hết</span><select id="ngheNext" disabled>
+              <option value="mix">Tự phát mix kế tiếp trong nhóm (mặc định)</option>
+              <option value="karaoke">Quay lại hàng chờ karaoke</option>
+            </select></div>
+            <div class="ngopt"><button class="btn btn-ghost btn-sm" id="ngheR2Btn" disabled>…</button><small id="ngheR2Info"></small></div>
+          </div>
+
+          <div class="ngkho" id="ngheKho">
+            <div class="ngkh"><b>Danh sách mix lấy từ 🎧 Kho nghe</b><span id="ngheSyncTt" class="ngsync"></span></div>
+            <div class="hint" id="ngheKhoInfo">Thêm nguồn, duyệt mix, xếp nhóm, ghim, ẩn, đánh dấu lưu R2: làm ở <b>kho.html → 🎧 Kho nghe</b>. Ở đây chỉ xem nhanh những gì khách đang thấy.</div>
+            <div class="actions wrap">
+              <a class="btn btn-y btn-sm" id="ngheMoKho" href="kho.html#nghe" target="_blank" rel="noopener">🎧 Mở Kho nghe</a>
+              <button class="btn btn-ghost btn-sm" id="ngheTai">↻ Đồng bộ ngay</button>
+            </div>
+          </div>
+
+          <details class="more" id="ngheDet"><summary>Xem các mix khách đang thấy <span class="tagx" id="ngheCnt">…</span></summary>
+            <div class="nggrp" id="ngheGroups"></div>
+            <div id="ngheList"></div>
+          </details>
+        </div>
+      </div>
     </div>
 
-    <div id="apkSec" style="display:none">
-      <div class="sect-lbl">📦 Phát hành APK BMBPlayer</div>
-      <div class="hint" id="apkInfo">Đang tải…</div>
-      <div class="fld"><span>File APK ĐÃ KÝ (BMBPlayer.apk)</span><input type="file" id="apkFile" accept=".apk,application/vnd.android.package-archive"></div>
-      <div class="hint" id="apkRead" style="display:none"></div>
-      <button class="btn btn-y btn-sm" id="apkUp" disabled>Tải lên &amp; phát hành</button>
-      <div class="hint" style="margin-top:14px">Số phiên bản được đọc thẳng từ file nên không gõ nhầm. Bản chưa ký hoặc không phải BMBPlayer sẽ bị chặn. Sau khi phát hành, TV / máy tính bảng / máy quầy đang chạy bản 2.4 trở lên sẽ tự báo có bản mới (TV và máy tính bảng chỉ hỏi khi phòng đang đóng).</div>
+    <!-- ===== Nhóm 4: Thư viện video (admin) ===== -->
+    <div class="cdg" id="cdg-lib">
+      <div id="libSec" style="display:none">
+        <div class="scard">
+          <div class="schd"><b>📀 Phát từ thư viện video lưu sẵn (R2 / NAS)</b><span class="scope cn">📍 Từng chi nhánh</span><span class="schip" id="libChip">…</span></div>
+          <p class="sdesc">Bật cho chi nhánh nào thì tivi ở đó phát những bài <b>đã có trong thư viện</b> bằng file của mình. Bài chưa có, file lỗi hoặc đứng hình lâu thì <b>tự phát YouTube như cũ</b> (tiếp đúng đoạn đang hát). <b>Tắt</b> = y như trước đây.</p>
+          <div class="libtools">
+            <input type="search" id="libFind" placeholder="🔎 Tìm chi nhánh…" autocomplete="off" aria-label="Tìm chi nhánh">
+            <span class="knseg" id="libFilt"><button type="button" data-f="" class="on">Tất cả</button><button type="button" data-f="on">Đang bật</button><button type="button" data-f="off">Đang tắt</button></span>
+            <button type="button" class="btn btn-ghost btn-sm" id="libToKn">📊 Xem tình trạng NAS ở Kết nối</button>
+          </div>
+          <div id="libBox"><div class="hint">Đang tải…</div></div>
+          <div class="hint" id="libMsg" style="display:none"></div>
+          <details class="more"><summary>Hướng dẫn nhập NAS của quán và cách theo dõi</summary>
+            <div class="hint"><b>NAS của quán</b> (để trống nếu chưa có): địa chỉ thư mục trên NAS có cùng cấu trúc với R2, ví dụ <code>…/vn/&lt;mã bài&gt;.mp4</code>. Tivi thử NAS trước, NAS không mở được thì dùng R2. Nên dùng địa chỉ <b>https://</b> có chứng chỉ (ví dụ <code>https://nas-cn03.bmb.id.vn/karaoke</code> trỏ về IP trong quán). Địa chỉ <b>http://</b> trong mạng quán (vd <code>http://192.168.1.10:8080/karaoke</code>) chỉ chạy với <b>app BMBPlayer 2.9 trở lên</b>; TV dùng app cũ sẽ bỏ qua NAS.<br>
+            <b>Theo dõi NAS:</b> TV tự kiểm tra NAS 5 phút/lần bằng ảnh nhỏ <code>_bmb/ping.png</code> đặt trong thư mục NAS (cùng chỗ với <code>vn</code>, <code>en</code>) — nhớ chép file này lên NAS. Chip 🟢🟡🔴⚫ cạnh tên chi nhánh; chi tiết từng TV ở <b>🔌 Kết nối → 📀 NAS quán</b>. NAS mất kết nối ≥ 10 phút thì báo Telegram cho admin (cùng công tắc với cảnh báo rớt TV).</div>
+          </details>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== Nhóm 5: Phát hành app (admin cao nhất) ===== -->
+    <div class="cdg" id="cdg-apk">
+      <div id="apkSec" style="display:none">
+        <div class="scard">
+          <div class="schd"><b>📦 Phát hành APK BMBPlayer</b><span class="scope all">🌐 Toàn chuỗi</span><span class="tagx">admin cao nhất</span></div>
+          <div class="hint" id="apkInfo">Đang tải…</div>
+          <div class="fld"><span>File APK ĐÃ KÝ (BMBPlayer.apk)</span><input type="file" id="apkFile" accept=".apk,application/vnd.android.package-archive"></div>
+          <div class="hint" id="apkRead" style="display:none"></div>
+          <button class="btn btn-y btn-sm" id="apkUp" disabled>Tải lên &amp; phát hành</button>
+          <details class="more"><summary>Lưu ý khi phát hành</summary>Số phiên bản được đọc thẳng từ file nên không gõ nhầm. Bản chưa ký hoặc không phải BMBPlayer sẽ bị chặn. Sau khi phát hành, TV / máy tính bảng / máy quầy đang chạy bản 2.4 trở lên sẽ tự báo có bản mới (TV và máy tính bảng chỉ hỏi khi phòng đang đóng).</details>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -1442,6 +1579,7 @@ function hienTheoQuyen(){
   $('btnThuHoiMtb').style.display = S.quanLy ? '' : 'none';
   $('btnNhatKy').style.display = S.quanLy ? '' : 'none';
   $('hgAdmin').style.display = S.quanLy ? '' : 'none';
+  $('btnToCdCn').parentNode.style.display = S.quanLy ? '' : 'none';   /* nhân viên quầy không vào được Cài đặt */
   $('selCN').style.display       = S.vaiTro==='admin' ? '' : 'none';
   $('tabKetNoi').style.display   = S.vaiTro==='admin' ? '' : 'none';   /* 🔌 Kết nối: chỉ admin */
 }
@@ -1739,6 +1877,7 @@ function hgSwDraw(){
   var b = $('btnHgSw'); if(!b) return;
   b.textContent = S.hgOn ? 'Đang BẬT — bấm để tắt' : 'Đang tắt — bấm để bật';
   b.className = 'btn btn-sm ' + (S.hgOn ? 'btn-y' : 'btn-ghost');
+  cdChip('hgChipCd', !!S.hgOn, 'ĐANG BẬT', 'ĐANG TẮT');
 }
 $('btnHgSw').addEventListener('click', function(){
   var on = !S.hgOn;
@@ -1903,6 +2042,15 @@ function drawToday(){
          + (o.source==='TABLET'?'tablet':'ĐT khách')+'</td><td>'+st+'</td><td>'+pos+'</td><td>'+pv+'</td>'
          + '<td class="mut">'+esc(o.nguoiXuLy||'—')+'</td></tr>';
   }).join('') || '<tr><td colspan="8" class="mut">Không có đơn nào trong ngày '+ngayVN(LS.ngay)+'.</td></tr>';
+  rspLb($('tbToday'));
+}
+/* điện thoại: mỗi hàng bảng thành một thẻ, gắn nhãn cột (lấy từ tiêu đề bảng) vào từng ô */
+function rspLb(tb){
+  var L = Array.prototype.map.call(tb.parentNode.querySelectorAll('thead th'), function(x){ return x.textContent; });
+  Array.prototype.forEach.call(tb.rows, function(r){
+    if(r.cells.length !== L.length) return;
+    Array.prototype.forEach.call(r.cells, function(c, i){ c.setAttribute('data-l', L[i]); });
+  });
 }
 
 /* ---------- tab Menu ---------- */
@@ -1930,7 +2078,14 @@ var IMG_RE = /^img:([0-9a-f]{10})$/;
 function monUrl(ic){ var m = IMG_RE.exec(ic||''); return m ? apkBase() + '/mon/' + m[1] : ''; }
 function icoHtml(ic){ var u = monUrl(ic); return u ? '<img src="'+esc(u)+'" alt="" loading="lazy" decoding="async">' : esc(ic||'•'); }
 
+function mnChon(m){
+  $('p5').classList.toggle('mn-mau', m === 'mau');
+  Array.prototype.forEach.call($('mnNav').children, function(b){ var on = b.getAttribute('data-m') === m; b.className = on ? 'on' : ''; b.setAttribute('aria-selected', on ? 'true' : 'false'); });
+}
+$('mnNav').addEventListener('click', function(ev){ var b = ev.target.closest('button'); if(b) mnChon(b.getAttribute('data-m')); });
 function loadMenuAdmin(){
+  $('mnNav').style.display = S.vaiTro === 'admin' ? '' : 'none';
+  if(S.vaiTro !== 'admin') mnChon('cn');
   $('menuList').innerHTML = '<div class="empty">Đang tải…</div>';
   api('admin.menuList', {}).then(function(r){
     if(!r || !r.ok){
@@ -1943,13 +2098,25 @@ function loadMenuAdmin(){
   if(S.vaiTro==='admin') loadMau(true);
 }
 function drawMenuChiNhanh(){
+  $('menuHint').style.display = '';
+  $('menuTools').style.display = S.suaMenu ? '' : 'none';
   $('menuHint').innerHTML = S.suaMenu
     ? 'Bấm <b>Còn hàng / Hết hàng</b> khi món về hoặc hết — món hết hàng tự ẩn khỏi màn hình khách. '
       + '<b>Ẩn</b>: tạm không bán món đó. <b>Bỏ</b>: xoá khỏi menu chi nhánh (đơn cũ không ảnh hưởng). ▲▼ để xếp thứ tự hiện cho khách.'
     : 'Món nào hết hàng thì bấm <b>Hết hàng</b> — khách sẽ không gọi được món đó nữa. Hàng về thì bấm lại <b>Còn hàng</b>.';
   if(!MN.items.length){
-    $('menuList').innerHTML = '<div class="empty">Chi nhánh chưa có món nào.'
-      + (S.suaMenu ? ' Bấm <b>＋ Chọn từ menu mẫu</b> để lấy món về.' : ' Nhờ quản lý chi nhánh thêm món.')+'</div>';
+    $('menuHint').style.display = 'none';
+    $('menuTools').style.display = 'none';   /* nút lớn trong thẻ trống đã thay chỗ */
+    $('menuList').innerHTML = '<div class="mnempty"><div class="ic" aria-hidden="true">🍺</div><b>Chi nhánh chưa có món nào</b>'
+      + '<p>Khách đang không thấy menu nước / dịch vụ trên điện thoại hay máy tính bảng để gọi.</p>'
+      + (S.suaMenu ? '<div class="acts"><button class="btn btn-y" id="mnEmptyMau">＋ Chọn món từ menu mẫu</button><button class="btn btn-ghost" id="mnEmptyRieng">✏️ Tạo món riêng</button></div>'
+          + '<small>Nên chọn từ menu mẫu trước (nhanh, đồng bộ cả chuỗi), món riêng của chi nhánh thêm sau.</small>'
+        : '<small>Nhờ quản lý chi nhánh thêm món.</small>')
+      + '</div>';
+    if(S.suaMenu){
+      $('mnEmptyMau').addEventListener('click', function(){ $('btnChonMau').click(); });
+      $('mnEmptyRieng').addEventListener('click', function(){ $('btnMonRieng').click(); });
+    }
     return;
   }
   var html = '';
@@ -2213,6 +2380,7 @@ function drawAccounts(items){
       + '<td style="white-space:nowrap"><button class="btn '+(it.hoatDong?'btn-bad':'btn-ok')+' btn-sm" data-khoa="'+u+'" data-v="'+(it.hoatDong?1:0)+'">'+(it.hoatDong?'Khoá':'Mở')+'</button> '
       + '<button class="btn btn-ghost btn-sm" data-mk="'+u+'">Đặt lại MK</button></td></tr>';
   }).join('') || '<tr><td colspan="6" class="mut">Chưa có tài khoản quầy nào cho chi nhánh này.</td></tr>';
+  rspLb($('tbAcc'));
   Array.prototype.forEach.call(document.querySelectorAll('#tbAcc [data-khoa]'), function(b){
     b.addEventListener('click', function(){ toggleAcc(this.getAttribute('data-khoa'), this.getAttribute('data-v')==='1'); });
   });
@@ -2637,7 +2805,8 @@ function seekVe(){
 function seekVe2(on){
   var b = $('seekBtn'); b.disabled = false; b.dataset.on = on ? '1' : '0';
   b.textContent = on ? 'Tắt thanh tua' : 'Bật thanh tua';
-  $('seekInfo').innerHTML = 'Hiện đang <b>' + (on ? 'BẬT' : 'TẮT') + '</b> (áp dụng cho mọi phòng). Bật: remote điện thoại / máy tính bảng có thanh trượt và nút tua ±10 giây cho bài đang hát trên TV. Phòng đang mở sẽ nhận thay đổi khi điện thoại / TV nối lại, hoặc ở lần mở phòng kế tiếp.';
+  $('seekInfo').textContent = '';
+  cdChip('seekChip', on, 'ĐANG BẬT', 'ĐANG TẮT');
 }
 $('seekBtn').onclick = function(){
   var b = $('seekBtn'), want = b.dataset.on !== '1'; b.disabled = true;
@@ -2665,7 +2834,9 @@ function ngheVe2(){
     : (r.r2 ? 'Mix nào có file <code>videos/nghe/&lt;mã YouTube&gt;.mp4</code> trong thư viện R2 thì TV phát file (không quảng cáo, không lỗi nhúng, tua mượt); mix chưa có file hoặc file lỗi vẫn phát YouTube. Hiện có <b>' + nf + '</b> mix có bản lưu.'
       : 'Đang tắt: tất cả mix phát bằng YouTube. Bật khi muốn ưu tiên file đã lưu (ví dụ YouTube chèn quảng cáo quá nhiều). File do app Tải Video đưa vào <code>videos/nghe/&lt;mã YouTube&gt;.mp4</code> (chỉ mix của nguồn được phép tải).');
   var dung = r.mixes.filter(function(m){ return !m.bad; }).length;
-  $('ngheInfo').innerHTML = 'Hiện đang <b>' + (r.on ? 'BẬT' : 'TẮT') + '</b> cho mọi chi nhánh. Bật: điện thoại / máy tính bảng của khách có ô <b>🎧 Nghe nhạc</b> cạnh «Quốc tế» (chỉ hiện khi có ít nhất 1 mix dùng được). Tắt: ô này ẩn hẳn, ai đang nghe thì tivi quay về karaoke. Khách đang thấy <b>' + dung + '</b> mix.';
+  cdChip('ngheChip', r.on, 'ĐANG BẬT', 'ĐANG TẮT');
+  $('ngheInfo').innerHTML = 'Khách đang thấy <b>' + dung + '</b> mix' + (dung < r.mixes.length ? ' (' + (r.mixes.length - dung) + ' mix lỗi, đã ẩn)' : '') + '.';
+  $('ngheCnt').textContent = dung + ' mix';
   var k = r.kho || {}, t = $('ngheSyncTt'), last = k.last || null;
   if(!k.noi){ t.className = 'ngsync off'; t.textContent = !k.coBinding ? 'Chưa nối Kho nghe' : 'Thiếu mật khẩu KHO_NGHE_PASS'; }
   else if(k.err){ t.className = 'ngsync bad'; t.textContent = 'Lỗi đồng bộ: ' + k.err; }
@@ -2709,7 +2880,7 @@ $('ngheTai').onclick = function(){ var b = $('ngheTai'); b.disabled = true; b.te
 function decoVe(){
   api('admin.decoGet', {}).then(function(r){
     if(!r || !r.ok){ $('decoMsg').textContent = (r && r.msg) || 'Không hỏi được cài đặt.'; return; }
-    $('decoSel').value = r.deco; $('decoSel').disabled = false; $('decoMsg').textContent = '';
+    $('decoSel').value = r.deco; $('decoSel').disabled = false; $('decoMsg').textContent = ''; cdChipSel('decoChip', $('decoSel'), r.deco !== 'off');
   }).catch(function(){ $('decoMsg').textContent = 'Không kết nối được máy chủ.'; });
 }
 $('decoSel').onchange = function(){
@@ -2717,13 +2888,13 @@ $('decoSel').onchange = function(){
   api('admin.decoSet', {deco:sel.value}).then(function(r){
     sel.disabled = false;
     if(!r || !r.ok){ alert((r && r.msg) || 'Không lưu được.'); decoVe(); return; }
-    $('decoMsg').textContent = 'Đã lưu. Tivi sẽ đổi trong vòng 10 phút.';
+    $('decoMsg').textContent = 'Đã lưu. Tivi sẽ đổi trong vòng 10 phút.'; cdChipSel('decoChip', sel, sel.value !== 'off');
   }).catch(function(){ sel.disabled = false; alert('Không kết nối được máy chủ.'); });
 };
 function scoreVe(){
   api('admin.scoreGet', {}).then(function(r){
     if(!r || !r.ok){ $('scoreMsg').textContent = (r && r.msg) || 'Không hỏi được cài đặt.'; return; }
-    $('scoreSel').value = r.score; $('scoreSel').disabled = false; $('scoreMsg').textContent = '';
+    $('scoreSel').value = r.score; $('scoreSel').disabled = false; $('scoreMsg').textContent = ''; cdChip('scoreChip', r.score !== 'off', r.score === 'mute' ? 'BẬT · im lặng' : 'BẬT · có tiếng', 'ĐANG TẮT');
   }).catch(function(){ $('scoreMsg').textContent = 'Không kết nối được máy chủ.'; });
 }
 $('scoreSel').onchange = function(){
@@ -2731,7 +2902,7 @@ $('scoreSel').onchange = function(){
   api('admin.scoreSet', {score:sel.value}).then(function(r){
     sel.disabled = false;
     if(!r || !r.ok){ alert((r && r.msg) || 'Không lưu được.'); scoreVe(); return; }
-    $('scoreMsg').textContent = 'Đã lưu. Tivi sẽ đổi trong vòng 10 phút.';
+    $('scoreMsg').textContent = 'Đã lưu. Tivi sẽ đổi trong vòng 10 phút.'; cdChip('scoreChip', sel.value !== 'off', sel.value === 'mute' ? 'BẬT · im lặng' : 'BẬT · có tiếng', 'ĐANG TẮT');
   }).catch(function(){ sel.disabled = false; alert('Không kết nối được máy chủ.'); });
 };
 /* ---- Thư viện video lưu sẵn: công tắc + NAS theo chi nhánh, số bài phát theo nguồn 7 ngày ---- */
@@ -2746,7 +2917,11 @@ function libVe2(){
   var r = LIBQ, dem = {}; if(!r) return;
   (r.dem || []).forEach(function(d){ (dem[d.cn] = dem[d.cn] || {})[d.src] = d.n; });
   var h = r.r2 ? '' : '<div class="hint" style="color:var(--bad)"><b>Worker chưa gắn thư viện</b> (binding LIB → bucket taivideo-files): bật cũng chưa có tác dụng cho tới khi deploy bản có binding này.</div>';
-  h += (S.branches || []).map(function(b){
+  var ds = (S.branches || []).slice(), nOn = ds.filter(function(b){ return (r.cfg[b.id] || {}).on; }).length;
+  cdChip('libChip', nOn > 0, 'Bật ' + nOn + '/' + ds.length + ' chi nhánh', 'Chưa bật chi nhánh nào');
+  var qf = bdau($('libFind').value), lf = LIBF;
+  ds = ds.filter(function(b){ var on = !!(r.cfg[b.id] || {}).on; return (!qf || bdau(b.ten).indexOf(qf) >= 0) && (lf === '' || (lf === 'on') === on); });
+  h += ds.map(function(b){
     var c = r.cfg[b.id] || { on:false, nas:'' }, d = dem[b.id] || {}, lib = (d.nas || 0) + (d.r2 || 0), tong = lib + (d.yt || 0);
     var tk = tong ? '<div class="knsm" style="margin-top:6px">7 ngày: <b>' + lib + '/' + tong + ' bài (' + Math.round(lib * 100 / tong) + '%) phát từ thư viện</b>'
       + ((d.nas || 0) ? ' · NAS ' + d.nas : '') + ((d.r2 || 0) ? ' · R2 ' + d.r2 : '') + ' · YouTube (chưa có file) ' + (d.yt || 0)
@@ -2758,7 +2933,7 @@ function libVe2(){
       + '<input type="url" class="libnas" placeholder="NAS của quán (tuỳ chọn), vd https://nas-cn03.bmb.id.vn/karaoke" value="' + esc(c.nas || '') + '" autocomplete="off">'
       + '<button type="button" class="btn btn-ghost btn-sm" data-libluu="1">Lưu NAS</button></div>' + tk + '</div>';
   }).join('');
-  $('libBox').innerHTML = h || '<div class="hint">Chưa có chi nhánh nào.</div>';
+  $('libBox').innerHTML = h || '<div class="hint">' + (qf || lf ? 'Không có chi nhánh nào khớp bộ lọc.' : 'Chưa có chi nhánh nào.') + '</div>';
 }
 $('libBox').addEventListener('click', function(e){
   var bt = e.target.closest('button[data-libon],button[data-libluu]'); if(!bt || !LIBQ) return;
@@ -2773,7 +2948,41 @@ $('libBox').addEventListener('click', function(e){
     $('libMsg').style.display = ''; $('libMsg').textContent = 'Đã lưu ' + ten + ': ' + (r.on ? 'BẬT' : 'TẮT') + (r.nas ? ' · NAS ' + r.nas : '') + '. Tivi nhận khi mở phòng hoặc sau tối đa 10 phút.';
   }).catch(function(){ bt.disabled = false; alert('Không kết nối được máy chủ.'); });
 });
-function cdMo(){ vtVe(); if(S.vaiTro === 'admin'){ seekVe(); ngheVe(); decoVe(); scoreVe(); libVe(); } if(S.sieuAdmin) apkVe();
+/* nhóm Cài đặt: chỉ hiện nhóm mà vai trò hiện tại dùng được; nhớ nhóm đang xem trong phiên */
+var CDG = { cur: '' };
+function bdau(t){ return String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').trim(); }
+function cdChip(id, on, tOn, tOff){ var c = $(id); if(!c) return; c.textContent = on ? tOn : tOff; c.className = 'schip' + (on ? ' on' : ''); }
+function cdChipSel(id, sel, on){ var o = sel.options[sel.selectedIndex]; if(!o) return; cdChip(id, on === undefined ? true : on, o.text.split(' (')[0].trim(), o.text.split(' (')[0].trim()); }
+function cdNhom(){
+  var ad = S.vaiTro === 'admin', ok = { me: true, cn: !!S.quanLy, tv: ad, lib: ad, apk: !!S.sieuAdmin }, first = '', n = 0;
+  Array.prototype.forEach.call($('cdNav').children, function(b){
+    var g = b.getAttribute('data-g'); b.style.display = ok[g] ? '' : 'none';
+    if(ok[g]){ n++; if(!first) first = g; }
+  });
+  $('cdNav').style.display = n > 1 ? '' : 'none';             /* quản lý chi nhánh chỉ có 1 nhóm → khỏi hiện thanh chọn */
+  $('cdSubKhach').style.display = ad ? '' : 'none';
+  if(!ok[CDG.cur]){ var sv = ''; try{ sv = sessionStorage.getItem('bmb_q_cdg') || ''; }catch(e){} CDG.cur = ok[sv] ? sv : first; }
+  cdChon(CDG.cur);
+}
+function cdChon(g){
+  CDG.cur = g; try{ sessionStorage.setItem('bmb_q_cdg', g); }catch(e){}
+  Array.prototype.forEach.call($('cdNav').children, function(b){ var on = b.getAttribute('data-g') === g; b.className = on ? 'on' : ''; b.setAttribute('aria-selected', on ? 'true' : 'false'); });
+  Array.prototype.forEach.call(document.querySelectorAll('#p7 .cdg'), function(x){ x.classList.toggle('on', x.id === 'cdg-' + g); });
+}
+$('cdNav').addEventListener('click', function(ev){ var b = ev.target.closest('button'); if(b) cdChon(b.getAttribute('data-g')); });
+var LIBF = '';
+$('libFind').addEventListener('input', function(){ libVe2(); });
+$('libFilt').addEventListener('click', function(ev){
+  var b = ev.target.closest('button'); if(!b) return; LIBF = b.getAttribute('data-f');
+  Array.prototype.forEach.call($('libFilt').children, function(x){ x.className = x === b ? 'on' : ''; });
+  libVe2();
+});
+function cdToQuay(mo){ S.sel = ''; setMv('phong'); showPage('p1'); drawPhong(); drawFeed(); if(mo && $('setupPanel').style.display === 'none') $('btnSetup').click(); }
+$('btnCdToQuay').addEventListener('click', function(){ cdToQuay(false); });
+$('btnToCdCn').addEventListener('click', function(){ showPage('p7'); cdChon('cn'); });
+$('knBody').addEventListener('click', function(ev){ var b = ev.target.closest('[data-cdgo]'); if(b){ showPage('p7'); cdChon(b.getAttribute('data-cdgo')); } });
+$('libToKn').addEventListener('click', function(){ KN.sub = 'nas'; showPage('p8'); });
+function cdMo(){ cdNhom(); hgSwDraw(); vtVe(); if(S.vaiTro === 'admin'){ seekVe(); ngheVe(); decoVe(); scoreVe(); libVe(); } if(S.sieuAdmin) apkVe();
   var tg = tgDuocNhan(); $('tgSecCd').style.display = tg ? '' : 'none'; if(tg) tgTai($('tgHostCd')); else clearInterval(TG.timer); }
 $('lgVt').addEventListener('click', vtDangNhap);
 $('vtBat').addEventListener('click', vtBat);
@@ -3244,7 +3453,8 @@ function knNasVe(r){
   $('knBody').innerHTML = h + knNasHd();
 }
 function knNasHd(){
-  return '<div class="knbox"><h3>Cách đọc</h3><div class="knsm" style="line-height:1.7">'
+  return (S.vaiTro === 'admin' ? '<div style="margin:0 0 10px"><button type="button" class="btn btn-ghost btn-sm" data-cdgo="lib">⚙️ Bật thư viện / nhập địa chỉ NAS ở Cài đặt</button></div>' : '')
+    + '<div class="knbox"><h3>Cách đọc</h3><div class="knsm" style="line-height:1.7">'
     + '🟢 <b>Online</b>: TV mở được NAS, nhanh, ít lỗi. '
     + '🟡 <b>Cảnh báo</b>: chậm (trên 1,5 giây), một số TV không mở được, lỗi khi phát từ 10%, TV dùng app cũ, thiếu file <code>_bmb/ping.png</code>, hoặc vừa lỗi (chưa đủ 10 phút). '
     + '🔴 <b>Mất kết nối</b>: TV đang bật nhưng không TV nào mở được NAS từ 10 phút — khách vẫn hát vì TV tự chuyển R2/YouTube, nhưng mất Internet lúc này thì không còn bài nào. '
