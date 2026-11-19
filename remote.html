@@ -10,7 +10,7 @@
 <style>
   :root{ --bg:#0a0a0f; --panel:#15151f; --line:#2a2a3a; --ink:#f2f2f7; --quiet:#9a9ab0; --accent:#8b5cf6; --accent2:#c084fc; --good:#34d399; --warn:#fbbf24; }
   *{box-sizing:border-box;margin:0;padding:0}
-  body{background:var(--bg); color:var(--ink); font-family:-apple-system,"Segoe UI",Roboto,Arial,sans-serif; min-height:100vh; display:flex; flex-direction:column}
+  body{background:var(--bg); color:var(--ink); font-family:-apple-system,"Segoe UI",Roboto,Arial,sans-serif; min-height:100vh; min-height:100dvh; display:flex; flex-direction:column}
   #top{position:sticky; top:0; z-index:30; background:var(--bg); box-shadow:0 6px 18px rgba(0,0,0,.45)}
   header{padding:5px 12px; background:linear-gradient(135deg,#1a1530,#0a0a0f); display:flex; align-items:center; gap:10px}
   .logoImg{height:28px; width:auto; display:block}
@@ -663,6 +663,24 @@ let guestTok = '', noTicket = false;                                   // vé kh
 const $ = id => document.getElementById(id);
 /* Máy tính bảng của quán: app BMBPlayer chế độ máy tính bảng, hoặc trình duyệt từng được gán / mở với ?tb=1 */
 const IS_TB_DEV = /BMBPlayerApp\/\S+ \(tablet\)/.test(navigator.userAgent) || params.get('tb') === '1' || (() => { try{ return localStorage.getItem('bmb_tablet') === '1'; }catch(e){ return false; } })();
+/* Toàn màn hình cho khách quét QR (điện thoại Android, Chrome): chạm lần đầu thì ẩn thanh địa chỉ.
+   Trình duyệt chỉ cho bật khi có thao tác chạm của khách nên không tự bật được lúc vừa mở trang.
+   Thử 1 lần mỗi phiên: khách vuốt từ trên xuống để thoát thì không ép bật lại.
+   Bỏ qua: máy tính, app BMBPlayer / máy tính bảng của quán, app đã cài ra màn hình chính, iPhone (Safari không hỗ trợ). */
+(function(){
+  try{
+    const de = document.documentElement, rq = de.requestFullscreen || de.webkitRequestFullscreen;
+    if(!rq || document.fullscreenEnabled === false || IS_TB_DEV || /BMBPlayerApp\//.test(navigator.userAgent)) return;
+    if(!matchMedia('(pointer: coarse)').matches || matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches) return;
+    if(sessionStorage.getItem('bmb_fs')) return;
+    const go = () => {
+      removeEventListener('click', go, true); removeEventListener('touchend', go, true);
+      try{ sessionStorage.setItem('bmb_fs', '1'); }catch(e){}
+      try{ const r = rq.call(de, { navigationUI: 'hide' }); if(r && r.catch) r.catch(() => {}); }catch(e){}
+    };
+    addEventListener('click', go, true); addEventListener('touchend', go, true);
+  }catch(e){}
+})();
 const DV_KEY = 'bmb_tb_dv';                                  // quyền thiết bị do quầy cấp khi gán (để tự quét QR đổi phòng)
 const API_NAME = 'np_api', PASS_NAME = 'np_pass';          // dùng chung tên với nhac.html: nếu cùng địa chỉ trang thì chỉ cần nhập một lần
 const CAT_KEY = 'bmb_yt_catalog_v1';
