@@ -406,7 +406,7 @@ details.hint[open] > summary{margin-bottom:8px}
 .knnote{border-left:4px solid var(--gold);background:#FFF8E8;border-radius:10px;padding:8px 12px;font-size:13px;margin:0 0 8px;color:var(--txt)}
 .knnote.r{border-color:var(--bad);background:#FFF1F3}.knnote.g{border-color:var(--ok);background:#EEFAF4}
 .kndot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:0}
-.kn-ev-rot{color:var(--bad);font-weight:700}.kn-ev-nhe{color:#8a7aa3;font-weight:600}.kn-ev-cat{color:#B7791F;font-weight:700}.kn-ev-noi{color:var(--ok)}
+.kn-ev-rot{color:var(--bad);font-weight:700}.kn-ev-nhe{color:#8a7aa3;font-weight:600}.kn-ev-tat{color:#6b6480;font-weight:600}.kn-ev-chop{color:#8a6d00;background:#FFF6D6;border-radius:6px;padding:1px 6px;font-weight:600}.kn-ev-cat{color:#B7791F;font-weight:700}.kn-ev-noi{color:var(--ok)}
 .knheat{display:inline-block;min-width:26px;text-align:center;border-radius:6px;padding:3px 5px;font-weight:700;font-size:12px;background:#F3EEF9;color:#9a86b3}
 .knheat.h1{background:#FFF1CC;color:#8a5a00}.knheat.h2{background:#FFD9A8;color:#7a3a00}.knheat.h3{background:#F7A9B5;color:#7a0b24}.knheat.h4{background:#D6314F;color:#fff}
 .knheat.m1{background:#EFE6FA;color:#6d4a96}.knheat.m2{background:#E0CCF5;color:#5b3585}.knheat.m3{background:#CDB0EE;color:#4a2272}.knheat.m4{background:#9B6AD0;color:#fff}
@@ -736,7 +736,7 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
     </div>
     <div class="knsub" id="knSub"><button data-s="tq" class="on">📊 Tổng quan</button><button data-s="may">📺 Thiết bị từng phòng</button><button data-s="nas">📀 NAS quán</button><button data-s="nk">🧾 Nhật ký</button><button data-s="ip">🌐 IP &amp; nhà mạng</button><button data-s="xh">📈 Xu hướng tuần</button><button data-s="cb">🔔 Cảnh báo Telegram</button><button data-s="bh">🎤 Bài hay chọn</button></div>
     <div id="knBody"><div class="mut">Đang tải…</div></div>
-    <div class="hint" style="margin-top:14px">Lưu trữ: <b>chi tiết từng sự kiện</b> của TV / máy tính bảng / mở-đóng phòng giữ <b>30 ngày</b>, của điện thoại khách giữ <b>7 ngày</b> (theo dõi nhanh); <b>số liệu tổng hợp theo ngày</b> và <b>danh sách IP</b> giữ <b>180 ngày</b> (theo dõi lâu). “Rớt” = máy tự mất kết nối hoặc im lặng quá lâu bị hệ thống ngắt. Một ngày tính từ 06:00 sáng. <b>Đếm lượt chọn bài</b> (tab Bài hay chọn) giữ vĩnh viễn.</div>
+    <div class="hint" style="margin-top:14px">Lưu trữ: <b>chi tiết từng sự kiện</b> của TV / máy tính bảng / mở-đóng phòng giữ <b>30 ngày</b>, của điện thoại khách giữ <b>7 ngày</b> (theo dõi nhanh); <b>số liệu tổng hợp theo ngày</b> và <b>danh sách IP</b> giữ <b>180 ngày</b> (theo dõi lâu). “Rớt” = máy tự mất kết nối hoặc im lặng quá lâu bị hệ thống ngắt (số đếm ở Tổng quan tính cả ba loại). Trong <b>Nhật ký</b>, TV rớt được tô màu theo loại: <b style="background:#FFF6D6;color:#8a6d00;border-radius:6px;padding:1px 6px">vàng nhạt = chớp mạng</b> (nối lại dưới 5 giây), <b style="color:#6b6480">xám = TV tắt / khởi động lại</b> (thường cúp điện lúc không có khách), <b style="color:var(--bad)">đỏ = mất mạng từ 5 giây</b>, <b style="color:#B7791F">cam = TV treo rồi tự khởi động lại</b>. Một ngày tính từ 06:00 sáng. <b>Đếm lượt chọn bài</b> (tab Bài hay chọn) giữ vĩnh viễn.</div>
   </div>
 
   <div class="pg" id="p7">
@@ -3018,11 +3018,63 @@ function knLagDong(g){ var ps = { '-1':'chưa bắt đầu', '0':'đã hết bà
     +(g.on===0?' · <b>TV báo mất mạng</b>':'')+(g.net?' · mạng '+esc(g.net)+(g.dl!=null?' '+g.dl+'Mb/s':'')+(g.nrtt!=null?' RTT '+g.nrtt+'ms':''):'')
     +(g.fjj?' · trang giật '+g.fjj+' nhịp':'')+(g.ltms>=1000?' · máy bận '+knDown(g.ltms):'')+(g.tf>=100?' · file rớt '+g.df+'/'+g.tf+' khung':'')+(g.qd?' · YouTube hạ nét '+g.qd+' lần':'')
     +(g.bs&&g.bs.length?' · các lần đứng gần nhất (giây thứ…/dài): '+g.bs.map(function(x){ return x[0]+'/'+(x[1]/10)+'s'; }).join(', '):''); }
-function knSuKien(e){
+/* 11/2026: tách "rớt thật" khỏi "chớp mạng" và "tắt máy" của TV — CHỈ để hiển thị nhật ký. Số đếm ở Tổng quan và cảnh báo Telegram vẫn tính như cũ.
+   - dut (mã 1006…) mà TV nối vào lại trong ≤ 5 giây  → 'chop'  (chớp mạng, TV vẫn có điện)
+   - cat 4007 (im >120s) rồi TV nối vào KHÔNG kèm báo "nối lại" của máy → 'tat' (TV tắt điện / app khởi động lại như máy mới)
+   - cat 4007 rồi TV nối vào CÓ kèm báo "nối lại" → 'mat' (TV còn chạy nhưng đứt mạng lâu: rớt thật)
+   Chưa thấy TV nối lại trong danh sách (hoặc đang lọc mất dòng "nối vào") thì không phân loại, giữ kiểu cũ. rows xếp mới → cũ. */
+var KN_CHOP_MS = 5000, KN_TAI_MS = 15000;
+function knPhanLoai(rows){
+  var out = {}, i, j, k, e, n, gap, tai;
+  for(i = 0; i < rows.length; i++){
+    e = rows[i];
+    if(e.role !== 'tv' || !(e.ev==='dut' || (e.ev==='cat' && (+e.code===4007 || (+e.code===4000 && e.im>40))))) continue;
+    n = null;
+    for(j = Math.min(rows.length-1, i+3); j >= 0; j--){                 // dòng mới hơn (và vài dòng cùng giây) → lấy lần nối vào sớm nhất sau lúc rớt
+      k = rows[j];
+      if(k.ev==='noi' && k.role==='tv' && k.phong_id===e.phong_id && k.t >= e.t - 3000){ n = k; break; }
+    }
+    if(!n) continue;
+    gap = Math.max(0, n.t - e.t);
+    if(e.ev==='dut'){ if(gap <= KN_CHOP_MS) out[i] = { k: 'chop', gap: gap }; continue; }
+    tai = rows.some(function(r){ return r.ev==='tai' && r.phong_id===e.phong_id && r.t >= n.t - 1000 && r.t <= n.t + KN_TAI_MS; });
+    if(+e.code===4000){ if(!tai) out[i] = { k: 'treo', gap: gap }; continue; }      // 4000 + không có báo nối lại: TV treo rồi tự khởi động lại
+    out[i] = { k: tai ? 'mat' : 'tat', gap: gap };
+  }
+  return out;
+}
+function knTaiDown(e){ var g = {}; try{ g = JSON.parse(e.dg||'{}'); }catch(x){} return g.down; }
+function knTomTat(rows, PL){
+  /* Số "chớp mạng / mất mạng" lấy từ báo "nối lại" của chính TV (đủ hơn dòng "MÁY RỚT" của server, vốn hay thiếu); dòng MÁY RỚT chớp mạng chỉ cộng thêm khi TV không có báo nối lại đi kèm. */
+  var c = { chop: 0, mat: 0, tat: 0, treo: 0, khac: 0 }, sg = 0, i, e, p, d, tais = rows.filter(function(r){ return r.role==='tv' && r.ev==='tai'; });
+  tais.forEach(function(r){ d = knTaiDown(r); if(d==null) return; if(d <= KN_CHOP_MS){ c.chop++; sg += d; } else c.mat++; });
+  for(i = 0; i < rows.length; i++){
+    e = rows[i]; if(e.role !== 'tv') continue;
+    p = PL[i];
+    if(p){
+      if(p.k==='tat') c.tat++; else if(p.k==='treo') c.treo++;
+      else if(p.k==='chop' && !tais.some(function(r){ return r.phong_id===e.phong_id && r.t >= e.t && r.t <= e.t + KN_TAI_MS; })){ c.chop++; sg += p.gap; }
+    }
+    else if(e.ev==='dut' || (e.ev==='cat' && +e.code===4007)) c.khac++;
+  }
+  if(!(c.chop + c.mat + c.tat + c.treo + c.khac)) return '';
+  return '<div class="knnote">TV trong các dòng bên dưới: <b>'+c.chop+' lần chớp mạng</b> (nối lại dưới 5 giây'+(c.chop?', tổng khoảng '+Math.round(sg/1000)+' giây':'')+') · <b>'+c.tat+' lần tắt / khởi động lại</b> (thường là cúp điện lúc không có khách) · <b style="color:var(--bad)">'+c.mat+' lần mất mạng từ 5 giây</b>'
+    + (c.treo?' · <b style="color:#B7791F">'+c.treo+' lần TV treo rồi tự khởi động lại</b>':'')
+    + (c.khac?' · '+c.khac+' lần chưa phân loại (TV chưa nối lại, hoặc đang lọc mất dòng “nối vào”)':'')+'</div>';
+}
+function knSuKien(e, pl){
   var c = e.code, tx, cls = '';
   if(e.ev==='noi'){ tx = 'nối vào'; cls = 'kn-ev-noi'; }
-  else if(e.ev==='dut'){ tx = 'MÁY RỚT · mã '+c+(e.why?' “'+esc(e.why)+'”':'')+(e.tuoi!=null?' · đã nối '+knTuoi(e.tuoi):''); cls = e.role==='tv' ? 'kn-ev-rot' : 'kn-ev-nhe'; }
-  else if(e.ev==='cat'){ tx = (c===4007?'MẤT TÍN HIỆU (im lặng, hệ thống ngắt) · mã 4007':'server cắt · mã '+c+' — '+esc(e.why||''))+(e.n?' ('+e.n+' máy)':'')+(e.im!=null&&e.im>=0?' · im '+e.im+'s':''); cls = c===4007 ? (e.role==='tv'?'kn-ev-rot':'kn-ev-nhe') : 'kn-ev-cat'; }
+  else if(e.ev==='dut'){
+    if(pl && pl.k==='chop'){ tx = '〰 chớp mạng · mã '+c+' · TV nối lại sau '+(pl.gap<1000?'dưới 1':Math.round(pl.gap/1000))+' giây'+(e.tuoi!=null?' · đã nối '+knTuoi(e.tuoi)+' trước đó':''); cls = 'kn-ev-chop'; }
+    else { tx = 'MÁY RỚT · mã '+c+(e.why?' “'+esc(e.why)+'”':'')+(e.tuoi!=null?' · đã nối '+knTuoi(e.tuoi):''); cls = e.role==='tv' ? 'kn-ev-rot' : 'kn-ev-nhe'; }
+  }
+  else if(e.ev==='cat'){
+    if(pl && pl.k==='tat'){ tx = '⏻ TV tắt / khởi động lại · mã 4007 · im '+e.im+'s · nối lại sau '+knDown(pl.gap)+' như máy mới bật'+'<div class="knsm">thường là cúp điện lúc không có khách; cũng có thể app tự thoát</div>'; cls = 'kn-ev-tat'; }
+    else if(pl && pl.k==='treo'){ tx = '⚠ TV treo '+e.im+'s rồi tự khởi động lại · mã 4000 · nối lại sau '+knDown(pl.gap)+' như máy mới bật'+'<div class="knsm">không có báo “nối lại” của máy ⇒ app/TV tự thoát hoặc khởi động lại (hay gặp trên TV RAM thấp)</div>'; cls = 'kn-ev-cat'; }
+    else if(pl && pl.k==='mat'){ tx = 'MẤT MẠNG THẬT · mã 4007 · im '+e.im+'s · TV vẫn chạy, nối lại sau '+knDown(pl.gap); cls = 'kn-ev-rot'; }
+    else { tx = (c===4007?'MẤT TÍN HIỆU (im lặng, hệ thống ngắt) · mã 4007':'server cắt · mã '+c+' — '+esc(e.why||''))+(e.n?' ('+e.n+' máy)':'')+(e.im!=null&&e.im>=0?' · im '+e.im+'s':''); cls = c===4007 ? (e.role==='tv'?'kn-ev-rot':'kn-ev-nhe') : 'kn-ev-cat'; }
+  }
   else if(e.ev==='tuchoi'){ tx = 'bị từ chối · mã '+c+' “'+esc(e.why||'')+'”'; cls = 'kn-ev-cat'; }
   else if(e.ev==='tai'){ var g = {}; try{ g = JSON.parse(e.dg||'{}'); }catch(x){}
     tx = '🔁 nối lại — <b>mất '+knDown(g.down)+'</b> · '+knLyDo(g)+(g.tries?' · thử '+g.tries+' lần':'')
@@ -3258,8 +3310,9 @@ function knNk(them){
 }
 function knNkBang(rows, coCn){
   if(!rows.length) return '<div class="mut" style="padding:10px">Không có sự kiện nào khớp.</div>';
-  return '<div class="tblwrap"><table><thead><tr><th>Lúc</th>'+(coCn?'<th>Chi nhánh</th>':'')+'<th>Phòng</th><th>Thiết bị</th><th>Sự kiện</th><th>IP · nhà mạng</th><th>Máy</th></tr></thead><tbody>'
-    + rows.map(function(e){ return '<tr><td style="white-space:nowrap">'+knTg(e.t)+'</td>'+(coCn?'<td>'+esc(knTenCn(e.cn))+'</td>':'')+'<td><b>'+esc(e.phong||'')+'</b></td><td>'+(KN_VAI[e.role]||esc(e.role||''))+'</td><td>'+knSuKien(e)+'</td><td>'+(e.ip?'<a href="#" data-ip="'+esc(e.ip)+'" data-ip-cn="'+esc(e.cn)+'">'+esc(e.ip)+'</a>':'')+(e.isp?'<div class="knsm">'+esc(e.isp)+(e.colo?' · '+esc(e.colo):'')+'</div>':'')+'</td><td class="knsm">'+esc(e.ua||'')+(e.dev?' <span title="mã máy">#'+esc(e.dev)+'</span>':'')+'</td></tr>'; }).join('')
+  var PL = knPhanLoai(rows);
+  return knTomTat(rows, PL) + '<div class="tblwrap"><table><thead><tr><th>Lúc</th>'+(coCn?'<th>Chi nhánh</th>':'')+'<th>Phòng</th><th>Thiết bị</th><th>Sự kiện</th><th>IP · nhà mạng</th><th>Máy</th></tr></thead><tbody>'
+    + rows.map(function(e, i){ return '<tr><td style="white-space:nowrap">'+knTg(e.t)+'</td>'+(coCn?'<td>'+esc(knTenCn(e.cn))+'</td>':'')+'<td><b>'+esc(e.phong||'')+'</b></td><td>'+(KN_VAI[e.role]||esc(e.role||''))+'</td><td>'+knSuKien(e, PL[i])+'</td><td>'+(e.ip?'<a href="#" data-ip="'+esc(e.ip)+'" data-ip-cn="'+esc(e.cn)+'">'+esc(e.ip)+'</a>':'')+(e.isp?'<div class="knsm">'+esc(e.isp)+(e.colo?' · '+esc(e.colo):'')+'</div>':'')+'</td><td class="knsm">'+esc(e.ua||'')+(e.dev?' <span title="mã máy">#'+esc(e.dev)+'</span>':'')+'</td></tr>'; }).join('')
     + '</tbody></table></div>';
 }
 function knCsv(){
