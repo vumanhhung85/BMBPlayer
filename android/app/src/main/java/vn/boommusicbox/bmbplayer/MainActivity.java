@@ -154,6 +154,10 @@ public class MainActivity extends Activity {
     private boolean resumed = false, selfKill = false;
     private long lastPong = 0, webBornAt = 0, pausedAt = 0, unrespSince = 0, goneWindow = 0;
     private int goneCount = 0;
+    // 3.2: trang TV tự ghi dòng "khởi động" vào nhật ký Kết nối — app cho biết máy bật bao lâu, app/trình hiển thị vì sao nạp lại (xem bootInfo)
+    private long actBornAt = 0, loadWhyAt = 0;
+    private boolean bootLaunch = false;
+    private String loadWhy = "start";
 
     private final Runnable retry = new Runnable() {
         @Override public void run() {
@@ -170,6 +174,11 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
         installCrashRestart();
+        actBornAt = SystemClock.elapsedRealtime();
+        loadWhyAt = System.currentTimeMillis();
+        bootLaunch = getIntent() != null && getIntent().getBooleanExtra("boot", false);
+        if (bootLaunch) loadWhy = "boot";
+        else if (loadWhyAt - prefs.getLong("crashAt", 0) < 60_000L) loadWhy = "crash";   // vừa văng rồi tự mở lại (installCrashRestart)
         Window w = getWindow();
         w.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN
                 | WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
@@ -712,6 +721,7 @@ public class MainActivity extends Activity {
                 if (now - goneWindow > 120_000L) { goneWindow = now; goneCount = 0; }
                 goneCount++;
                 if (!selfKill) record("n_gone", detail != null && detail.didCrash() ? "trình hiển thị lỗi" : "trình hiển thị bị tắt (thiếu RAM)");
+                if (!selfKill && detail != null && detail.didCrash()) loadWhy = "rcrash";   // 3.2: lỗi của trình hiển thị (khác với bị tắt vì thiếu RAM)
                 selfKill = false;
                 destroyWeb();
                 boolean storm = goneCount > 3;                       // hỏng liên tục: nghỉ 30 giây, tránh vòng lặp
@@ -1309,10 +1319,51 @@ public class MainActivity extends Activity {
     }
 
     private void record(String key, String what) {
+        if ("n_gone".equals(key) || "n_hang".equals(key) || "n_night".equals(key)) { loadWhy = key.substring(2); loadWhyAt = System.currentTimeMillis(); }   // sắp dựng lại trình hiển thị: trang mới mở sẽ biết vì sao
         try {
             prefs.edit().putInt(key, prefs.getInt(key, 0) + 1)
                     .putLong("t_last", System.currentTimeMillis()).putString("w_last", what).apply();
         } catch (Throwable ignored) {}
+    }
+
+    /** 3.2: số đo cho dòng "khởi động" của trang TV. Chỉ đọc, không đổi gì trên máy.
+     *  up = máy đã chạy bao lâu từ lúc bật nguồn (ms) · pup = tiến trình app · aup = màn hình app · wup = trình hiển thị hiện tại
+     *  lw/lwt = vì sao trình hiển thị được nạp lần gần nhất (start | boot | crash | gone | hang | night) và lúc nào
+     *  upd = lúc cài/cập nhật app gần nhất · ex* = lý do Android ghi lần app bị đóng trước đó (Android 11+) · ram/ramf/low = RAM máy */
+    private String bootInfo() {
+        org.json.JSONObject o = new org.json.JSONObject();
+        try {
+            long now = SystemClock.elapsedRealtime();
+            o.put("up", now);
+            if (Build.VERSION.SDK_INT >= 24) o.put("pup", now - android.os.Process.getStartElapsedRealtime());
+            o.put("aup", now - actBornAt);
+            o.put("wup", webBornAt > 0 ? now - webBornAt : -1);
+            o.put("boot", bootLaunch ? 1 : 0);
+            o.put("lw", loadWhy);
+            o.put("lwt", loadWhyAt);
+            o.put("sdk", Build.VERSION.SDK_INT);
+            o.put("ng", prefs.getInt("n_gone", 0)); o.put("nh", prefs.getInt("n_hang", 0)); o.put("nc", prefs.getInt("n_crash", 0)); o.put("nn", prefs.getInt("n_night", 0));
+            try { o.put("upd", getPackageManager().getPackageInfo(getPackageName(), 0).lastUpdateTime); } catch (Throwable ignored) {}
+            android.app.ActivityManager am = (android.app.ActivityManager) getSystemService(ACTIVITY_SERVICE);
+            if (am != null) {
+                try {
+                    android.app.ActivityManager.MemoryInfo mi = new android.app.ActivityManager.MemoryInfo();
+                    am.getMemoryInfo(mi);
+                    o.put("ram", mi.totalMem / 1048576L); o.put("ramf", mi.availMem / 1048576L); o.put("low", mi.lowMemory ? 1 : 0);
+                } catch (Throwable ignored) {}
+                if (Build.VERSION.SDK_INT >= 30) {
+                    try {
+                        java.util.List<android.app.ApplicationExitInfo> ls = am.getHistoricalProcessExitReasons(getPackageName(), 0, 1);
+                        if (ls != null && !ls.isEmpty()) {
+                            android.app.ApplicationExitInfo e = ls.get(0);
+                            o.put("ex", e.getReason()); o.put("ext", e.getTimestamp());
+                            String d = e.getDescription(); if (d != null) o.put("exd", d.length() > 60 ? d.substring(0, 60) : d);
+                        }
+                    } catch (Throwable ignored) {}
+                }
+            }
+        } catch (Throwable ignored) {}
+        return o.toString();
     }
 
     private String statsLine() {
@@ -1358,6 +1409,9 @@ public class MainActivity extends Activity {
         /** 2.9: trang hỏi "app này có cho phát video http của NAS quán trong trang https không?". Bản cũ không có hàm này → trang bỏ qua NAS http. */
         @JavascriptInterface
         public boolean mixedOk() { return true; }
+
+        @JavascriptInterface
+        public String bootInfo() { return MainActivity.this.bootInfo(); }   // 3.2: xem MainActivity.bootInfo
 
         @JavascriptInterface
         public int getVolume() { return volPct(); }
