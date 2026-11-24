@@ -348,6 +348,59 @@ const params = new URLSearchParams(location.search);
 const ROOM0 = (params.get('room') || 'P1').toUpperCase();
 const bc = openRoomChannel('tv', ROOM0);          // có ?r=<mã TV> hoặc đã gán → kênh riêng của phòng qua Worker bmbplayer; ?local=1 → BroadcastChannel (thử 1 máy)
 const ROOM = bc.ws ? bc.roomId : ROOM0;
+/* ---------- 11/2026: Dòng "khởi động" trong nhật ký Kết nối ----------
+   Mỗi lần trang TV mở, gửi 1 tin {type:'kd'} cho biết VÌ SAO trang mở lại, để quầy phân biệt cúp điện / app văng / trình hiển thị bị tắt / tải lại có chủ đích.
+   - Trang ghi nhịp sống vào localStorage 'bmb_kd' mỗi 15 giây (s = lúc mở, hb = nhịp cuối, n = số bài). Trang tự tải lại có chủ đích thì ghi lý do (kdBye);
+     đóng bình thường (pagehide) thì ghi 'dong'. Cúp điện, app văng, trình hiển thị bị Android tắt thì KHÔNG kịp ghi gì → biết là đóng đột ngột.
+   - Chạy trong APK 3.2+ (BMBNative.bootInfo): máy đã bật bao lâu → biết chắc TV vừa bật nguồn; tiến trình app mới hay cũ; trình hiển thị vì sao nạp lại.
+   - Lúc mới bật TV thường chưa có mạng: trang tự tải lại nhiều lần (reloadIfStuck) → giữ lý do GỐC (o0) qua các lần đó, không để thành "tải lại chờ YouTube".
+   Chỉ đọc số có sẵn; không gửi khi chưa gán phòng (BroadcastChannel). Phải nằm trước mọi chỗ gọi kdBye(). */
+const KD_KEY = 'bmb_kd', KD_T0 = Date.now();
+function kdRead(){ try{ return JSON.parse(localStorage.getItem(KD_KEY) || 'null'); }catch(e){ return null; } }
+const KD_PREV = kdRead();
+let KD_D = null;
+function kdBeat(extra){
+  let n = 0; try{ n = PQ.n; }catch(e){}
+  try{ localStorage.setItem(KD_KEY, JSON.stringify(Object.assign({ s: KD_T0, hb: Date.now(), n, o0: KD_D ? KD_D.o0 : undefined }, extra || {}))); }catch(e){}
+}
+function kdBye(why){ kdBeat({ bye: why, bt: Date.now() }); }
+function kdNative(){ try{ return window.BMBNative && typeof BMBNative.bootInfo === 'function' ? JSON.parse(BMBNative.bootInfo() || '{}') : null; }catch(e){ return null; } }
+function kdTinh(){
+  const now = Date.now(), p = KD_PREV, nv = kdNative();
+  let nav = ''; try{ const e = performance.getEntriesByType && performance.getEntriesByType('navigation')[0]; nav = e ? e.type : (performance.navigation ? ['navigate', 'reload', 'back_forward'][performance.navigation.type] || '' : ''); }catch(e){}
+  const d = { nav };
+  if(nv) ['up', 'pup', 'aup', 'wup', 'boot', 'lw', 'lwt', 'sdk', 'ng', 'nh', 'nc', 'nn', 'upd', 'ram', 'ramf', 'low', 'ex', 'ext', 'exd'].forEach(k => { if(nv[k] != null) d[k] = nv[k]; });
+  const hb = p && p.hb ? p.hb : 0;
+  if(hb){ d.gap = Math.max(0, KD_T0 - hb); d.pd = Math.max(0, hb - (p.s || hb)); d.pn = p.n || 0; if(p.bye) d.bye = p.bye; }
+  const clockOk = !hb || now >= hb;                                                          // TV mất điện có thể mất giờ cho tới khi có mạng
+  if(!hb) d.k = 'dau';
+  else if(nv && nv.up != null && (clockOk ? now - nv.up > hb - 5000 : (!p.bye && nv.up < 30 * 60000))) d.k = 'bat';   // máy bật nguồn SAU nhịp sống cuối → TV tắt nguồn / mất điện / khởi động lại máy
+  else if(nv && nv.upd && nv.upd > hb - 5000) d.k = 'capnhat';                                    // app vừa được cập nhật
+  else if(nv && nv.pup != null && now - nv.pup > hb - 5000) d.k = 'app';                          // tiến trình app mới: app văng / bị Android đóng / bị tắt
+  else if(nv && ['gone', 'rcrash', 'hang', 'night'].includes(nv.lw) && nv.lwt > hb - 2000) d.k = 'web';   // cùng tiến trình, trình hiển thị dựng lại SAU nhịp cuối (thiếu RAM / lỗi / treo / làm mới đêm)
+  else if(p.bye) d.k = 'tai';                                                                     // trang tự tải lại có chủ đích / đóng bình thường
+  else d.k = 'dot';                                                                               // đóng đột ngột, không có app để biết thêm
+  /* Tải lại chờ mạng / chờ YouTube ngay sau một lần khởi động: giữ lý do gốc của lần đầu */
+  if(p && p.bye === 'yt' && p.o0 && d.k === 'tai'){ d.goc = p.o0; d.yt = (p.o0.yt || 0) + 1; d.k = p.o0.k; }
+  d.o0 = d.goc ? Object.assign({}, d.goc, { yt: d.yt }) : { k: d.k, gap: d.gap, pd: d.pd, pn: d.pn, bye: d.bye };
+  return d;
+}
+KD_D = kdTinh();
+kdBeat();
+setInterval(kdBeat, 15000);
+window.addEventListener('pagehide', () => { const o = kdRead(); if(!(o && o.s === KD_T0 && o.bye)) kdBye('dong'); });
+(function kdBao(){
+  if(!bc.ws) return;
+  let n = 0;
+  const t = setInterval(() => {
+    if(++n > 300){ clearInterval(t); return; }                       // 10 phút vẫn chưa nối: bỏ (lần nối sau sẽ có dòng 'nối lại' riêng)
+    if(!(bc.isOpen && bc.isOpen())) return;
+    clearInterval(t);
+    const d = Object.assign({}, KD_D); delete d.o0;
+    if(d.goc){ d.gap = d.goc.gap; d.pd = d.goc.pd; d.pn = d.goc.pn; d.bye = d.goc.bye; delete d.goc; }   // số đo của lần đóng GỐC
+    setTimeout(() => { try{ bc.postMessage({ type: 'kd', d }); }catch(e){} }, 1500);    // chờ Worker nhận xong lượt nối
+  }, 2000);
+})();
 const $ = id => document.getElementById(id);
 const sleepless = () => {};
 let roomName = '';
@@ -397,7 +450,7 @@ if(needSetup){
     const raw = $('setupIn').value.trim(); let tok = '', api = '';
     try{ const u = new URL(raw); tok = u.searchParams.get('r') || ''; api = u.searchParams.get('api') || ''; }catch(e){ tok = raw; }
     if(!TV_TOKEN_RE.test(tok)){ $('setupErr').textContent = 'Không đúng liên kết TV. Liên kết có dạng …/index.html?r=P1A2B….1.xxxx — lấy bằng nút "Chép liên kết TV" (không phải mã QR của khách).'; return; }
-    location.replace(location.pathname + '?r=' + encodeURIComponent(tok) + (api ? '&api=' + encodeURIComponent(api) : ''));
+    kdBye('gan'); location.replace(location.pathname + '?r=' + encodeURIComponent(tok) + (api ? '&api=' + encodeURIComponent(api) : ''));
   };
   $('setupBtn').onclick = apply;
   $('setupIn').addEventListener('keydown', e => { if(e.key === 'Enter') apply(); });
@@ -438,7 +491,7 @@ function startPairing(){
       const r = await post('/api/tv/pair/poll', { code, key });
       if(r.s === 200 && r.d.tok){
         $('pairSub').textContent = 'Đã gán vào phòng ' + (r.d.name || r.d.id || '') + ' — đang vào phòng…';
-        location.replace(location.pathname + '?r=' + encodeURIComponent(r.d.tok));
+        kdBye('gan'); location.replace(location.pathname + '?r=' + encodeURIComponent(r.d.tok));
         return;
       }
       if(r.s === 404 || r.s === 403) return fresh();
@@ -649,7 +702,7 @@ setTimeout(() => { if(!ready) showDiag(apiFailed ? 'api' : (player ? 'player' : 
 function reloadIfStuck(){
   if(ready) return;
   let n = 0; try{ n = +sessionStorage.getItem('bmb_reload') || 0; sessionStorage.setItem('bmb_reload', n + 1); }catch(e){}
-  if(n < 40) location.reload();
+  if(n < 40){ kdBye('yt'); location.reload(); }
 }
 setTimeout(reloadIfStuck, 30000);
 window.addEventListener('online', () => setTimeout(reloadIfStuck, 1500));
@@ -662,7 +715,7 @@ function showDiag(kind){
     ? '<b>Không tải được trình phát YouTube.</b><br>Có thể mạng chưa có, hoặc tiện ích chặn quảng cáo / phần mềm diệt virus đang chặn YouTube trên tên miền <b></b>. Trang sẽ tự thử lại.'
     : '<b>Trình phát YouTube chưa phản hồi.</b><br>Có thể tiện ích chặn quảng cáo đang chặn khung YouTube trên tên miền <b></b>. Trang sẽ tự thử lại.';
   t.querySelectorAll('b')[1].textContent = location.hostname;
-  const b = document.createElement('button'); b.textContent = '↻ Tải lại ngay'; b.onclick = () => location.reload();
+  const b = document.createElement('button'); b.textContent = '↻ Tải lại ngay'; b.onclick = () => { kdBye('tay'); location.reload(); };
   d.append(t, b); d.style.display = 'block'; $('idle').style.display = 'flex';
   paintReady(); push();
 }
@@ -1623,7 +1676,7 @@ if(bc.ws){
   bc.onstatus = s => {
     if(s === 'offline' || s === 'connecting'){ paintRoomTag('đang nối…'); connTxt = 'đang nối…'; }
     if(s === 'replaced') roomNote('Màn hình khác đã nhận phòng này');
-    if(s === 'rotated'){ roomNote('Phòng này đã gán cho TV khác — chuyển sang màn hình gán phòng…'); paintGuestQr(''); setTimeout(() => location.replace(location.pathname), 2500); }
+    if(s === 'rotated'){ roomNote('Phòng này đã gán cho TV khác — chuyển sang màn hình gán phòng…'); paintGuestQr(''); setTimeout(() => { kdBye('gan'); location.replace(location.pathname); }, 2500); }
     if(s === 'expired') roomNote('Mã TV không hợp lệ');
     paintReady();
   };
@@ -1654,7 +1707,7 @@ if(bc.ws){
       const changed = now !== base;
       const h = new Date().getHours();
       const morning = h >= 4 && h < 5 && Date.now() - BOOT > 6 * 3600 * 1000;
-      if((changed || morning) && idle()){ try{ sessionStorage.setItem('bmb_reload', '0'); }catch(e){} lsFlush(true); location.reload(); }
+      if((changed || morning) && idle()){ try{ sessionStorage.setItem('bmb_reload', '0'); }catch(e){} lsFlush(true); kdBye(changed ? 'capnhat' : 'sang'); location.reload(); }
     }catch(e){ /* mất mạng / máy chủ bận: bỏ qua, lần sau kiểm lại */ }
   }
   check();

@@ -122,6 +122,7 @@
     }
     window.addEventListener('online', probe);
     ch.postMessage = msg => { if(sock && sock.readyState === 1) sock.send(JSON.stringify(msg)); };
+    ch.isOpen = () => !!(sock && sock.readyState === 1);   // 11/2026: trang TV chờ kênh mở để gửi 1 dòng 'khởi động' (xem index.html, kdBao)
     ch.rtt = R; ch.netInfo = netInfo;
     ch.close = () => { stopped = true; try{ sock.close(); }catch(e){} };
     document.addEventListener('visibilitychange', () => {   // điện thoại ngủ máy rồi mở lại: nối lại ngay (hoặc làm tươi trạng thái nếu còn nối)

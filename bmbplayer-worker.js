@@ -2171,7 +2171,7 @@ async function knGhi(env, c, e) {
   if (!env.DB) return;
   await knBang(env);
   const ngay = ngayKinhDoanh(e.t), cn = c.branch || '', pid = c.rid || '', ph = c.name || '';
-  if (e.ev === 'tai' || e.ev === 'phat' || e.ev === 'lag' || e.ev === 'lagtv') {                 // báo cáo từ phía máy (nối lại / chất lượng phát 1 bài): chỉ lưu chi tiết, không cộng vào số đếm
+  if (e.ev === 'tai' || e.ev === 'phat' || e.ev === 'lag' || e.ev === 'lagtv' || e.ev === 'kd') {                 // báo cáo từ phía máy (nối lại / chất lượng phát 1 bài): chỉ lưu chi tiết, không cộng vào số đếm
     await env.DB.prepare(`INSERT INTO kn_sk (t, cn, phong_id, phong, ev, role, ip, isp, dev, ua, dg) VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
       .bind(e.t, cn, pid, ph, e.ev, e.role || '', String(e.ip || ''), e.isp || null, e.dev || null, e.ua || null, JSON.stringify(e.dg || {})).run();
     return;
@@ -2299,7 +2299,7 @@ async function adminKnNhatKy(env, body) {
   if (pid) { sql += ' AND phong_id = ?'; b.push(pid); }
   if (['tv', 'tablet', 'remote'].includes(role)) { sql += ' AND role = ?'; b.push(role); }
   if (ev === 'rot') sql += ` AND (ev = 'dut' OR (ev = 'cat' AND code = 4007))`;
-  else if (['noi', 'dut', 'cat', 'tuchoi', 'mo', 'dong', 'loi', 'xoa', 'tai', 'phat', 'hg'].includes(ev)) { sql += ' AND ev = ?'; b.push(ev); }
+  else if (['noi', 'dut', 'cat', 'tuchoi', 'mo', 'dong', 'loi', 'xoa', 'tai', 'phat', 'hg', 'kd'].includes(ev)) { sql += ' AND ev = ?'; b.push(ev); }
   else if (ev === 'lag') sql += ` AND ev IN ('lag', 'lagtv')`;         // nhân viên báo lag + số đo TV gửi ngay lúc đó
   else sql += ` AND ev <> 'phat'`;                                  // báo cáo từng bài hát nhiều → chỉ hiện khi lọc "Phát nhạc trên TV"
   if (ip) { sql += ' AND ip = ?'; b.push(ip); }
@@ -3173,6 +3173,19 @@ export class Room extends DurableObject {
       const dg = { down: nu(g.down, 7 * 86400000), why: tx(g.why, 16), tries: nu(g.tries, 999), on: g.on === 0 ? 0 : 1, hid: g.hid ? 1 : 0, rtt: nu(g.rtt, 60000), rttMax: nu(g.rttMax, 60000),
         net: tx(g.net, 8), nrtt: nu(g.nrtt, 60000), dl: Number.isFinite(+g.dl) ? Math.round(+g.dl * 10) / 10 : undefined, ty: tx(g.ty, 12) };
       await this.ghi('tai', { role: a.role, ip: netKey(a.ip), isp: a.isp, dev: (a.dev || '').slice(0, 8) || undefined, ua: a.ua, dg });
+      return;
+    }
+
+    if(m.type === 'kd'){                                 // 11/2026: TV báo vì sao trang vừa mở lại (máy mới bật / app văng / trình hiển thị dựng lại / tải lại có chủ đích) — xem index.html kdTinh
+      if(a.role !== 'tv' || a.kdOk || data.length > 1500) return;
+      a.kdOk = 1; try{ ws.serializeAttachment(a); }catch(e){}
+      const g = m.d || {}, nu = (v, mx) => Number.isFinite(+v) && v !== '' && v !== null ? Math.max(0, Math.min(mx, Math.round(+v))) : undefined, tx = (v, n) => String(v == null ? '' : v).replace(/[^\w.-]/g, '').slice(0, n) || undefined;
+      const KD_K = ['dau', 'bat', 'capnhat', 'app', 'web', 'tai', 'dot'], NAM = 400 * 86400000, T9 = 9e15;
+      const dg = { k: KD_K.includes(g.k) ? g.k : undefined, nav: tx(g.nav, 12), gap: nu(g.gap, NAM), pd: nu(g.pd, NAM), pn: nu(g.pn, 99999), bye: tx(g.bye, 10), yt: nu(g.yt, 99),
+        up: nu(g.up, NAM), pup: nu(g.pup, NAM), aup: nu(g.aup, NAM), wup: Number.isFinite(+g.wup) && +g.wup >= 0 ? nu(g.wup, NAM) : undefined, boot: g.boot ? 1 : undefined, lw: tx(g.lw, 8), lwt: nu(g.lwt, T9),
+        sdk: nu(g.sdk, 99), ng: nu(g.ng, 1e6), nh: nu(g.nh, 1e6), nc: nu(g.nc, 1e6), nn: nu(g.nn, 1e6), upd: nu(g.upd, T9), ram: nu(g.ram, 1e6), ramf: nu(g.ramf, 1e6), low: g.low ? 1 : undefined,
+        ex: nu(g.ex, 99), ext: nu(g.ext, T9), exd: g.exd == null ? undefined : String(g.exd).replace(/[<>&"']/g, '').slice(0, 60) };
+      await this.ghi('kd', { role: 'tv', ip: netKey(a.ip), isp: a.isp, ua: a.ua, dg });
       return;
     }
 

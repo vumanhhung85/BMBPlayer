@@ -736,7 +736,7 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
     </div>
     <div class="knsub" id="knSub"><button data-s="tq" class="on">📊 Tổng quan</button><button data-s="may">📺 Thiết bị từng phòng</button><button data-s="nas">📀 NAS quán</button><button data-s="nk">🧾 Nhật ký</button><button data-s="ip">🌐 IP &amp; nhà mạng</button><button data-s="xh">📈 Xu hướng tuần</button><button data-s="cb">🔔 Cảnh báo Telegram</button><button data-s="bh">🎤 Bài hay chọn</button></div>
     <div id="knBody"><div class="mut">Đang tải…</div></div>
-    <div class="hint" style="margin-top:14px">Lưu trữ: <b>chi tiết từng sự kiện</b> của TV / máy tính bảng / mở-đóng phòng giữ <b>30 ngày</b>, của điện thoại khách giữ <b>7 ngày</b> (theo dõi nhanh); <b>số liệu tổng hợp theo ngày</b> và <b>danh sách IP</b> giữ <b>180 ngày</b> (theo dõi lâu). “Rớt” = máy tự mất kết nối hoặc im lặng quá lâu bị hệ thống ngắt (số đếm ở Tổng quan tính cả ba loại). Trong <b>Nhật ký</b>, TV rớt được tô màu theo loại: <b style="background:#FFF6D6;color:#8a6d00;border-radius:6px;padding:1px 6px">vàng nhạt = chớp mạng</b> (nối lại dưới 5 giây), <b style="color:#6b6480">xám = TV tắt / khởi động lại</b> (thường cúp điện lúc không có khách), <b style="color:var(--bad)">đỏ = mất mạng từ 5 giây</b>, <b style="color:#B7791F">cam = TV treo rồi tự khởi động lại</b>. Một ngày tính từ 06:00 sáng. <b>Đếm lượt chọn bài</b> (tab Bài hay chọn) giữ vĩnh viễn.</div>
+    <div class="hint" style="margin-top:14px">Lưu trữ: <b>chi tiết từng sự kiện</b> của TV / máy tính bảng / mở-đóng phòng giữ <b>30 ngày</b>, của điện thoại khách giữ <b>7 ngày</b> (theo dõi nhanh); <b>số liệu tổng hợp theo ngày</b> và <b>danh sách IP</b> giữ <b>180 ngày</b> (theo dõi lâu). “Rớt” = máy tự mất kết nối hoặc im lặng quá lâu bị hệ thống ngắt (số đếm ở Tổng quan tính cả ba loại). Trong <b>Nhật ký</b>, TV rớt được tô màu theo loại: <b style="background:#FFF6D6;color:#8a6d00;border-radius:6px;padding:1px 6px">vàng nhạt = chớp mạng</b> (nối lại dưới 5 giây), <b style="color:#6b6480">xám = TV tắt / khởi động lại</b> (thường cúp điện lúc không có khách), <b style="color:var(--bad)">đỏ = mất mạng từ 5 giây</b>, <b style="color:#B7791F">cam = TV/app khởi động lại ngoài ý muốn</b>. Mỗi lần trang TV mở lại, TV tự ghi một dòng <b>⏻ TV khởi động</b> nói rõ vì sao (TV vừa bật nguồn, app văng, Android tắt vì thiếu RAM, trang tải lại có chủ đích…); TV chạy app 3.2 trở lên mới có số đo của máy. Một ngày tính từ 06:00 sáng. <b>Đếm lượt chọn bài</b> (tab Bài hay chọn) giữ vĩnh viễn.</div>
   </div>
 
   <div class="pg" id="p7">
@@ -3024,6 +3024,34 @@ function knLagDong(g){ var ps = { '-1':'chưa bắt đầu', '0':'đã hết bà
    - cat 4007 rồi TV nối vào CÓ kèm báo "nối lại" → 'mat' (TV còn chạy nhưng đứt mạng lâu: rớt thật)
    Chưa thấy TV nối lại trong danh sách (hoặc đang lọc mất dòng "nối vào") thì không phân loại, giữ kiểu cũ. rows xếp mới → cũ. */
 var KN_CHOP_MS = 5000, KN_TAI_MS = 15000;
+/* 11/2026: dòng "khởi động" (ev 'kd') do trang TV tự gửi mỗi lần mở — xem index.html kdTinh. APK 3.2+ mới có số đo của máy (up, pup, lw, ex…). */
+var KN_KD_BYE = { capnhat: 'có bản web mới', sang: 'làm mới buổi sáng', yt: 'chờ mạng / YouTube lúc mới bật', tay: 'nhân viên bấm Tải lại', gan: 'gán phòng', dong: 'đóng bình thường' };
+var KN_KD_LW = { gone: 'Android tắt trình hiển thị vì thiếu RAM', rcrash: 'trình hiển thị bị lỗi', hang: 'trang treo, app tự dựng lại', night: 'làm mới hằng đêm (bình thường)' };
+var KN_KD_EX = { 1: 'app tự thoát', 2: 'bị hệ thống tắt', 3: 'Android đóng vì thiếu RAM', 4: 'app văng (lỗi Java)', 5: 'app văng (lỗi hệ thống)', 6: 'app treo không phản hồi (ANR)', 7: 'app lỗi lúc mở', 9: 'dùng quá nhiều tài nguyên', 10: 'người dùng / hệ thống yêu cầu đóng', 11: 'người dùng buộc dừng app', 13: 'lý do khác', 15: 'gói app thay đổi', 16: 'app được cập nhật' };
+function knKdDg(e){ var g = {}; try{ g = JSON.parse(e.dg||'{}'); }catch(x){} return g; }
+function knKdTen(g){
+  if(g.k==='bat') return { tx: '⏻ TV VỪA BẬT NGUỒN', cls: 'kn-ev-tat', why: 'TV đã tắt nguồn hoặc mất điện rồi bật lại' + (g.boot ? ' (app tự mở khi máy bật)' : '') };
+  if(g.k==='capnhat') return { tx: '⬆ app vừa cập nhật', cls: 'kn-ev-nhe', why: 'cài bản APK mới' };
+  if(g.k==='app') return { tx: '⚠ APP KHỞI ĐỘNG LẠI', cls: 'kn-ev-cat', why: (g.ex!=null && KN_KD_EX[g.ex]) ? KN_KD_EX[g.ex] : (g.lw==='crash' ? 'app văng rồi tự mở lại' : 'app bị đóng (Android 11 trở lên mới biết lý do)') };
+  if(g.k==='web') return { tx: g.lw==='night' ? '↻ trình hiển thị làm mới' : '⚠ TRÌNH HIỂN THỊ DỰNG LẠI', cls: g.lw==='night' ? 'kn-ev-nhe' : 'kn-ev-cat', why: KN_KD_LW[g.lw] || 'app dựng lại trình hiển thị' };
+  if(g.k==='tai') return { tx: '↻ trang tải lại', cls: 'kn-ev-nhe', why: KN_KD_BYE[g.bye] || 'có chủ đích' };
+  if(g.k==='dot') return { tx: '⚠ TRANG ĐÓNG ĐỘT NGỘT', cls: 'kn-ev-cat', why: 'TV chưa có app 3.2 nên chưa biết do cúp điện hay app văng' };
+  if(g.k==='dau') return { tx: 'mở lần đầu trên máy này', cls: 'kn-ev-nhe', why: '' };
+  return { tx: 'khởi động', cls: 'kn-ev-nhe', why: '' };
+}
+function knKdChiTiet(g){
+  var a = [];
+  if(g.pd!=null) a.push('lần trước chạy '+knDown(g.pd)+(g.pn?' ('+g.pn+' bài)':''));
+  if(g.gap!=null) a.push('tắt/im '+knDown(g.gap)+' rồi mới mở lại');
+  if(g.yt) a.push('tải lại chờ mạng '+g.yt+' lần');
+  if(g.up!=null) a.push('máy đã bật '+knDown(g.up));
+  if(g.pup!=null && g.k!=='bat') a.push('app chạy '+knDown(g.pup));
+  if(g.ram) a.push('RAM trống '+(g.ramf!=null?g.ramf:'?')+'/'+g.ram+' MB'+(g.low?' <b>(máy báo thiếu RAM)</b>':''));
+  if(g.nh!=null) a.push('từ lúc cài app: treo '+g.nh+' · trình hiển thị bị tắt '+(g.ng||0)+' · văng '+(g.nc||0));
+  if(g.exd && g.k==='app') a.push('Android ghi: “'+esc(g.exd)+'”');
+  if(g.up==null) a.push('<i>chưa có số đo của máy (cần app 3.2)</i>');
+  return a.join(' · ');
+}
 function knPhanLoai(rows){
   var out = {}, i, j, k, e, n, gap, tai;
   for(i = 0; i < rows.length; i++){
@@ -3036,6 +3064,12 @@ function knPhanLoai(rows){
     }
     if(!n) continue;
     gap = Math.max(0, n.t - e.t);
+    var kd = null;
+    for(k = j; k >= 0; k--){ if(rows[k].ev==='kd' && rows[k].phong_id===e.phong_id && rows[k].t >= n.t - 5000 && rows[k].t <= n.t + 60000){ kd = knKdDg(rows[k]); break; } }
+    if(kd && kd.k){                                                     // TV đã tự báo vì sao trang mở lại → tin số đo đó hơn đoán
+      out[i] = { k: kd.k==='bat' ? 'tat' : (kd.k==='tai' || kd.k==='capnhat' || kd.k==='dau' || (kd.k==='web' && kd.lw==='night')) ? 'tai' : 'treo', gap: gap, kd: kd };
+      continue;
+    }
     if(e.ev==='dut'){ if(gap <= KN_CHOP_MS) out[i] = { k: 'chop', gap: gap }; continue; }
     tai = rows.some(function(r){ return r.ev==='tai' && r.phong_id===e.phong_id && r.t >= n.t - 1000 && r.t <= n.t + KN_TAI_MS; });
     if(+e.code===4000){ if(!tai) out[i] = { k: 'treo', gap: gap }; continue; }      // 4000 + không có báo nối lại: TV treo rồi tự khởi động lại
@@ -3052,25 +3086,28 @@ function knTomTat(rows, PL){
     e = rows[i]; if(e.role !== 'tv') continue;
     p = PL[i];
     if(p){
-      if(p.k==='tat') c.tat++; else if(p.k==='treo') c.treo++;
+      if(p.k==='tat') c.tat++; else if(p.k==='treo') c.treo++; else if(p.k==='tai') c.tl = (c.tl||0) + 1;
       else if(p.k==='chop' && !tais.some(function(r){ return r.phong_id===e.phong_id && r.t >= e.t && r.t <= e.t + KN_TAI_MS; })){ c.chop++; sg += p.gap; }
     }
     else if(e.ev==='dut' || (e.ev==='cat' && +e.code===4007)) c.khac++;
   }
-  if(!(c.chop + c.mat + c.tat + c.treo + c.khac)) return '';
+  if(!(c.chop + c.mat + c.tat + c.treo + c.khac + (c.tl||0))) return '';
   return '<div class="knnote">TV trong các dòng bên dưới: <b>'+c.chop+' lần chớp mạng</b> (nối lại dưới 5 giây'+(c.chop?', tổng khoảng '+Math.round(sg/1000)+' giây':'')+') · <b>'+c.tat+' lần tắt / khởi động lại</b> (thường là cúp điện lúc không có khách) · <b style="color:var(--bad)">'+c.mat+' lần mất mạng từ 5 giây</b>'
-    + (c.treo?' · <b style="color:#B7791F">'+c.treo+' lần TV treo rồi tự khởi động lại</b>':'')
+    + (c.treo?' · <b style="color:#B7791F">'+c.treo+' lần TV/app khởi động lại ngoài ý muốn</b>':'')
+    + (c.tl?' · '+c.tl+' lần trang tải lại có chủ đích':'')
     + (c.khac?' · '+c.khac+' lần chưa phân loại (TV chưa nối lại, hoặc đang lọc mất dòng “nối vào”)':'')+'</div>';
 }
 function knSuKien(e, pl){
   var c = e.code, tx, cls = '';
   if(e.ev==='noi'){ tx = 'nối vào'; cls = 'kn-ev-noi'; }
   else if(e.ev==='dut'){
-    if(pl && pl.k==='chop'){ tx = '〰 chớp mạng · mã '+c+' · TV nối lại sau '+(pl.gap<1000?'dưới 1':Math.round(pl.gap/1000))+' giây'+(e.tuoi!=null?' · đã nối '+knTuoi(e.tuoi)+' trước đó':''); cls = 'kn-ev-chop'; }
+    if(pl && pl.kd){ var kd2 = knKdTen(pl.kd); tx = (pl.k==='tat' ? '⏻ TV tắt nguồn' : pl.k==='tai' ? '↻ trang tải lại' : '⚠ TV/app khởi động lại')+' · mã '+c+' · nối lại sau '+knDown(pl.gap)+'<div class="knsm">'+esc(kd2.why)+' (xem dòng khởi động)</div>'; cls = pl.k==='tat' ? 'kn-ev-tat' : pl.k==='tai' ? 'kn-ev-nhe' : 'kn-ev-cat'; }
+    else if(pl && pl.k==='chop'){ tx = '〰 chớp mạng · mã '+c+' · TV nối lại sau '+(pl.gap<1000?'dưới 1':Math.round(pl.gap/1000))+' giây'+(e.tuoi!=null?' · đã nối '+knTuoi(e.tuoi)+' trước đó':''); cls = 'kn-ev-chop'; }
     else { tx = 'MÁY RỚT · mã '+c+(e.why?' “'+esc(e.why)+'”':'')+(e.tuoi!=null?' · đã nối '+knTuoi(e.tuoi):''); cls = e.role==='tv' ? 'kn-ev-rot' : 'kn-ev-nhe'; }
   }
   else if(e.ev==='cat'){
-    if(pl && pl.k==='tat'){ tx = '⏻ TV tắt / khởi động lại · mã 4007 · im '+e.im+'s · nối lại sau '+knDown(pl.gap)+' như máy mới bật'+'<div class="knsm">thường là cúp điện lúc không có khách; cũng có thể app tự thoát</div>'; cls = 'kn-ev-tat'; }
+    if(pl && pl.kd){ var kn = knKdTen(pl.kd); tx = (pl.k==='tat' ? '⏻ TV tắt nguồn' : pl.k==='tai' ? '↻ trang tải lại' : '⚠ TV/app khởi động lại')+' · mã '+c+(e.im!=null&&e.im>=0?' · im '+e.im+'s':'')+' · nối lại sau '+knDown(pl.gap)+'<div class="knsm">'+esc(kn.why)+' (xem dòng khởi động)</div>'; cls = pl.k==='tat' ? 'kn-ev-tat' : pl.k==='tai' ? 'kn-ev-nhe' : 'kn-ev-cat'; }
+    else if(pl && pl.k==='tat'){ tx = '⏻ TV tắt / khởi động lại · mã 4007 · im '+e.im+'s · nối lại sau '+knDown(pl.gap)+' như máy mới bật'+'<div class="knsm">thường là cúp điện lúc không có khách; cũng có thể app tự thoát</div>'; cls = 'kn-ev-tat'; }
     else if(pl && pl.k==='treo'){ tx = '⚠ TV treo '+e.im+'s rồi tự khởi động lại · mã 4000 · nối lại sau '+knDown(pl.gap)+' như máy mới bật'+'<div class="knsm">không có báo “nối lại” của máy ⇒ app/TV tự thoát hoặc khởi động lại (hay gặp trên TV RAM thấp)</div>'; cls = 'kn-ev-cat'; }
     else if(pl && pl.k==='mat'){ tx = 'MẤT MẠNG THẬT · mã 4007 · im '+e.im+'s · TV vẫn chạy, nối lại sau '+knDown(pl.gap); cls = 'kn-ev-rot'; }
     else { tx = (c===4007?'MẤT TÍN HIỆU (im lặng, hệ thống ngắt) · mã 4007':'server cắt · mã '+c+' — '+esc(e.why||''))+(e.n?' ('+e.n+' máy)':'')+(e.im!=null&&e.im>=0?' · im '+e.im+'s':''); cls = c===4007 ? (e.role==='tv'?'kn-ev-rot':'kn-ev-nhe') : 'kn-ev-cat'; }
@@ -3079,6 +3116,8 @@ function knSuKien(e, pl){
   else if(e.ev==='tai'){ var g = {}; try{ g = JSON.parse(e.dg||'{}'); }catch(x){}
     tx = '🔁 nối lại — <b>mất '+knDown(g.down)+'</b> · '+knLyDo(g)+(g.tries?' · thử '+g.tries+' lần':'')
       + (g.rtt!=null ? '<div class="knsm">ping trước khi rớt: TB '+g.rtt+'ms, cao nhất '+(g.rttMax!=null?g.rttMax:'?')+'ms'+(g.net?' · mạng '+esc(g.net):'')+(g.ty?' ('+esc(g.ty)+')':'')+(g.nrtt!=null?' · RTT '+g.nrtt+'ms':'')+(g.dl!=null?' · '+g.dl+'Mb/s':'')+'</div>' : (g.net?'<div class="knsm">mạng '+esc(g.net)+(g.ty?' ('+esc(g.ty)+')':'')+'</div>':'')); cls = 'kn-ev-noi'; }
+  else if(e.ev==='kd'){ var gk = knKdDg(e), kk = knKdTen(gk);
+    tx = '<b>'+kk.tx+'</b>'+(kk.why?' — '+esc(kk.why):'')+'<div class="knsm">'+knKdChiTiet(gk)+'</div>'; cls = kk.cls; }
   else if(e.ev==='phat'){ var p = {}; try{ p = JSON.parse(e.dg||'{}'); }catch(x){}
     var xau = (p.bn||0)>0 || (p.st||0)>6000 || (p.ltms||0)>3000 || p.err || p.fb || p.lag;
     tx = '🎵 bài thứ '+(p.n||'?')+' từ lúc bật'+(p.src&&p.src!=='yt'?' · 📀 '+(p.src==='nas'?'NAS quán':'thư viện R2'):'')+(p.fb?' · <b>'+knFb(p.fb)+'</b>':'')+(p.q?' · <b>'+knQ(p.q)+'</b>':'')+(p.st!=null?' · mở bài '+knDown(p.st):'')
@@ -3291,7 +3330,7 @@ function knMay(){
 function knNkLoc(){
   var L = KN.loc, h = '<div class="knf">'
     + '<select id="knfRole"><option value="">Mọi thiết bị</option><option value="tv">TV</option><option value="tablet">Máy tính bảng</option><option value="remote">Điện thoại khách</option></select>'
-    + '<select id="knfEv"><option value="">Mọi sự kiện</option><option value="rot">Chỉ RỚT</option><option value="noi">Nối vào</option><option value="tai">Nối lại (máy tự báo)</option><option value="phat">🎵 Phát nhạc trên TV (giật/đứng hình)</option><option value="lag">🐌 Quầy báo lag</option><option value="cat">Server cắt</option><option value="tuchoi">Bị từ chối</option><option value="hg">⏱ Nhắc giờ (khách đổi)</option><option value="mo">Mở phòng</option><option value="dong">Đóng phòng</option></select>'
+    + '<select id="knfEv"><option value="">Mọi sự kiện</option><option value="rot">Chỉ RỚT</option><option value="noi">Nối vào</option><option value="tai">Nối lại (máy tự báo)</option><option value="kd">⏻ TV khởi động (vì sao mở lại)</option><option value="phat">🎵 Phát nhạc trên TV (giật/đứng hình)</option><option value="lag">🐌 Quầy báo lag</option><option value="cat">Server cắt</option><option value="tuchoi">Bị từ chối</option><option value="hg">⏱ Nhắc giờ (khách đổi)</option><option value="mo">Mở phòng</option><option value="dong">Đóng phòng</option></select>'
     + '<input id="knfIp" placeholder="Lọc IP" style="width:150px" value="'+esc(L.ip)+'">'
     + (L.phong ? '<span class="knchip">Phòng '+esc(L.phongTen)+'<button data-bo="phong" title="Bỏ lọc">✕</button></span>' : '')
     + (L.quanh ? '<span class="knchip">±2 phút quanh '+knTg(L.quanh)+'<button data-bo="quanh" title="Bỏ lọc">✕</button></span>' : '')
