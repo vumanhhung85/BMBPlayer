@@ -540,6 +540,18 @@
   <section>
     <h2>Sao lưu kho</h2>
     <div class="line"><button class="ghost" id="dumpBtn" type="button"><svg class="i"><use href="#i-dl"/></svg>Tải toàn bộ kho (CSV)</button> <span class="hint" id="dumpOut">Nên tải trước khi dọn thật (dọn xong không hoàn tác được). Tải lại sau khi dọn để so trước/sau.</span></div>
+    <div style="border-top:1px solid var(--line, #e3e7ee); margin-top:14px; padding-top:12px">
+      <div class="line"><b>Sao lưu bảng nhỏ</b> <span class="hint" id="bkInfo">Đang đọc…</span></div>
+      <div class="hint">Gồm kênh/nguồn, danh sách chặn, lượt chọn, bài hot và cài đặt (không gồm bảng bài: bảng đó dùng nút CSV ở trên). Tự chạy 2 giờ sáng mỗi ngày và giữ 45 bản.</div>
+      <div class="line"><button class="ghost" id="bkRun" type="button">Sao lưu ngay</button> <button class="ghost" id="bkDl" type="button"><svg class="i"><use href="#i-dl"/></svg>Tải file sao lưu (JSON)</button></div>
+      <div class="line"><select id="bkFile" aria-label="Bản sao lưu"></select> <button class="ghost" id="bkPrev" type="button">Xem trước khôi phục</button> <button class="ghost" id="bkGo" type="button" disabled>Khôi phục (chỉ thêm dòng thiếu)</button></div>
+      <div class="line"><label class="chk">Hoặc dùng file đã tải về: <input type="file" id="bkUp" accept=".json,.gz"></label> <span class="hint" id="bkUpInfo"></span></div>
+      <details class="help"><summary>Ghi đè (nguy hiểm)</summary>
+        <div class="hint">Mặc định khôi phục chỉ <b>thêm</b> dòng còn thiếu, không xoá hay ghi đè gì nên không làm mất dữ liệu đang chạy. Ghi đè thay các dòng đang có bằng dòng trong file (dòng chỉ có ở kho hiện tại vẫn giữ). Cần R2, và kho tự sao lưu một bản "truoc-khoi-phuc" trước.</div>
+        <div class="line"><input id="bkConfirm" type="text" placeholder="Gõ KHOI PHUC để mở nút" style="width:190px" autocomplete="off"> <button class="danger" id="bkOver" type="button" disabled>Khôi phục và ghi đè…</button></div>
+      </details>
+      <pre id="bkOut">Chưa xem trước.</pre>
+    </div>
   </section>
 
   <section class="zone-danger">
@@ -1392,7 +1404,90 @@ $('dumpBtn').onclick = async () => {
   }catch(e){ out.className = 'hint err'; out.textContent = 'Lỗi: ' + e.message + (got ? ' (đã đọc ' + fmt(got) + ' bản, chưa lưu file)' : ''); }
   finally{ b.disabled = false; }
 };
-function loadAll(){ loadStats(); loadGrow(); loadChannels(); loadHot(); }
+/* ---------- Sao lưu / khôi phục bảng nhỏ ---------- */
+const BK_LABEL = { channels:'Kênh / nguồn', rejected:'Danh sách chặn', pick_log:'Lượt chọn', hot:'Danh sách hot', hot_songs:'Bài hot', meta:'Cài đặt' };
+let BKS = { src:null, preview:false, r2:false };
+const bkBody = extra => Object.assign(BKS.src ? { data:BKS.src } : { file:$('bkFile').value }, extra || {});
+const bkFmtAt = t => { if(!t) return '?'; const d = new Date(t), p = n => String(n).padStart(2, '0'); return p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()); };
+const bkName = f => { const m = /\/(auto|tay|truoc-khoi-phuc)-(\d{4})-(\d{2})-(\d{2})(?:-(\d{2})(\d{2}))?/.exec(f); if(!m) return f; return ({ auto:'Tự động', tay:'Bấm tay', 'truoc-khoi-phuc':'Trước khi khôi phục' })[m[1]] + ' · ' + m[4] + '/' + m[3] + '/' + m[2] + (m[5] ? ' ' + m[5] + ':' + m[6] : ''); };
+function bkReset(){ BKS.preview = false; $('bkGo').disabled = true; $('bkOver').disabled = true; }
+async function loadBackup(){
+  const info = $('bkInfo'), sel = $('bkFile'); sel.replaceChildren(); bkReset();
+  try{
+    const d = await api('/api/kho/backup/status');
+    BKS.r2 = !!d.r2;
+    info.className = 'hint ' + (d.r2 ? 'ok' : 'err');
+    info.textContent = d.r2 ? ('R2 đã bật · sao lưu gần nhất: ' + (d.last ? bkFmtAt(d.last) + ' (' + ago(d.last) + ')' : 'chưa có') + ' · ' + d.files.length + ' bản')
+                           : 'Chưa gắn R2: thêm biến BACKUP (R2 bucket) vào Worker kho để có sao lưu tự động. Vẫn tải file về được.';
+    d.files.forEach(f => { const o = el('option', null, bkName(f.file) + ' · ' + (f.size / 1024 < 1024 ? Math.round(f.size / 1024) + ' KB' : (f.size / 1048576).toFixed(1) + ' MB')); o.value = f.file; sel.append(o); });
+    if(!d.files.length){ const o = el('option', null, d.r2 ? 'Chưa có bản sao lưu' : 'Chưa gắn R2'); o.value = ''; sel.append(o); }
+    $('bkRun').disabled = !d.r2; $('bkPrev').disabled = false;
+  }catch(e){ if(e && e.switched) return; info.className = 'hint err'; info.textContent = 'Kho này chưa có tính năng sao lưu (cần dán kho-worker.js mới): ' + e.message; $('bkRun').disabled = true; $('bkPrev').disabled = true; }
+}
+function bkShowPlan(d){
+  const rows = (d.plan || []).map(x => (BK_LABEL[x.table] || x.table) + ': file ' + fmt(x.inFile) + ' · hiện có ' + fmt(x.now) + ' · thiếu ' + fmt(x.missing) + (x.note ? ' (' + x.note + ')' : ''));
+  return 'Bản sao lưu lúc ' + bkFmtAt(d.at) + '\n' + rows.join('\n');
+}
+$('bkRun').onclick = async () => {
+  const b = $('bkRun'), out = $('bkOut'); b.disabled = true; out.textContent = 'Đang sao lưu…';
+  try{
+    const d = await api('/api/kho/backup/run', {});
+    if(!d.ok) throw new Error(d.msg || 'Không sao lưu được');
+    out.textContent = 'Đã sao lưu: ' + Object.keys(d.rows).map(t => (BK_LABEL[t] || t) + ' ' + fmt(d.rows[t])).join(' · ') + ' (' + Math.round(d.bytes / 1024) + ' KB).';
+    await loadBackup();
+  }catch(e){ if(!e.switched) out.textContent = 'Lỗi: ' + e.message; }
+  finally{ b.disabled = !BKS.r2; }
+};
+$('bkDl').onclick = async () => {
+  const b = $('bkDl'), out = $('bkOut'); b.disabled = true;
+  try{
+    if(!cfg.kho || !cfg.pass) throw new Error('Chưa nhập địa chỉ Worker kho và mật khẩu');
+    const res = await fetch(cfg.kho + '/api/kho/backup/export', { headers:{ 'x-pass':cfg.pass } });
+    if(!res.ok){ let d = {}; try{ d = await res.json(); }catch(e){} throw new Error(d.error || 'Lỗi ' + res.status); }
+    const blob = await res.blob(), a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = 'kho-' + CUR + '-sao-luu-' + dmy(Date.now()) + '.json';
+    document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+    out.textContent = 'Đã tải file sao lưu về máy.';
+  }catch(e){ out.textContent = 'Lỗi: ' + e.message; }
+  finally{ b.disabled = false; }
+};
+$('bkUp').onchange = async ev => {
+  const f = ev.target.files && ev.target.files[0], info = $('bkUpInfo'); BKS.src = null; bkReset();
+  if(!f){ info.textContent = ''; return; }
+  try{
+    let text;
+    if(/\.gz$/i.test(f.name)) text = await new Response(f.stream().pipeThrough(new DecompressionStream('gzip'))).text(); else text = await f.text();
+    const d = JSON.parse(text);
+    if(!d || d.v !== 1 || !d.tables) throw new Error('không phải file sao lưu của kho');
+    BKS.src = d; info.className = 'hint ok'; info.textContent = f.name + ' · ' + bkFmtAt(d.at) + ' · kho ' + d.lang;
+  }catch(e){ info.className = 'hint err'; info.textContent = 'Không đọc được file: ' + e.message; ev.target.value = ''; }
+};
+$('bkFile').onchange = () => { BKS.src = null; $('bkUp').value = ''; $('bkUpInfo').textContent = ''; bkReset(); };
+$('bkPrev').onclick = async () => {
+  const b = $('bkPrev'), out = $('bkOut'); b.disabled = true; bkReset();
+  try{
+    if(!BKS.src && !$('bkFile').value) throw new Error('Chưa chọn bản sao lưu (hoặc file tải lên)');
+    out.textContent = 'Đang so với kho hiện tại…';
+    const d = await api('/api/kho/restore', bkBody());
+    const miss = d.plan.reduce((n, x) => n + x.missing, 0);
+    out.textContent = bkShowPlan(d) + '\n\n' + (miss ? 'Khôi phục sẽ thêm ' + fmt(miss) + ' dòng còn thiếu; không xoá, không ghi đè.' : 'Kho hiện tại đã có đủ mọi dòng của bản này. Không cần khôi phục.');
+    BKS.preview = true; $('bkGo').disabled = !miss; $('bkOver').disabled = $('bkConfirm').value.trim() !== 'KHOI PHUC';
+  }catch(e){ if(!e.switched) out.textContent = 'Lỗi: ' + e.message; }
+  finally{ b.disabled = false; }
+};
+$('bkConfirm').oninput = () => { $('bkOver').disabled = !(BKS.preview && $('bkConfirm').value.trim() === 'KHOI PHUC'); };
+async function bkDo(overwrite){
+  const out = $('bkOut'), g = $('bkGo'), o = $('bkOver'); g.disabled = o.disabled = true;
+  try{
+    out.textContent = 'Đang khôi phục… (có thể mất vài phút với danh sách chặn lớn, đừng đóng trang)';
+    const d = await api('/api/kho/restore', bkBody(overwrite ? { apply:true, overwrite:true, confirm:'KHOI PHUC' } : { apply:true }));
+    out.textContent = 'Đã khôi phục ' + (overwrite ? '(ghi đè)' : '(chỉ thêm dòng thiếu)') + ': ' + d.applied.map(x => (BK_LABEL[x.table] || x.table) + ' +' + fmt(x.added)).join(' · ') + (d.before ? '\nĐã tự lưu bản trước khi khôi phục: ' + bkName(d.before) : '');
+    BKS.preview = false; loadAll(); loadBackup();
+  }catch(e){ if(!e.switched) out.textContent = 'Lỗi: ' + e.message; g.disabled = false; }
+}
+$('bkGo').onclick = () => { if(confirm('Khôi phục: chỉ THÊM các dòng còn thiếu vào kho hiện tại, không xoá hay ghi đè gì. Tiếp tục?')) bkDo(false); };
+$('bkOver').onclick = () => { if(confirm('Ghi đè các dòng đang có bằng dòng trong bản sao lưu. Kho sẽ tự lưu một bản trước khi làm. Tiếp tục?')) bkDo(true); };
+function loadAll(){ loadStats(); loadGrow(); loadChannels(); loadHot(); loadBackup(); }
 fillCfg(); paintKho();     // địa chỉ Worker điền sẵn, chỉ cần nhập mật khẩu
 if(!(CUR === 'nghe' ? (K.passNghe || K.pass) : cfg.pass)) $('settings').style.display = '';
 showTab(HASH[location.hash.replace('#', '')] || lsGet('kho_tab') || 'home');
