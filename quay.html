@@ -3216,8 +3216,8 @@ function knTqVe(r){
   $('knBody').innerHTML = h;
 }
 /* Lý do TV đổi nguồn giữa bài (thư viện video lưu sẵn): 'r2-loi' → file R2 lỗi nên phát YouTube… */
-function knFb(fb){ var m = /^(nas|r2)-(\w+)$/.exec(fb || ''); if(!m) return 'đổi nguồn'; var ly = { loi:'lỗi', cham:'mở chậm', dung:'đứng hình lâu' }[m[2]] || m[2];
-  return m[1] === 'nas' ? 'NAS quán ' + ly + ' → chuyển R2' : 'file thư viện ' + ly + ' → chuyển YouTube'; }
+function knFb(fb){ var m = /^(nas|r2|hd)-(\w+)$/.exec(fb || ''); if(!m) return 'đổi nguồn'; var ly = { loi:'lỗi', cham:'mở chậm', dung:'đứng hình lâu' }[m[2]] || m[2];
+  return m[1] === 'nas' ? 'NAS quán ' + ly + ' → chuyển R2' : m[1] === 'hd' ? 'bản 1080p ' + ly + ' → chuyển bản 720p' : 'file thư viện ' + ly + ' → chuyển YouTube'; }
 function knQ(q){ return { tiny:'144p', small:'240p', medium:'360p', large:'480p', hd720:'720p', hd1080:'1080p', hd1440:'1440p', hd2160:'4K', highres:'>4K' }[q] || q || '?'; }
 function knPt(a, b){ return b ? Math.round(100*a/b)+'%' : '—'; }
 function knQTop(o){ var k = Object.keys(o||{}).sort(function(a,b){ return o[b]-o[a]; }); return k.length ? k.slice(0,2).map(function(x){ return knQ(x)+' ('+o[x]+')'; }).join(', ') : '—'; }

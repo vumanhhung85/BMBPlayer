@@ -667,6 +667,7 @@ function pqEnd(why, err){
   pqBEnd(c, now);
   pqFrames(c);
   if(c.st === null && !err && now - c.t0 < 4000) return;              // bấm qua bài trước khi kịp phát: không tính
+  if(c.hd && c.src !== 'yt' && (c.bn >= 3 || c.bms > 8000 || (c.tf >= 300 && c.df / c.tf > 0.05))) hdFail();   // bản 1080p phát được nhưng giật / rớt khung nhiều → máy hoặc mạng không gánh nổi
   const qk = Object.keys(c.q), q = qk.sort((a, b) => c.q[b] - c.q[a])[0] || '', qmx = qk.sort((a, b) => PQ_RANK.indexOf(b) - PQ_RANK.indexOf(a))[0] || '';
   const ltms = Math.round(LT.ms - c.ltMs), xau = c.bn > 0 || (c.st !== null && c.st > 6000 && !c.lock) || ltms > 3000 || !!err || !!c.fb
     || c.qd > 0 || c.fjj >= 3 || (c.tf >= 300 && c.df / c.tf > 0.03) || c.lag > 0;      // 11/2026: YouTube tự hạ độ nét, trang giật nhịp, file rớt >3% khung cũng là bài có vấn đề → báo luôn
@@ -746,7 +747,26 @@ function onReady(){
 const PS = { UNSTARTED:-1, ENDED:0, PLAYING:1, PAUSED:2, BUFFERING:3, CUED:5 };
 const LIB_ASK_MS = 2500, NAS_TRY_MS = 5000, R2_TRY_MS = 9000, STALL_MS = 12000;
 let LIB = { on:false, nas:'', t:'' }, src = 'yt', loadSeq = 0, nasBad = 0, nasOffUntil = 0;
-const libMemo = new Map();                        // mã bài → { at, r } (r = null: không có trong thư viện)
+const libMemo = new Map();                        // mã bài|mức (h = được bản 1080p, s = chỉ bản thường) → { at, r } (r = null: không có trong thư viện)
+/* 11/2026 — bản 1080p trong thư viện (thư mục 1080/ do Tải Video nâng cấp, bản 720p vẫn giữ ở vn/en):
+   chỉ TV KHÔNG bị giới hạn dưới 1080p mới xin (box RAM ≤ 2GB để "Tự động" = 720p, admin đặt "Tối đa 720p" = 720p, admin đặt "Tối đa 1080p" = được).
+   Thêm hai lớp giữ ổn định: mạng báo chậm (2G/3G, tiết kiệm dữ liệu, băng thông ước < 4 Mb/s) → tạm dùng bản thường;
+   bản 1080p đứng hình / mở chậm / giật 2 lần trong 30 phút → cả TV dùng bản thường 30 phút (hdOffUntil). NAS chưa có bản 1080p 3 bài liền → thôi thử NAS 1080p 30 phút. */
+const HD_DIR = '1080', HD_OFF_MS = 30 * 60000;
+let hdOffUntil = 0, hdFails = [], nasHdMiss = 0, nasHdOffUntil = 0, libStep = null;
+function libQ(){
+  if(Date.now() < hdOffUntil) return '720';
+  if(clCap && clCap < 1080) return String(clCap);
+  try{ const cn = navigator.connection; if(cn && (cn.saveData || /(^|-)[23]g$/.test(cn.effectiveType || '') || (cn.downlink > 0 && cn.downlink < 4))) return '720'; }catch(e){}
+  return clCap ? String(clCap) : 'max';
+}
+const libHdOn = () => { const q = libQ(); return q === 'max' || +q >= 1080; };
+const libMk = id => id + '|' + (libHdOn() ? 'h' : 's');
+function libMemoDel(id){ libMemo.delete(id + '|h'); libMemo.delete(id + '|s'); }
+function hdFail(){
+  const now = Date.now(); hdFails = hdFails.filter(t => now - t < HD_OFF_MS); hdFails.push(now);
+  if(hdFails.length >= 2){ hdOffUntil = now + HD_OFF_MS; hdFails = []; }
+}
 const P = () => (src === 'yt' && player) ? player : VP;
 const both = f => { if(ready && player){ try{ f(player); }catch(e){} } try{ f(VP); }catch(e){} };   // âm lượng / tắt tiếng: giữ hai trình phát giống nhau
 const VP = (() => {
@@ -756,7 +776,7 @@ const VP = (() => {
   const emit = s => { if(quiet || st === s) return; st = s; if(src !== 'yt') onStateChange({ data:s }); };
   function fail(why){ if(quiet) return; const f = onFail; clr(); onFail = null; if(f) f(why, v.currentTime || 0); }
   v.addEventListener('loadeddata', () => { clearTimeout(tFail); tFail = null; });
-  v.addEventListener('playing', () => { clearTimeout(tStall); tStall = null; if(src === 'nas') nasBad = 0; emit(PS.PLAYING); });
+  v.addEventListener('playing', () => { clearTimeout(tStall); tStall = null; if(src === 'nas'){ nasBad = 0; if(libStep && libStep.k === 'nas' && libStep.hd) nasHdMiss = 0; } emit(PS.PLAYING); });
   v.addEventListener('pause', () => { if(!v.ended && st === PS.PLAYING) emit(PS.PAUSED); });
   v.addEventListener('waiting', () => { if(quiet) return; emit(PS.BUFFERING); clearTimeout(tStall); tStall = setTimeout(() => { if(v.readyState < 3) fail('dung'); }, STALL_MS); });
   v.addEventListener('ended', () => { clr(); emit(PS.ENDED); });
@@ -851,19 +871,20 @@ const LIB_FAIL = {};
 function libFind(id){
   if(!LIB.on || !LIB.t || !bc.ws) return Promise.resolve(null);
   if(OFF.on && nasCfg()) return Promise.resolve(LIB_ERR);             // đang mất Internet: khỏi chờ Worker 2,5 giây mỗi bài
-  const m = libMemo.get(id);
+  const mk = libMk(id), q = libQ(), m = libMemo.get(mk);
   if(m && Date.now() - m.at < (m.r ? 20 : 5) * 60000) return Promise.resolve(m.r);
   let ctl = null; try{ ctl = new AbortController(); }catch(e){}
   const to = setTimeout(() => { try{ if(ctl) ctl.abort(); }catch(e){} }, LIB_ASK_MS);
-  return fetch(phongApi() + '/api/lib/src?id=' + encodeURIComponent(id) + '&t=' + encodeURIComponent(LIB.t), { cache:'no-store', signal: ctl ? ctl.signal : undefined })
+  return fetch(phongApi() + '/api/lib/src?id=' + encodeURIComponent(id) + '&q=' + q + '&t=' + encodeURIComponent(LIB.t), { cache:'no-store', signal: ctl ? ctl.signal : undefined })
     .then(r => r.json().catch(() => ({})).then(d => { if(r.status === 403){ LIB.on = false; libMemo.clear(); return null; } return r.ok ? d : LIB_FAIL; }))   // vé hết hạn/sai: dùng YouTube tới khi TV nhận vé mới
     .then(d => {
       clearTimeout(to);
       if(d === LIB_FAIL) return nasCfg() ? LIB_ERR : null;
       if(!d) return null;
       if(d.off){ LIB.on = false; libMemo.clear(); return null; }
-      const r = d.rel && d.url ? { rel:d.rel, url:d.url, nas:d.nas || '' } : null;
-      if(typeof d.rel === 'string') libMemo.set(id, { at:Date.now(), r });
+      const a = d.hd && d.alt && d.alt.rel && d.alt.url ? { rel:d.alt.rel, url:d.alt.url, nas:d.alt.nas || '' } : null;
+      const r = d.rel && d.url ? { rel:d.rel, url:d.url, nas:d.nas || '', hd: !!d.hd, alt: a } : null;
+      if(typeof d.rel === 'string') libMemo.set(mk, { at:Date.now(), r });
       return r;
     })
     .catch(() => { clearTimeout(to); return nasCfg() ? LIB_ERR : null; });
@@ -941,10 +962,12 @@ function offPlay(id, seq){
   const stale = () => seq !== loadSeq || cur < 0 || !queue[cur] || queue[cur].id !== id;
   const net = netUp(); net.then(up => { if(!up) offBegin(); });
   const giveUp = () => { net.then(up => { if(stale()) return; if(up){ lsBump('yt'); playYt(id, 0); } else offSkip(id); }); };
+  const dirs = (libHdOn() && Date.now() >= nasHdOffUntil ? [HD_DIR] : []).concat(NAS_DIRS);   // box mạnh: thử bản 1080p trên NAS trước; NAS không có thì trả lỗi ngay → thư mục kế
+  libStep = null;
   const tryDir = i => {
     if(stale()) return;
-    if(i >= NAS_DIRS.length){ giveUp(); return; }
-    const rel = (NAS_DIRS[i] === '.' ? '' : NAS_DIRS[i] + '/') + id + '.mp4';
+    if(i >= dirs.length){ giveUp(); return; }
+    const rel = (dirs[i] === '.' ? '' : dirs[i] + '/') + id + '.mp4';
     const okOnce = () => { VP.el.removeEventListener('playing', okOnce); if(!stale()) lsBump('nas'); };
     VP.el.addEventListener('playing', okOnce);
     playFile('nas', { rel, nas: LIB.nas + '/' + rel, url:'' }, 0, why => {
@@ -988,19 +1011,44 @@ function playFile(kind, r, t, onFail, failMs){
   if(PQ.c) PQ.c.src = kind;
   VP.setVolume(NATIVE ? 100 : vol);
   if(userMuted || lock === 'muted') VP.mute(); else VP.unMute();
-  VP.open(kind === 'nas' ? r.nas : r.url, t, failMs || (kind === 'nas' ? NAS_TRY_MS : R2_TRY_MS), onFail || ((why, at) => libFail(kind, r, id, why, at)));
+  VP.open(kind === 'nas' ? r.nas : r.url, t, failMs || (kind === 'nas' ? NAS_TRY_MS : R2_TRY_MS), onFail);
   clearTimeout(wd); wd = setTimeout(() => guard(id, 1), 3500);
 }
-/* File thư viện không mở được / lỗi / đứng hình lâu: NAS → R2 → YouTube, tiếp từ giây đang hát */
-function libFail(kind, r, id, why, at){
-  if(cur < 0 || !queue[cur] || queue[cur].id !== id || src !== kind) return;
-  if(kind === 'nas'){
-    lsBump('nasloi'); if(++nasBad >= 3){ nasOffUntil = Date.now() + 10 * 60000; nasBad = 0; }
-    if(Date.now() - NH.lastRun > 60000) nhSoon('loi', 1500);       // NAS vừa lỗi khi phát → kiểm tra & báo ngay để quầy thấy sớm
-    if(PQ.c) PQ.c.fb = 'nas-' + why;
-    playFile('r2', r, at); return;
+/* Thứ tự nguồn của một bài (mỗi bước lỗi / mở chậm / đứng hình lâu thì sang bước kế, tiếp từ giây đang hát):
+   bản 1080p (box mạnh):  NAS 1080p → NAS 720p → R2 1080p → R2 720p → YouTube
+   bản thường:            NAS → R2 → YouTube (như trước)
+   NAS lỗi thật (không tới được / chậm) → bỏ mọi bước NAS còn lại. NAS chỉ thiếu bản 1080p của bài → không tính là NAS lỗi. */
+function libSteps(r){
+  const s = [], alt = r.alt;
+  if(r.nas && nasUsable(r.nas)){
+    if(!r.hd || Date.now() >= nasHdOffUntil) s.push({ k:'nas', f:r, hd:!!r.hd });
+    if(r.hd && alt && alt.nas) s.push({ k:'nas', f:alt, hd:false });
   }
-  lsBump('loi'); libMemo.delete(id);
+  s.push({ k:'r2', f:r, hd:!!r.hd });
+  if(r.hd && alt) s.push({ k:'r2', f:alt, hd:false });
+  return s;
+}
+function libPlay(r){ const steps = libSteps(r), id = queue[cur].id; lsBump(steps[0].k); libGo(steps, id, 0); }
+function libGo(steps, id, at){
+  const st = steps[0]; libStep = st;
+  playFile(st.k, st.f, at, (why, t) => libNext(steps, id, why, t));
+  if(PQ.c) PQ.c.hd = st.hd;
+}
+function libNext(steps, id, why, at){
+  if(cur < 0 || !queue[cur] || queue[cur].id !== id) return;
+  const st = steps[0]; if(!st || src !== st.k) return;
+  steps.shift();
+  if(st.k === 'nas'){
+    if(st.hd && why === 'loi'){ if(++nasHdMiss >= 3){ nasHdOffUntil = Date.now() + HD_OFF_MS; nasHdMiss = 0; } }   // NAS chưa có bản 1080p của bài này
+    else {
+      lsBump('nasloi'); if(++nasBad >= 3){ nasOffUntil = Date.now() + 10 * 60000; nasBad = 0; }
+      if(Date.now() - NH.lastRun > 60000) nhSoon('loi', 1500);       // NAS vừa lỗi khi phát → kiểm tra & báo ngay để quầy thấy sớm
+      if(PQ.c) PQ.c.fb = 'nas-' + why;
+      for(let i = steps.length - 1; i >= 0; i--) if(steps[i].k === 'nas') steps.splice(i, 1);
+    }
+  } else if(st.hd){ hdFail(); if(PQ.c) PQ.c.fb = 'hd-' + why; }
+  if(steps.length){ libGo(steps, id, at); return; }
+  lsBump('loi'); libMemoDel(id); libStep = null;
   if(PQ.c) PQ.c.fb = 'r2-' + why;
   playYt(id, at);
 }
@@ -1117,9 +1165,8 @@ function load(){
   libFind(id).then(r => {
     if(seq !== loadSeq || cur < 0 || !queue[cur] || queue[cur].id !== id) return;   // đã sang bài khác trong lúc chờ
     if(r === LIB_ERR || (OFF.on && nasCfg())){ offPlay(id, seq); return; }          // quán có NAS và Worker không trả lời / đang mất mạng
-    if(!r){ lsBump('yt'); playYt(id, 0); }
-    else if(r.nas && nasUsable(r.nas)){ lsBump('nas'); playFile('nas', r, 0); }
-    else { lsBump('r2'); playFile('r2', r, 0); }
+    if(!r){ libStep = null; lsBump('yt'); playYt(id, 0); }
+    else libPlay(r);
     push();
   });
 }

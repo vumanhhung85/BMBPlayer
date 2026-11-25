@@ -1465,7 +1465,30 @@ async function libTv(env, cn) {
   const c = libCn(await libCfg(env), cn);
   return { on: c.on, nas: c.nas, t: await libTicket(env, cn) };
 }
-/* GET /api/lib/src?id=<mã YouTube>&t=<vé TV> → {rel, url (link R2 đã ký), nas (link NAS nếu chi nhánh có)} hoặc {rel:''} */
+/* GET /api/lib/src?id=<mã YouTube>&t=<vé TV>&q=<giới hạn độ nét của TV> → {rel, url (link R2 đã ký), nas (link NAS nếu chi nhánh có)} hoặc {rel:''}
+   11/2026 — bản 1080p (thư mục LIB_HD, mặc định "1080", do Tải Video nâng cấp; bản 720p ở vn/en vẫn giữ):
+   · q = 'max' hoặc ≥ 1080 (box mạnh, admin không giới hạn) → ưu tiên 1080/, kèm alt = bản 720p (nếu có) để TV lùi về khi bản 1080p mở chậm / đứng hình / NAS chưa có.
+   · q khác (box yếu RAM ≤ 2GB, admin "Tối đa 720p", mạng chậm) hoặc TV bản cũ không gửi q → KHÔNG đụng 1080/, y như trước.
+   Hỏi R2 các thư mục CÙNG LÚC (không nối đuôi) → thêm thư mục 1080 không làm TV chờ lâu hơn; kết quả có/không của từng thư mục nhớ trong Worker LIB_MEMO_MS
+   để nhiều TV / lần hỏi trước bài kế không hỏi R2 lặp lại. */
+const LIB_MEMO_MS = 10 * 60000, LIB_MEMO_MAX = 4000;
+const libMemoW = new Map();                                   // mã|thư mục → { at, size } (size 0 = không có)
+const libHd = env => { const d = String(env.LIB_HD == null ? '1080' : env.LIB_HD).trim().toLowerCase(); return /^[a-z0-9_-]{1,20}$/.test(d) ? d : ''; };
+const libHdOk = q => q === 'max' || (+q >= 1080);
+async function libHead(env, d, id) {
+  const rel = (d === '.' ? '' : d + '/') + id + '.mp4', k = d + '|' + id, now = Date.now(), m = libMemoW.get(k);
+  if (m && now - m.at < LIB_MEMO_MS) return { rel, size: m.size };
+  let size = 0;
+  try { const h = await env.LIB.head(libKey(env, rel)); size = h ? (h.size || 1) : 0; }
+  catch (e) { return { rel, size: 0, err: 1 }; }                    // R2 lỗi: không nhớ, lần sau hỏi lại
+  if (libMemoW.size >= LIB_MEMO_MAX) { for (const key of libMemoW.keys()) { libMemoW.delete(key); if (libMemoW.size < LIB_MEMO_MAX * 0.8) break; } }
+  libMemoW.set(k, { at: now, size });
+  return { rel, size };
+}
+async function libLink(env, u, rel, nas) {
+  const exp = Date.now() + LIB_URL_MS, sig = await hmac(env.SECRET, 'libf|' + rel + '|' + exp);
+  return { rel, url: u.origin + '/lib/' + rel + '?e=' + exp + '&s=' + sig, nas: nas ? nas + '/' + rel : '' };
+}
 async function libSrc(env, u) {
   const cn = await libTicketOk(env, u.searchParams.get('t'));
   if (!cn) return [403, { rel: '', error: 'ticket' }];
@@ -1476,13 +1499,16 @@ async function libSrc(env, u) {
   else if (!c.on) return [200, { rel: '', off: true }];
   const id = u.searchParams.get('id') || '';
   if (!/^[\w-]{11}$/.test(id)) return [400, { rel: '', error: 'id' }];
-  for (const d of nghe ? ['nghe'] : libDirs(env)) {
-    const rel = (d === '.' ? '' : d + '/') + id + '.mp4';
-    const h = await env.LIB.head(libKey(env, rel));
-    if (!h) continue;
-    const exp = Date.now() + LIB_URL_MS, sig = await hmac(env.SECRET, 'libf|' + rel + '|' + exp);
-    return [200, { rel, size: h.size, url: u.origin + '/lib/' + rel + '?e=' + exp + '&s=' + sig, nas: !nghe && c.nas ? c.nas + '/' + rel : '' }];
+  const hd = !nghe && libHdOk(u.searchParams.get('q')) ? libHd(env) : '';
+  const base = nghe ? ['nghe'] : libDirs(env).filter(d => d !== hd);
+  const nas = !nghe && c.nas ? c.nas : '';
+  const [h1, ...hs] = await Promise.all([hd ? libHead(env, hd, id) : null, ...base.map(d => libHead(env, d, id))]);
+  const b = hs.find(x => x.size) || null;                    // bản thường (720p): thư mục đầu tiên có file, theo thứ tự LIB_DIRS
+  if (h1 && h1.size) {
+    const r = await libLink(env, u, h1.rel, nas);
+    return [200, Object.assign(r, { size: h1.size, hd: 1, alt: b ? Object.assign(await libLink(env, u, b.rel, nas), { size: b.size }) : null })];
   }
+  if (b) return [200, Object.assign(await libLink(env, u, b.rel, nas), { size: b.size })];
   return [200, { rel: '' }];
 }
 /* GET|HEAD /lib/<thư mục>/<mã>.mp4?e=&s= — phát file R2, hỗ trợ tua (Range → 206) */
@@ -1537,7 +1563,7 @@ async function adminLibGet(env, body) {
   try { await libBang(env); dem = (await env.DB.prepare(`SELECT cn, src, SUM(n) n FROM lib_dem WHERE ngay >= ? GROUP BY cn, src`).bind(ngayKinhDoanh(Date.now() - 6 * 86400000)).all()).results || []; } catch (e) {}
   let nas = {};
   try { nas = await nasTomTat(env, cfg); } catch (e) { console.error('nasTomTat', e); }
-  return ok({ cfg: ra, dem, r2: !!env.LIB, dirs: libDirs(env), nas });
+  return ok({ cfg: ra, dem, r2: !!env.LIB, dirs: libDirs(env), hd: libHd(env), nas });
 }
 async function adminLibSet(env, body) {
   const [, loi] = await canPhien(env, body, 'admin');
